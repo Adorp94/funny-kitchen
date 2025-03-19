@@ -1,13 +1,20 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Navigation } from "@/components/layout/navigation";
 import { Toaster } from "react-hot-toast";
 import { CartProvider } from "@/contexts/cart-context";
 import { FloatingCart } from "@/components/cart/floating-cart";
+import { initializeApp } from "@/lib/app-init";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
+  // Initialize app resources on mount
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
   return (
     <CartProvider>
       <div className="flex h-screen">

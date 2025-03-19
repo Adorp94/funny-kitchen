@@ -481,36 +481,43 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 
                 {/* Dropdown for search results */}
                 {showDropdown && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-64 rounded-md overflow-auto">
-                    {loading ? (
-                      <div className="px-4 py-3 text-sm text-gray-500 flex items-center">
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        <span>Cargando clientes...</span>
-                      </div>
-                    ) : filteredClientes.length > 0 ? (
-                      <ul className="py-1 text-sm divide-y divide-gray-100">
-                        {filteredClientes.map((cliente) => (
-                          <li
-                            key={cliente.cliente_id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                            onClick={async () => {
-                              setSelectedCliente(cliente);
-                              setSearchTerm(cliente.nombre || '');
-                              setShowDropdown(false);
-                              await fetchCliente(cliente.cliente_id);
-                            }}
-                          >
-                            <div className="font-medium">{cliente.nombre || 'Cliente sin nombre'}</div>
-                            <div className="text-xs text-gray-500 flex flex-col">
-                              {cliente.celular && <span>Tel: {cliente.celular}</span>}
-                              {cliente.correo && <span>Email: {cliente.correo}</span>}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="px-4 py-2 text-sm text-gray-500">
-                        No se encontraron clientes
+                  <div className="absolute z-20 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200">
+                    <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-track-gray-100">
+                      {loading ? (
+                        <div className="p-4 flex items-center justify-center">
+                          <Loader2 className="h-5 w-5 text-teal-500 animate-spin mr-2" />
+                          <span className="text-sm text-gray-500">Cargando clientes...</span>
+                        </div>
+                      ) : filteredClientes.length > 0 ? (
+                        <ul className="py-1 text-sm divide-y divide-gray-100">
+                          {filteredClientes.map((cliente) => (
+                            <li
+                              key={cliente.cliente_id}
+                              className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                              onClick={async () => {
+                                setSelectedCliente(cliente);
+                                setSearchTerm(cliente.nombre || '');
+                                setShowDropdown(false);
+                                await fetchCliente(cliente.cliente_id);
+                              }}
+                            >
+                              <div className="font-medium text-gray-900">{cliente.nombre || 'Cliente sin nombre'}</div>
+                              <div className="text-xs text-gray-500 mt-1 flex flex-col">
+                                {cliente.celular && <span>Tel: {cliente.celular}</span>}
+                                {cliente.correo && <span>Email: {cliente.correo}</span>}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          No se encontraron clientes
+                        </div>
+                      )}
+                    </div>
+                    {filteredClientes.length > 10 && (
+                      <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-100 text-center bg-gray-50">
+                        {filteredClientes.length} clientes encontrados
                       </div>
                     )}
                   </div>
