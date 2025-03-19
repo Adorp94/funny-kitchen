@@ -9,16 +9,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input/input';
 
+// Match the database schema exactly
+interface Cliente {
+  cliente_id: number;
+  nombre: string;
+  celular: string;
+  correo: string | null;
+  razon_social: string | null;
+  rfc: string | null;
+  tipo_cliente: string | null;
+  lead: string | null;
+  direccion_envio: string | null;
+  recibe: string | null;
+  atencion: string | null;
+}
+
+// Form data interface with string cliente_id for form handling
+interface ClienteFormData {
+  cliente_id: string;
+  nombre: string;
+  celular: string;
+  correo: string;
+  razon_social: string;
+  rfc: string;
+  tipo_cliente: string;
+  lead: string;
+  direccion_envio: string;
+  recibe: string;
+  atencion: string;
+}
+
 interface ClienteFormProps {
   clienteId?: number;
-  onClienteChange?: (cliente: any) => void;
+  onClienteChange?: (cliente: Cliente | null) => void;
 }
 
 export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
-  const [clientes, setClientes] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('nuevo');
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ClienteFormData>({
     cliente_id: '',
     nombre: '',
     celular: '',
@@ -26,6 +56,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     razon_social: '',
     rfc: '',
     tipo_cliente: 'Normal',
+    lead: 'No',
     direccion_envio: '',
     recibe: '',
     atencion: ''
@@ -61,6 +92,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     try {
       const res = await fetch(`/api/clientes?id=${id}`);
       const data = await res.json();
+      
+      // Convert any null values to empty strings for the form
       setFormData({
         cliente_id: data.cliente_id.toString(),
         nombre: data.nombre || '',
@@ -69,6 +102,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         razon_social: data.razon_social || '',
         rfc: data.rfc || '',
         tipo_cliente: data.tipo_cliente || 'Normal',
+        lead: data.lead || 'No',
         direccion_envio: data.direccion_envio || '',
         recibe: data.recibe || '',
         atencion: data.atencion || ''
@@ -77,13 +111,44 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       setActiveTab('existente');
       
       if (onClienteChange) {
-        onClienteChange(data);
+        // Ensure cliente_id is a number
+        const cliente: Cliente = {
+          cliente_id: typeof data.cliente_id === 'string' ? parseInt(data.cliente_id) : data.cliente_id,
+          nombre: data.nombre,
+          celular: data.celular,
+          correo: data.correo,
+          razon_social: data.razon_social,
+          rfc: data.rfc,
+          tipo_cliente: data.tipo_cliente,
+          lead: data.lead,
+          direccion_envio: data.direccion_envio,
+          recibe: data.recibe,
+          atencion: data.atencion
+        };
+        onClienteChange(cliente);
       }
     } catch (error) {
       console.error('Error fetching cliente:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Convert form data to Cliente object for parent component
+  const formDataToCliente = (data: ClienteFormData): Cliente => {
+    return {
+      cliente_id: data.cliente_id ? parseInt(data.cliente_id) : 0,
+      nombre: data.nombre,
+      celular: data.celular,
+      correo: data.correo || null,
+      razon_social: data.razon_social || null,
+      rfc: data.rfc || null,
+      tipo_cliente: data.tipo_cliente || null,
+      lead: data.lead || null,
+      direccion_envio: data.direccion_envio || null,
+      recibe: data.recibe || null,
+      atencion: data.atencion || null
+    };
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -94,8 +159,9 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         [name]: value
       };
       
-      if (onClienteChange) {
-        onClienteChange(newData);
+      // Only notify parent if we're in nuevo tab or if we're editing the atencion field in existente tab
+      if (onClienteChange && (activeTab === 'nuevo' || (activeTab === 'existente' && name === 'atencion'))) {
+        onClienteChange(formDataToCliente(newData));
       }
       
       return newData;
@@ -109,8 +175,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         celular: value || ''
       };
       
-      if (onClienteChange) {
-        onClienteChange(newData);
+      if (onClienteChange && activeTab === 'nuevo') {
+        onClienteChange(formDataToCliente(newData));
       }
       
       return newData;
@@ -129,6 +195,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         razon_social: '',
         rfc: '',
         tipo_cliente: 'Normal',
+        lead: 'No',
         direccion_envio: '',
         recibe: '',
         atencion: ''
@@ -196,13 +263,17 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
               <FormLabel>Tipo de cliente</FormLabel>
               <Select 
                 value={formData.tipo_cliente} 
-                onValueChange={(value) => 
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    tipo_cliente: value,
-                    ...(onClienteChange && { onClienteChange: onClienteChange({ ...prev, tipo_cliente: value }) })
-                  }))
-                }
+                onValueChange={(value) => {
+                  setFormData(prev => {
+                    const newData = { ...prev, tipo_cliente: value };
+                    
+                    if (onClienteChange) {
+                      onClienteChange(formDataToCliente(newData));
+                    }
+                    
+                    return newData;
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Normal / Premium / Broker" />
@@ -281,7 +352,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         <TabsContent value="existente">
           <div className="space-y-6">
             <FormControl>
-              <FormLabel required>Cliente/Lead existente</FormLabel>
+              <FormLabel required>Cliente existente</FormLabel>
               <Select 
                 value={formData.cliente_id} 
                 onValueChange={handleClienteSelect}
@@ -289,7 +360,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el cliente" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {clientes.map((cliente) => (
                     <SelectItem 
                       key={cliente.cliente_id} 
@@ -304,6 +375,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
             
             {formData.cliente_id && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Basic Information */}
                 <FormControl>
                   <FormLabel>Nombre</FormLabel>
                   <Input
@@ -324,6 +396,68 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                   />
                 </FormControl>
                 
+                <FormControl>
+                  <FormLabel>Correo</FormLabel>
+                  <Input
+                    name="correo"
+                    value={formData.correo}
+                    readOnly
+                    icon={<Mail className="h-4 w-4" />}
+                  />
+                </FormControl>
+                
+                <FormControl>
+                  <FormLabel>Tipo de cliente</FormLabel>
+                  <Input
+                    name="tipo_cliente"
+                    value={formData.tipo_cliente}
+                    readOnly
+                  />
+                </FormControl>
+                
+                {/* Business Information */}
+                <FormControl className="col-span-1 md:col-span-2">
+                  <FormLabel>Razón Social</FormLabel>
+                  <Input
+                    name="razon_social"
+                    value={formData.razon_social}
+                    readOnly
+                    icon={<Building2 className="h-4 w-4" />}
+                  />
+                </FormControl>
+                
+                <FormControl className="col-span-1 md:col-span-2">
+                  <FormLabel>RFC</FormLabel>
+                  <Input
+                    name="rfc"
+                    value={formData.rfc}
+                    readOnly
+                    icon={<FileText className="h-4 w-4" />}
+                  />
+                </FormControl>
+                
+                {/* Shipping Information */}
+                <FormControl>
+                  <FormLabel>Dirección de envío</FormLabel>
+                  <Input
+                    name="direccion_envio"
+                    value={formData.direccion_envio}
+                    readOnly
+                    icon={<MapPin className="h-4 w-4" />}
+                  />
+                </FormControl>
+                
+                <FormControl>
+                  <FormLabel>¿Quién recibe?</FormLabel>
+                  <Input
+                    name="recibe"
+                    value={formData.recibe}
+                    readOnly
+                    icon={<User className="h-4 w-4" />}
+                  />
+                </FormControl>
+                
+                {/* Only editable field */}
                 <FormControl>
                   <FormLabel>Atención</FormLabel>
                   <Input

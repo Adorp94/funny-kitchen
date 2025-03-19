@@ -12,17 +12,19 @@ import { Resumen } from "@/components/cotizacion/resumen";
 import { CartTable } from "@/components/cart/cart-table";
 import { supabase } from "@/lib/supabase/client";
 
+// Match the interface with ClienteForm component
 interface Cliente {
-  id?: number;
+  cliente_id: number;
   nombre: string;
   celular: string;
-  correo?: string;
-  razon_social?: string;
-  rfc?: string;
-  tipo_cliente?: string;
-  direccion_envio?: string;
-  recibe?: string;
-  atencion?: string;
+  correo: string | null;
+  razon_social: string | null;
+  rfc: string | null;
+  tipo_cliente: string | null;
+  lead: string | null;
+  direccion_envio: string | null;
+  recibe: string | null;
+  atencion: string | null;
 }
 
 export default function NuevaCotizacionPage() {
@@ -76,11 +78,25 @@ export default function NuevaCotizacionPage() {
   };
   
   // Handle client selection or creation
-  const handleClienteSubmit = (data: Cliente, isNew: boolean) => {
-    setCliente(data);
-    setIsNewClient(isNew);
-    if (!isNew) {
-      setExistingClienteId(data.id || null);
+  const handleClienteSubmit = (clienteData: Cliente | null, isNew: boolean = true) => {
+    if (!clienteData) {
+      setCliente(null);
+      setExistingClienteId(null);
+      return;
+    }
+    
+    // Simply set the cliente as is, since it now matches our interface
+    setCliente(clienteData);
+    
+    // Determine if this is a new client or existing one based on the cliente_id
+    // If cliente_id is 0, it means it's a new client from the form
+    const isNewClient = clienteData.cliente_id === 0;
+    setIsNewClient(isNewClient);
+    
+    if (!isNewClient) {
+      setExistingClienteId(clienteData.cliente_id);
+    } else {
+      setExistingClienteId(null);
     }
   };
 
@@ -115,6 +131,7 @@ export default function NuevaCotizacionPage() {
           razon_social: cliente.razon_social,
           rfc: cliente.rfc,
           tipo_cliente: cliente.tipo_cliente,
+          lead: cliente.lead,
           direccion_envio: cliente.direccion_envio,
           recibe: cliente.recibe,
           atencion: cliente.atencion
@@ -174,7 +191,9 @@ export default function NuevaCotizacionPage() {
         <div className="lg:col-span-5 space-y-6">
           <div>
             <h2 className="text-lg font-medium mb-4">Cliente</h2>
-            <ClienteForm onClienteChange={data => handleClienteSubmit(data, true)} />
+            <ClienteForm 
+              onClienteChange={(data) => handleClienteSubmit(data)} 
+            />
           </div>
         
           <div className="pt-6 border-t border-gray-100">
