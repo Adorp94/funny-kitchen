@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { Mail, Phone, Building2, FileText, MapPin, User } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Mail, Phone, Building2, FileText, MapPin, User, Loader2, Search, X } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input/input';
+import { supabase } from "@/lib/supabase/client";
+import { toast } from "react-hot-toast";
 
 // Match the database schema exactly
 interface Cliente {
@@ -55,12 +57,18 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     correo: '',
     razon_social: '',
     rfc: '',
-    tipo_cliente: 'Normal',
-    lead: 'No',
+    tipo_cliente: '',
+    lead: '',
     direccion_envio: '',
     recibe: '',
     atencion: ''
   });
+  
+  // New state for searchable client dropdown
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeTab === 'existente') {
@@ -73,15 +81,40 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       fetchCliente(clienteId);
     }
   }, [clienteId]);
+  
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const fetchClientes = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/clientes');
-      const data = await res.json();
-      setClientes(data);
+      // Use Supabase client directly instead of API route
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('nombre');
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Fetched clients from Supabase:', data);
+      setClientes(data || []);
     } catch (error) {
       console.error('Error fetching clientes:', error);
+      toast.error('Error al cargar los clientes');
+      setClientes([]);
     } finally {
       setLoading(false);
     }
@@ -90,8 +123,18 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const fetchCliente = async (id: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/clientes?id=${id}`);
-      const data = await res.json();
+      // Use Supabase client directly instead of API route
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('cliente_id', id)
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log('Fetched client details:', data);
       
       // Convert any null values to empty strings for the form
       setFormData({
@@ -108,6 +151,9 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         atencion: data.atencion || ''
       });
       
+      // Update the search term with the client's name
+      setSearchTerm(data.nombre || '');
+      setSelectedCliente(data);
       setActiveTab('existente');
       
       if (onClienteChange) {
@@ -129,6 +175,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       }
     } catch (error) {
       console.error('Error fetching cliente:', error);
+      toast.error('Error al cargar el cliente');
     } finally {
       setLoading(false);
     }
@@ -204,6 +251,45 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       if (onClienteChange) {
         onClienteChange(null);
       }
+    }
+  };
+
+  // Filter clients based on search term
+  const filteredClientes = clientes.filter(cliente => {
+    if (!searchTerm || searchTerm.trim() === '') return true;
+    
+    try {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        (typeof cliente.nombre === 'string' && cliente.nombre.toLowerCase().includes(searchLower)) || 
+        (typeof cliente.celular === 'string' && cliente.celular.includes(searchTerm)) ||
+        (typeof cliente.correo === 'string' && cliente.correo.toLowerCase().includes(searchLower))
+      );
+    } catch (error) {
+      console.error('Error filtering cliente:', error);
+      return false;
+    }
+  });
+  
+  const resetSelection = () => {
+    setSelectedCliente(null);
+    setSearchTerm("");
+    setFormData({
+      cliente_id: '',
+      nombre: '',
+      celular: '',
+      correo: '',
+      razon_social: '',
+      rfc: '',
+      tipo_cliente: 'Normal',
+      lead: 'No',
+      direccion_envio: '',
+      recibe: '',
+      atencion: ''
+    });
+    
+    if (onClienteChange) {
+      onClienteChange(null);
     }
   };
 
@@ -353,24 +439,83 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
           <div className="space-y-6">
             <FormControl>
               <FormLabel required>Cliente existente</FormLabel>
-              <Select 
-                value={formData.cliente_id} 
-                onValueChange={handleClienteSelect}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona el cliente" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {clientes.map((cliente) => (
-                    <SelectItem 
-                      key={cliente.cliente_id} 
-                      value={cliente.cliente_id.toString()}
+              <div className="relative" ref={dropdownRef}>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <Input
+                    placeholder="Buscar por nombre o teléfono"
+                    className="pl-10 pr-10"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      const value = e.target.value || '';
+                      setSearchTerm(value);
+                      setShowDropdown(true);
+                      if (selectedCliente && value !== selectedCliente.nombre) {
+                        setSelectedCliente(null);
+                        setFormData(prev => ({ ...prev, cliente_id: '' }));
+                        
+                        if (onClienteChange) {
+                          onClienteChange(null);
+                        }
+                      }
+                    }}
+                    onFocus={() => setShowDropdown(true)}
+                    disabled={loading}
+                  />
+                  {loading && (
+                    <div className="absolute inset-y-0 right-0 pr-10 flex items-center">
+                      <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />
+                    </div>
+                  )}
+                  {searchTerm && (
+                    <button
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={resetSelection}
                     >
-                      {cliente.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Dropdown for search results */}
+                {showDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-64 rounded-md overflow-auto">
+                    {loading ? (
+                      <div className="px-4 py-3 text-sm text-gray-500 flex items-center">
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <span>Cargando clientes...</span>
+                      </div>
+                    ) : filteredClientes.length > 0 ? (
+                      <ul className="py-1 text-sm divide-y divide-gray-100">
+                        {filteredClientes.map((cliente) => (
+                          <li
+                            key={cliente.cliente_id}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={async () => {
+                              setSelectedCliente(cliente);
+                              setSearchTerm(cliente.nombre || '');
+                              setShowDropdown(false);
+                              await fetchCliente(cliente.cliente_id);
+                            }}
+                          >
+                            <div className="font-medium">{cliente.nombre || 'Cliente sin nombre'}</div>
+                            <div className="text-xs text-gray-500 flex flex-col">
+                              {cliente.celular && <span>Tel: {cliente.celular}</span>}
+                              {cliente.correo && <span>Email: {cliente.correo}</span>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="px-4 py-2 text-sm text-gray-500">
+                        No se encontraron clientes
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </FormControl>
             
             {formData.cliente_id && (
@@ -468,6 +613,17 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                     icon={<User className="h-4 w-4" />}
                   />
                 </FormControl>
+              </div>
+            )}
+            {!formData.cliente_id && searchTerm && filteredClientes.length === 0 && (
+              <div className="p-6 text-center">
+                <p className="text-gray-500">No se encontraron resultados para "{searchTerm}"</p>
+                <p className="text-gray-500 mt-2">Prueba con otro término de búsqueda o crea un nuevo cliente.</p>
+              </div>
+            )}
+            {!formData.cliente_id && !searchTerm && (
+              <div className="p-6 text-center">
+                <p className="text-gray-500">Busca un cliente existente usando el campo de búsqueda.</p>
               </div>
             )}
           </div>
