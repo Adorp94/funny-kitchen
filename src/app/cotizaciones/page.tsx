@@ -141,12 +141,13 @@ export default function CotizacionesPage() {
     <main className="container mx-auto py-6 px-4 lg:px-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Cotizaciones</h1>
-        <Button asChild>
-          <Link href="/nueva-cotizacion">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva cotización
-          </Link>
-        </Button>
+        <Link 
+          href="/nueva-cotizacion"
+          className="inline-flex items-center justify-center rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva cotización
+        </Link>
       </div>
       
       <div className="bg-white rounded-lg border shadow-sm p-6">

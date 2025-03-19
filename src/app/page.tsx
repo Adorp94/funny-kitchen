@@ -55,16 +55,19 @@ export default function Home() {
     <main className="flex-1 p-6 overflow-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Button asChild>
-          <Link href="/nueva-cotizacion">Nueva cotización</Link>
-        </Button>
+        <Link 
+          href="/nueva-cotizacion"
+          className="inline-flex items-center justify-center rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
+        >
+          Nueva cotización
+        </Link>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Cotizaciones</CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            <ClipboardList className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -72,7 +75,7 @@ export default function Home() {
             ) : (
               <div className="text-2xl font-bold">{data.totalCotizaciones}</div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {data.pendientesCotizaciones} pendientes, {data.aceptadasCotizaciones} aceptadas
             </p>
           </CardContent>
@@ -131,24 +134,27 @@ export default function Home() {
       <div className="mt-8">
         <h2 className="text-xl font-semibold mb-4">Acciones rápidas</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <Button asChild variant="outline" className="h-24 flex flex-col items-center justify-center">
-            <Link href="/nueva-cotizacion">
-              <ClipboardList className="h-6 w-6 mb-2" />
-              <span>Nueva cotización</span>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-24 flex flex-col items-center justify-center">
-            <Link href="/clientes">
-              <Users className="h-6 w-6 mb-2" />
-              <span>Ver clientes</span>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-24 flex flex-col items-center justify-center">
-            <Link href="/productos">
-              <ChefHat className="h-6 w-6 mb-2" />
-              <span>Administrar productos</span>
-            </Link>
-          </Button>
+          <Link 
+            href="/nueva-cotizacion"
+            className="inline-flex items-center justify-center h-24 flex-col rounded-md font-medium border border-input bg-white hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <ClipboardList className="h-6 w-6 mb-2" />
+            <span>Nueva cotización</span>
+          </Link>
+          <Link 
+            href="/clientes"
+            className="inline-flex items-center justify-center h-24 flex-col rounded-md font-medium border border-input bg-white hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <Users className="h-6 w-6 mb-2" />
+            <span>Ver clientes</span>
+          </Link>
+          <Link 
+            href="/productos"
+            className="inline-flex items-center justify-center h-24 flex-col rounded-md font-medium border border-input bg-white hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <ChefHat className="h-6 w-6 mb-2" />
+            <span>Administrar productos</span>
+          </Link>
         </div>
       </div>
     </main>

@@ -7,20 +7,13 @@ module.exports = {
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   safelist: [
-    {
-      pattern: /^(bg|text|border|ring)-(white|black|gray|red|yellow|green|blue|primary|indigo|purple|pink)(-\d+)?$/,
-      variants: ['hover', 'focus', 'active'],
-    },
-    {
-      pattern: /^(rounded|p|m|gap|space|grid|flex|items|justify|border)(-\w+)*$/,
-    },
-    {
-      pattern: /^(w|h)-(full|\d+\/\d+|\d+)$/,
-    },
-    'flex-1', 'flex-col', 'md:col-span-2', 'lg:grid-cols-3', 'md:grid-cols-2', 'md:grid-cols-3',
-    'animate-pulse', 'overflow-auto', 'text-muted-foreground',
-    'text-xs', 'text-sm', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl', 'font-bold', 'font-medium', 'font-semibold',
-    'mb-2', 'mb-4', 'mb-6', 'mt-1', 'mt-2', 'mt-8'
+    'bg-white', 'bg-gray-50', 'bg-gray-100', 'bg-gray-200', 'bg-gray-300',
+    'text-white', 'text-gray-500', 'text-gray-700', 'text-gray-400',
+    'border-gray-200', 'border-gray-300', 'border-gray-100',
+    'bg-primary', 'text-primary', 'border-primary',
+    'hover:bg-primary-600', 'hover:text-primary',
+    'bg-blue-50', 'bg-green-50', 'text-blue-700', 'text-green-700',
+    'border-blue-200', 'border-green-200'
   ],
   theme: {
     extend: {
@@ -39,30 +32,18 @@ module.exports = {
           900: '#134e4a',
           950: '#042f2e',
         },
-        border: 'hsl(214.3, 31.8%, 91.4%)',
-        input: 'hsl(214.3, 31.8%, 91.4%)',
-        ring: 'hsl(164, 88%, 36%)',
-        background: 'hsl(0, 0%, 100%)',
-        foreground: 'hsl(222.2, 84%, 4.9%)',
+        ring: '#14b8a6',
         muted: {
-          DEFAULT: 'hsl(210, 40%, 96.1%)',
-          foreground: 'hsl(215.4, 16.3%, 46.9%)',
+          DEFAULT: '#f1f5f9',
+          foreground: '#64748b',
         },
         accent: {
-          DEFAULT: 'hsl(210, 40%, 96.1%)',
-          foreground: 'hsl(222.2, 47.4%, 11.2%)',
-        },
-        card: {
-          DEFAULT: 'hsl(0, 0%, 100%)',
-          foreground: 'hsl(222.2, 84%, 4.9%)',
-        },
-        popover: {
-          DEFAULT: 'hsl(0, 0%, 100%)',
-          foreground: 'hsl(222.2, 84%, 4.9%)',
+          DEFAULT: '#f1f5f9',
+          foreground: '#1e293b',
         },
         destructive: {
-          DEFAULT: 'hsl(0, 84.2%, 60.2%)',
-          foreground: 'hsl(210, 40%, 98%)',
+          DEFAULT: '#ef4444',
+          foreground: '#f8fafc',
         },
       },
       borderRadius: {

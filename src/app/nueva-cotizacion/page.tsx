@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProductoExistenteForm } from "@/components/cotizacion/producto-existente-form";
+import { useCart } from "@/contexts/cart-context";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
-import ProductoForm, { NewProductData } from "@/components/cotizacion/producto-form";
-import { ProductosTable } from "@/components/cotizacion/productos-table";
 import { Resumen } from "@/components/cotizacion/resumen";
-import { generateProductId } from "@/lib/utils";
+import { CartTable } from "@/components/cart/cart-table";
+import { supabase } from "@/lib/supabase/client";
 
 interface Cliente {
   id?: number;
@@ -23,43 +25,29 @@ interface Cliente {
   atencion?: string;
 }
 
-interface Product {
-  prodsxc_id: number;
-  item: number;
-  producto_id: number;
-  nombre: string | null;
-  producto: string | null;
-  colores: string;
-  cantidad: number;
-  precio_final: number;
-  descuento: number;
-  capacidad?: number;
-  unidad?: string;
-  descripcion?: string;
-  acabado?: string;
-}
-
 export default function NuevaCotizacionPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState("existente");
+  const { 
+    cartItems, 
+    clearCart, 
+    currency, 
+    setCurrency, 
+    exchangeRate, 
+    setExchangeRate 
+  } = useCart();
   
   // State for cliente
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [existingClienteId, setExistingClienteId] = useState<number | null>(null);
   const [isNewClient, setIsNewClient] = useState(true);
   
-  // State for productos
-  const [products, setProducts] = useState<Product[]>([]);
-  const [nextProductId, setNextProductId] = useState(1);
-  const [nextItemId, setNextItemId] = useState(1);
-  
   // State for cotización settings
   const [descuento, setDescuento] = useState(0);
-  const [currency, setCurrency] = useState<"MXN" | "USD">("MXN");
   const [hasIva, setHasIva] = useState(true);
   const [hasShipping, setHasShipping] = useState(false);
   const [shippingAmount, setShippingAmount] = useState<number>(100);
   const [estimatedTime, setEstimatedTime] = useState(6);
-  const [exchangeRate, setExchangeRate] = useState(20);
   
   // Fetch exchange rate on component mount
   useEffect(() => {
@@ -82,8 +70,8 @@ export default function NuevaCotizacionPage() {
   
   // Calculate subtotal
   const calcSubtotal = () => {
-    return products.reduce((total, product) => {
-      return total + (product.cantidad * (product.precio_final - (product.precio_final * product.descuento)));
+    return cartItems.reduce((total, item) => {
+      return total + item.subtotal;
     }, 0);
   };
   
@@ -95,41 +83,10 @@ export default function NuevaCotizacionPage() {
       setExistingClienteId(data.id || null);
     }
   };
-  
-  // Handle adding a new product
-  const handleAddNewProduct = async (data: NewProductData) => {
-    const newProduct: Product = {
-      prodsxc_id: nextProductId,
-      item: nextItemId,
-      producto_id: 0, // This will be filled when saved to database
-      nombre: data.nombre,
-      producto: null,
-      colores: data.colores.join(', '),
-      capacidad: data.capacidad,
-      unidad: data.unidad,
-      cantidad: data.cantidad,
-      precio_final: data.precio,
-      descuento: 0,
-      descripcion: data.descripcion
-    };
-    
-    setProducts([...products, newProduct]);
-    setNextProductId(nextProductId + 1);
-    setNextItemId(nextItemId + 1);
-  };
-  
-  // Handle removing a product
-  const handleRemoveProduct = (id: number) => {
-    setProducts(products.filter(product => product.prodsxc_id !== id));
-  };
-  
-  // Handle product discount change
-  const handleProductDiscountChange = (id: number, discount: number) => {
-    setProducts(products.map(product => 
-      product.prodsxc_id === id 
-        ? { ...product, descuento: discount } 
-        : product
-    ));
+
+  // Handle currency change
+  const handleCurrencyChange = (newCurrency: "MXN" | "USD") => {
+    setCurrency(newCurrency);
   };
   
   // Handle form submission
@@ -139,7 +96,7 @@ export default function NuevaCotizacionPage() {
       return;
     }
     
-    if (products.length === 0) {
+    if (cartItems.length === 0) {
       toast.error("Por favor, agrega al menos un producto");
       return;
     }
@@ -172,33 +129,34 @@ export default function NuevaCotizacionPage() {
         precio_total: subtotal * (1 - descuento) * iva + envio,
         tiempo_estimado: estimatedTime,
         envio: envio,
-        productos: products.map(product => ({
-          producto_id: product.producto_id,
-          colores: product.colores,
-          descuento: product.descuento,
-          cantidad: product.cantidad,
-          precio_final: product.precio_final,
-          acabado: product.acabado,
-          descripcion: product.descripcion
+        productos: cartItems.map(item => ({
+          producto_id: isNaN(parseInt(item.id)) ? 0 : parseInt(item.id),
+          colores: item.colores,
+          descuento: item.descuento / 100, // Convert from percentage
+          cantidad: item.cantidad,
+          precio_final: item.precio,
+          descripcion: item.nombre
         }))
       };
       
-      const response = await fetch("/api/cotizaciones", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cotizacionData),
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success("Cotización generada con éxito");
-        router.push(`/cotizaciones/${result.cotizacion_id}`);
-      } else {
-        throw new Error(result.error || "Error al generar la cotización");
-      }
+      toast.promise(
+        fetch("/api/cotizaciones", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(cotizacionData),
+        }).then(res => res.json()),
+        {
+          loading: 'Generando cotización...',
+          success: (data) => {
+            clearCart();
+            router.push(`/cotizaciones/${data.cotizacion_id}`);
+            return 'Cotización generada con éxito';
+          },
+          error: 'Error al generar la cotización'
+        }
+      );
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error al generar la cotización");
@@ -206,63 +164,73 @@ export default function NuevaCotizacionPage() {
   };
   
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6">Nueva Cotización</h1>
+    <div className="container mx-auto py-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Nueva Cotización</h1>
+      </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <ClienteForm onClienteChange={data => handleClienteSubmit(data, true)} />
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">Productos</h2>
-            
-            <Tabs defaultValue="agregar" className="w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-white rounded-lg p-6 shadow-sm">
+        {/* Left Column - Client & Product Form */}
+        <div className="lg:col-span-5 space-y-6">
+          <div>
+            <h2 className="text-lg font-medium mb-4">Cliente</h2>
+            <ClienteForm onClienteChange={data => handleClienteSubmit(data, true)} />
+          </div>
+        
+          <div className="pt-6 border-t border-gray-100">
+            <h2 className="text-lg font-medium mb-4">Agregar Productos</h2>
+            <Tabs defaultValue="existente" onValueChange={setActiveTab}>
               <TabsList className="mb-4">
-                <TabsTrigger value="agregar" className="flex-1">Agregar Producto</TabsTrigger>
-                <TabsTrigger value="lista" className="flex-1">Lista de Productos</TabsTrigger>
+                <TabsTrigger value="existente">Existente</TabsTrigger>
+                <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="agregar">
-                <ProductoForm 
-                  onSubmit={handleAddNewProduct} 
-                  onCancel={() => {}} 
-                />
+              <TabsContent value="existente">
+                <ProductoExistenteForm />
               </TabsContent>
               
-              <TabsContent value="lista">
-                {products.length > 0 ? (
-                  <ProductosTable 
-                    products={products} 
-                    onDelete={handleRemoveProduct} 
-                    onDescuentoChange={handleProductDiscountChange} 
-                    currency={currency}
-                    exchangeRate={exchangeRate}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No hay productos agregados
-                  </div>
-                )}
+              <TabsContent value="nuevo">
+                <div className="text-center py-8 text-gray-500">
+                  <p>Este formulario para agregar productos nuevos está en desarrollo.</p>
+                  <Button className="mt-4 bg-teal-500 hover:bg-teal-600 text-white" onClick={() => setActiveTab("existente")}>
+                    Usar Productos Existentes
+                  </Button>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
         </div>
         
-        <div className="lg:col-span-1">
-          <Resumen 
-            subtotal={calcSubtotal()}
-            onDescuentoChange={setDescuento}
-            onCurrencyChange={setCurrency}
-            onIvaChange={setHasIva}
-            onShippingChange={(hasShipping, amount) => {
-              setHasShipping(hasShipping);
-              if (amount !== undefined) setShippingAmount(amount);
-            }}
-            onEstimatedTimeChange={setEstimatedTime}
-            onGenerateCotizacion={handleGenerateCotizacion}
-            exchangeRate={exchangeRate}
-            isFormValid={!!cliente && products.length > 0}
-          />
+        {/* Right Column - Cart & Summary */}
+        <div className="lg:col-span-7 space-y-6 pl-0 lg:pl-6 pt-6 lg:pt-0 mt-6 lg:mt-0 border-t lg:border-t-0 lg:border-l border-gray-100">
+          <div>
+            <h2 className="text-lg font-medium mb-4">Productos Agregados</h2>
+            {cartItems.length > 0 ? (
+              <CartTable />
+            ) : (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                <p>No hay productos en la cotización</p>
+              </div>
+            )}
+          </div>
+          
+          <div className="pt-6 border-t border-gray-100">
+            <h2 className="text-lg font-medium mb-4">Resumen</h2>
+            <Resumen 
+              subtotal={calcSubtotal()}
+              onDescuentoChange={setDescuento}
+              onCurrencyChange={handleCurrencyChange}
+              onIvaChange={setHasIva}
+              onShippingChange={(hasShipping, amount) => {
+                setHasShipping(hasShipping);
+                if (amount !== undefined) setShippingAmount(amount);
+              }}
+              onEstimatedTimeChange={setEstimatedTime}
+              onGenerateCotizacion={handleGenerateCotizacion}
+              exchangeRate={exchangeRate}
+              isFormValid={!!cliente && cartItems.length > 0}
+            />
+          </div>
         </div>
       </div>
     </div>
