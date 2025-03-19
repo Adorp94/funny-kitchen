@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
 import path from 'path';
-import { supabase } from '../supabase/client';
+import fs from 'fs';
+import { supabaseAdmin } from '../supabase/client';
 
 // Interface for PDF data
 export interface PDFQuoteData {
@@ -55,16 +55,18 @@ export async function generateQuotePDF(data: PDFQuoteData): Promise<Buffer> {
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       
-      // Header with logo - try SVG first, then PNG as fallback
-      const logoSvgPath = path.join(process.cwd(), 'public/assets/logo.svg');
-      const logoPngPath = path.join(process.cwd(), 'public/assets/logo.png');
-      
-      if (fs.existsSync(logoSvgPath)) {
-        doc.image(logoSvgPath, 50, 50, { width: 150 });
-      } else if (fs.existsSync(logoPngPath)) {
-        doc.image(logoPngPath, 50, 50, { width: 150 });
-      } else {
-        // Fallback if no logo is found
+      // Header with logo
+      try {
+        const logoPath = path.join(process.cwd(), 'public/assets/logo.png');
+        if (fs.existsSync(logoPath)) {
+          doc.image(logoPath, 50, 50, { width: 150 });
+        } else {
+          // Fallback if logo is not found
+          doc.fontSize(16).font('Helvetica-Bold');
+          doc.text('FUNNY KITCHEN', 50, 50);
+        }
+      } catch (error) {
+        console.error('Error loading logo:', error);
         doc.fontSize(16).font('Helvetica-Bold');
         doc.text('FUNNY KITCHEN', 50, 50);
       }
@@ -129,53 +131,69 @@ export async function generateQuotePDF(data: PDFQuoteData): Promise<Buffer> {
       // Table rows
       doc.fillColor('black');
       let yPos = tableTop + 20;
+      let pageHeight = 750; // A4 page height (lowered a bit to account for margins)
       
-      productList.forEach((product, idx) => {
-        // Alternate row colors
-        if (idx % 2 === 0) {
-          doc.fillColor('#f8f8f8');
+      // Calculate the space needed for summary at the bottom
+      const summaryHeight = 100; // estimated height needed for summary
+      const footerHeight = 30; // estimated height for footer
+      const maxRowsHeight = pageHeight - summaryHeight - footerHeight - yPos;
+      
+      productList.forEach((product, index) => {
+        // Check if we need a new page
+        if (yPos + 20 > maxRowsHeight) {
+          doc.addPage();
+          yPos = 50; // Reset Y position on the new page
+          
+          // Redraw headers on new page
+          doc.fillColor('#668ca0');
           doc.rect(50, yPos, 500, 20).fill();
+          doc.fillColor('white');
+          
+          let headerX = 50;
+          tableHeaders.forEach((header, i) => {
+            doc.text(header, headerX + 5, yPos + 5, { width: colWidths[i], align: 'center' });
+            headerX += colWidths[i];
+          });
+          
+          yPos += 20;
+          doc.fillColor('black');
         }
         
-        doc.fillColor('black').fontSize(10).font('Helvetica');
+        // Alternate row colors
+        if (index % 2 === 0) {
+          doc.fillColor('#f0f0f0');
+          doc.rect(50, yPos, 500, 20).fill();
+          doc.fillColor('black');
+        }
         
-        // Format product data
-        const description = product.descripcion;
-        const unitPrice = product.pu;
-        const quantity = product.cantidad;
-        const totalPrice = product.precio;
+        // Product description
+        doc.fontSize(9).font('Helvetica');
+        doc.text(product.descripcion, 55, yPos + 5, { width: colWidths[0] - 10 });
         
-        xPos = 50;
-        doc.text(description, xPos + 5, yPos + 5, { width: colWidths[0] - 10 });
-        xPos += colWidths[0];
+        // Price per unit
+        doc.text(`$${product.pu}`, 50 + colWidths[0] + 5, yPos + 5, { width: colWidths[1] - 10, align: 'right' });
         
-        doc.text(`$${unitPrice}`, xPos + 5, yPos + 5, { width: colWidths[1] - 10, align: 'right' });
-        xPos += colWidths[1];
+        // Quantity
+        doc.text(product.cantidad, 50 + colWidths[0] + colWidths[1] + 5, yPos + 5, { width: colWidths[2] - 10, align: 'center' });
         
-        doc.text(quantity, xPos + 5, yPos + 5, { width: colWidths[2] - 10, align: 'center' });
-        xPos += colWidths[2];
-        
-        doc.text(`$${totalPrice}`, xPos + 5, yPos + 5, { width: colWidths[3] - 10, align: 'right' });
+        // Total price
+        doc.text(`$${product.precio}`, 50 + colWidths[0] + colWidths[1] + colWidths[2] + 5, yPos + 5, { width: colWidths[3] - 10, align: 'right' });
         
         yPos += 20;
       });
       
-      // Summary table
-      const summaryX = 370;
-      const summaryY = yPos + 20;
-      const summaryWidth = 180;
-      
-      // Draw summary rows
-      doc.font('Helvetica-Bold').fontSize(10);
+      // Summary section
+      const summaryX = 350;
+      const summaryWidth = 200;
+      let currentY = yPos + 20;
       
       // Subtotal row
       doc.fillColor('#f0f0f0');
-      doc.rect(summaryX, summaryY, summaryWidth, 20).fill();
+      doc.rect(summaryX, currentY, summaryWidth, 20).fill();
       doc.fillColor('black');
-      doc.text('Subtotal:', summaryX + 10, summaryY + 5, { width: 80 });
-      doc.text(`$${formatNumber(data.subtotal)}`, summaryX + 100, summaryY + 5, { width: 70, align: 'right' });
-      
-      let currentY = summaryY + 20;
+      doc.text('Subtotal:', summaryX + 10, currentY + 5, { width: 80 });
+      doc.text(`$${formatNumber(data.subtotal)}`, summaryX + 100, currentY + 5, { width: 70, align: 'right' });
+      currentY += 20;
       
       // Discount row (if any)
       if (data.descuento > 0) {
@@ -220,45 +238,13 @@ export async function generateQuotePDF(data: PDFQuoteData): Promise<Buffer> {
       
       doc.fontSize(7);
       doc.text('CUIDADOS: TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.', 50, 720);
-      doc.text('TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.', 50, 730);
+
+      // Bank information
+      doc.fontSize(9).font('Helvetica-Bold').text('Datos Bancarios:', 50, 650);
+      doc.font('Helvetica').text(`Titular: ${data.titular}`, 50, 665);
+      doc.text(`Cuenta: ${data.cuenta}`, 50, 680);
       
-      doc.font('Helvetica-Bold');
-      doc.text('DATOS BANCARIOS:', 50, 745);
-      
-      if (data.moneda === 'Dólares') {
-        doc.text('LEAD BANK', 50, 755);
-        doc.text('PABLO ANAYA', 50, 765);
-        doc.text('210319511130', 50, 775);
-        doc.text('ABA 101019644', 50, 785);
-      } else {
-        doc.text('BBVA', 50, 755);
-        doc.text(data.titular, 50, 765);
-        doc.text(`CUENTA: ${data.cuenta}`, 50, 775);
-        doc.text(`CLABE: ${data.clabe}`, 50, 785);
-        doc.text('ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.', 50, 795);
-      }
-      
-      // QR code - try SVG first, then PNG as fallback
-      const qrSvgPath = path.join(process.cwd(), 'public/assets/qr.svg');
-      const qrPngPath = path.join(process.cwd(), 'public/assets/qr.png');
-      
-      if (fs.existsSync(qrSvgPath)) {
-        doc.image(qrSvgPath, 50, 720, { width: 60 });
-      } else if (fs.existsSync(qrPngPath)) {
-        doc.image(qrPngPath, 50, 720, { width: 60 });
-      }
-      
-      // Vendor information on the right
-      doc.font('Helvetica-Bold').fontSize(8);
-      doc.text('ATENTAMENTE:', 400, 720, { align: 'right' });
-      doc.text(data.vendedor, 400, 730, { align: 'right' });
-      doc.text(data.correo_vendedor, 400, 740, { align: 'right' });
-      doc.text(data.telefono_vendedor, 400, 750, { align: 'right' });
-      doc.text('HTTPS://FUNNYKITCHEN.MX', 400, 760, { align: 'right' });
-      doc.text('AZUCENAS #439 LOS GIRASOLES.', 400, 770, { align: 'right' });
-      doc.text('ZAPOPAN, JALISCO 45138', 400, 780, { align: 'right' });
-      
-      // Finalize PDF
+      // Finalize the PDF
       doc.end();
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -285,37 +271,98 @@ function parseProductsString(productsString: string, numProducts: number): Produ
   return products;
 }
 
-// Format number with commas as thousands separators
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US', { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 2 
-  });
+// Helper function to format currency values
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('es-MX', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 // Upload PDF to Supabase Storage
 export async function uploadPDFToSupabase(pdfBuffer: Buffer, fileName: string): Promise<string> {
   try {
-    const { data, error } = await supabase.storage
-      .from('cotizaciones')
-      .upload(fileName, pdfBuffer, {
+    // Format filename for consistency
+    const formattedFileName = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
+    
+    console.log(`Uploading PDF to bucket 'cotizacionpdf' with filename '${formattedFileName}'`);
+    
+    // First try to get the bucket to verify access
+    const { data: bucket, error: bucketError } = await supabaseAdmin.storage
+      .getBucket('cotizacionpdf');
+    
+    if (bucketError) {
+      console.error(`Error accessing bucket: ${bucketError.message}`);
+      // If the bucket doesn't exist, try to create it
+      if (bucketError.message.includes('does not exist')) {
+        console.log('Bucket does not exist. Attempting to create it...');
+        const { error: createError } = await supabaseAdmin.storage.createBucket('cotizacionpdf', {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB
+        });
+        
+        if (createError) {
+          console.error(`Failed to create bucket: ${createError.message}`);
+          throw createError;
+        }
+        console.log('Bucket created successfully');
+      } else {
+        throw bucketError;
+      }
+    }
+    
+    // Upload the file
+    const { data, error } = await supabaseAdmin.storage
+      .from('cotizacionpdf')
+      .upload(formattedFileName, pdfBuffer, {
         contentType: 'application/pdf',
-        upsert: true
+        upsert: true // Replace existing file
       });
     
     if (error) {
+      console.error(`Upload error: ${error.message}`);
       throw error;
     }
     
+    console.log('PDF uploaded successfully');
+    
     // Get public URL for the uploaded file
-    const { data: publicUrlData } = supabase.storage
-      .from('cotizaciones')
-      .getPublicUrl(fileName);
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('cotizacionpdf')
+      .getPublicUrl(formattedFileName);
+    
+    console.log(`Public URL: ${publicUrlData.publicUrl}`);
     
     return publicUrlData.publicUrl;
   } catch (error) {
     console.error('Error uploading PDF to Supabase:', error);
-    throw error;
+    // Try a fallback approach with a timestamped name if replacing failed
+    try {
+      const timestampedFileName = `${fileName.replace('.pdf', '')}_${Date.now()}.pdf`;
+      console.log(`Trying fallback upload with timestamped name: ${timestampedFileName}`);
+      
+      const { data, error: uploadError } = await supabaseAdmin.storage
+        .from('cotizacionpdf')
+        .upload(timestampedFileName, pdfBuffer, {
+          contentType: 'application/pdf',
+        });
+      
+      if (uploadError) {
+        console.error(`Fallback upload error: ${uploadError.message}`);
+        throw uploadError;
+      }
+      
+      const { data: publicUrlData } = supabaseAdmin.storage
+        .from('cotizacionpdf')
+        .getPublicUrl(timestampedFileName);
+      
+      console.log(`Fallback upload successful. Public URL: ${publicUrlData.publicUrl}`);
+      return publicUrlData.publicUrl;
+      
+    } catch (fallbackError) {
+      console.error('Fallback upload also failed:', fallbackError);
+      throw fallbackError;
+    }
   }
 }
 

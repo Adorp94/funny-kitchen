@@ -3,43 +3,44 @@ import { generateQuotePDF, uploadPDFToSupabase } from '@/lib/pdf/generator';
 
 export async function GET(request: NextRequest) {
   try {
-    // Create test data for PDF generation
+    // Sample data for testing
     const testData = {
-      nombre_archivo: 'cotizacion_test.pdf',
+      nombre_archivo: 'test-cotizacion.pdf',
       num_cotizacion: 12345,
       num_productos: 3,
-      cliente: 'Cliente de Prueba, S.A. de C.V.',
-      telefono_cliente: '(33) 1234-5678',
+      cliente: 'Cliente de Prueba',
+      telefono_cliente: '123-456-7890',
       vendedor: 'Vendedor de Prueba',
-      telefono_vendedor: '(33) 8765-4321',
-      correo_vendedor: 'vendedor@funnykitchen.mx',
-      fecha_cotizacion: new Date().toISOString().split('T')[0],
+      telefono_vendedor: '987-654-3210',
+      correo_vendedor: 'vendedor@example.com',
+      fecha_cotizacion: new Date().toLocaleDateString('es-MX'),
       valor_iva: '16%',
-      tiempo_entrega: '5-10 días hábiles',
+      tiempo_entrega: '7 días',
       moneda: 'Pesos',
-      subtotal: 12500,
-      descuento: 1250,
-      iva: 1800,
-      envio: 350,
-      total: 13400,
-      titular: 'PABLO ANAYA',
-      cuenta: '0123456789',
-      clabe: '012345678901234567',
-      atencion: 'Sr. Juan Pérez',
-      productos: 'Plato Redondo 20cm (Azul)~850~4~3400~' +
-        'Taza para Café 250ml~350~10~3500~' +
-        'Juego de Cubiertos Completo~5600~1~5600',
+      subtotal: 10000,
+      descuento: 1000,
+      iva: 1440,
+      envio: 500,
+      total: 10940,
+      titular: 'FUNNY KITCHEN S.A. DE C.V',
+      cuenta: '012 244 0415',
+      clabe: '012 320 00122440415 9',
+      atencion: 'Juan Pérez',
+      productos: 'Producto 1~1000~2~2000~Producto 2~2000~1~2000~Producto 3~3000~2~6000',
     };
-
-    // Generate the PDF
+    
+    // Generate PDF
+    console.log('Generating test PDF...');
     const pdfBuffer = await generateQuotePDF(testData);
     
-    // Upload to Supabase Storage
-    const fileName = `test_${Date.now()}.pdf`;
-    const pdfUrl = await uploadPDFToSupabase(pdfBuffer, fileName);
+    // Upload to Supabase
+    console.log('Uploading test PDF to Supabase...');
+    const pdfUrl = await uploadPDFToSupabase(pdfBuffer, 'test-cotizacion.pdf');
     
-    // Return the PDF URL
-    return NextResponse.json({ success: true, pdfUrl });
+    return NextResponse.json({
+      message: 'Test PDF generated successfully',
+      pdfUrl
+    });
   } catch (error) {
     console.error('Error generating test PDF:', error);
     return NextResponse.json(

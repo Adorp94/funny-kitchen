@@ -1,4 +1,4 @@
-import { supabase } from "./client";
+import { supabaseAdmin } from "./client";
 
 /**
  * Initializes the required Supabase storage buckets
@@ -6,14 +6,14 @@ import { supabase } from "./client";
  */
 export async function initializeStorageBuckets() {
   try {
-    // Check if cotizaciones bucket exists
-    const { data: buckets, error } = await supabase.storage.getBucket('cotizaciones');
+    // Check if cotizacionpdf bucket exists
+    const { data: buckets, error } = await supabaseAdmin.storage.getBucket('cotizacionpdf');
     
     if (error && error.message.includes('does not exist')) {
-      console.log('Creating cotizaciones bucket...');
+      console.log('Creating cotizacionpdf bucket...');
       
       // Create the bucket with public access
-      const { error: createError } = await supabase.storage.createBucket('cotizaciones', {
+      const { error: createError } = await supabaseAdmin.storage.createBucket('cotizacionpdf', {
         public: true,
         fileSizeLimit: 10485760, // 10MB limit for PDF files
       });
@@ -22,11 +22,11 @@ export async function initializeStorageBuckets() {
         throw createError;
       }
       
-      console.log('Cotizaciones bucket created successfully');
+      console.log('Cotizacionpdf bucket created successfully');
     } else if (error) {
       throw error;
     } else {
-      console.log('Cotizaciones bucket already exists');
+      console.log('Cotizacionpdf bucket already exists');
     }
     
     return { success: true };

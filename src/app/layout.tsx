@@ -1,6 +1,7 @@
 import "@/app/globals.css";
 import type { Metadata } from "next";
 import { ClientLayout } from "@/components/layout/client-layout";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "Funny Kitchen",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="es">
       <body className="min-h-screen bg-gray-50">
         <ClientLayout>{children}</ClientLayout>
+        <Toaster />
       </body>
     </html>
   );

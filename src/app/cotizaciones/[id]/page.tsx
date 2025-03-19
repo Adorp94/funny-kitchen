@@ -4,10 +4,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
-import { Loader2, ArrowLeft, Eye, Pen, Trash } from 'lucide-react'
+import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
-import QuotationActions from '@/components/cotizacion/quotation-actions'
-import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
 
@@ -233,6 +231,57 @@ export default function CotizacionDetailPage() {
               </>
             )}
           </Button>
+          
+          <Button 
+            variant="outline"
+            onClick={async () => {
+              try {
+                // Show loading indicator
+                toast({
+                  title: "Generando PDF",
+                  description: "Por favor espere mientras se genera el PDF...",
+                });
+                
+                // Make the API call
+                const response = await fetch(`/api/cotizaciones/${cotizacion.id}/pdf`, {
+                  method: 'POST',
+                });
+                
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.error || 'Failed to generate PDF');
+                }
+                
+                const data = await response.json();
+                
+                // Update the cotizacion state with the new PDF URL
+                setCotizacion({
+                  ...cotizacion,
+                  pdf_url: data.pdfUrl
+                });
+                
+                toast({
+                  title: "PDF Generado",
+                  description: "El PDF ha sido generado y guardado correctamente.",
+                });
+                
+                // Open the PDF in a new tab
+                if (data.pdfUrl) {
+                  window.open(data.pdfUrl, '_blank');
+                }
+              } catch (error) {
+                console.error('Error generating PDF:', error);
+                toast({
+                  title: "Error",
+                  description: error instanceof Error ? error.message : "Ocurrió un error al generar el PDF",
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            {cotizacion.pdf_url ? 'Regenerar PDF' : 'Generar PDF'}
+          </Button>
         </div>
       </div>
       
@@ -373,6 +422,19 @@ export default function CotizacionDetailPage() {
             moneda={cotizacion.moneda}
             valor_iva={cotizacion.valor_iva}
             tiempo_entrega={cotizacion.tiempo_entrega}
+            hasExistingPdf={!!cotizacion.pdf_url}
+            onPdfGenerated={(pdfUrl) => {
+              // Update the cotizacion state with the new PDF URL
+              setCotizacion({
+                ...cotizacion,
+                pdf_url: pdfUrl
+              });
+              
+              toast({
+                title: "PDF Guardado",
+                description: "La URL del PDF ha sido actualizada en la cotización.",
+              });
+            }}
           />
         </div>
       </div>
