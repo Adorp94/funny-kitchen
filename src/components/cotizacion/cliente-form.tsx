@@ -142,8 +142,6 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-bold mb-4">Cliente</h2>
-      
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="nuevo" className="flex-1">Nuevo</TabsTrigger>
