@@ -13,7 +13,12 @@ interface Cliente {
   nombre: string;
   celular: string;
   correo: string | null;
+  razon_social: string | null;
+  rfc: string | null;
   tipo_cliente: string | null;
+  lead: string | null;
+  direccion_envio: string | null;
+  recibe: string | null;
   atencion: string | null;
 }
 

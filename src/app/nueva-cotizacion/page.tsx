@@ -17,7 +17,12 @@ interface Cliente {
   nombre: string;
   celular: string;
   correo: string | null;
+  razon_social: string | null;
+  rfc: string | null;
   tipo_cliente: string | null;
+  lead: string | null;
+  direccion_envio: string | null;
+  recibe: string | null;
   atencion: string | null;
 }
 
@@ -279,6 +284,8 @@ export default function NuevaCotizacionPage() {
                       <p className="font-medium text-gray-900">{cliente.nombre}</p>
                       <p className="text-sm text-gray-500">{cliente.celular}</p>
                       {cliente.correo && <p className="text-sm text-gray-500">{cliente.correo}</p>}
+                      {cliente.razon_social && <p className="text-sm text-gray-500">Razón Social: {cliente.razon_social}</p>}
+                      {cliente.rfc && <p className="text-sm text-gray-500">RFC: {cliente.rfc}</p>}
                     </div>
                   </div>
                 </div>
@@ -331,22 +338,52 @@ export default function NuevaCotizacionPage() {
                   <h3 className="font-medium text-gray-700 mb-3">Información del Cliente</h3>
                   <ul className="space-y-2 text-sm">
                     <li className="flex">
-                      <span className="text-gray-500 w-20">Nombre:</span>
+                      <span className="text-gray-500 w-32">Nombre:</span>
                       <span className="font-medium text-gray-900">{cliente?.nombre}</span>
                     </li>
                     <li className="flex">
-                      <span className="text-gray-500 w-20">Teléfono:</span>
+                      <span className="text-gray-500 w-32">Teléfono:</span>
                       <span className="font-medium text-gray-900">{cliente?.celular}</span>
                     </li>
                     {cliente?.correo && (
                       <li className="flex">
-                        <span className="text-gray-500 w-20">Correo:</span>
+                        <span className="text-gray-500 w-32">Correo:</span>
                         <span className="font-medium text-gray-900">{cliente?.correo}</span>
+                      </li>
+                    )}
+                    {cliente?.razon_social && (
+                      <li className="flex">
+                        <span className="text-gray-500 w-32">Razón Social:</span>
+                        <span className="font-medium text-gray-900">{cliente?.razon_social}</span>
+                      </li>
+                    )}
+                    {cliente?.rfc && (
+                      <li className="flex">
+                        <span className="text-gray-500 w-32">RFC:</span>
+                        <span className="font-medium text-gray-900">{cliente?.rfc}</span>
+                      </li>
+                    )}
+                    {cliente?.tipo_cliente && (
+                      <li className="flex">
+                        <span className="text-gray-500 w-32">Tipo Cliente:</span>
+                        <span className="font-medium text-gray-900">{cliente?.tipo_cliente}</span>
+                      </li>
+                    )}
+                    {cliente?.direccion_envio && (
+                      <li className="flex">
+                        <span className="text-gray-500 w-32">Dirección:</span>
+                        <span className="font-medium text-gray-900">{cliente?.direccion_envio}</span>
+                      </li>
+                    )}
+                    {cliente?.recibe && (
+                      <li className="flex">
+                        <span className="text-gray-500 w-32">Recibe:</span>
+                        <span className="font-medium text-gray-900">{cliente?.recibe}</span>
                       </li>
                     )}
                     {cliente?.atencion && (
                       <li className="flex">
-                        <span className="text-gray-500 w-20">Atención:</span>
+                        <span className="text-gray-500 w-32">Atención:</span>
                         <span className="font-medium text-gray-900">{cliente?.atencion}</span>
                       </li>
                     )}

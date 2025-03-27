@@ -12,7 +12,12 @@ interface Cliente {
   nombre: string;
   celular: string;
   correo: string | null;
+  razon_social: string | null;
+  rfc: string | null;
   tipo_cliente: string | null;
+  lead: string | null;
+  direccion_envio: string | null;
+  recibe: string | null;
   atencion: string | null;
 }
 
@@ -98,10 +103,25 @@ export function PDFCotizacion({ cliente, folio = "TEMP-001" }: PDFCotizacionProp
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-2 text-gray-800">Información del Cliente</h2>
           <div className="bg-gray-50 p-4 rounded-md">
-            <p><span className="font-semibold">Cliente:</span> {cliente.nombre}</p>
-            <p><span className="font-semibold">Teléfono:</span> {cliente.celular}</p>
-            {cliente.correo && <p><span className="font-semibold">Correo:</span> {cliente.correo}</p>}
-            {cliente.atencion && <p><span className="font-semibold">Atención:</span> {cliente.atencion}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <p><span className="font-semibold">Cliente:</span> {cliente.nombre}</p>
+                <p><span className="font-semibold">Teléfono:</span> {cliente.celular}</p>
+                {cliente.correo && <p><span className="font-semibold">Correo:</span> {cliente.correo}</p>}
+                {cliente.tipo_cliente && <p><span className="font-semibold">Tipo:</span> {cliente.tipo_cliente}</p>}
+              </div>
+              <div>
+                {cliente.razon_social && <p><span className="font-semibold">Razón Social:</span> {cliente.razon_social}</p>}
+                {cliente.rfc && <p><span className="font-semibold">RFC:</span> {cliente.rfc}</p>}
+                {cliente.atencion && <p><span className="font-semibold">Atención:</span> {cliente.atencion}</p>}
+              </div>
+            </div>
+            {cliente.direccion_envio && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <p><span className="font-semibold">Dirección de envío:</span> {cliente.direccion_envio}</p>
+                {cliente.recibe && <p><span className="font-semibold">Recibe:</span> {cliente.recibe}</p>}
+              </div>
+            )}
           </div>
         </div>
         
