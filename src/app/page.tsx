@@ -36,13 +36,11 @@ export default function HomePage() {
             </div>
             <div className="md:w-5/12">
               <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <Image
-                  src="/kitchen-sample.jpg"
-                  alt="Kitchen Sample"
-                  width={600}
-                  height={400}
-                  className="w-full h-auto"
-                />
+                <div 
+                  className="w-full h-[250px] bg-gradient-to-br from-teal-100 to-teal-300 flex items-center justify-center"
+                >
+                  <span className="text-teal-700 font-medium">Funny Kitchen</span>
+                </div>
               </div>
             </div>
           </div>

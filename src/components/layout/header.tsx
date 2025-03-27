@@ -38,7 +38,7 @@ export function Header() {
         <div className="flex items-center">
           <Link href="/" className="flex items-center mr-6">
             <Image
-              src="/logo.png"
+              src="/assets/logo.svg"
               alt="Funny Kitchen"
               width={36}
               height={36}
