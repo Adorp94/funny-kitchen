@@ -12,104 +12,187 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Menu, User, LogOut } from "lucide-react";
+import { ShoppingCart, LayoutDashboard, ClipboardList, ChefHat, Users, Settings, User, LogOut, Menu, X, Plus } from "lucide-react";
+import { useCart } from "@/contexts/cart-context";
 
-interface HeaderProps {
-  toggleSidebar?: () => void;
-  isMobile?: boolean;
-}
+// Navigation items
+const navigation = [
+  {
+    name: "Dashboard",
+    href: "/",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "Cotizaciones",
+    href: "/cotizaciones",
+    icon: ClipboardList,
+  },
+  {
+    name: "Productos",
+    href: "/productos",
+    icon: ChefHat,
+  },
+  {
+    name: "Clientes",
+    href: "/clientes",
+    icon: Users,
+  },
+];
 
-export function Header({ toggleSidebar, isMobile = false }: HeaderProps) {
+export function Header() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { totalItems } = useCart();
   
-  // Path titles mapping
-  const pathTitles: Record<string, string> = {
-    "/": "Dashboard",
-    "/cotizaciones": "Cotizaciones",
-    "/nueva-cotizacion": "Nueva cotización",
-    "/productos": "Productos",
-    "/clientes": "Clientes",
-    "/configuracion": "Configuración",
-  };
-  
-  // Get correct title based on current path
-  const getPageTitle = () => {
-    if (pathname in pathTitles) {
-      return pathTitles[pathname];
-    }
-    
-    if (pathname.startsWith("/cotizaciones/")) {
-      return "Detalle de cotización";
-    }
-    
-    return "Funny Kitchen";
+  // Check if a given path is active
+  const isActive = (path: string) => {
+    if (path === "/" && pathname !== "/") return false;
+    return pathname === path || pathname.startsWith(path);
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-6">
-      <div className="flex items-center">
-        {isMobile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleSidebar}
-            className="mr-2 lg:hidden"
-          >
-            <Menu className="h-6 w-6" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
-        )}
-        
+    <header className="w-full mx-auto max-w-[1440px]">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+        {/* Left section with logo */}
         <div className="flex items-center">
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center mr-6">
             <Image
               src="/logo.png"
               alt="Funny Kitchen"
-              width={40}
-              height={40}
+              width={36}
+              height={36}
               className="mr-2"
             />
-            <span className="font-bold text-lg hidden sm:inline">Funny Kitchen</span>
+            <span className="font-medium text-xl">Funny Kitchen</span>
           </Link>
           
-          <div className="hidden md:flex items-center ml-6">
-            <span className="text-gray-400 mx-2">/</span>
-            <h1 className="text-lg font-medium">{getPageTitle()}</h1>
-          </div>
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(item.href)
+                    ? "text-teal-700 bg-teal-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        
+        {/* Right section with actions */}
+        <div className="flex items-center space-x-2">
+          {/* Create New Quotation Button */}
+          <Link href="/nueva-cotizacion" className="hidden sm:flex">
+            <Button 
+              size="sm" 
+              className="bg-teal-500 hover:bg-teal-600 text-white rounded-lg"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Nueva cotización
+            </Button>
+          </Link>
+          
+          {/* Settings Link */}
+          <Link 
+            href="/configuracion" 
+            className={`p-2 rounded-lg ${
+              isActive("/configuracion")
+                ? "text-teal-700 bg-teal-50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            }`}
+          >
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">Configuración</span>
+          </Link>
+          
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="rounded-lg hover:bg-gray-50"
+              >
+                <User className="h-5 w-5 text-gray-600" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="flex items-center justify-start gap-2 p-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100">
+                  <User className="h-4 w-4 text-teal-700" />
+                </div>
+                <div className="flex flex-col space-y-0.5">
+                  <p className="text-sm font-medium">Admin</p>
+                  <p className="text-xs text-gray-500">admin@funnykitchen.mx</p>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/configuracion" className="cursor-pointer w-full">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configuración
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <LogOut className="mr-2 h-4 w-4" /> 
+                <span>Cerrar sesión</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden rounded-lg"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+            <span className="sr-only">Toggle menu</span>
+          </Button>
         </div>
       </div>
       
-      <div className="flex items-center">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-              <User className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="flex items-center justify-start gap-2 p-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                <User className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex flex-col space-y-0.5">
-                <p className="text-sm font-medium">Admin</p>
-                <p className="text-xs text-gray-500">admin@funnykitchen.mx</p>
-              </div>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/configuracion" className="cursor-pointer w-full">
-                Configuración
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-100 py-2 px-4">
+          <nav className="flex flex-col space-y-1">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive(item.href)
+                    ? "text-teal-700 bg-teal-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                }`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <item.icon className="mr-2 h-5 w-5" />
+                {item.name}
               </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <LogOut className="mr-2 h-4 w-4" /> 
-              <span>Cerrar sesión</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+            ))}
+            <Link
+              href="/nueva-cotizacion"
+              className="flex items-center px-3 py-2 mt-2 rounded-lg text-sm font-medium bg-teal-500 text-white hover:bg-teal-600 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Nueva cotización
+            </Link>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
