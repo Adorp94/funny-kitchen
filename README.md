@@ -1,13 +1,14 @@
 # Funny Kitchen Simplified
 
-Una aplicación web optimizada para la creación de cotizaciones de cocina y muebles. Esta versión simplificada proporciona las características básicas para generar cotizaciones rápidamente.
+Una aplicación web optimizada para la creación de cotizaciones de cocina y muebles. Esta versión simplificada proporciona las características esenciales para generar cotizaciones profesionales rápidamente.
 
 ## Características
 
 - ✅ **Formulario de cliente validado**: Captura información del cliente con validación de campos para asegurar datos correctos.
 - ✅ **Gestión de productos**: Agrega y administra productos con cantidad, precio y cálculo automático de subtotales.
 - ✅ **Soporte multi-moneda**: Trabaja con precios en MXN o USD según tus necesidades.
-- ✅ **Persistencia de datos**: Los datos se guardan en el navegador usando sessionStorage.
+- ✅ **Generación de PDF**: Genera cotizaciones profesionales en formato PDF, listas para enviar a tus clientes o imprimir.
+- ✅ **Persistencia de datos**: Los datos se guardan temporalmente en el navegador usando sessionStorage.
 - ✅ **Diseño responsivo**: Interfaz moderna adaptada a dispositivos móviles y escritorio.
 
 ## Desarrollo Local
@@ -55,6 +56,7 @@ La aplicación estará disponible en [http://localhost:3000](http://localhost:30
 - **app/**: Páginas de la aplicación
   - **page.tsx**: Página principal
   - **nueva-cotizacion/page.tsx**: Formulario para crear nuevas cotizaciones
+  - **ver-cotizacion/page.tsx**: Vista previa de cotización en PDF
 
 - **components/**: Componentes reutilizables
   - **layout/**: Componentes de estructura
@@ -63,18 +65,30 @@ La aplicación estará disponible en [http://localhost:3000](http://localhost:30
     - **cliente-form.tsx**: Formulario de datos del cliente con validación
     - **producto-simplificado.tsx**: Formulario para agregar productos
     - **lista-productos.tsx**: Tabla para visualizar y administrar productos
+    - **pdf-cotizacion.tsx**: Componente para visualizar y generar PDF
 
 - **contexts/**: Gestión de estado
   - **productos-context.tsx**: Contexto para la gestión de productos
+
+- **services/**: Servicios de la aplicación
+  - **pdf-service.ts**: Servicio para la generación de PDFs
+
+## Flujo de Trabajo
+
+1. Ingresa la información del cliente con validación de campos
+2. Agrega productos a la cotización con cantidad y precio
+3. Visualiza el resumen de la cotización
+4. Genera un PDF profesional de la cotización
+5. Descarga o imprime la cotización
 
 ## Próximas Características
 
 - 🔄 Conexión con base de datos para almacenamiento permanente
 - 🔄 Gestión completa de productos con catálogo
 - 🔄 Sistema completo de cotizaciones con historial
-- 🔄 Generación de PDF
+- 🔄 Personalización de plantillas PDF
 - 🔄 Autenticación de usuarios
 
 ---
 
-Desarrollado con Next.js 14 y Tailwind CSS.
+Desarrollado con Next.js 14, Tailwind CSS y jsPDF.
