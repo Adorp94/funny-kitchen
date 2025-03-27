@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Mail, Phone, User } from 'lucide-react';
+import { Mail, Phone, User, AlertCircle } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import 'react-phone-number-input/style.css';
 import PhoneInput from 'react-phone-number-input/input';
 import { toast } from "react-hot-toast";
+import { isValidPhoneNumber } from 'react-phone-number-input';
 
 // Match the database schema exactly
 interface Cliente {
@@ -29,6 +30,13 @@ interface ClienteFormData {
   atencion: string;
 }
 
+// Validation errors interface
+interface FormErrors {
+  nombre?: string;
+  celular?: string;
+  correo?: string;
+}
+
 interface ClienteFormProps {
   clienteId?: number;
   onClienteChange?: (cliente: Cliente | null) => void;
@@ -38,6 +46,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const [activeTab, setActiveTab] = useState<string>("nuevo");
   const [formDataChanged, setFormDataChanged] = useState<boolean>(false);
   const [initialized, setInitialized] = useState<boolean>(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState<ClienteFormData>({
     cliente_id: "",
@@ -92,15 +102,52 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     }
   };
 
+  // Validate the form
+  const validateForm = (data: ClienteFormData): FormErrors => {
+    const newErrors: FormErrors = {};
+    
+    // Validate name
+    if (!data.nombre.trim()) {
+      newErrors.nombre = "El nombre es obligatorio";
+    } else if (data.nombre.trim().length < 3) {
+      newErrors.nombre = "El nombre debe tener al menos 3 caracteres";
+    }
+    
+    // Validate phone
+    if (!data.celular) {
+      newErrors.celular = "El teléfono es obligatorio";
+    } else if (!isValidPhoneNumber(data.celular)) {
+      newErrors.celular = "El formato de teléfono no es válido";
+    }
+    
+    // Validate email if provided
+    if (data.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.correo)) {
+      newErrors.correo = "El formato de correo no es válido";
+    }
+    
+    return newErrors;
+  };
+
   // Update this useEffect to handle parent notification when form data changes
   useEffect(() => {
-    // Only notify parent when we have a complete form AND form data has changed
+    // Only notify parent when we have a complete form AND form data has changed AND no errors
     if (formDataChanged) {
-      // Check that we have required fields based on the active tab
-      if (activeTab === 'nuevo' && formData.nombre && formData.celular) {
-        safeNotifyParent(formDataToCliente(formData));
-      } else if (activeTab === 'existente' && formData.cliente_id) {
-        safeNotifyParent(formDataToCliente(formData));
+      const validationErrors = validateForm(formData);
+      setErrors(validationErrors);
+      
+      // Only notify if there are no errors and we have required fields
+      const hasNoErrors = Object.keys(validationErrors).length === 0;
+      
+      if (hasNoErrors) {
+        // Check that we have required fields based on the active tab
+        if (activeTab === 'nuevo' && formData.nombre && formData.celular) {
+          safeNotifyParent(formDataToCliente(formData));
+        } else if (activeTab === 'existente' && formData.cliente_id) {
+          safeNotifyParent(formDataToCliente(formData));
+        }
+      } else {
+        // If we have errors, notify parent with null to indicate invalid data
+        safeNotifyParent(null);
       }
       
       // Reset the changed flag after handling
@@ -128,6 +175,12 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         [name]: value
       };
       
+      // Mark field as touched
+      setTouched(prev => ({
+        ...prev,
+        [name]: true
+      }));
+      
       // Just mark data as changed, don't notify directly
       setFormDataChanged(true);
       return newData;
@@ -141,10 +194,26 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         celular: value || ''
       };
       
+      // Mark field as touched
+      setTouched(prev => ({
+        ...prev,
+        celular: true
+      }));
+      
       // Just mark data as changed, don't notify directly
       setFormDataChanged(true);
       return newData;
     });
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched(prev => ({
+      ...prev,
+      [field]: true
+    }));
+    
+    // Validate the form on blur
+    setErrors(validateForm(formData));
   };
 
   return (
@@ -164,25 +233,40 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 name="nombre"
                 value={formData.nombre}
                 onChange={handleInputChange}
+                onBlur={() => handleBlur('nombre')}
                 placeholder="Ingresa el nombre del cliente"
                 icon={<User className="h-4 w-4" />}
+                className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                 required
               />
+              {touched.nombre && errors.nombre && (
+                <div className="text-red-500 text-xs mt-1 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {errors.nombre}
+                </div>
+              )}
             </FormControl>
             
             {/* Celular */}
             <FormControl>
               <FormLabel required>Celular</FormLabel>
-              <div className="flex h-10 w-full rounded-md border border-input bg-background text-sm ring-offset-background">
+              <div className={`flex h-10 w-full rounded-md border ${touched.celular && errors.celular ? 'border-red-500' : 'border-input'} bg-background text-sm ring-offset-background`}>
                 <PhoneInput
                   className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
                   country="MX"
                   value={formData.celular}
                   onChange={handlePhoneChange}
+                  onBlur={() => handleBlur('celular')}
                   placeholder="+52"
                   required
                 />
               </div>
+              {touched.celular && errors.celular && (
+                <div className="text-red-500 text-xs mt-1 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {errors.celular}
+                </div>
+              )}
             </FormControl>
             
             {/* Correo */}
@@ -193,9 +277,17 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 name="correo"
                 value={formData.correo}
                 onChange={handleInputChange}
+                onBlur={() => handleBlur('correo')}
                 placeholder="funny@ejemplo.com"
                 icon={<Mail className="h-4 w-4" />}
+                className={`${touched.correo && errors.correo ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
               />
+              {touched.correo && errors.correo && (
+                <div className="text-red-500 text-xs mt-1 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {errors.correo}
+                </div>
+              )}
             </FormControl>
             
             {/* Atención */}

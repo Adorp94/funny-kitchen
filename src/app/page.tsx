@@ -1,92 +1,112 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  LayoutDashboard,
-  ClipboardList,
-  FileText
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { ArrowRight, FilePlus, Sparkles, Database, ListChecks, FileText, LucideGithub } from "lucide-react";
 
-export default function Home() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Simulate data loading
-    const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, []);
-
+export default function HomePage() {
   return (
-    <main className="flex-1 p-6 overflow-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Link 
-          href="/nueva-cotizacion"
-          className="inline-flex items-center justify-center rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
-        >
-          Nueva cotización
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-lg p-6 border border-gray-100 shadow-sm mb-8">
-        <h2 className="text-lg font-medium mb-4">Versión Simplificada</h2>
-        <p className="text-gray-600 mb-4">
-          Esta es una versión simplificada de la aplicación Funny Kitchen diseñada para demostrar la funcionalidad básica del sistema de creación de cotizaciones.
-        </p>
-        <p className="text-gray-600 mb-6">
-          Actualmente solo está disponible la funcionalidad para crear una nueva cotización con información básica del cliente.
-        </p>
-        <Link 
-          href="/nueva-cotizacion"
-          className="inline-flex items-center justify-center rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
-        >
-          Crear Nueva Cotización
-        </Link>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Cotizaciones</CardTitle>
-            <ClipboardList className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-5 w-16 bg-gray-200 animate-pulse rounded"></div>
-            ) : (
-              <div className="text-2xl font-bold">1</div>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              Versión simplificada de demostración
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold mb-4">Acciones rápidas</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Link 
-            href="/nueva-cotizacion"
-            className="inline-flex items-center justify-center h-24 flex-col rounded-md font-medium border border-input bg-white hover:bg-accent hover:text-accent-foreground transition-colors"
-          >
-            <ClipboardList className="h-6 w-6 mb-2" />
-            <span>Nueva cotización</span>
-          </Link>
-          <div 
-            className="inline-flex items-center justify-center h-24 flex-col rounded-md font-medium border border-input bg-gray-50 text-gray-400 cursor-not-allowed"
-          >
-            <FileText className="h-6 w-6 mb-2" />
-            <span>Ver cotizaciones (próximamente)</span>
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-teal-500 to-teal-700 text-white py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between">
+            <div className="md:w-1/2 mb-10 md:mb-0">
+              <h1 className="text-4xl md:text-5xl font-bold mb-6">
+                Cotizaciones simples para tu cocina
+              </h1>
+              <p className="text-xl mb-8 text-teal-100">
+                Una herramienta optimizada para crear cotizaciones de cocinas y muebles de manera rápida y sencilla.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link href="/nueva-cotizacion">
+                  <Button size="lg" className="bg-white text-teal-700 hover:bg-teal-50 w-full sm:w-auto">
+                    <FilePlus className="mr-2 h-5 w-5" />
+                    Nueva Cotización
+                  </Button>
+                </Link>
+                <Link href="https://github.com/adolfojmnz/funny-kitchen" target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-teal-600 w-full sm:w-auto">
+                    <LucideGithub className="mr-2 h-5 w-5" />
+                    Ver en GitHub
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="md:w-5/12">
+              <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <Image
+                  src="/kitchen-sample.jpg"
+                  alt="Kitchen Sample"
+                  width={600}
+                  height={400}
+                  className="w-full h-auto"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </main>
+
+      {/* Features Section */}
+      <div className="py-20 px-4 bg-gray-50">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-800">Características</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                <ListChecks className="h-6 w-6 text-teal-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Formulario de Cliente</h3>
+              <p className="text-gray-600">
+                Captura información del cliente con validación de campos para asegurar datos correctos.
+              </p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                <Database className="h-6 w-6 text-teal-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Productos Personalizados</h3>
+              <p className="text-gray-600">
+                Agrega y administra productos con precios en diferentes monedas para tu cotización.
+              </p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                <FileText className="h-6 w-6 text-teal-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3 text-gray-800">Resumen Detallado</h3>
+              <p className="text-gray-600">
+                Obtén un resumen completo de la cotización con todos los detalles del cliente y productos.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div className="py-16 px-4 bg-white">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="inline-block p-2 bg-teal-100 rounded-full mb-4">
+            <Sparkles className="h-6 w-6 text-teal-600" />
+          </div>
+          <h2 className="text-3xl font-bold mb-4 text-gray-800">
+            Empieza a crear cotizaciones ahora
+          </h2>
+          <p className="text-lg mb-8 text-gray-600">
+            Simplifique el proceso de cotización para sus proyectos de cocina y muebles con nuestra herramienta fácil de usar.
+          </p>
+          <Link href="/nueva-cotizacion">
+            <Button size="lg" className="bg-teal-600 hover:bg-teal-700 text-white">
+              Crear Mi Primera Cotización
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }

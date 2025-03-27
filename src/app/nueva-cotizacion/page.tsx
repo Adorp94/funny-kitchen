@@ -4,8 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Receipt, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
+import { ProductoSimplificado } from "@/components/cotizacion/producto-simplificado";
+import { ListaProductos } from "@/components/cotizacion/lista-productos";
+import { useProductos } from "@/contexts/productos-context";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Match the interface with ClienteForm component
 interface Cliente {
@@ -25,6 +29,17 @@ export default function NuevaCotizacionPage() {
   const [clienteData, setClienteData] = useState<Cliente | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Get productos from context
+  const { 
+    productos, 
+    addProducto, 
+    removeProducto, 
+    clearProductos, 
+    total,
+    moneda,
+    setMoneda
+  } = useProductos();
 
   // Use effect to update cliente state after render
   useEffect(() => {
@@ -63,7 +78,12 @@ export default function NuevaCotizacionPage() {
       return;
     }
     
-    setActiveStep(prev => Math.min(prev + 1, 2));
+    if (activeStep === 2 && productos.length === 0) {
+      toast.error("Por favor, agrega al menos un producto");
+      return;
+    }
+    
+    setActiveStep(prev => Math.min(prev + 1, 3));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -73,21 +93,31 @@ export default function NuevaCotizacionPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle form submission (simplified version)
+  // Handle form submission
   const handleGenerateCotizacion = async () => {
     if (!cliente) {
       toast.error("Por favor, ingresa la información del cliente");
       return;
     }
     
+    if (productos.length === 0) {
+      toast.error("Por favor, agrega al menos un producto");
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
-      // In a simplified version, just show a success message
+      // In this simplified version, just show a success message
       setTimeout(() => {
         // Clear session storage 
         sessionStorage.removeItem('cotizacion_cliente');
         sessionStorage.removeItem('cotizacion_clienteForm');
+        sessionStorage.removeItem('cotizacion_productos');
+        sessionStorage.removeItem('cotizacion_moneda');
+        
+        // Clear products
+        clearProductos();
         
         setIsLoading(false);
         router.push('/');
@@ -111,11 +141,16 @@ export default function NuevaCotizacionPage() {
     }
   };
   
+  // Format currency
+  const formatCurrency = (amount: number): string => {
+    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${amount.toFixed(2)}`;
+  };
+  
   return (
     <div className="py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col items-center mb-12">
-          <h1 className="text-2xl font-medium text-gray-900 mb-10">Nueva Cotización (Versión Simplificada)</h1>
+          <h1 className="text-2xl font-medium text-gray-900 mb-10">Nueva Cotización</h1>
           
           {/* Step indicators */}
           <div className="flex w-full max-w-md justify-between relative">
@@ -123,7 +158,7 @@ export default function NuevaCotizacionPage() {
             <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-200">
               <div 
                 className="absolute h-0.5 bg-teal-500 transition-all duration-500" 
-                style={{ width: `${(activeStep - 1) * 100}%` }}
+                style={{ width: `${(activeStep - 1) * 50}%` }}
               ></div>
             </div>
             
@@ -153,6 +188,21 @@ export default function NuevaCotizacionPage() {
                 `}
               >
                 2
+              </button>
+              <span className="mt-2 text-sm font-medium text-gray-700">Productos</span>
+            </div>
+            
+            {/* Step 3 */}
+            <div className="flex flex-col items-center relative z-10">
+              <button 
+                onClick={() => cliente && productos.length > 0 && setActiveStep(3)}
+                className={`
+                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
+                  transition-all duration-200 font-medium text-sm
+                  ${getStepClasses(3)}
+                `}
+              >
+                3
               </button>
               <span className="mt-2 text-sm font-medium text-gray-700">Finalizar</span>
             </div>
@@ -192,8 +242,92 @@ export default function NuevaCotizacionPage() {
             </div>
           )}
           
-          {/* Step 2: Resumen y Finalizar */}
+          {/* Step 2: Productos */}
           {activeStep === 2 && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Package className="h-5 w-5 text-teal-600 mr-2" />
+                      <h2 className="text-lg font-medium text-gray-900">Agregar Productos</h2>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-500">Moneda:</span>
+                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue placeholder="Moneda" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MXN">MXN</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <ProductoSimplificado onAddProduct={addProducto} />
+                </div>
+              </div>
+              
+              {/* Client summary for this step */}
+              {cliente && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-6 py-4 flex justify-between items-center">
+                    <h3 className="text-sm font-medium text-gray-700">Cliente Seleccionado</h3>
+                    <Button 
+                      variant="ghost" 
+                      className="text-teal-600 h-8 px-2 py-0" 
+                      onClick={() => setActiveStep(1)}
+                    >
+                      Cambiar
+                    </Button>
+                  </div>
+                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+                    <div className="space-y-1">
+                      <p className="font-medium text-gray-900">{cliente.nombre}</p>
+                      <p className="text-sm text-gray-500">{cliente.celular}</p>
+                      {cliente.correo && <p className="text-sm text-gray-500">{cliente.correo}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Products list */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100">
+                  <h2 className="text-lg font-medium text-gray-900">Productos Agregados</h2>
+                </div>
+                <div className="p-6">
+                  <ListaProductos 
+                    productos={productos} 
+                    onRemoveProduct={removeProducto}
+                    moneda={moneda} 
+                  />
+                </div>
+                <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
+                  <Button 
+                    variant="outline" 
+                    onClick={prevStep}
+                    className="text-gray-600 border-gray-300"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
+                  </Button>
+                  <Button 
+                    onClick={nextStep} 
+                    disabled={productos.length === 0}
+                    className="bg-teal-500 hover:bg-teal-600 text-white px-5"
+                  >
+                    Continuar <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Step 3: Resumen y Finalizar */}
+          {activeStep === 3 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center">
@@ -236,10 +370,38 @@ export default function NuevaCotizacionPage() {
                   </Button>
                 </div>
                 
-                <div className="text-center py-6">
-                  <p className="text-gray-500 mb-4">
-                    Esta es una versión simplificada. En la versión completa, aquí verías los productos y las opciones de cotización.
-                  </p>
+                {/* Products */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-medium text-gray-700">Productos</h3>
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
+                      <span className="text-sm text-gray-500">Moneda: {moneda}</span>
+                    </div>
+                  </div>
+                  <ListaProductos 
+                    productos={productos} 
+                    onRemoveProduct={removeProducto}
+                    moneda={moneda}
+                  />
+                  <Button 
+                    variant="ghost" 
+                    className="text-teal-600 p-0 h-auto mt-3 text-xs" 
+                    onClick={() => setActiveStep(2)}
+                  >
+                    Editar productos
+                  </Button>
+                </div>
+                
+                {/* Summary */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-700 mb-3">Resumen</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Total:</span>
+                      <span className="font-medium text-gray-900">{formatCurrency(total)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -252,7 +414,7 @@ export default function NuevaCotizacionPage() {
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
-                  disabled={isLoading || !cliente}
+                  disabled={isLoading || !cliente || productos.length === 0}
                   className="bg-teal-500 hover:bg-teal-600 text-white px-5"
                 >
                   {isLoading ? (
