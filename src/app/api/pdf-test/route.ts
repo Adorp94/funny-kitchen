@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateQuotePDF, uploadPDFToSupabase } from '@/lib/pdf/generator';
+import { generateQuotePDF } from '@/lib/pdf/generator';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,14 +33,12 @@ export async function GET(request: NextRequest) {
     console.log('Generating test PDF...');
     const pdfBuffer = await generateQuotePDF(testData);
     
-    // Upload to Supabase
-    console.log('Uploading test PDF to Supabase...');
-    const pdfUrl = await uploadPDFToSupabase(pdfBuffer, 'test-cotizacion.pdf');
+    // Return the PDF directly as a download
+    const response = new NextResponse(pdfBuffer);
+    response.headers.set('Content-Type', 'application/pdf');
+    response.headers.set('Content-Disposition', `attachment; filename="test-cotizacion.pdf"`);
     
-    return NextResponse.json({
-      message: 'Test PDF generated successfully',
-      pdfUrl
-    });
+    return response;
   } catch (error) {
     console.error('Error generating test PDF:', error);
     return NextResponse.json(

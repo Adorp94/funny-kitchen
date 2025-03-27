@@ -83,9 +83,24 @@ export default function CotizacionesPage() {
     try {
       const response = await fetch("/api/cotizaciones");
       const data = await response.json();
-      setCotizaciones(data);
+      
+      // The API returns an object with a cotizaciones property
+      if (data && data.cotizaciones) {
+        // Map the data to include client and vendor names
+        const formattedCotizaciones = data.cotizaciones.map((cotizacion: any) => ({
+          ...cotizacion,
+          cliente_nombre: cotizacion.clientes?.nombre || 'Cliente sin nombre',
+          vendedor_nombre: cotizacion.vendedores ? 
+            `${cotizacion.vendedores.nombre} ${cotizacion.vendedores.apellidos || ''}` : 
+            'Vendedor sin nombre'
+        }));
+        setCotizaciones(formattedCotizaciones);
+      } else {
+        setCotizaciones([]);
+      }
     } catch (error) {
       console.error("Error fetching cotizaciones:", error);
+      setCotizaciones([]);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +146,8 @@ export default function CotizacionesPage() {
   
   const handleDownloadPdf = async (id: number) => {
     try {
-      window.open(`/api/pdf/${id}`, '_blank');
+      // Open the direct-pdf endpoint in a new tab for immediate download
+      window.open(`/api/direct-pdf/${id}`, '_blank');
     } catch (error) {
       console.error(`Error downloading PDF for cotización ${id}:`, error);
     }
@@ -164,14 +180,14 @@ export default function CotizacionesPage() {
           
           <div className="w-full md:w-64">
             <Select 
-              value={statusFilter || ""}
-              onValueChange={(value) => setStatusFilter(value || null)}
+              value={statusFilter || "all"}
+              onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Filtrar por estatus" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="Pendiente">Pendiente</SelectItem>
                 <SelectItem value="Aceptada">Aceptada</SelectItem>
                 <SelectItem value="Rechazada">Rechazada</SelectItem>

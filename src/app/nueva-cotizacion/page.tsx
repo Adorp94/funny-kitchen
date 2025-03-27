@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,8 @@ export default function NuevaCotizacionPage() {
   const [hasShipping, setHasShipping] = useState(false);
   const [shippingAmount, setShippingAmount] = useState<number>(100);
   const [estimatedTime, setEstimatedTime] = useState(6);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Fetch exchange rate on component mount
   useEffect(() => {
@@ -117,66 +119,55 @@ export default function NuevaCotizacionPage() {
       return;
     }
     
+    setIsLoading(true);
+
     try {
-      const subtotal = calcSubtotal();
-      const iva = hasIva ? 1.16 : 1;
-      const envio = hasShipping ? shippingAmount : 0;
+      // Create a temporary cotization ID
+      const tempCotizacionId = Math.floor(Math.random() * 10000);
       
+      // Prepare the quote data
       const cotizacionData = {
-        cliente_id: existingClienteId,
-        cliente: isNewClient ? {
+        cliente: {
           nombre: cliente.nombre,
-          celular: cliente.celular,
-          correo: cliente.correo,
-          razon_social: cliente.razon_social,
-          rfc: cliente.rfc,
-          tipo_cliente: cliente.tipo_cliente,
-          lead: cliente.lead,
-          direccion_envio: cliente.direccion_envio,
-          recibe: cliente.recibe,
-          atencion: cliente.atencion
-        } : null,
-        vendedor_id: 1, // Default vendedor ID
-        fecha_cotizacion: new Date().toISOString(),
+          atencion: cliente.atencion,
+          celular: cliente.celular
+        },
+        vendedor: {
+          nombre: "Vendedor",
+          celular: "",
+          correo: "ventas@funnykitchen.mx"
+        },
         moneda: currency,
-        tipo_cambio: exchangeRate,
-        iva: iva,
+        iva: hasIva ? 1.16 : 1,
         tipo_cuenta: hasIva ? "MORAL" : "FISICA",
-        descuento_total: descuento,
-        precio_total: subtotal * (1 - descuento) * iva + envio,
+        descuento_total: descuento / 100,
         tiempo_estimado: estimatedTime,
-        envio: envio,
+        envio: hasShipping ? shippingAmount : 0,
         productos: cartItems.map(item => ({
-          producto_id: isNaN(parseInt(item.id)) ? 0 : parseInt(item.id),
+          descripcion: item.nombre,
           colores: item.colores,
-          descuento: item.descuento / 100, // Convert from percentage
+          descuento: item.descuento / 100,
           cantidad: item.cantidad,
-          precio_final: item.precio,
-          descripcion: item.nombre
-        }))
+          precio_final: item.precio
+        })),
+        precio_total: calcSubtotal() * (1 - descuento / 100) * (hasIva ? 1.16 : 1) + (hasShipping ? shippingAmount : 0)
       };
       
-      toast.promise(
-        fetch("/api/cotizaciones", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(cotizacionData),
-        }).then(res => res.json()),
-        {
-          loading: 'Generando cotización...',
-          success: (data) => {
-            clearCart();
-            router.push(`/cotizaciones/${data.cotizacion_id}`);
-            return 'Cotización generada con éxito';
-          },
-          error: 'Error al generar la cotización'
-        }
-      );
+      // Create a URL with the data as a parameter
+      const params = new URLSearchParams();
+      params.append('data', JSON.stringify(cotizacionData));
+      
+      // Open the direct-pdf endpoint in a new tab for download
+      window.open(`/api/direct-pdf/${tempCotizacionId}?${params.toString()}`, '_blank');
+
+      // Clear cart and redirect
+      clearCart();
+      setIsLoading(false);
+      router.push('/');
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al generar la cotización");
+      console.error('Error generating quotation:', error);
+      setIsLoading(false);
+      setError('Failed to generate quotation.');
     }
   };
   

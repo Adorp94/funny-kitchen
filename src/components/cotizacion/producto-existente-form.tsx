@@ -28,7 +28,7 @@ export function ProductoExistenteForm() {
   const [descuento, setDescuento] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  const { addToCart } = useCart();
+  const { addToCart, currency, exchangeRate } = useCart();
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -142,15 +142,38 @@ export function ProductoExistenteForm() {
     setDescuento(0);
   };
 
+  // Convert price based on currency
+  const getAdjustedPrice = (price: number): number => {
+    if (!price || isNaN(price)) return 0;
+    
+    // If currency is USD, convert from MXN to USD (prices are stored in MXN)
+    if (currency === "USD") {
+      return parseFloat((price / exchangeRate).toFixed(2));
+    }
+    // If MXN, return the original price
+    return price;
+  };
+
+  // Get display price for UI
+  const getDisplayPrice = (price: number): string => {
+    const adjustedPrice = getAdjustedPrice(price);
+    return currency === "USD" 
+      ? `$${adjustedPrice.toFixed(2)} USD` 
+      : `$${price.toFixed(2)} MXN`;
+  };
+
   const handleAddToCart = () => {
     if (!selectedProducto) return;
     
     // Generate a unique ID for the cart item
     const cartItemId = uuidv4();
     
-    // Calculate the subtotal
-    const precio = selectedProducto.precio || 0;
-    const subtotal = cantidad * precio * (1 - descuento / 100);
+    // Get the base price (stored as MXN)
+    const basePrice = selectedProducto.precio || 0;
+    
+    // Calculate the subtotal using the adjusted price based on currency
+    const adjustedPrice = getAdjustedPrice(basePrice);
+    const subtotal = cantidad * adjustedPrice * (1 - descuento / 100);
     
     // Add the product to the cart
     addToCart({
@@ -159,7 +182,7 @@ export function ProductoExistenteForm() {
       nombre: selectedProducto.nombre,
       colores,
       cantidad,
-      precio,
+      precio: adjustedPrice,  // Use the adjusted price based on currency
       descuento,
       subtotal
     });
@@ -228,7 +251,7 @@ export function ProductoExistenteForm() {
                         {producto.sku} - {producto.nombre}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        Precio: ${producto.precio?.toFixed(2) || '0.00'}
+                        Precio: {getDisplayPrice(producto.precio || 0)}
                       </div>
                     </li>
                   ))}
@@ -284,15 +307,18 @@ export function ProductoExistenteForm() {
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">$</span>
+              <span className="text-gray-500">{currency === "USD" ? "$" : "$"}</span>
             </div>
             <Input
               id="precio"
               type="text"
               className="pl-8"
-              value={selectedProducto?.precio?.toFixed(2) || '0.00'}
+              value={selectedProducto ? getAdjustedPrice(selectedProducto.precio || 0).toFixed(2) : '0.00'}
               readOnly
             />
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <span className="text-gray-500">{currency}</span>
+            </div>
           </div>
         </div>
         

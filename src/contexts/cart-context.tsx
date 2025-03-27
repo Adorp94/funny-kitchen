@@ -76,6 +76,41 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currency, exchangeRate, isClient]);
 
+  // Handle currency changes by updating all product prices
+  const handleCurrencyChange = (newCurrency: "MXN" | "USD") => {
+    // Only process if there's an actual change
+    if (newCurrency === currency) return;
+    
+    // Convert all prices in the cart based on the new currency
+    const updatedItems = cartItems.map(item => {
+      let newPrice: number;
+      
+      if (currency === "MXN" && newCurrency === "USD") {
+        // Convert from MXN to USD
+        newPrice = parseFloat((item.precio / exchangeRate).toFixed(2));
+      } else if (currency === "USD" && newCurrency === "MXN") {
+        // Convert from USD to MXN
+        newPrice = parseFloat((item.precio * exchangeRate).toFixed(2));
+      } else {
+        newPrice = item.precio;
+      }
+      
+      // Recalculate subtotal with new price
+      const newSubtotal = parseFloat((item.cantidad * newPrice * (1 - item.descuento / 100)).toFixed(2));
+      
+      return {
+        ...item,
+        precio: newPrice,
+        subtotal: newSubtotal
+      };
+    });
+    
+    // Update cart items with converted prices
+    setCartItems(updatedItems);
+    // Update currency
+    setCurrency(newCurrency);
+  };
+
   const addToCart = (product: CartProduct) => {
     setCartItems(prevItems => {
       // Check if product already exists in cart
@@ -156,7 +191,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       totalItems,
       subtotal,
       currency,
-      setCurrency,
+      setCurrency: handleCurrencyChange,
       exchangeRate,
       setExchangeRate
     }}>

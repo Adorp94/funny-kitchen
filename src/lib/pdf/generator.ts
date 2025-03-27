@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import path from 'path';
 import fs from 'fs';
-import { supabaseAdmin } from '../supabase/client';
+import { Readable } from 'stream';
 
 // Interface for PDF data
 export interface PDFQuoteData {
@@ -39,10 +39,11 @@ interface ProductItem {
 export async function generateQuotePDF(data: PDFQuoteData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      // Create a document
+      // Create a document with standard fonts (no external fonts)
       const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
+        font: 'Helvetica',
         info: {
           Title: `Cotización ${data.num_cotizacion}`,
           Author: 'Funny Kitchen',
@@ -50,10 +51,14 @@ export async function generateQuotePDF(data: PDFQuoteData): Promise<Buffer> {
         }
       });
 
-      // Buffer to store PDF
-      const chunks: Buffer[] = [];
-      doc.on('data', chunk => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      // Buffer to store PDF content
+      const buffers: Buffer[] = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        resolve(pdfBuffer);
+      });
+      doc.on('error', reject);
       
       // Header with logo
       try {
@@ -277,93 +282,6 @@ function formatNumber(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value);
-}
-
-// Upload PDF to Supabase Storage
-export async function uploadPDFToSupabase(pdfBuffer: Buffer, fileName: string): Promise<string> {
-  try {
-    // Format filename for consistency
-    const formattedFileName = fileName.includes('.pdf') ? fileName : `${fileName}.pdf`;
-    
-    console.log(`Uploading PDF to bucket 'cotizacionpdf' with filename '${formattedFileName}'`);
-    
-    // First try to get the bucket to verify access
-    const { data: bucket, error: bucketError } = await supabaseAdmin.storage
-      .getBucket('cotizacionpdf');
-    
-    if (bucketError) {
-      console.error(`Error accessing bucket: ${bucketError.message}`);
-      // If the bucket doesn't exist, try to create it
-      if (bucketError.message.includes('does not exist')) {
-        console.log('Bucket does not exist. Attempting to create it...');
-        const { error: createError } = await supabaseAdmin.storage.createBucket('cotizacionpdf', {
-          public: true,
-          fileSizeLimit: 10485760, // 10MB
-        });
-        
-        if (createError) {
-          console.error(`Failed to create bucket: ${createError.message}`);
-          throw createError;
-        }
-        console.log('Bucket created successfully');
-      } else {
-        throw bucketError;
-      }
-    }
-    
-    // Upload the file
-    const { data, error } = await supabaseAdmin.storage
-      .from('cotizacionpdf')
-      .upload(formattedFileName, pdfBuffer, {
-        contentType: 'application/pdf',
-        upsert: true // Replace existing file
-      });
-    
-    if (error) {
-      console.error(`Upload error: ${error.message}`);
-      throw error;
-    }
-    
-    console.log('PDF uploaded successfully');
-    
-    // Get public URL for the uploaded file
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('cotizacionpdf')
-      .getPublicUrl(formattedFileName);
-    
-    console.log(`Public URL: ${publicUrlData.publicUrl}`);
-    
-    return publicUrlData.publicUrl;
-  } catch (error) {
-    console.error('Error uploading PDF to Supabase:', error);
-    // Try a fallback approach with a timestamped name if replacing failed
-    try {
-      const timestampedFileName = `${fileName.replace('.pdf', '')}_${Date.now()}.pdf`;
-      console.log(`Trying fallback upload with timestamped name: ${timestampedFileName}`);
-      
-      const { data, error: uploadError } = await supabaseAdmin.storage
-        .from('cotizacionpdf')
-        .upload(timestampedFileName, pdfBuffer, {
-          contentType: 'application/pdf',
-        });
-      
-      if (uploadError) {
-        console.error(`Fallback upload error: ${uploadError.message}`);
-        throw uploadError;
-      }
-      
-      const { data: publicUrlData } = supabaseAdmin.storage
-        .from('cotizacionpdf')
-        .getPublicUrl(timestampedFileName);
-      
-      console.log(`Fallback upload successful. Public URL: ${publicUrlData.publicUrl}`);
-      return publicUrlData.publicUrl;
-      
-    } catch (fallbackError) {
-      console.error('Fallback upload also failed:', fallbackError);
-      throw fallbackError;
-    }
-  }
 }
 
 // Calculate totals based on products and settings

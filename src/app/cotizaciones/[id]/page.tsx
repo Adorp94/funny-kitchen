@@ -8,6 +8,8 @@ import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
+import { formatDate } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 
 interface Producto {
   id: string
@@ -230,6 +232,17 @@ export default function CotizacionDetailPage() {
                 Eliminar
               </>
             )}
+          </Button>
+          
+          <Button 
+            variant="default"
+            onClick={() => {
+              // Open the direct-pdf endpoint in a new tab for immediate download
+              window.open(`/api/direct-pdf/${cotizacion.id}`, '_blank');
+            }}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Descargar PDF
           </Button>
           
           <Button 
