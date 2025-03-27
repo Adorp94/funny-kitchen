@@ -139,6 +139,37 @@ export default function NuevaCotizacionPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
+  // Add a useEffect to preserve client data when navigating between steps
+  useEffect(() => {
+    // Save client data to sessionStorage whenever it changes
+    if (cliente) {
+      sessionStorage.setItem('cotizacion_cliente', JSON.stringify(cliente));
+    }
+  }, [cliente]);
+
+  // Add a useEffect to load any previously saved client data on component mount
+  useEffect(() => {
+    // Try to load any saved client data from sessionStorage
+    const savedCliente = sessionStorage.getItem('cotizacion_cliente');
+    if (savedCliente && !cliente) {
+      try {
+        const parsedCliente = JSON.parse(savedCliente);
+        setClienteData(parsedCliente);
+        setCliente(parsedCliente);
+        
+        // Determine if this is a new client or existing one
+        const isNewClient = parsedCliente.cliente_id === 0;
+        setIsNewClient(isNewClient);
+        
+        if (!isNewClient) {
+          setExistingClienteId(parsedCliente.cliente_id);
+        }
+      } catch (e) {
+        console.error("Error parsing saved client data:", e);
+      }
+    }
+  }, []);
+  
   // Handle form submission
   const handleGenerateCotizacion = async () => {
     if (!cliente) {
@@ -192,7 +223,9 @@ export default function NuevaCotizacionPage() {
       // Open the direct-pdf endpoint in a new tab for download
       window.open(`/api/direct-pdf/${tempCotizacionId}?${params.toString()}`, '_blank');
 
-      // Clear cart and redirect
+      // Clear session storage and cart after successful submission
+      sessionStorage.removeItem('cotizacion_cliente');
+      sessionStorage.removeItem('cotizacion_clienteForm');
       clearCart();
       setIsLoading(false);
       router.push('/cotizaciones');

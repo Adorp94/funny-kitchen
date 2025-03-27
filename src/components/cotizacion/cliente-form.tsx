@@ -47,93 +47,213 @@ interface ClienteFormProps {
 }
 
 export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
+  const [activeTab, setActiveTab] = useState<string>("nuevo");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>('nuevo');
-  const [formData, setFormData] = useState<ClienteFormData>({
-    cliente_id: '',
-    nombre: '',
-    celular: '',
-    correo: '',
-    razon_social: '',
-    rfc: '',
-    tipo_cliente: 'Normal',
-    lead: 'No',
-    direccion_envio: '',
-    recibe: '',
-    atencion: ''
-  });
-  
-  // New state for searchable client dropdown
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Add a state to track form data changes for useEffect
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const [formDataChanged, setFormDataChanged] = useState<boolean>(false);
-  // Track if client form has been initialized from props
   const [initialized, setInitialized] = useState<boolean>(false);
 
-  // Create a safe wrapper for onClienteChange
-  const safeNotifyParent = (cliente: Cliente | null) => {
-    // Schedule this for after render using setTimeout with 0ms delay
-    setTimeout(() => {
-      if (onClienteChange) {
-        onClienteChange(cliente);
+  const [formData, setFormData] = useState<ClienteFormData>({
+    cliente_id: "",
+    nombre: "",
+    celular: "",
+    correo: "",
+    razon_social: "",
+    rfc: "",
+    tipo_cliente: "",
+    lead: "",
+    direccion_envio: "",
+    recibe: "",
+    atencion: ""
+  });
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load saved form data from sessionStorage on first render
+  useEffect(() => {
+    // Try to load any saved form data from sessionStorage
+    const savedFormData = sessionStorage.getItem('cotizacion_clienteForm');
+    if (savedFormData && !initialized) {
+      try {
+        const parsedFormData = JSON.parse(savedFormData);
+        setFormData(parsedFormData);
+        
+        // Set active tab based on whether we have a client ID
+        if (parsedFormData.cliente_id) {
+          setActiveTab("existente");
+          // Set search term if this is an existing client
+          setSearchTerm(parsedFormData.nombre + (parsedFormData.cliente_id ? ` (${parsedFormData.cliente_id})` : ''));
+          // Mark as changed to trigger notification to parent
+          setFormDataChanged(true);
+        } else if (parsedFormData.nombre || parsedFormData.celular) {
+          setActiveTab("nuevo");
+          // Mark as changed to trigger notification to parent
+          setFormDataChanged(true);
+        }
+        
+        setInitialized(true);
+      } catch (e) {
+        console.error("Error parsing saved form data:", e);
       }
-    }, 0);
+    }
+  }, []);
+
+  // Save form data to sessionStorage when it changes
+  useEffect(() => {
+    if (formData.nombre || formData.celular || formData.cliente_id) {
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  // Safe way to notify parent of changes to avoid issues during initialization
+  const safeNotifyParent = (cliente: Cliente | null) => {
+    if (onClienteChange) {
+      // Use setTimeout to move the state update out of the render cycle
+      setTimeout(() => {
+        onClienteChange(cliente);
+      }, 0);
+    }
   };
 
-  // Effect to load clients when switching to existente tab
+  // Effect to handle initialization from clienteId
   useEffect(() => {
-    if (activeTab === 'existente') {
+    if (clienteId && !initialized) {
+      fetchCliente(clienteId);
+      setActiveTab("existente");
+      setInitialized(true);
+    }
+  }, [clienteId]);
+
+  // Effect to fetch clientes when the existente tab is active
+  useEffect(() => {
+    if (activeTab === "existente") {
       fetchClientes();
     }
   }, [activeTab]);
 
-  // Effect to handle clienteId changes from props
-  useEffect(() => {
-    if (clienteId && !initialized) {
-      fetchCliente(clienteId);
-      setInitialized(true);
-    }
-  }, [clienteId, initialized]);
-  
-  // When switching tabs, preserve the form data
-  useEffect(() => {
-    // If we have form data with a cliente_id and we switch to existente tab
-    if (formData.cliente_id && activeTab === 'existente') {
-      // Ensure search term is set
-      if (!searchTerm && formData.nombre) {
-        setSearchTerm(formData.nombre);
-      }
-    }
-  }, [activeTab, formData, searchTerm]);
-
-  // Handle click outside to close dropdown
+  // Handle outside clicks to close dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     }
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  // Update useEffect to notify parent component after render
+  // Effect to preserve form data when switching tabs
   useEffect(() => {
-    if (formDataChanged && onClienteChange) {
-      if (activeTab === 'nuevo' || (activeTab === 'existente' && formData.cliente_id && formData.atencion)) {
+    if (formDataChanged && activeTab === "existente" && selectedCliente) {
+      setSearchTerm(`${selectedCliente.nombre} (${selectedCliente.cliente_id})`);
+    }
+    // Also update selectedCliente when switching to "existente" tab with client_id in formData
+    else if (activeTab === "existente" && formData.cliente_id && !selectedCliente) {
+      // Try to find the cliente by ID in the existing clientes
+      const cliente = clientes.find(c => c.cliente_id.toString() === formData.cliente_id);
+      if (cliente) {
+        setSelectedCliente(cliente);
+        setSearchTerm(`${cliente.nombre} (${cliente.cliente_id})`);
+      }
+    }
+    // When switching to "nuevo" tab, make sure form data is preserved
+    else if (activeTab === "nuevo" && formData.cliente_id === "" && sessionStorage.getItem('cotizacion_clienteForm')) {
+      // Don't overwrite existing data if we already have some
+      if (!formData.nombre && !formData.celular) {
+        const savedFormData = sessionStorage.getItem('cotizacion_clienteForm');
+        if (savedFormData) {
+          try {
+            const parsedFormData = JSON.parse(savedFormData);
+            // Only apply if this is for "nuevo" (no client_id)
+            if (!parsedFormData.cliente_id) {
+              setFormData(parsedFormData);
+              setFormDataChanged(true);
+            }
+          } catch (e) {
+            console.error("Error parsing saved form data:", e);
+          }
+        }
+      }
+    }
+  }, [activeTab, formDataChanged, selectedCliente, formData.cliente_id, clientes, formData.nombre, formData.celular]);
+
+  // Update this useEffect to handle parent notification when form data changes
+  useEffect(() => {
+    // Only notify parent when we have a complete form AND form data has changed
+    if (formDataChanged) {
+      // Check that we have required fields based on the active tab
+      if (activeTab === 'nuevo' && formData.nombre && formData.celular) {
+        safeNotifyParent(formDataToCliente(formData));
+      } else if (activeTab === 'existente' && formData.cliente_id) {
         safeNotifyParent(formDataToCliente(formData));
       }
+      
+      // Reset the changed flag after handling
       setFormDataChanged(false);
     }
-  }, [formData, formDataChanged, onClienteChange, activeTab]);
+  }, [formData, formDataChanged, activeTab]);
+
+  // Convert state to formData format
+  const stateToFormData = (cliente: Cliente): ClienteFormData => {
+    return {
+      cliente_id: cliente.cliente_id.toString(),
+      nombre: cliente.nombre || "",
+      celular: cliente.celular || "",
+      correo: cliente.correo || "",
+      razon_social: cliente.razon_social || "",
+      rfc: cliente.rfc || "",
+      tipo_cliente: cliente.tipo_cliente || "",
+      lead: cliente.lead || "",
+      direccion_envio: cliente.direccion_envio || "",
+      recibe: cliente.recibe || "",
+      atencion: cliente.atencion || ""
+    };
+  };
+
+  // Fetch a specific cliente by ID
+  const fetchCliente = async (id: number) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("*")
+        .eq("cliente_id", id)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const cliente: Cliente = data as Cliente;
+        setSelectedCliente(cliente);
+        
+        // Convert Cliente to FormData format
+        const newFormData = stateToFormData(cliente);
+        setFormData(newFormData);
+        
+        // Update search term
+        setSearchTerm(`${cliente.nombre} (${cliente.cliente_id})`);
+        
+        // Mark as changed instead of direct notification
+        setFormDataChanged(true);
+        
+        // Also save to sessionStorage
+        sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
+      }
+    } catch (error) {
+      console.error("Error fetching cliente:", error);
+      toast.error('Error al cargar el cliente');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchClientes = async () => {
     setLoading(true);
@@ -159,87 +279,6 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     }
   };
 
-  // Function to convert state data to form data
-  const stateToFormData = (cliente: Cliente): ClienteFormData => {
-    return {
-      cliente_id: cliente.cliente_id.toString(),
-      nombre: cliente.nombre || '',
-      celular: cliente.celular || '',
-      correo: cliente.correo || '',
-      razon_social: cliente.razon_social || '',
-      rfc: cliente.rfc || '',
-      tipo_cliente: cliente.tipo_cliente || 'Normal',
-      lead: cliente.lead || 'No',
-      direccion_envio: cliente.direccion_envio || '',
-      recibe: cliente.recibe || '',
-      atencion: cliente.atencion || ''
-    };
-  };
-
-  // Update the fetchCliente to use our convert function
-  const fetchCliente = async (id: number) => {
-    setLoading(true);
-    try {
-      // Use Supabase client directly instead of API route
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('cliente_id', id)
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      console.log('Fetched client details:', data);
-      
-      // Convert any null values to empty strings for the form using our helper
-      const formattedData = {
-        cliente_id: data.cliente_id,
-        nombre: data.nombre,
-        celular: data.celular,
-        correo: data.correo,
-        razon_social: data.razon_social,
-        rfc: data.rfc,
-        tipo_cliente: data.tipo_cliente,
-        lead: data.lead,
-        direccion_envio: data.direccion_envio,
-        recibe: data.recibe,
-        atencion: data.atencion
-      };
-      
-      setFormData(stateToFormData(formattedData));
-      
-      // Update the search term with the client's name
-      setSearchTerm(data.nombre || '');
-      setSelectedCliente(data);
-      setActiveTab('existente');
-      
-      // Create the cliente object for the parent component
-      const cliente: Cliente = {
-        cliente_id: typeof data.cliente_id === 'string' ? parseInt(data.cliente_id) : data.cliente_id,
-        nombre: data.nombre,
-        celular: data.celular,
-        correo: data.correo,
-        razon_social: data.razon_social,
-        rfc: data.rfc,
-        tipo_cliente: data.tipo_cliente,
-        lead: data.lead,
-        direccion_envio: data.direccion_envio,
-        recibe: data.recibe,
-        atencion: data.atencion
-      };
-      
-      // Use the safe notify function instead of direct call
-      safeNotifyParent(cliente);
-    } catch (error) {
-      console.error('Error fetching cliente:', error);
-      toast.error('Error al cargar el cliente');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Convert form data to Cliente object for parent component
   const formDataToCliente = (data: ClienteFormData): Cliente => {
     return {
@@ -257,6 +296,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     };
   };
 
+  // Remove the direct parent notification from these methods
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
@@ -265,15 +305,13 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         [name]: value
       };
       
-      // Mark form data as changed instead of calling onClienteChange directly
-      if (activeTab === 'nuevo' || (activeTab === 'existente' && name === 'atencion')) {
-        setFormDataChanged(true);
-      }
-      
+      // Just mark data as changed, don't notify directly
+      setFormDataChanged(true);
       return newData;
     });
   };
 
+  // Remove the direct parent notification from here too
   const handlePhoneChange = (value: string | undefined) => {
     setFormData(prev => {
       const newData = {
@@ -281,35 +319,38 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         celular: value || ''
       };
       
-      // Mark form data as changed instead of calling onClienteChange directly
-      if (activeTab === 'nuevo') {
-        setFormDataChanged(true);
-      }
-      
+      // Just mark data as changed, don't notify directly
+      setFormDataChanged(true);
       return newData;
     });
   };
 
+  // Handle client selection
   const handleClienteSelect = async (id: string) => {
     if (id) {
       await fetchCliente(parseInt(id));
+      // No direct parent notification needed here as fetchCliente sets formDataChanged
     } else {
-      setFormData({
+      // Reset the form data
+      const emptyFormData = {
         cliente_id: '',
         nombre: '',
         celular: '',
         correo: '',
         razon_social: '',
         rfc: '',
-        tipo_cliente: 'Normal',
-        lead: 'No',
+        tipo_cliente: '',
+        lead: '',
         direccion_envio: '',
         recibe: '',
         atencion: ''
-      });
-      
-      // Use the safe notify function
-      safeNotifyParent(null);
+      };
+      setFormData(emptyFormData);
+      setSelectedCliente(null);
+      // Clear from sessionStorage
+      sessionStorage.removeItem('cotizacion_clienteForm');
+      // Set formDataChanged to trigger the useEffect
+      setFormDataChanged(true);
     }
   };
 
@@ -347,8 +388,11 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       atencion: ''
     });
     
-    // Use the safe version instead of direct call
-    safeNotifyParent(null);
+    // Clear from sessionStorage
+    sessionStorage.removeItem('cotizacion_clienteForm');
+    
+    // Mark as changed to trigger useEffect instead of direct notification
+    setFormDataChanged(true);
   };
 
   return (
@@ -406,7 +450,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
             <FormControl>
               <FormLabel>Tipo de cliente</FormLabel>
               <Select 
-                value={formData.tipo_cliente} 
+                value={formData.tipo_cliente || "Normal"} 
                 onValueChange={(value) => {
                   setFormData(prev => {
                     const newData = { ...prev, tipo_cliente: value };
@@ -511,8 +555,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                           setSelectedCliente(null);
                           setFormData(prev => ({ ...prev, cliente_id: '' }));
                           
-                          // Use the safe version
-                          safeNotifyParent(null);
+                          // Mark as changed to trigger useEffect notification instead of direct call
+                          setFormDataChanged(true);
                         }
                       }}
                       onFocus={() => setShowDropdown(true)}
