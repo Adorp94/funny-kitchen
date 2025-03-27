@@ -5,17 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { ShoppingCart, LayoutDashboard, ClipboardList, ChefHat, Users, Settings, User, LogOut, Menu, X, Plus } from "lucide-react";
-import { useCart } from "@/contexts/cart-context";
+import { LayoutDashboard, ClipboardList, Menu, X, Plus } from "lucide-react";
 
-// Navigation items
+// Simplified navigation items
 const navigation = [
   {
     name: "Dashboard",
@@ -23,26 +15,15 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
-    name: "Cotizaciones",
-    href: "/cotizaciones",
+    name: "Nueva Cotización",
+    href: "/nueva-cotizacion",
     icon: ClipboardList,
-  },
-  {
-    name: "Productos",
-    href: "/productos",
-    icon: ChefHat,
-  },
-  {
-    name: "Clientes",
-    href: "/clientes",
-    icon: Users,
-  },
+  }
 ];
 
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { totalItems } = useCart();
   
   // Check if a given path is active
   const isActive = (path: string) => {
@@ -97,55 +78,6 @@ export function Header() {
             </Button>
           </Link>
           
-          {/* Settings Link */}
-          <Link 
-            href="/configuracion" 
-            className={`p-2 rounded-lg ${
-              isActive("/configuracion")
-                ? "text-teal-700 bg-teal-50"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-            }`}
-          >
-            <Settings className="h-5 w-5" />
-            <span className="sr-only">Configuración</span>
-          </Link>
-          
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="rounded-lg hover:bg-gray-50"
-              >
-                <User className="h-5 w-5 text-gray-600" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="flex items-center justify-start gap-2 p-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100">
-                  <User className="h-4 w-4 text-teal-700" />
-                </div>
-                <div className="flex flex-col space-y-0.5">
-                  <p className="text-sm font-medium">Admin</p>
-                  <p className="text-xs text-gray-500">admin@funnykitchen.mx</p>
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/configuracion" className="cursor-pointer w-full">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Configuración
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <LogOut className="mr-2 h-4 w-4" /> 
-                <span>Cerrar sesión</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
           {/* Mobile menu button */}
           <Button
             variant="ghost"
@@ -182,14 +114,6 @@ export function Header() {
                 {item.name}
               </Link>
             ))}
-            <Link
-              href="/nueva-cotizacion"
-              className="flex items-center px-3 py-2 mt-2 rounded-lg text-sm font-medium bg-teal-500 text-white hover:bg-teal-600 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Nueva cotización
-            </Link>
           </nav>
         </div>
       )}
