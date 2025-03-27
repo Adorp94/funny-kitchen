@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import { ProductoSimplificado } from "@/components/cotizacion/producto-simplificado";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
@@ -108,21 +108,11 @@ export default function NuevaCotizacionPage() {
     setIsLoading(true);
 
     try {
-      // In this simplified version, just show a success message
+      // In this simplified version, navigate to the PDF view
       setTimeout(() => {
-        // Clear session storage 
-        sessionStorage.removeItem('cotizacion_cliente');
-        sessionStorage.removeItem('cotizacion_clienteForm');
-        sessionStorage.removeItem('cotizacion_productos');
-        sessionStorage.removeItem('cotizacion_moneda');
-        
-        // Clear products
-        clearProductos();
-        
         setIsLoading(false);
-        router.push('/');
-        toast.success("¡Cotización generada con éxito!");
-      }, 1500);
+        router.push('/ver-cotizacion');
+      }, 1000);
     } catch (error) {
       console.error('Error generating quotation:', error);
       setIsLoading(false);
@@ -427,7 +417,7 @@ export default function NuevaCotizacionPage() {
                     </span>
                   ) : (
                     <span className="flex items-center">
-                      Generar Cotización <Save className="ml-2 h-4 w-4" />
+                      Ver Cotización en PDF <FileText className="ml-2 h-4 w-4" />
                     </span>
                   )}
                 </Button>
