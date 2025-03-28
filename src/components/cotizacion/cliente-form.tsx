@@ -90,85 +90,70 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     atencion: ""
   });
 
-  // Clear data on page refresh, always reset form when page is reloaded
+  // Completely rewritten persistence logic
   useEffect(() => {
-    // Check if this is a genuine page refresh (not just component mount/remount)
-    const checkPageRefresh = () => {
-      const lastPageLoadTime = sessionStorage.getItem('lastPageLoadTime');
-      const currentTime = new Date().getTime();
-      
-      // If there's no lastPageLoadTime or it's been more than 2 seconds, consider it a refresh
-      const isRefresh = !lastPageLoadTime || (currentTime - parseInt(lastPageLoadTime)) > 2000;
-      
-      // Update the lastPageLoadTime
-      sessionStorage.setItem('lastPageLoadTime', currentTime.toString());
-      
-      return isRefresh;
-    };
-    
-    // Handle page refresh
-    const handlePageRefresh = () => {
-      console.log("Page was refreshed, clearing form data");
-      // Clear any existing saved form data
-      sessionStorage.removeItem('cotizacion_clienteForm');
-      // Reset the form data
-      setFormData({
-        cliente_id: "",
-        nombre: "",
-        celular: "",
-        correo: "",
-        razon_social: "",
-        rfc: "",
-        tipo_cliente: "Normal",
-        direccion_envio: "",
-        recibe: "",
-        atencion: ""
-      });
-      setSearchResults([]);
-      setSearchTerm('');
-    };
-    
-    // Handle normal component mounting
-    const handleNormalMount = () => {
-      console.log("Component mounted normally, trying to load saved data");
-      // Try to load any saved form data from previous sections
-      const savedFormData = sessionStorage.getItem('cotizacion_clienteForm');
-      if (savedFormData) {
+    const initializeForm = () => {
+      // Check if this is a page refresh or a navigation
+      const isPageRefresh = !sessionStorage.getItem('navigationOccurred');
+
+      if (isPageRefresh) {
+        // On page refresh, clear everything
+        console.log("Page refresh detected: clearing form data");
+        sessionStorage.removeItem('cotizacion_clienteForm');
+        
+        setFormData({
+          cliente_id: "",
+          nombre: "",
+          celular: "",
+          correo: "",
+          razon_social: "",
+          rfc: "",
+          tipo_cliente: "Normal",
+          direccion_envio: "",
+          recibe: "",
+          atencion: ""
+        });
+      } else {
+        // On regular component mount (like when navigating between steps)
+        // try to load saved data
         try {
-          const parsedFormData = JSON.parse(savedFormData);
-          setFormData(parsedFormData);
-          
-          // Set active tab based on whether we have a client ID
-          if (parsedFormData.cliente_id) {
-            setActiveTab("existente");
-            // Mark as changed to trigger notification to parent
-            setFormDataChanged(true);
-          } else if (parsedFormData.nombre || parsedFormData.celular) {
-            setActiveTab("nuevo");
-            // Mark as changed to trigger notification to parent
-            setFormDataChanged(true);
+          const savedData = sessionStorage.getItem('cotizacion_clienteForm');
+          if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            console.log("Loading saved form data:", parsedData);
+            
+            setFormData(parsedData);
+            
+            // Set active tab based on whether we have a client ID
+            if (parsedData.cliente_id) {
+              setActiveTab("existente");
+              setFormDataChanged(true); // Trigger parent notification
+            } else if (parsedData.nombre || parsedData.celular) {
+              setActiveTab("nuevo");
+              setFormDataChanged(true); // Trigger parent notification
+            }
+          } else {
+            console.log("No saved form data found");
           }
         } catch (e) {
-          console.error("Error parsing saved form data:", e);
+          console.error("Error loading saved form data:", e);
         }
       }
+      
+      // Mark that we've initialized and set the navigation flag for next time
+      setInitialized(true);
+      sessionStorage.setItem('navigationOccurred', 'true');
     };
     
-    // Only do initialization once
     if (!initialized) {
-      // If it's a refresh, clear data. Otherwise, try to load saved data
-      if (checkPageRefresh()) {
-        handlePageRefresh();
-      } else {
-        handleNormalMount();
-      }
-      
-      setInitialized(true);
+      initializeForm();
     }
     
-    // Add event listener for beforeunload
+    // Add a beforeunload listener to detect actual page refreshes
     const handleBeforeUnload = () => {
-      // Don't remove session data, let the next load decide whether to clear or keep
+      // When the page is refreshed/closed, remove the navigation marker
+      // so next load will be treated as a refresh
+      sessionStorage.removeItem('navigationOccurred');
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -177,13 +162,6 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
-
-  // Save form data to sessionStorage only when user interacts with it
-  useEffect(() => {
-    if ((formData.nombre || formData.celular || formData.cliente_id) && initialized && formDataChanged) {
-      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(formData));
-    }
-  }, [formData, initialized, formDataChanged]);
 
   // Safe way to notify parent of changes to avoid issues during initialization
   const safeNotifyParent = (cliente: ClienteType | null) => {
@@ -283,8 +261,16 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         [name]: true
       }));
       
-      // Just mark data as changed, don't notify directly
+      // Mark data as changed to trigger parent notification
       setFormDataChanged(true);
+      
+      // Save to sessionStorage
+      const updatedData = {
+        ...prev,
+        [name]: value
+      };
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedData));
+      
       return newData;
     });
   };
@@ -302,8 +288,16 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         celular: true
       }));
       
-      // Just mark data as changed, don't notify directly
+      // Mark data as changed to trigger parent notification
       setFormDataChanged(true);
+      
+      // Save to sessionStorage
+      const updatedData = {
+        ...prev,
+        celular: value || ''
+      };
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedData));
+      
       return newData;
     });
   };
@@ -350,7 +344,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     
     if (!cliente) return;
     
-    setFormData({
+    // Completely replace the form data with the selected client
+    const updatedFormData = {
       cliente_id: cliente.cliente_id.toString(),
       nombre: cliente.nombre || "",
       celular: cliente.celular || "",
@@ -361,10 +356,14 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       direccion_envio: cliente.direccion_envio || "",
       recibe: cliente.recibe || "",
       atencion: cliente.atencion || ""
-    });
+    };
     
-    // Mark data as changed to trigger notification to parent
+    setFormData(updatedFormData);
     setFormDataChanged(true);
+    
+    // Save to sessionStorage
+    sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
+    console.log("Client selected, saved to sessionStorage:", updatedFormData);
     
     // Close combobox
     setComboboxOpen(false);
@@ -413,13 +412,18 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       
       if (data) {
         // Update form with the new client ID
-        setFormData(prev => ({
-          ...prev,
+        const updatedFormData = {
+          ...formData,
           cliente_id: data.cliente_id.toString()
-        }));
+        };
+        
+        setFormData(updatedFormData);
         
         // Mark as changed to trigger notification to parent
         setFormDataChanged(true);
+        
+        // Save to sessionStorage
+        sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
         
         toast.success("Cliente guardado exitosamente");
       }
@@ -430,6 +434,32 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       setIsSaving(false);
     }
   };
+
+  // Add additional debugging effect to monitor sessionStorage
+  useEffect(() => {
+    // Check saved data on tab change or other updates to help debug persistence
+    const savedData = sessionStorage.getItem('cotizacion_clienteForm');
+    console.log("Current sessionStorage state:", savedData ? JSON.parse(savedData) : "No data");
+    
+    // Listen for tab changes in the form
+    const handleTabChange = () => {
+      const currentData = sessionStorage.getItem('cotizacion_clienteForm');
+      console.log("After tab change, sessionStorage:", currentData ? JSON.parse(currentData) : "No data");
+    };
+    
+    // Listen for storage events from other tabs/windows
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'cotizacion_clienteForm') {
+        console.log("Storage changed in another tab:", e.newValue ? JSON.parse(e.newValue) : "No data");
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [activeTab]);
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
@@ -716,12 +746,27 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                         <Button 
                           size="sm" 
                           onClick={() => {
-                            setActiveTab("nuevo");
-                            setFormData(prev => ({
-                              ...prev,
+                            // Create new client with the search term as name
+                            const newFormData = {
+                              cliente_id: "",
                               nombre: searchTerm,
-                              cliente_id: ""
-                            }));
+                              celular: "",
+                              correo: "",
+                              razon_social: "",
+                              rfc: "",
+                              tipo_cliente: "Normal",
+                              direccion_envio: "",
+                              recibe: "",
+                              atencion: ""
+                            };
+                            
+                            setActiveTab("nuevo");
+                            setFormData(newFormData);
+                            setFormDataChanged(true);
+                            
+                            // Save to sessionStorage
+                            sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
+                            
                             setComboboxOpen(false);
                           }}
                           className="bg-teal-500 hover:bg-teal-600 text-white"
@@ -734,22 +779,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                         <div
                           key={cliente.cliente_id}
                           className="flex items-center px-3 py-2 cursor-pointer hover:bg-slate-100"
-                          onClick={() => {
-                            setFormData({
-                              cliente_id: cliente.cliente_id.toString(),
-                              nombre: cliente.nombre || "",
-                              celular: cliente.celular || "",
-                              correo: cliente.correo || "",
-                              razon_social: cliente.razon_social || "",
-                              rfc: cliente.rfc || "",
-                              tipo_cliente: cliente.tipo_cliente || "Normal",
-                              direccion_envio: cliente.direccion_envio || "",
-                              recibe: cliente.recibe || "",
-                              atencion: cliente.atencion || ""
-                            });
-                            setFormDataChanged(true);
-                            setComboboxOpen(false);
-                          }}
+                          onClick={() => handleSelectClient(cliente.cliente_id.toString())}
                         >
                           <User className="h-4 w-4 mr-2 text-muted-foreground" />
                           <span className="flex-1">
@@ -951,8 +981,19 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setFormData(prev => ({...prev, cliente_id: ""}));
+                      // Clear the client selection
+                      const updatedFormData = {
+                        ...formData,
+                        cliente_id: ""
+                      };
+                      
+                      setFormData(updatedFormData);
                       setFormDataChanged(true);
+                      
+                      // Save to sessionStorage
+                      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
+                      console.log("Client selection cleared");
+                      
                       setComboboxOpen(true);
                     }}
                   >
@@ -992,11 +1033,26 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                   className="mt-3 bg-teal-500 hover:bg-teal-600 text-white" 
                   size="sm"
                   onClick={() => {
+                    // Create new client with the search term as name
+                    const newFormData = {
+                      cliente_id: "",
+                      nombre: searchTerm,
+                      celular: "",
+                      correo: "",
+                      razon_social: "",
+                      rfc: "",
+                      tipo_cliente: "Normal",
+                      direccion_envio: "",
+                      recibe: "",
+                      atencion: ""
+                    };
+                    
                     setActiveTab("nuevo");
-                    setFormData(prev => ({
-                      ...prev,
-                      nombre: searchTerm
-                    }));
+                    setFormData(newFormData);
+                    setFormDataChanged(true);
+                    
+                    // Save to sessionStorage
+                    sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
                   }}
                 >
                   Crear nuevo cliente
