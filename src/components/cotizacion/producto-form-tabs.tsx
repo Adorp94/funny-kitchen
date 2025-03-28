@@ -111,54 +111,38 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   // Initialize form and handle persistence
   useEffect(() => {
     const initializeForm = () => {
-      // Check if this is a page refresh or a navigation
-      const isPageRefresh = !sessionStorage.getItem('navigationOccurred');
-
-      if (isPageRefresh) {
-        // On page refresh, clear everything
-        console.log("Page refresh detected: clearing form data");
+      // Always clear session storage on component mount during development
+      // This prevents leftover data from previous sessions
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Development mode detected: clearing form data");
         sessionStorage.removeItem('cotizacion_productoForm');
-        
-        setFormData({
-          producto_id: "",
-          nombre: "",
-          tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
-          precio: "",
-          sku: "",
-          capacidad: "",
-          unidad: "ml",
-          tipo_producto: "Personalizado",
-          descripcion: "",
-          colores: "",
-          acabado: "",
-          cantidad: "1"
-        });
+        sessionStorage.removeItem('navigationOccurred');
       } else {
-        // On regular component mount (like when navigating between steps)
-        // try to load saved data
-        try {
-          const savedData = sessionStorage.getItem('cotizacion_productoForm');
-          if (savedData) {
-            const parsedData = JSON.parse(savedData);
-            console.log("Loading saved form data:", parsedData);
-            
-            setFormData(parsedData);
-            
-            // Set active tab based on whether we have a product ID
-            if (parsedData.producto_id) {
-              setActiveTab("existente");
-              setFormDataChanged(true); // Trigger parent notification
-            } else if (parsedData.nombre) {
-              setActiveTab("nuevo");
-              setFormDataChanged(true); // Trigger parent notification
-            }
-          } else {
-            console.log("No saved form data found");
-          }
-        } catch (e) {
-          console.error("Error loading saved form data:", e);
+        // Check if this is a page refresh or a navigation in production
+        const isPageRefresh = !sessionStorage.getItem('navigationOccurred');
+        
+        if (isPageRefresh) {
+          // On page refresh, clear everything
+          console.log("Page refresh detected: clearing form data");
+          sessionStorage.removeItem('cotizacion_productoForm');
         }
       }
+      
+      // Always start with a fresh form
+      setFormData({
+        producto_id: "",
+        nombre: "",
+        tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+        precio: "",
+        sku: "",
+        capacidad: "",
+        unidad: "ml",
+        tipo_producto: "Personalizado",
+        descripcion: "",
+        colores: "",
+        acabado: "",
+        cantidad: "1"
+      });
       
       // Mark that we've initialized and set the navigation flag for next time
       setInitialized(true);
@@ -184,11 +168,22 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   }, []);
   
   // Safe way to notify parent of changes to avoid issues during initialization
-  const safeNotifyParent = (producto: ProductoType | null) => {
-    if (onProductoChange) {
+  const safeNotifyParent = (producto: ProductoType | null, cantidad?: number) => {
+    if (onProductoChange && producto) {
+      // Create a modified product with the cantidad field
+      const productoWithCantidad = {
+        ...producto,
+        cantidad: cantidad || parseInt(formData.cantidad) || 1
+      };
+      
       // Use setTimeout to move the state update out of the render cycle
       setTimeout(() => {
-        onProductoChange(producto);
+        onProductoChange(productoWithCantidad);
+      }, 0);
+    } else if (onProductoChange) {
+      // Just pass null if the product is null
+      setTimeout(() => {
+        onProductoChange(null);
       }, 0);
     }
   };
@@ -226,33 +221,6 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     return newErrors;
   };
 
-  // Update this useEffect to handle parent notification when form data changes
-  useEffect(() => {
-    // Only notify parent when we have a complete form AND form data has changed AND no errors
-    if (formDataChanged && initialized) {
-      const validationErrors = validateForm(formData);
-      setErrors(validationErrors);
-      
-      // Only notify if there are no errors and we have required fields
-      const hasNoErrors = Object.keys(validationErrors).length === 0;
-      
-      if (hasNoErrors) {
-        // Check that we have required fields based on the active tab
-        if (activeTab === 'nuevo' && formData.nombre && formData.precio) {
-          safeNotifyParent(formDataToProducto(formData));
-        } else if (activeTab === 'existente' && formData.producto_id) {
-          safeNotifyParent(formDataToProducto(formData));
-        }
-      } else {
-        // If we have errors, notify parent with null to indicate invalid data
-        safeNotifyParent(null);
-      }
-      
-      // Reset the changed flag after handling
-      setFormDataChanged(false);
-    }
-  }, [formData, formDataChanged, activeTab, initialized]);
-
   // Convert form data to Producto object for parent component
   const formDataToProducto = (data: ProductoFormData): ProductoType => {
     return {
@@ -287,15 +255,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         [name]: true
       }));
       
-      // Mark data as changed to trigger parent notification
-      setFormDataChanged(true);
-      
-      // Save to sessionStorage
-      const updatedData = {
+      // Save to sessionStorage without triggering parent notification
+      // This prevents auto-adding to cart when editing fields
+      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify({
         ...prev,
         [name]: value
-      };
-      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(updatedData));
+      }));
       
       return newData;
     });
@@ -315,15 +280,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         [name]: true
       }));
       
-      // Mark data as changed to trigger parent notification
-      setFormDataChanged(true);
-      
-      // Save to sessionStorage
-      const updatedData = {
+      // Save to sessionStorage without triggering parent notification
+      // This prevents auto-adding to cart when changing dropdowns
+      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify({
         ...prev,
         [name]: value
-      };
-      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(updatedData));
+      }));
       
       return newData;
     });
@@ -367,7 +329,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   };
 
   // Search for products with pagination support
-  const handleSearch = async (searchTermValue: string, page = 0, append = false) => {
+  const handleSearch = async (searchTermValue: string, page = 0, append = false): Promise<void> => {
     setIsSearching(true);
     
     try {
@@ -409,7 +371,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
-  // Handle scrolling to load more results
+  // Handle scrolling to load more results - preserve scroll position
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
     
@@ -419,8 +381,24 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
       hasMoreResults &&
       !isSearching
     ) {
+      // Remember current scroll position and height
+      const scrollTop = element.scrollTop;
+      const previousHeight = element.scrollHeight;
+      
       // Load more results
-      handleSearch(searchTerm, currentPage + 1, true);
+      setIsSearching(true);
+      
+      handleSearch(searchTerm, currentPage + 1, true)
+        .then(() => {
+          // Use a small timeout to ensure the DOM has updated
+          setTimeout(() => {
+            // Calculate new position: previous scroll position + difference in heights
+            if (element) {
+              const newPosition = scrollTop + (element.scrollHeight - previousHeight);
+              element.scrollTop = newPosition;
+            }
+          }, 10);
+        });
     }
   };
   
@@ -471,14 +449,71 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     };
     
     setFormData(updatedFormData);
-    setFormDataChanged(true);
     
-    // Save to sessionStorage
+    // Save to sessionStorage without triggering parent notification
     sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(updatedFormData));
     console.log("Product selected, saved to sessionStorage:", updatedFormData);
     
+    // Do NOT set formDataChanged to true here, as we don't want to auto-add to cart
+    // setFormDataChanged(true);
+    
     // Close combobox
     setComboboxOpen(false);
+  };
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    // When switching tabs, clear the form to avoid data confusion
+    setActiveTab(value);
+    
+    // Clear the form when switching tabs
+    setFormData({
+      producto_id: "",
+      nombre: "",
+      tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+      precio: "",
+      sku: "",
+      capacidad: "",
+      unidad: "ml",
+      tipo_producto: "Personalizado",
+      descripcion: "",
+      colores: "",
+      acabado: "",
+      cantidad: "1"
+    });
+    
+    setTouched({});
+    
+    // We no longer auto-open search when switching to Existente tab
+    // This improves UX by giving users more control
+  };
+
+  // Add useEffect to handle clicks outside the combobox
+  useEffect(() => {
+    // Only add listener if combobox is open
+    if (comboboxOpen) {
+      const handleClickOutside = (event: MouseEvent) => {
+        // Check if the click was outside the combobox
+        if (listRef.current && !listRef.current.contains(event.target as Node)) {
+          // Close the combobox
+          setComboboxOpen(false);
+        }
+      };
+      
+      // Add the event listener
+      document.addEventListener('mousedown', handleClickOutside);
+      
+      // Clean up
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [comboboxOpen]);
+
+  // Add utility function to prevent scroll on number inputs
+  const preventScrollInput = (e: React.WheelEvent<HTMLInputElement>) => {
+    // Prevent the input value from changing when scrolling
+    e.currentTarget.blur();
   };
 
   // Update existing product in database
@@ -525,6 +560,8 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         inventario: null
       };
       
+      console.log("Updating product:", productoToUpdate);
+      
       // Update the product in the database
       const response = await fetch(`/api/productos/${formData.producto_id}`, {
         method: 'PUT',
@@ -540,16 +577,13 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
       }
       
       const data = await response.json();
+      console.log("Update response:", data);
       
-      if (data) {
-        // Mark as changed to trigger notification to parent
-        setFormDataChanged(true);
-        
-        // Save to sessionStorage
-        sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(formData));
-        
-        toast.success("Producto actualizado exitosamente");
-      }
+      // Show success message
+      toast.success("Producto actualizado exitosamente");
+      
+      // Refresh the product list
+      handleSearch("", 0, false);
     } catch (error) {
       console.error("Error updating product:", error);
       toast.error("Error al actualizar el producto");
@@ -577,36 +611,41 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
       return;
     }
     
-    // If valid, notify parent
-    safeNotifyParent(formDataToProducto(formData));
+    // If valid, notify parent with the quantity
+    const cantidad = parseInt(formData.cantidad) || 1;
+    safeNotifyParent(formDataToProducto(formData), cantidad);
     
-    // Show success message
-    toast.success("Producto agregado al carrito exitosamente");
+    // Fully reset the form after adding to cart
+    setFormData({
+      producto_id: "",
+      nombre: "",
+      tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+      precio: "",
+      sku: "",
+      capacidad: "",
+      unidad: "ml",
+      tipo_producto: "Personalizado",
+      descripcion: "",
+      colores: "",
+      acabado: "",
+      cantidad: "1"
+    });
     
-    // Clear form if it's a new product (don't clear if updating existing)
-    if (activeTab === "nuevo") {
-      setFormData({
-        producto_id: "",
-        nombre: "",
-        tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
-        precio: "",
-        sku: "",
-        capacidad: "",
-        unidad: "ml",
-        tipo_producto: "Personalizado",
-        descripcion: "",
-        colores: "",
-        acabado: "",
-        cantidad: "1"
-      });
-      
-      setTouched({});
+    // Clear touched state
+    setTouched({});
+    
+    // Clear the data from session storage
+    sessionStorage.removeItem('cotizacion_productoForm');
+    
+    // Open search if in existing tab
+    if (activeTab === "existente") {
+      setComboboxOpen(true);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid grid-cols-2 mb-6">
           <TabsTrigger value="existente">Existente</TabsTrigger>
           <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
@@ -839,19 +878,56 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               {/* Cantidad */}
               <FormControl>
                 <FormLabel required>Cantidad</FormLabel>
-                <Input
-                  name="cantidad"
-                  type="number"
-                  min="1"
-                  value={formData.cantidad}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('cantidad')}
-                  placeholder="Ej: 10"
-                  icon={<Layers className="h-4 w-4" />}
-                  className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  required
-                  readOnly={!formData.producto_id && !comboboxOpen}
-                />
+                <div className="flex">
+                  <Input
+                    name="cantidad"
+                    type="number"
+                    min="1"
+                    value={formData.cantidad}
+                    onChange={handleInputChange}
+                    onBlur={() => handleBlur('cantidad')}
+                    onWheel={preventScrollInput}
+                    placeholder="Ej: 10"
+                    icon={<Layers className="h-4 w-4" />}
+                    className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    required
+                    readOnly={!formData.producto_id && !comboboxOpen}
+                  />
+                  <div className="flex flex-col ml-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6 rounded-t-md border-b-0"
+                      onClick={() => {
+                        const currentValue = parseInt(formData.cantidad) || 0;
+                        if (currentValue < 999) {
+                          setFormData(prev => ({ ...prev, cantidad: (currentValue + 1).toString() }));
+                          handleBlur('cantidad');
+                        }
+                      }}
+                      disabled={!formData.producto_id && !comboboxOpen}
+                    >
+                      <span className="text-xs">+</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6 rounded-b-md"
+                      onClick={() => {
+                        const currentValue = parseInt(formData.cantidad) || 0;
+                        if (currentValue > 1) {
+                          setFormData(prev => ({ ...prev, cantidad: (currentValue - 1).toString() }));
+                          handleBlur('cantidad');
+                        }
+                      }}
+                      disabled={!formData.producto_id && !comboboxOpen}
+                    >
+                      <span className="text-xs">-</span>
+                    </Button>
+                  </div>
+                </div>
                 {touched.cantidad && errors.cantidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -870,9 +946,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   value={formData.precio}
                   onChange={handleInputChange}
                   onBlur={() => handleBlur('precio')}
+                  onWheel={preventScrollInput}
                   placeholder="Ej: 150.00"
                   icon={<Banknote className="h-4 w-4" />}
-                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                   required
                   readOnly={!formData.producto_id && !comboboxOpen}
                 />
@@ -1028,9 +1105,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   value={formData.capacidad}
                   onChange={handleInputChange}
                   onBlur={() => handleBlur('capacidad')}
+                  onWheel={preventScrollInput}
                   placeholder="Ej: 350"
                   icon={<Box className="h-4 w-4" />}
-                  className={`${touched.capacidad && errors.capacidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  className={`${touched.capacidad && errors.capacidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                 />
                 {touched.capacidad && errors.capacidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
@@ -1165,9 +1243,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   value={formData.precio}
                   onChange={handleInputChange}
                   onBlur={() => handleBlur('precio')}
+                  onWheel={preventScrollInput}
                   placeholder="Ej: 150.00"
                   icon={<Banknote className="h-4 w-4" />}
-                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                   required
                 />
                 {touched.precio && errors.precio && (
@@ -1180,18 +1259,53 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               
               <FormControl>
                 <FormLabel required>Cantidad</FormLabel>
-                <Input
-                  name="cantidad"
-                  type="number"
-                  min="1"
-                  value={formData.cantidad}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('cantidad')}
-                  placeholder="Ej: 10"
-                  icon={<Layers className="h-4 w-4" />}
-                  className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  required
-                />
+                <div className="flex">
+                  <Input
+                    name="cantidad"
+                    type="number"
+                    min="1"
+                    value={formData.cantidad}
+                    onChange={handleInputChange}
+                    onBlur={() => handleBlur('cantidad')}
+                    onWheel={preventScrollInput}
+                    placeholder="Ej: 10"
+                    icon={<Layers className="h-4 w-4" />}
+                    className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    required
+                  />
+                  <div className="flex flex-col ml-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6 rounded-t-md border-b-0"
+                      onClick={() => {
+                        const currentValue = parseInt(formData.cantidad) || 0;
+                        if (currentValue < 999) {
+                          setFormData(prev => ({ ...prev, cantidad: (currentValue + 1).toString() }));
+                          handleBlur('cantidad');
+                        }
+                      }}
+                    >
+                      <span className="text-xs">+</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-6 w-6 rounded-b-md"
+                      onClick={() => {
+                        const currentValue = parseInt(formData.cantidad) || 0;
+                        if (currentValue > 1) {
+                          setFormData(prev => ({ ...prev, cantidad: (currentValue - 1).toString() }));
+                          handleBlur('cantidad');
+                        }
+                      }}
+                    >
+                      <span className="text-xs">-</span>
+                    </Button>
+                  </div>
+                </div>
                 {touched.cantidad && errors.cantidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />

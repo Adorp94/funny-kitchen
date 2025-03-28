@@ -12,6 +12,20 @@ import { useProductos } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
 
+// Define the Producto interface locally
+interface Producto {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  subtotal: number;
+  sku: string;
+  descripcion: string;
+  colores: string[];
+  acabado: string;
+  descuento: number;
+}
+
 export default function NuevaCotizacionPage() {
   const router = useRouter();
   const [activeStep, setActiveStep] = useState<number>(1);
@@ -49,7 +63,25 @@ export default function NuevaCotizacionPage() {
 
   // Add a useEffect to load any previously saved client data on component mount
   useEffect(() => {
-    // Try to load any saved client data from sessionStorage
+    // Check if we're in development mode
+    if (process.env.NODE_ENV === 'development') {
+      // Clear all session storage in development mode
+      console.log("Development mode detected: clearing all session storage");
+      sessionStorage.removeItem('cotizacion_cliente');
+      sessionStorage.removeItem('cotizacion_productoForm');
+      sessionStorage.removeItem('navigationOccurred');
+      
+      // Reset client state
+      setClienteData(null);
+      setCliente(null);
+      
+      // Clear products context
+      clearProductos();
+      
+      return; // Skip loading from session storage
+    }
+    
+    // In production, try to load any saved client data from sessionStorage
     const savedCliente = sessionStorage.getItem('cotizacion_cliente');
     if (savedCliente && !cliente) {
       try {
@@ -251,20 +283,49 @@ export default function NuevaCotizacionPage() {
                   <ProductoFormTabs onProductoChange={(producto) => {
                     if (producto) {
                       // Format product data for addProducto
-                      const productoToAdd = {
+                      const productoToAdd: Producto = {
                         id: String(producto.producto_id || Date.now()), // Use product ID or timestamp
-                        sku: producto.sku || "",
                         nombre: producto.nombre,
+                        cantidad: Number(producto.cantidad) || 1,
+                        precio: producto.precio || 0,
+                        subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
+                        sku: producto.sku || "",
                         descripcion: producto.descripcion || "",
                         colores: producto.colores ? producto.colores.split(',').map(c => c.trim()) : [],
                         acabado: "",
-                        cantidad: 1,
-                        precio: producto.precio || 0,
                         descuento: 0,
-                        subtotal: producto.precio || 0,
                       };
-                      addProducto(productoToAdd);
-                      toast.success("Producto agregado a la cotización");
+                      
+                      // Check if this product already exists in the cart by ID
+                      const existingProductIndex = productos.findIndex(
+                        p => p.id === productoToAdd.id
+                      );
+                      
+                      if (existingProductIndex >= 0) {
+                        // If it exists, update the quantity and subtotal
+                        const updatedProductos = [...productos] as any[];
+                        const existingProduct = updatedProductos[existingProductIndex];
+                        
+                        // When the same product is added again, accumulate the quantity
+                        const newQuantity = existingProduct.cantidad + productoToAdd.cantidad;
+                        
+                        updatedProductos[existingProductIndex] = {
+                          ...existingProduct,
+                          cantidad: newQuantity,
+                          subtotal: productoToAdd.precio * newQuantity,
+                        };
+                        
+                        // Replace the entire array in context
+                        clearProductos();
+                        updatedProductos.forEach(p => addProducto(p));
+                        
+                        // Show a single notification about the update
+                        toast.success(`Se actualizó el producto "${productoToAdd.nombre}" (${newQuantity} unidades)`);
+                      } else {
+                        // If it's a new product, add it
+                        addProducto(productoToAdd);
+                        toast.success(`Se agregó "${productoToAdd.nombre}" a la cotización`);
+                      }
                     }
                   }} />
                 </div>
