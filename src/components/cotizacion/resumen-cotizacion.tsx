@@ -58,7 +58,7 @@ export function ResumenCotizacion({
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
     const convertedAmount = convertAmount(amount);
-    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${convertedAmount.toFixed(2)}`;
+    return `${convertedAmount.toFixed(2)} ${moneda === 'MXN' ? 'MXN' : 'USD'}`;
   };
 
   // Calculate discount amount
@@ -238,7 +238,6 @@ export function ResumenCotizacion({
         <div className="flex items-center justify-between pl-6">
           <span className="text-sm text-gray-600">Costo de envío:</span>
           <div className="flex items-center space-x-1">
-            <span className="text-gray-500">{moneda === 'MXN' ? 'MX$' : 'US$'}</span>
             <Input
               type="text"
               inputMode="decimal"
@@ -247,6 +246,7 @@ export function ResumenCotizacion({
               className="w-20 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               placeholder="0"
             />
+            <span className="text-gray-500">{moneda === 'MXN' ? 'MXN' : 'USD'}</span>
           </div>
         </div>
       )}

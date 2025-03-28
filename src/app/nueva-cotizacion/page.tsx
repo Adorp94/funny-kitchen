@@ -206,7 +206,7 @@ export default function NuevaCotizacionPage() {
       console.log(`Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
     }
     
-    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${displayAmount.toFixed(2)}`;
+    return `${displayAmount.toFixed(2)} ${moneda}`;
   };
 
   // Handle currency change
