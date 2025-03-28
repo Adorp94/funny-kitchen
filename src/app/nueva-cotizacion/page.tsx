@@ -10,16 +10,7 @@ import { ProductoSimplificado } from "@/components/cotizacion/producto-simplific
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
 import { useProductos } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// Match the interface with ClienteForm component
-interface Cliente {
-  cliente_id: number;
-  nombre: string;
-  celular: string;
-  correo: string | null;
-  tipo_cliente: string | null;
-  atencion: string | null;
-}
+import { Cliente } from "@/lib/supabase";
 
 export default function NuevaCotizacionPage() {
   const router = useRouter();
