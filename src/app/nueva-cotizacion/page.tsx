@@ -16,9 +16,48 @@ import { Cliente } from "@/lib/supabase";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
 
-// Define the Producto interface with all required properties
-interface Producto extends ProductoBase {
+interface ExtendedProductoBase extends ProductoBase {
+  cantidad: number;
+  sku?: string;
+  descripcion?: string;
+  colores?: string[];
+  acabado?: string;
   descuento: number;
+}
+
+// Define the Producto interface properly
+interface Producto extends ExtendedProductoBase {
+  subtotal: number;
+}
+
+// Define the form data interface to fix the 'formData' errors
+interface ProductoFormData {
+  tipo: 'nuevo' | 'existente';
+  producto?: any;
+  cantidad?: number;
+  [key: string]: any; // Allow additional properties
+}
+
+// Define a more explicit type for the API's product format
+interface ApiProducto {
+  producto_id?: string | number;
+  nombre: string;
+  cantidad: number | string;
+  precio: number;
+  descuento?: number;
+  sku?: string;
+  descripcion?: string;
+  colores?: string[] | string;
+  acabado?: string;
+}
+
+// Extend ProductoBase with additional properties
+interface ExtendedProducto extends ProductoBase {
+  descuento: number;
+  sku: string;
+  descripcion: string;
+  colores: string[];
+  acabado: string;
 }
 
 export default function NuevaCotizacionPage() {
@@ -50,6 +89,9 @@ export default function NuevaCotizacionPage() {
     setShippingCost,
     exchangeRate
   } = useProductos();
+
+  // Add formData state
+  const [formData, setFormData] = useState<ProductoFormData>({ tipo: 'nuevo' });
 
   // Use effect to update cliente state after render
   useEffect(() => {
@@ -121,67 +163,30 @@ export default function NuevaCotizacionPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // Update handleSubmit to use MouseEvent instead of FormEvent
+  const handleGenerateCotizacion = async () => {
+    if (!cliente) {
+      toast.error("Por favor, ingresa la información del cliente");
+      return;
+    }
+    
+    if (productos.length === 0) {
+      toast.error("Por favor, agrega al menos un producto");
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
-      if (formData.tipo === 'nuevo') {
-        const response = await fetch('/api/productos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        });
-
-        if (!response.ok) {
-          throw new Error('Error al crear el producto');
-        }
-
-        const producto = await response.json();
-        const newProduct: Producto = {
-          id: producto.id,
-          nombre: producto.nombre,
-          precio: producto.precio || 0,
-          cantidad: Number(producto.cantidad) || 1,
-          subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
-          sku: producto.sku || "",
-          descripcion: producto.descripcion || "",
-          colores: Array.isArray(producto.colores) ? producto.colores : [],
-          acabado: producto.acabado || "",
-          descuento: 0
-        };
-
-        handleAddProduct(newProduct);
-        toast.success('Producto creado y agregado al carrito');
-      } else {
-        // Handle existing product
-        const producto = formData.producto;
-        if (producto) {
-          const newProduct: Producto = {
-            id: producto.id,
-            nombre: producto.nombre,
-            precio: producto.precio || 0,
-            cantidad: Number(formData.cantidad) || 1,
-            subtotal: (producto.precio || 0) * (Number(formData.cantidad) || 1),
-            sku: producto.sku || "",
-            descripcion: producto.descripcion || "",
-            colores: Array.isArray(producto.colores) ? producto.colores : [],
-            acabado: producto.acabado || "",
-            descuento: 0
-          };
-
-          handleAddProduct(newProduct);
-          toast.success('Producto agregado al carrito');
-        }
-      }
+      // In this simplified version, navigate to the PDF view
+      setTimeout(() => {
+        setIsLoading(false);
+        router.push('/ver-cotizacion');
+      }, 1000);
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al procesar el producto');
-    } finally {
+      console.error('Error generating quotation:', error);
       setIsLoading(false);
+      toast.error("Error al generar la cotización");
     }
   };
   
@@ -371,19 +376,23 @@ export default function NuevaCotizacionPage() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <ProductoFormTabs onProductoChange={(producto) => {
+                  <ProductoFormTabs onProductoChange={(producto: any) => {
                     if (producto) {
                       // Format product data for addProducto
-                      const productoToAdd: Producto = {
+                      const productoToAdd = {
                         id: String(producto.producto_id || Date.now()), // Use product ID or timestamp
-                        nombre: producto.nombre,
+                        nombre: producto.nombre || '',
                         cantidad: Number(producto.cantidad) || 1,
                         precio: producto.precio || 0,
                         descuento: producto.descuento || 0,
-                        subtotal: producto.precio * producto.cantidad,
+                        subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
                         sku: producto.sku || '',
                         descripcion: producto.descripcion || '',
-                        colores: producto.colores || [],
+                        colores: Array.isArray(producto.colores) 
+                          ? producto.colores 
+                          : typeof producto.colores === 'string' 
+                            ? producto.colores.split(',') 
+                            : [],
                         acabado: producto.acabado || '',
                       };
                       
@@ -394,7 +403,7 @@ export default function NuevaCotizacionPage() {
                       
                       if (existingProductIndex >= 0) {
                         // If it exists, update the quantity and subtotal
-                        const updatedProductos = [...productos] as any[];
+                        const updatedProductos = [...productos];
                         const existingProduct = updatedProductos[existingProductIndex];
                         
                         // When the same product is added again, accumulate the quantity
@@ -565,7 +574,7 @@ export default function NuevaCotizacionPage() {
                   <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
                 </Button>
                 <Button 
-                  onClick={handleSubmit}
+                  onClick={handleGenerateCotizacion}
                   disabled={isLoading || !cliente || productos.length === 0}
                   className="bg-teal-500 hover:bg-teal-600 text-white px-5"
                 >
