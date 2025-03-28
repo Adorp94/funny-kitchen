@@ -46,7 +46,7 @@ export function ListaProductosConDescuento({
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
     const convertedAmount = convertAmount(amount);
-    return `${convertedAmount.toFixed(2)} ${moneda === 'MXN' ? 'MXN' : 'USD'}`;
+    return `$${convertedAmount.toFixed(2)} ${moneda}`;
   };
 
   // Calculate price after discount for a product

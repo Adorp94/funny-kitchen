@@ -17,7 +17,7 @@ export function ListaProductos({
 }: ListaProductosProps) {
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    return `${amount.toFixed(2)} ${moneda === 'MXN' ? 'MXN' : 'USD'}`;
+    return `$${amount.toFixed(2)} ${moneda}`;
   };
 
   // Calculate total
