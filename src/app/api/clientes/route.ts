@@ -6,6 +6,11 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const id = searchParams.get('id');
   const query = searchParams.get('query');
+  const page = parseInt(searchParams.get('page') || '0');
+  const pageSize = parseInt(searchParams.get('pageSize') || '20');
+  const from = page * pageSize;
+  
+  console.log(`API request received: id=${id}, query=${query}, page=${page}, pageSize=${pageSize}`);
   
   try {
     if (id) {
@@ -20,26 +25,53 @@ export async function GET(request: NextRequest) {
       
       return NextResponse.json(data);
     } else if (query) {
+      console.log(`Searching clients with query: "${query}"`);
+      
       // Search clients
-      const { data, error } = await supabase
+      let searchQuery = supabase
         .from('clientes')
-        .select('*')
-        .ilike('nombre', `%${query}%`)
-        .order('nombre');
+        .select('*', { count: 'exact' });
+        
+      // Search across multiple fields: nombre, celular, correo
+      searchQuery = searchQuery
+        .or(`nombre.ilike.%${query}%,celular.ilike.%${query}%,correo.ilike.%${query}%`);
+      
+      // Apply pagination and order
+      const { data, error, count } = await searchQuery
+        .order('nombre')
+        .range(from, from + pageSize - 1)
+        .limit(pageSize);
         
       if (error) throw error;
       
-      return NextResponse.json(data);
+      console.log(`Found ${data.length} results, total count: ${count}`);
+      
+      // Return results with pagination info
+      return NextResponse.json({
+        data,
+        count,
+        hasMore: data.length === pageSize
+      });
     } else {
-      // Get all clients
-      const { data, error } = await supabase
+      console.log(`Fetching all clients, page: ${page}, pageSize: ${pageSize}`);
+      
+      // Get all clients (paginated)
+      const { data, error, count } = await supabase
         .from('clientes')
-        .select('*')
-        .order('nombre');
+        .select('*', { count: 'exact' })
+        .order('nombre')
+        .range(from, from + pageSize - 1)
+        .limit(pageSize);
         
       if (error) throw error;
       
-      return NextResponse.json(data);
+      console.log(`Found ${data.length} results, total count: ${count}`);
+      
+      return NextResponse.json({
+        data,
+        count,
+        hasMore: data && data.length === pageSize
+      });
     }
   } catch (error) {
     console.error('Error fetching clientes:', error);
@@ -64,7 +96,6 @@ export async function POST(request: NextRequest) {
         razon_social: body.razon_social || null,
         rfc: body.rfc || null,
         tipo_cliente: body.tipo_cliente || 'Normal',
-        lead: body.lead || 'No',
         direccion_envio: body.direccion_envio || null,
         recibe: body.recibe || null,
         atencion: body.atencion || null
@@ -108,7 +139,6 @@ export async function PATCH(request: NextRequest) {
         razon_social: body.razon_social,
         rfc: body.rfc,
         tipo_cliente: body.tipo_cliente,
-        lead: body.lead,
         direccion_envio: body.direccion_envio,
         recibe: body.recibe,
         atencion: body.atencion

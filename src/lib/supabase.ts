@@ -9,32 +9,46 @@ export interface Cliente {
   razon_social: string | null;
   rfc: string | null;
   tipo_cliente: string | null;
-  lead: string | null;
   direccion_envio: string | null;
   recibe: string | null;
   atencion: string | null;
 }
 
-// Search for clients by name
-export async function searchClientes(query: string) {
+// Search for clients by name or phone with pagination
+export async function searchClientes(query: string, page = 0, pageSize = 20) {
   const supabase = createClientComponentClient();
   
   try {
-    if (!query || query.length < 2) {
-      return { data: [], error: null };
+    // Call the API endpoint directly
+    const response = await fetch(`/api/clientes?query=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch clients');
     }
     
-    const { data, error } = await supabase
-      .from('clientes')
-      .select('*')
-      .ilike('nombre', `%${query}%`)
-      .order('nombre')
-      .limit(10);
-      
-    return { data, error };
+    const result = await response.json();
+    
+    // Check if result is in the new format (contains data property) or old format (array)
+    if (Array.isArray(result)) {
+      // Old API format
+      return { 
+        data: result, 
+        error: null, 
+        count: result.length, 
+        hasMore: result.length === pageSize 
+      };
+    } else {
+      // New API format
+      return { 
+        data: result.data || [], 
+        error: null, 
+        count: result.count || 0, 
+        hasMore: result.hasMore || false 
+      };
+    }
   } catch (error) {
     console.error('Error searching clientes:', error);
-    return { data: null, error };
+    return { data: null, error, count: 0, hasMore: false };
   }
 }
 
@@ -70,7 +84,6 @@ export async function insertCliente(cliente: Omit<Cliente, 'cliente_id'>) {
         razon_social: cliente.razon_social || null,
         rfc: cliente.rfc || null,
         tipo_cliente: cliente.tipo_cliente || 'Normal',
-        lead: cliente.lead || null,
         direccion_envio: cliente.direccion_envio || null,
         recibe: cliente.recibe || null,
         atencion: cliente.atencion || null
@@ -99,7 +112,6 @@ export async function updateCliente(cliente: Partial<Cliente> & { cliente_id: nu
         razon_social: cliente.razon_social,
         rfc: cliente.rfc,
         tipo_cliente: cliente.tipo_cliente,
-        lead: cliente.lead,
         direccion_envio: cliente.direccion_envio,
         recibe: cliente.recibe,
         atencion: cliente.atencion
