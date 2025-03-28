@@ -59,7 +59,23 @@ interface ProductoFormProps {
 }
 
 export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormProps) {
-  const [activeTab, setActiveTab] = useState<string>("nuevo");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // Check if we have previously saved form data with a product_id
+    const savedForm = sessionStorage.getItem('cotizacion_productoForm');
+    if (savedForm) {
+      try {
+        const parsedForm = JSON.parse(savedForm);
+        // If we have a product ID, go to "existente" tab
+        if (parsedForm.producto_id) {
+          return "existente";
+        }
+      } catch (error) {
+        console.error('Error parsing saved form data', error);
+      }
+    }
+    // Default to "existente" tab regardless
+    return "existente";
+  });
   const [formDataChanged, setFormDataChanged] = useState<boolean>(false);
   const [initialized, setInitialized] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -355,9 +371,23 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     setIsSearching(true);
     
     try {
-      const { data, error, hasMore } = await searchProductos(searchTermValue, page, pageSize);
+      console.log(`Searching products with term: "${searchTermValue}", page: ${page}`);
       
-      if (error) throw error;
+      // Use direct fetch instead of the helper function while debugging
+      const response = await fetch(`/api/productos?query=${encodeURIComponent(searchTermValue)}&page=${page}&pageSize=${pageSize}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      
+      const result = await response.json();
+      
+      // Process results
+      const data = result.data || [];
+      const hasMore = result.hasMore || false;
+      const count = result.count || 0;
+      
+      console.log(`Found ${data.length} results, total count: ${count}, hasMore: ${hasMore}`);
       
       if (data) {
         if (append) {
@@ -368,7 +398,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
           setSearchResults(data);
         }
         
-        setHasMoreResults(hasMore || false);
+        setHasMoreResults(hasMore);
         setCurrentPage(page);
       }
     } catch (error) {
@@ -528,13 +558,442 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
+  // Add a function to handle adding product to cart
+  const handleAddToCart = () => {
+    // Validate form first
+    const validationErrors = validateForm(formData);
+    setErrors(validationErrors);
+    
+    // Mark all fields as touched
+    setTouched({
+      nombre: true,
+      precio: true,
+      capacidad: true,
+      cantidad: true
+    });
+    
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error("Por favor corrige los errores antes de agregar al carrito");
+      return;
+    }
+    
+    // If valid, notify parent
+    safeNotifyParent(formDataToProducto(formData));
+    
+    // Show success message
+    toast.success("Producto agregado al carrito exitosamente");
+    
+    // Clear form if it's a new product (don't clear if updating existing)
+    if (activeTab === "nuevo") {
+      setFormData({
+        producto_id: "",
+        nombre: "",
+        tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+        precio: "",
+        sku: "",
+        capacidad: "",
+        unidad: "ml",
+        tipo_producto: "Personalizado",
+        descripcion: "",
+        colores: "",
+        acabado: "",
+        cantidad: "1"
+      });
+      
+      setTouched({});
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4 grid grid-cols-2">
-          <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
+        <TabsList className="grid grid-cols-2 mb-6">
           <TabsTrigger value="existente">Existente</TabsTrigger>
+          <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="existente">
+          <div className="space-y-6">
+            <div className="text-sm text-gray-500 mb-4">
+              Busca y selecciona un producto existente para usar en esta cotización. Si no encuentras el producto, puedes crear uno nuevo en la pestaña "Nuevo".
+            </div>
+            
+            {/* Producto search with simplified combobox */}
+            <div className="relative w-full">
+              <div className="w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    // Reset and load initial data when opening
+                    setSearchTerm('');
+                    setSearchResults([]);
+                    setIsSearching(true);
+                    setComboboxOpen(true);
+                    
+                    // Fetch all products on open
+                    handleSearch('', 0, false);
+                  }}
+                  className="w-full flex justify-between items-center"
+                >
+                  {formData.producto_id ? (
+                    <span className="truncate">
+                      {formData.sku ? `${formData.sku} - ` : ''}{formData.nombre}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Buscar producto por nombre o SKU...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </div>
+              
+              {comboboxOpen && (
+                <div className="absolute z-50 bg-white border border-gray-200 rounded-md shadow-lg w-full max-w-[400px] mt-1">
+                  <div className="border-b p-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                        }}
+                        autoFocus
+                        placeholder="Buscar por nombre o SKU..."
+                        className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className="max-h-[300px] overflow-auto" 
+                    ref={listRef}
+                    onScroll={handleScroll}
+                  >
+                    {isSearching ? (
+                      <div className="py-6 text-center text-sm text-muted-foreground">
+                        <div className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
+                        Buscando productos...
+                      </div>
+                    ) : searchResults.length === 0 ? (
+                      <div className="py-4 text-center">
+                        <p className="text-sm text-muted-foreground mb-2">No se encontraron productos</p>
+                        <Button 
+                          size="sm" 
+                          onClick={() => {
+                            // Create new product with the search term as name
+                            const newFormData = {
+                              producto_id: "",
+                              nombre: searchTerm,
+                              tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+                              precio: "",
+                              sku: "",
+                              capacidad: "",
+                              unidad: "ml",
+                              tipo_producto: "Personalizado",
+                              descripcion: "",
+                              colores: "",
+                              acabado: "",
+                              cantidad: "1"
+                            };
+                            
+                            setActiveTab("nuevo");
+                            setFormData(newFormData);
+                            setFormDataChanged(true);
+                            
+                            // Save to sessionStorage
+                            sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(newFormData));
+                            
+                            setComboboxOpen(false);
+                          }}
+                          className="bg-teal-500 hover:bg-teal-600 text-white"
+                        >
+                          Crear nuevo producto
+                        </Button>
+                      </div>
+                    ) : (
+                      searchResults.map((producto) => (
+                        <div
+                          key={producto.producto_id}
+                          className="flex items-center px-3 py-2 cursor-pointer hover:bg-slate-100"
+                          onClick={() => handleSelectProduct(producto.producto_id.toString())}
+                        >
+                          <Package className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">
+                              {producto.sku && (
+                                <span className="text-gray-500 mr-2">{producto.sku}</span>
+                              )}
+                              {searchTerm && searchTerm.length > 1
+                                ? highlightMatch(producto.nombre, searchTerm)
+                                : producto.nombre}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-1">
+                              {producto.capacidad && producto.unidad && (
+                                <span className="bg-gray-100 px-1 rounded">
+                                  {producto.capacidad} {producto.unidad}
+                                </span>
+                              )}
+                              {producto.precio !== null && (
+                                <span className="bg-gray-100 px-1 rounded">
+                                  ${producto.precio.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    
+                    {hasMoreResults && !isSearching && (
+                      <div className="py-2 text-center text-xs text-gray-500 border-t">
+                        Desplázate para cargar más
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="border-t p-2">
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setComboboxOpen(false)}
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Product form fields - always visible */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              {/* Nombre */}
+              <FormControl>
+                <FormLabel required>Nombre del producto</FormLabel>
+                <Input
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleInputChange}
+                  onBlur={() => handleBlur('nombre')}
+                  placeholder="Ingresa el nombre del producto"
+                  icon={<Package className="h-4 w-4" />}
+                  className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  required
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                  onClick={() => !formData.producto_id && setComboboxOpen(true)}
+                />
+                {touched.nombre && errors.nombre && (
+                  <div className="text-red-500 text-xs mt-1 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errors.nombre}
+                  </div>
+                )}
+              </FormControl>
+              
+              {/* Descripción */}
+              <FormControl>
+                <FormLabel>Descripción</FormLabel>
+                <textarea
+                  name="descripcion"
+                  value={formData.descripcion}
+                  onChange={handleInputChange}
+                  placeholder="Describe el producto"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                />
+              </FormControl>
+              
+              {/* Colores */}
+              <FormControl>
+                <FormLabel>Colores</FormLabel>
+                <Input
+                  name="colores"
+                  value={formData.colores}
+                  onChange={handleInputChange}
+                  placeholder="Ej: Rojo, Azul, Verde"
+                  icon={<Layers className="h-4 w-4" />}
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                />
+              </FormControl>
+              
+              {/* Acabado */}
+              <FormControl>
+                <FormLabel>Acabado</FormLabel>
+                <Select 
+                  value={formData.acabado} 
+                  onValueChange={(value) => handleSelectChange('acabado', value)}
+                  disabled={!formData.producto_id && !comboboxOpen}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar acabado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Mate">Mate</SelectItem>
+                    <SelectItem value="Brillante">Brillante</SelectItem>
+                    <SelectItem value="Satinado">Satinado</SelectItem>
+                    <SelectItem value="Rústico">Rústico</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              
+              {/* Cantidad */}
+              <FormControl>
+                <FormLabel required>Cantidad</FormLabel>
+                <Input
+                  name="cantidad"
+                  type="number"
+                  min="1"
+                  value={formData.cantidad}
+                  onChange={handleInputChange}
+                  onBlur={() => handleBlur('cantidad')}
+                  placeholder="Ej: 10"
+                  icon={<Layers className="h-4 w-4" />}
+                  className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  required
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                />
+                {touched.cantidad && errors.cantidad && (
+                  <div className="text-red-500 text-xs mt-1 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errors.cantidad}
+                  </div>
+                )}
+              </FormControl>
+              
+              {/* Precio unitario */}
+              <FormControl>
+                <FormLabel required>Precio unitario</FormLabel>
+                <Input
+                  name="precio"
+                  type="number"
+                  step="0.01"
+                  value={formData.precio}
+                  onChange={handleInputChange}
+                  onBlur={() => handleBlur('precio')}
+                  placeholder="Ej: 150.00"
+                  icon={<Banknote className="h-4 w-4" />}
+                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  required
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                />
+                {touched.precio && errors.precio && (
+                  <div className="text-red-500 text-xs mt-1 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errors.precio}
+                  </div>
+                )}
+              </FormControl>
+              
+              {/* Action buttons */}
+              <div className="md:col-span-2 mt-4 flex justify-between">
+                {!formData.producto_id ? (
+                  <Button 
+                    onClick={() => setComboboxOpen(true)}
+                    variant="default"
+                    className="bg-teal-500 hover:bg-teal-600 text-white"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    Buscar Producto
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // Clear the product selection
+                      const updatedFormData = {
+                        ...formData,
+                        producto_id: ""
+                      };
+                      
+                      setFormData(updatedFormData);
+                      setFormDataChanged(true);
+                      
+                      // Save to sessionStorage
+                      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(updatedFormData));
+                      console.log("Product selection cleared");
+                      
+                      setComboboxOpen(true);
+                    }}
+                  >
+                    Cambiar producto
+                  </Button>
+                )}
+                
+                <div className="flex gap-2">
+                  {formData.producto_id && (
+                    <Button
+                      type="button"
+                      onClick={handleUpdateProduct}
+                      disabled={isSaving || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                      variant="outline"
+                      className="border-teal-500 text-teal-600 hover:bg-teal-50"
+                    >
+                      {isSaving ? (
+                        <>
+                          <span className="animate-spin mr-2">⏳</span>
+                          Actualizando...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Actualizar
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={!formData.producto_id || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                    variant="default"
+                    className="bg-teal-500 hover:bg-teal-600 text-white"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Agregar al Carrito
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {!formData.producto_id && searchResults.length === 0 && !isSearching && searchTerm.length > 0 && (
+              <div className="border border-amber-300 bg-amber-50 p-4 rounded-md mt-4 text-sm">
+                <p className="font-medium text-amber-800 mb-2">No se encontraron productos con ese nombre</p>
+                <p className="text-amber-700">Puedes crear un nuevo producto en la pestaña "Nuevo".</p>
+                <Button 
+                  className="mt-3 bg-teal-500 hover:bg-teal-600 text-white" 
+                  size="sm"
+                  onClick={() => {
+                    // Create new product with the search term as name
+                    const newFormData = {
+                      producto_id: "",
+                      nombre: searchTerm,
+                      tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+                      precio: "",
+                      sku: "",
+                      capacidad: "",
+                      unidad: "ml",
+                      tipo_producto: "Personalizado",
+                      descripcion: "",
+                      colores: "",
+                      acabado: "",
+                      cantidad: "1"
+                    };
+                    
+                    setActiveTab("nuevo");
+                    setFormData(newFormData);
+                    setFormDataChanged(true);
+                    
+                    // Save to sessionStorage
+                    sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(newFormData));
+                  }}
+                >
+                  Crear nuevo producto
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
         
         <TabsContent value="nuevo">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -741,358 +1200,20 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                 )}
               </FormControl>
             </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="existente">
-          <div className="space-y-6">
-            <div className="text-sm text-gray-500 mb-4">
-              Busca y selecciona un producto existente para usar en esta cotización. Si no encuentras el producto, puedes crear uno nuevo en la pestaña "Nuevo".
+            
+            {/* Add button at the end */}
+            <div className="md:col-span-2 mt-6 flex justify-end">
+              <Button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                variant="default"
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Agregar al Carrito
+              </Button>
             </div>
-            
-            {/* Producto search with simplified combobox */}
-            <div className="relative w-full">
-              <div className="w-full">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    // Reset and load initial data when opening
-                    setSearchTerm('');
-                    setSearchResults([]);
-                    setIsSearching(true);
-                    setComboboxOpen(true);
-                    
-                    // Fetch all products on open
-                    handleSearch('', 0, false);
-                  }}
-                  className="w-full flex justify-between items-center"
-                >
-                  {formData.producto_id ? (
-                    <span className="truncate">
-                      {formData.sku ? `${formData.sku} - ` : ''}{formData.nombre}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Buscar producto por nombre o SKU...</span>
-                  )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </div>
-              
-              {comboboxOpen && (
-                <div className="absolute z-50 bg-white border border-gray-200 rounded-md shadow-lg w-full max-w-[400px] mt-1">
-                  <div className="border-b p-2">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <input
-                        value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                        }}
-                        autoFocus
-                        placeholder="Buscar por nombre o SKU..."
-                        className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className="max-h-[300px] overflow-auto" 
-                    ref={listRef}
-                    onScroll={handleScroll}
-                  >
-                    {isSearching ? (
-                      <div className="py-6 text-center text-sm text-muted-foreground">
-                        <div className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
-                        Buscando productos...
-                      </div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="py-4 text-center">
-                        <p className="text-sm text-muted-foreground mb-2">No se encontraron productos</p>
-                        <Button 
-                          size="sm" 
-                          onClick={() => {
-                            // Create new product with the search term as name
-                            const newFormData = {
-                              producto_id: "",
-                              nombre: searchTerm,
-                              tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
-                              precio: "",
-                              sku: "",
-                              capacidad: "",
-                              unidad: "ml",
-                              tipo_producto: "Personalizado",
-                              descripcion: "",
-                              colores: "",
-                              acabado: "",
-                              cantidad: "1"
-                            };
-                            
-                            setActiveTab("nuevo");
-                            setFormData(newFormData);
-                            setFormDataChanged(true);
-                            
-                            // Save to sessionStorage
-                            sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(newFormData));
-                            
-                            setComboboxOpen(false);
-                          }}
-                          className="bg-teal-500 hover:bg-teal-600 text-white"
-                        >
-                          Crear nuevo producto
-                        </Button>
-                      </div>
-                    ) : (
-                      searchResults.map((producto) => (
-                        <div
-                          key={producto.producto_id}
-                          className="flex items-center px-3 py-2 cursor-pointer hover:bg-slate-100"
-                          onClick={() => handleSelectProduct(producto.producto_id.toString())}
-                        >
-                          <Package className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">
-                              {producto.sku && (
-                                <span className="text-gray-500 mr-2">{producto.sku}</span>
-                              )}
-                              {searchTerm && searchTerm.length > 1
-                                ? highlightMatch(producto.nombre, searchTerm)
-                                : producto.nombre}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-1">
-                              {producto.capacidad && producto.unidad && (
-                                <span className="bg-gray-100 px-1 rounded">
-                                  {producto.capacidad} {producto.unidad}
-                                </span>
-                              )}
-                              {producto.precio !== null && (
-                                <span className="bg-gray-100 px-1 rounded">
-                                  ${producto.precio.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    
-                    {hasMoreResults && !isSearching && (
-                      <div className="py-2 text-center text-xs text-gray-500 border-t">
-                        Desplázate para cargar más
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="border-t p-2">
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setComboboxOpen(false)}
-                    >
-                      Cerrar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Product form fields - always visible */}
-            {formData.producto_id && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                {/* Nombre */}
-                <FormControl>
-                  <FormLabel required>Nombre del producto</FormLabel>
-                  <Input
-                    name="nombre"
-                    value={formData.nombre}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('nombre')}
-                    placeholder="Ingresa el nombre del producto"
-                    icon={<Package className="h-4 w-4" />}
-                    className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                    required
-                  />
-                  {touched.nombre && errors.nombre && (
-                    <div className="text-red-500 text-xs mt-1 flex items-center">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      {errors.nombre}
-                    </div>
-                  )}
-                </FormControl>
-                
-                {/* Descripción */}
-                <FormControl>
-                  <FormLabel>Descripción</FormLabel>
-                  <textarea
-                    name="descripcion"
-                    value={formData.descripcion}
-                    onChange={handleInputChange}
-                    placeholder="Describe el producto"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  />
-                </FormControl>
-                
-                {/* Colores */}
-                <FormControl>
-                  <FormLabel>Colores</FormLabel>
-                  <Input
-                    name="colores"
-                    value={formData.colores}
-                    onChange={handleInputChange}
-                    placeholder="Ej: Rojo, Azul, Verde"
-                    icon={<Layers className="h-4 w-4" />}
-                  />
-                </FormControl>
-                
-                {/* Acabado */}
-                <FormControl>
-                  <FormLabel>Acabado</FormLabel>
-                  <Select 
-                    value={formData.acabado} 
-                    onValueChange={(value) => handleSelectChange('acabado', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar acabado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Mate">Mate</SelectItem>
-                      <SelectItem value="Brillante">Brillante</SelectItem>
-                      <SelectItem value="Satinado">Satinado</SelectItem>
-                      <SelectItem value="Rústico">Rústico</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                
-                {/* Cantidad */}
-                <FormControl>
-                  <FormLabel required>Cantidad</FormLabel>
-                  <Input
-                    name="cantidad"
-                    type="number"
-                    min="1"
-                    value={formData.cantidad}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('cantidad')}
-                    placeholder="Ej: 10"
-                    icon={<Layers className="h-4 w-4" />}
-                    className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                    required
-                  />
-                  {touched.cantidad && errors.cantidad && (
-                    <div className="text-red-500 text-xs mt-1 flex items-center">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      {errors.cantidad}
-                    </div>
-                  )}
-                </FormControl>
-                
-                {/* Precio unitario */}
-                <FormControl>
-                  <FormLabel required>Precio unitario</FormLabel>
-                  <Input
-                    name="precio"
-                    type="number"
-                    step="0.01"
-                    value={formData.precio}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('precio')}
-                    placeholder="Ej: 150.00"
-                    icon={<Banknote className="h-4 w-4" />}
-                    className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                    required
-                  />
-                  {touched.precio && errors.precio && (
-                    <div className="text-red-500 text-xs mt-1 flex items-center">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      {errors.precio}
-                    </div>
-                  )}
-                </FormControl>
-                
-                {/* Action buttons */}
-                <div className="md:col-span-2 mt-4 flex justify-between">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      // Clear the product selection
-                      const updatedFormData = {
-                        ...formData,
-                        producto_id: ""
-                      };
-                      
-                      setFormData(updatedFormData);
-                      setFormDataChanged(true);
-                      
-                      // Save to sessionStorage
-                      sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(updatedFormData));
-                      console.log("Product selection cleared");
-                      
-                      setComboboxOpen(true);
-                    }}
-                  >
-                    Cambiar producto
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    onClick={handleUpdateProduct}
-                    disabled={isSaving || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
-                    variant="default"
-                    className="bg-teal-500 hover:bg-teal-600 text-white"
-                  >
-                    {isSaving ? (
-                      <>
-                        <span className="animate-spin mr-2">⏳</span>
-                        Actualizando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Actualizar Producto
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-            
-            {!formData.producto_id && searchResults.length === 0 && !isSearching && searchTerm.length > 0 && (
-              <div className="border border-amber-300 bg-amber-50 p-4 rounded-md mt-4 text-sm">
-                <p className="font-medium text-amber-800 mb-2">No se encontraron productos con ese nombre</p>
-                <p className="text-amber-700">Puedes crear un nuevo producto en la pestaña "Nuevo".</p>
-                <Button 
-                  className="mt-3 bg-teal-500 hover:bg-teal-600 text-white" 
-                  size="sm"
-                  onClick={() => {
-                    // Create new product with the search term as name
-                    const newFormData = {
-                      producto_id: "",
-                      nombre: searchTerm,
-                      tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
-                      precio: "",
-                      sku: "",
-                      capacidad: "",
-                      unidad: "ml",
-                      tipo_producto: "Personalizado",
-                      descripcion: "",
-                      colores: "",
-                      acabado: "",
-                      cantidad: "1"
-                    };
-                    
-                    setActiveTab("nuevo");
-                    setFormData(newFormData);
-                    setFormDataChanged(true);
-                    
-                    // Save to sessionStorage
-                    sessionStorage.setItem('cotizacion_productoForm', JSON.stringify(newFormData));
-                  }}
-                >
-                  Crear nuevo producto
-                </Button>
-              </div>
-            )}
           </div>
         </TabsContent>
       </Tabs>

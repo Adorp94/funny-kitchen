@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
-import { ProductoSimplificado } from "@/components/cotizacion/producto-simplificado";
+import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
 import { useProductos } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -248,7 +248,25 @@ export default function NuevaCotizacionPage() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <ProductoSimplificado onAddProduct={addProducto} />
+                  <ProductoFormTabs onProductoChange={(producto) => {
+                    if (producto) {
+                      // Format product data for addProducto
+                      const productoToAdd = {
+                        id: String(producto.producto_id || Date.now()), // Use product ID or timestamp
+                        sku: producto.sku || "",
+                        nombre: producto.nombre,
+                        descripcion: producto.descripcion || "",
+                        colores: producto.colores ? producto.colores.split(',').map(c => c.trim()) : [],
+                        acabado: "",
+                        cantidad: 1,
+                        precio: producto.precio || 0,
+                        descuento: 0,
+                        subtotal: producto.precio || 0,
+                      };
+                      addProducto(productoToAdd);
+                      toast.success("Producto agregado a la cotización");
+                    }
+                  }} />
                 </div>
               </div>
               
