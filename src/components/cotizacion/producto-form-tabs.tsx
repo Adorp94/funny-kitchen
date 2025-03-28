@@ -188,11 +188,28 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
-  // Validate the form
+  // Validate the form with less strict requirements for existing products
   const validateForm = (data: ProductoFormData): FormErrors => {
     const newErrors: FormErrors = {};
     
-    // Validate name
+    // For existing products, only check that we have a name and a product_id
+    if (data.producto_id) {
+      // Validate name for existing products
+      if (!data.nombre.trim()) {
+        newErrors.nombre = "El nombre es obligatorio";
+      }
+      
+      // Validate quantity for existing products
+      if (!data.cantidad) {
+        newErrors.cantidad = "La cantidad es obligatoria";
+      } else if (isNaN(parseInt(data.cantidad)) || parseInt(data.cantidad) <= 0) {
+        newErrors.cantidad = "La cantidad debe ser un número entero positivo";
+      }
+      
+      return newErrors; // Return early, other validations not needed for existing products
+    }
+    
+    // More strict validation for new products
     if (!data.nombre.trim()) {
       newErrors.nombre = "El nombre es obligatorio";
     } else if (data.nombre.trim().length < 3) {
@@ -869,56 +886,20 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               {/* Cantidad */}
               <FormControl>
                 <FormLabel required>Cantidad</FormLabel>
-                <div className="flex">
-                  <Input
-                    name="cantidad"
-                    type="number"
-                    min="1"
-                    value={formData.cantidad}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('cantidad')}
-                    onWheel={preventScrollInput}
-                    placeholder="Ej: 10"
-                    icon={<Layers className="h-4 w-4" />}
-                    className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                    required
-                    readOnly={!formData.producto_id && !comboboxOpen}
-                  />
-                  <div className="flex flex-col ml-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-t-md border-b-0"
-                      onClick={() => {
-                        const currentValue = parseInt(formData.cantidad) || 0;
-                        if (currentValue < 999) {
-                          setFormData(prev => ({ ...prev, cantidad: (currentValue + 1).toString() }));
-                          handleBlur('cantidad');
-                        }
-                      }}
-                      disabled={!formData.producto_id && !comboboxOpen}
-                    >
-                      <span className="text-xs">+</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-b-md"
-                      onClick={() => {
-                        const currentValue = parseInt(formData.cantidad) || 0;
-                        if (currentValue > 1) {
-                          setFormData(prev => ({ ...prev, cantidad: (currentValue - 1).toString() }));
-                          handleBlur('cantidad');
-                        }
-                      }}
-                      disabled={!formData.producto_id && !comboboxOpen}
-                    >
-                      <span className="text-xs">-</span>
-                    </Button>
-                  </div>
-                </div>
+                <Input
+                  name="cantidad"
+                  type="number"
+                  min="1"
+                  value={formData.cantidad}
+                  onChange={handleInputChange}
+                  onBlur={() => handleBlur('cantidad')}
+                  onWheel={preventScrollInput}
+                  placeholder="Ej: 10"
+                  icon={<Layers className="h-4 w-4" />}
+                  className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  required
+                  readOnly={!formData.producto_id && !comboboxOpen}
+                />
                 {touched.cantidad && errors.cantidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -1013,7 +994,8 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   <Button
                     type="button"
                     onClick={handleAddToCart}
-                    disabled={!formData.producto_id || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                    // Only require product_id, name, and valid quantity for existing products
+                    disabled={!formData.producto_id || !formData.nombre || !formData.cantidad || Object.keys(errors).length > 0}
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
@@ -1250,53 +1232,19 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               
               <FormControl>
                 <FormLabel required>Cantidad</FormLabel>
-                <div className="flex">
-                  <Input
-                    name="cantidad"
-                    type="number"
-                    min="1"
-                    value={formData.cantidad}
-                    onChange={handleInputChange}
-                    onBlur={() => handleBlur('cantidad')}
-                    onWheel={preventScrollInput}
-                    placeholder="Ej: 10"
-                    icon={<Layers className="h-4 w-4" />}
-                    className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                    required
-                  />
-                  <div className="flex flex-col ml-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-t-md border-b-0"
-                      onClick={() => {
-                        const currentValue = parseInt(formData.cantidad) || 0;
-                        if (currentValue < 999) {
-                          setFormData(prev => ({ ...prev, cantidad: (currentValue + 1).toString() }));
-                          handleBlur('cantidad');
-                        }
-                      }}
-                    >
-                      <span className="text-xs">+</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 rounded-b-md"
-                      onClick={() => {
-                        const currentValue = parseInt(formData.cantidad) || 0;
-                        if (currentValue > 1) {
-                          setFormData(prev => ({ ...prev, cantidad: (currentValue - 1).toString() }));
-                          handleBlur('cantidad');
-                        }
-                      }}
-                    >
-                      <span className="text-xs">-</span>
-                    </Button>
-                  </div>
-                </div>
+                <Input
+                  name="cantidad"
+                  type="number"
+                  min="1"
+                  value={formData.cantidad}
+                  onChange={handleInputChange}
+                  onBlur={() => handleBlur('cantidad')}
+                  onWheel={preventScrollInput}
+                  placeholder="Ej: 10"
+                  icon={<Layers className="h-4 w-4" />}
+                  className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                  required
+                />
                 {touched.cantidad && errors.cantidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />
