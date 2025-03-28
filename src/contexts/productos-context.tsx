@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Producto } from "@/components/cotizacion/producto-simplificado";
 import { ProductoConDescuento } from "@/components/cotizacion/lista-productos-con-descuento";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface ProductosContextType {
   productos: ProductoConDescuento[];
@@ -20,6 +21,7 @@ interface ProductosContextType {
   total: number;
   moneda: 'MXN' | 'USD';
   setMoneda: (moneda: 'MXN' | 'USD') => void;
+  exchangeRate: number | null;
 }
 
 const ProductosContext = createContext<ProductosContextType | undefined>(undefined);
@@ -30,6 +32,20 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
   const [hasIva, setHasIva] = useState<boolean>(false);
   const [shippingCost, setShippingCost] = useState<number>(0);
+  
+  // Use the exchange rate hook
+  const { 
+    exchangeRate, 
+    loading: exchangeRateLoading, 
+    error: exchangeRateError, 
+    convertMXNtoUSD 
+  } = useExchangeRate();
+
+  // Log currency and exchange rate changes
+  useEffect(() => {
+    console.log('Currency changed in context:', moneda);
+    console.log('Exchange rate in context:', exchangeRate);
+  }, [moneda, exchangeRate]);
 
   // Load products and settings from sessionStorage on first mount
   useEffect(() => {
@@ -146,7 +162,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         setShippingCost,
         total,
         moneda,
-        setMoneda
+        setMoneda,
+        exchangeRate
       }}
     >
       {children}

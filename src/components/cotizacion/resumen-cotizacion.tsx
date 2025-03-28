@@ -5,6 +5,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DollarSign, Truck, Receipt, Percent } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 
 interface ResumenCotizacionProps {
   subtotal: number;
@@ -12,6 +15,7 @@ interface ResumenCotizacionProps {
   onIvaChange: (hasIva: boolean) => void;
   onShippingChange: (value: number) => void;
   moneda: 'MXN' | 'USD';
+  onCurrencyChange: (currency: 'MXN' | 'USD') => void;
 }
 
 export function ResumenCotizacion({
@@ -19,8 +23,19 @@ export function ResumenCotizacion({
   onGlobalDiscountChange,
   onIvaChange,
   onShippingChange,
-  moneda
+  moneda,
+  onCurrencyChange
 }: ResumenCotizacionProps) {
+  const { 
+    exchangeRate, 
+    loading, 
+    error, 
+    convertMXNtoUSD, 
+    convertUSDtoMXN,
+    formatExchangeRateInfo,
+    lastUpdated
+  } = useExchangeRate();
+
   // State for the form - using string values for inputs
   const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasIva, setHasIva] = useState<boolean>(false);
@@ -31,9 +46,18 @@ export function ResumenCotizacion({
   const globalDiscount = parseFloat(globalDiscountStr) || 0;
   const shippingCost = parseFloat(shippingCostStr) || 0;
 
+  // Convert amounts based on selected currency
+  const convertAmount = (amount: number): number => {
+    if (moneda === 'USD' && exchangeRate) {
+      return convertMXNtoUSD(amount);
+    }
+    return amount;
+  };
+
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${amount.toFixed(2)}`;
+    const convertedAmount = convertAmount(amount);
+    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${convertedAmount.toFixed(2)}`;
   };
 
   // Calculate discount amount
@@ -46,10 +70,22 @@ export function ResumenCotizacion({
   const ivaAmount = hasIva ? subtotalAfterDiscount * 0.16 : 0;
   
   // Calculate shipping cost (only if shipping is enabled)
-  const shippingAmount = hasShipping ? shippingCost : 0;
+  const shippingAmount = hasShipping ? (moneda === 'USD' ? convertUSDtoMXN(shippingCost) : shippingCost) : 0;
   
   // Total amount
   const total = subtotalAfterDiscount + ivaAmount + shippingAmount;
+
+  // Handle currency change
+  const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
+    if (hasShipping && shippingCost > 0) {
+      const newShippingCost = newCurrency === 'USD' 
+        ? Number((shippingCost / (exchangeRate || 1)).toFixed(2))
+        : Number((shippingCost * (exchangeRate || 1)).toFixed(2));
+      setShippingCostStr(newShippingCost.toString());
+      onShippingChange(newShippingCost);
+    }
+    onCurrencyChange(newCurrency);
+  };
 
   // Handle global discount change
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,13 +128,51 @@ export function ResumenCotizacion({
       // Convert to number for the callback
       const numValue = value === '' ? 0 : parseFloat(value);
       const boundedValue = Math.max(numValue, 0);
-      onShippingChange(boundedValue);
+      
+      // Convert to MXN if in USD mode
+      const mxnValue = moneda === 'USD' ? convertUSDtoMXN(boundedValue) : boundedValue;
+      onShippingChange(mxnValue);
     }
   };
 
   return (
     <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-      <h3 className="font-medium text-gray-700 mb-3">Resumen</h3>
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="font-medium text-gray-700">Resumen</h3>
+        <div className="flex flex-col items-end space-y-2">
+          <div className="flex items-center space-x-2">
+            <Select value={moneda} onValueChange={handleCurrencyChange}>
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Moneda" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MXN">MXN</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {exchangeRate && (
+            <div className="text-xs space-y-1">
+              <div className="text-gray-600 font-medium">
+                {formatExchangeRateInfo()}
+              </div>
+              <div className="text-gray-400">
+                Última actualización: {new Date(lastUpdated).toLocaleDateString()}
+              </div>
+            </div>
+          )}
+          {loading && (
+            <div className="text-xs text-gray-500">
+              Cargando tipo de cambio...
+            </div>
+          )}
+          {error && (
+            <div className="text-xs text-red-500">
+              Error al cargar tipo de cambio
+            </div>
+          )}
+        </div>
+      </div>
       
       {/* Global Discount */}
       <div className="flex items-center justify-between">

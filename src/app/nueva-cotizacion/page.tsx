@@ -13,18 +13,11 @@ import { ResumenCotizacion } from "@/components/cotizacion/resumen-cotizacion";
 import { useProductos } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
+import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
 
-// Define the Producto interface locally with all required properties
-interface Producto {
-  id: string;
-  nombre: string;
-  cantidad: number;
-  precio: number;
-  subtotal: number;
-  sku: string;
-  descripcion: string;
-  colores: string[];
-  acabado: string;
+// Define the Producto interface with all required properties
+interface Producto extends ProductoBase {
   descuento: number;
 }
 
@@ -36,21 +29,26 @@ export default function NuevaCotizacionPage() {
   const [clienteData, setClienteData] = useState<Cliente | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { convertMXNtoUSD, convertUSDtoMXN } = useExchangeRate();
 
   // Get productos from context
-  const { 
-    productos, 
-    addProducto, 
-    removeProducto, 
-    updateProductoDiscount,
+  const {
+    productos,
+    addProducto,
+    removeProducto,
+    updateProductoDiscount: handleUpdateProductDiscount,
     clearProductos, 
     total,
     moneda,
     setMoneda,
     subtotal,
+    globalDiscount,
     setGlobalDiscount,
+    hasIva,
     setHasIva,
-    setShippingCost
+    shippingCost,
+    setShippingCost,
+    exchangeRate
   } = useProductos();
 
   // Use effect to update cliente state after render
@@ -124,29 +122,66 @@ export default function NuevaCotizacionPage() {
   };
 
   // Handle form submission
-  const handleGenerateCotizacion = async () => {
-    if (!cliente) {
-      toast.error("Por favor, ingresa la información del cliente");
-      return;
-    }
-    
-    if (productos.length === 0) {
-      toast.error("Por favor, agrega al menos un producto");
-      return;
-    }
-    
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
 
     try {
-      // In this simplified version, navigate to the PDF view
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push('/ver-cotizacion');
-      }, 1000);
+      if (formData.tipo === 'nuevo') {
+        const response = await fetch('/api/productos', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Error al crear el producto');
+        }
+
+        const producto = await response.json();
+        const newProduct: Producto = {
+          id: producto.id,
+          nombre: producto.nombre,
+          precio: producto.precio || 0,
+          cantidad: Number(producto.cantidad) || 1,
+          subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
+          sku: producto.sku || "",
+          descripcion: producto.descripcion || "",
+          colores: Array.isArray(producto.colores) ? producto.colores : [],
+          acabado: producto.acabado || "",
+          descuento: 0
+        };
+
+        handleAddProduct(newProduct);
+        toast.success('Producto creado y agregado al carrito');
+      } else {
+        // Handle existing product
+        const producto = formData.producto;
+        if (producto) {
+          const newProduct: Producto = {
+            id: producto.id,
+            nombre: producto.nombre,
+            precio: producto.precio || 0,
+            cantidad: Number(formData.cantidad) || 1,
+            subtotal: (producto.precio || 0) * (Number(formData.cantidad) || 1),
+            sku: producto.sku || "",
+            descripcion: producto.descripcion || "",
+            colores: Array.isArray(producto.colores) ? producto.colores : [],
+            acabado: producto.acabado || "",
+            descuento: 0
+          };
+
+          handleAddProduct(newProduct);
+          toast.success('Producto agregado al carrito');
+        }
+      }
     } catch (error) {
-      console.error('Error generating quotation:', error);
+      console.error('Error:', error);
+      toast.error('Error al procesar el producto');
+    } finally {
       setIsLoading(false);
-      toast.error("Error al generar la cotización");
     }
   };
   
@@ -161,11 +196,60 @@ export default function NuevaCotizacionPage() {
     }
   };
   
-  // Format currency
+  // Format currency with proper conversion
   const formatCurrency = (amount: number): string => {
-    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${amount.toFixed(2)}`;
+    let displayAmount = amount;
+    
+    // Convert to USD if needed
+    if (moneda === 'USD' && exchangeRate) {
+      displayAmount = amount / exchangeRate;
+      console.log(`Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
+    }
+    
+    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${displayAmount.toFixed(2)}`;
   };
-  
+
+  // Handle currency change
+  const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
+    console.log(`Changing currency from ${moneda} to ${newCurrency}`);
+    setMoneda(newCurrency);
+  };
+
+  // Handle adding a product to the cart
+  const handleAddProduct = (producto: Producto) => {
+    const existingProduct = productos.find(p => p.id === producto.id);
+    
+    if (existingProduct) {
+      // If product exists, update its quantity
+      const updatedProduct = {
+        ...existingProduct,
+        cantidad: existingProduct.cantidad + producto.cantidad,
+      };
+      
+      // Recalculate subtotal
+      updatedProduct.subtotal = updatedProduct.precio * updatedProduct.cantidad;
+      
+      // Clear and update the products list
+      clearProductos();
+      productos.forEach(p => {
+        if (p.id === producto.id) {
+          addProducto(updatedProduct);
+        } else {
+          addProducto(p);
+        }
+      });
+      
+      toast.success(`Se actualizó la cantidad del producto a ${updatedProduct.cantidad}`);
+    } else {
+      // If product doesn't exist, add it as new
+      addProducto({
+        ...producto,
+        subtotal: producto.precio * producto.cantidad
+      });
+      toast.success('Producto agregado al carrito');
+    }
+  };
+
   return (
     <div className="py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
@@ -295,12 +379,12 @@ export default function NuevaCotizacionPage() {
                         nombre: producto.nombre,
                         cantidad: Number(producto.cantidad) || 1,
                         precio: producto.precio || 0,
-                        subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
-                        sku: producto.sku || "",
-                        descripcion: producto.descripcion || "",
-                        colores: producto.colores ? producto.colores.split(',').map(c => c.trim()) : [],
-                        acabado: "",
-                        descuento: 0,
+                        descuento: producto.descuento || 0,
+                        subtotal: producto.precio * producto.cantidad,
+                        sku: producto.sku || '',
+                        descripcion: producto.descripcion || '',
+                        colores: producto.colores || [],
+                        acabado: producto.acabado || '',
                       };
                       
                       // Check if this product already exists in the cart by ID
@@ -449,7 +533,7 @@ export default function NuevaCotizacionPage() {
                   <ListaProductosConDescuento 
                     productos={productos} 
                     onRemoveProduct={removeProducto}
-                    onUpdateProductDiscount={updateProductoDiscount}
+                    onUpdateProductDiscount={handleUpdateProductDiscount}
                     moneda={moneda}
                     editMode={true}
                   />
@@ -469,6 +553,7 @@ export default function NuevaCotizacionPage() {
                   onIvaChange={setHasIva}
                   onShippingChange={setShippingCost}
                   moneda={moneda}
+                  onCurrencyChange={handleCurrencyChange}
                 />
               </div>
               <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
@@ -480,7 +565,7 @@ export default function NuevaCotizacionPage() {
                   <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
                 </Button>
                 <Button 
-                  onClick={handleGenerateCotizacion}
+                  onClick={handleSubmit}
                   disabled={isLoading || !cliente || productos.length === 0}
                   className="bg-teal-500 hover:bg-teal-600 text-white px-5"
                 >

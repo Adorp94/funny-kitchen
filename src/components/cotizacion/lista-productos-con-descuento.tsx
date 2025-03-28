@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Percent } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Producto } from './producto-simplificado';
+import { useExchangeRate } from '@/hooks/useExchangeRate';
 
 // Extended product interface with discount
 export interface ProductoConDescuento extends Producto {
@@ -26,20 +27,42 @@ export function ListaProductosConDescuento({
   moneda = 'MXN',
   editMode = true
 }: ListaProductosConDescuentoProps) {
+  const { exchangeRate, loading, error, convertMXNtoUSD } = useExchangeRate();
+
+  // Explicitly log currency and exchange rate
+  useEffect(() => {
+    console.log('Current currency in ListaProductos:', moneda);
+    console.log('Exchange rate in ListaProductos:', exchangeRate);
+  }, [moneda, exchangeRate]);
+
+  // Convert amount based on selected currency
+  const convertAmount = (amount: number): number => {
+    if (moneda === 'USD' && exchangeRate) {
+      const result = amount / exchangeRate;
+      console.log(`Converting ${amount} MXN → ${result.toFixed(2)} USD (rate: ${exchangeRate})`);
+      return Number(result.toFixed(2));
+    }
+    return amount;
+  };
+
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${amount.toFixed(2)}`;
+    const convertedAmount = convertAmount(amount);
+    return `${moneda === 'MXN' ? 'MX$' : 'US$'}${convertedAmount.toFixed(2)}`;
   };
 
   // Calculate price after discount for a product
   const getPriceAfterDiscount = (producto: ProductoConDescuento): number => {
     const discount = producto.descuento || 0;
-    return producto.precio * (1 - discount / 100);
+    const originalPrice = producto.precio;
+    const discountedPrice = originalPrice * (1 - discount / 100);
+    return discountedPrice;
   };
 
   // Calculate subtotal after discount for a product
   const getSubtotalAfterDiscount = (producto: ProductoConDescuento): number => {
-    return getPriceAfterDiscount(producto) * producto.cantidad;
+    const priceAfterDiscount = getPriceAfterDiscount(producto);
+    return priceAfterDiscount * producto.cantidad;
   };
 
   // Calculate total after individual discounts
