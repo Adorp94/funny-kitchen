@@ -249,14 +249,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         [name]: value
       };
       
-      // Mark field as touched
-      setTouched(prev => ({
-        ...prev,
-        [name]: true
-      }));
+      // Don't mark field as touched while typing
+      // This prevents validation errors from showing up during typing
       
       // Save to sessionStorage without triggering parent notification
-      // This prevents auto-adding to cart when editing fields
       sessionStorage.setItem('cotizacion_productoForm', JSON.stringify({
         ...prev,
         [name]: value
@@ -592,7 +588,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
-  // Add a function to handle adding product to cart
+  // Modify handleAddToCart to not open search after adding product
   const handleAddToCart = () => {
     // Validate form first
     const validationErrors = validateForm(formData);
@@ -636,11 +632,6 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     
     // Clear the data from session storage
     sessionStorage.removeItem('cotizacion_productoForm');
-    
-    // Open search if in existing tab
-    if (activeTab === "existente") {
-      setComboboxOpen(true);
-    }
   };
 
   return (
