@@ -21,11 +21,15 @@ export function ResumenCotizacion({
   onShippingChange,
   moneda
 }: ResumenCotizacionProps) {
-  // State for the form
-  const [globalDiscount, setGlobalDiscount] = useState<number>(0);
+  // State for the form - using string values for inputs
+  const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasIva, setHasIva] = useState<boolean>(false);
   const [hasShipping, setHasShipping] = useState<boolean>(false);
-  const [shippingCost, setShippingCost] = useState<number>(0);
+  const [shippingCostStr, setShippingCostStr] = useState<string>('0');
+
+  // Parse numeric values from strings
+  const globalDiscount = parseFloat(globalDiscountStr) || 0;
+  const shippingCost = parseFloat(shippingCostStr) || 0;
 
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
@@ -49,10 +53,17 @@ export function ResumenCotizacion({
 
   // Handle global discount change
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    const discount = isNaN(value) ? 0 : Math.min(Math.max(value, 0), 100);
-    setGlobalDiscount(discount);
-    onGlobalDiscountChange(discount);
+    const value = e.target.value;
+    
+    // Allow empty string or valid numbers
+    if (value === '' || !isNaN(parseFloat(value))) {
+      setGlobalDiscountStr(value);
+      
+      // Convert to number for the callback
+      const numValue = value === '' ? 0 : parseFloat(value);
+      const boundedValue = Math.min(Math.max(numValue, 0), 100);
+      onGlobalDiscountChange(boundedValue);
+    }
   };
 
   // Handle IVA toggle
@@ -65,17 +76,24 @@ export function ResumenCotizacion({
   const handleShippingToggle = (checked: boolean) => {
     setHasShipping(checked);
     if (!checked) {
-      setShippingCost(0);
+      setShippingCostStr('0');
       onShippingChange(0);
     }
   };
 
   // Handle shipping cost change
   const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    const cost = isNaN(value) ? 0 : Math.max(value, 0);
-    setShippingCost(cost);
-    onShippingChange(cost);
+    const value = e.target.value;
+    
+    // Allow empty string or valid numbers
+    if (value === '' || !isNaN(parseFloat(value))) {
+      setShippingCostStr(value);
+      
+      // Convert to number for the callback
+      const numValue = value === '' ? 0 : parseFloat(value);
+      const boundedValue = Math.max(numValue, 0);
+      onShippingChange(boundedValue);
+    }
   };
 
   return (
@@ -90,12 +108,12 @@ export function ResumenCotizacion({
         </div>
         <div className="flex items-center space-x-1">
           <Input
-            type="number"
-            value={globalDiscount}
+            type="text"
+            inputMode="numeric"
+            value={globalDiscountStr}
             onChange={handleGlobalDiscountChange}
             className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            min="0"
-            max="100"
+            placeholder="0"
           />
           <span className="text-gray-500">%</span>
         </div>
@@ -131,12 +149,12 @@ export function ResumenCotizacion({
           <div className="flex items-center space-x-1">
             <span className="text-gray-500">{moneda === 'MXN' ? 'MX$' : 'US$'}</span>
             <Input
-              type="number"
-              value={shippingCost}
+              type="text"
+              inputMode="decimal"
+              value={shippingCostStr}
               onChange={handleShippingCostChange}
               className="w-20 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              min="0"
-              step="0.01"
+              placeholder="0"
             />
           </div>
         </div>

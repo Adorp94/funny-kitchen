@@ -50,12 +50,35 @@ export function ListaProductosConDescuento({
 
   // Handle discount change
   const handleDiscountChange = (id: string, value: string) => {
-    const discount = parseFloat(value);
+    // Allow empty string or valid number
+    if (value === '' || !isNaN(parseFloat(value))) {
+      // Convert to number for the callback but allow empty input
+      const numValue = value === '' ? 0 : parseFloat(value);
+      // Ensure discount is between 0 and 100
+      const validDiscount = Math.min(Math.max(numValue, 0), 100);
+      
+      onUpdateProductDiscount(id, validDiscount);
+    }
+  };
+
+  // Render the discount input for a product
+  const renderDiscountInput = (producto: ProductoConDescuento) => {
+    // Display empty string if discount is 0, otherwise show the value
+    const displayValue = producto.descuento === 0 ? '' : producto.descuento?.toString();
     
-    // Ensure discount is between 0 and 100
-    const validDiscount = isNaN(discount) ? 0 : Math.min(Math.max(discount, 0), 100);
-    
-    onUpdateProductDiscount(id, validDiscount);
+    return (
+      <div className="flex items-center justify-center">
+        <Input
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onChange={(e) => handleDiscountChange(producto.id, e.target.value)}
+          className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          placeholder="0"
+        />
+        <span className="ml-1 text-gray-500">%</span>
+      </div>
+    );
   };
 
   if (productos.length === 0) {
@@ -99,17 +122,7 @@ export function ListaProductosConDescuento({
                 </td>
                 {editMode && (
                   <td className="px-4 py-3 text-sm text-center">
-                    <div className="flex items-center justify-center">
-                      <Input
-                        type="number"
-                        value={producto.descuento || 0}
-                        onChange={(e) => handleDiscountChange(producto.id, e.target.value)}
-                        className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        min="0"
-                        max="100"
-                      />
-                      <span className="ml-1 text-gray-500">%</span>
-                    </div>
+                    {renderDiscountInput(producto)}
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
