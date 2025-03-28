@@ -90,62 +90,100 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     atencion: ""
   });
 
-  // Clear data on page refresh, but load from sessionStorage on normal first render
+  // Clear data on page refresh, always reset form when page is reloaded
   useEffect(() => {
-    // Check if this is a fresh load (not just component remounting)
-    const isFreshPageLoad = !sessionStorage.getItem('pageLoaded');
+    // Check if this is a genuine page refresh (not just component mount/remount)
+    const checkPageRefresh = () => {
+      const lastPageLoadTime = sessionStorage.getItem('lastPageLoadTime');
+      const currentTime = new Date().getTime();
+      
+      // If there's no lastPageLoadTime or it's been more than 2 seconds, consider it a refresh
+      const isRefresh = !lastPageLoadTime || (currentTime - parseInt(lastPageLoadTime)) > 2000;
+      
+      // Update the lastPageLoadTime
+      sessionStorage.setItem('lastPageLoadTime', currentTime.toString());
+      
+      return isRefresh;
+    };
     
-    if (isFreshPageLoad) {
-      // Mark that the page has been loaded
-      sessionStorage.setItem('pageLoaded', 'true');
+    // Handle page refresh
+    const handlePageRefresh = () => {
+      console.log("Page was refreshed, clearing form data");
       // Clear any existing saved form data
       sessionStorage.removeItem('cotizacion_clienteForm');
-      setInitialized(true);
-      return;
-    }
-
-    // If not fresh load, try to load any saved form data
-    const savedFormData = sessionStorage.getItem('cotizacion_clienteForm');
-    if (savedFormData && !initialized) {
-      try {
-        const parsedFormData = JSON.parse(savedFormData);
-        setFormData(parsedFormData);
-        
-        // Set active tab based on whether we have a client ID
-        if (parsedFormData.cliente_id) {
-          setActiveTab("existente");
-          // Mark as changed to trigger notification to parent
-          setFormDataChanged(true);
-        } else if (parsedFormData.nombre || parsedFormData.celular) {
-          setActiveTab("nuevo");
-          // Mark as changed to trigger notification to parent
-          setFormDataChanged(true);
+      // Reset the form data
+      setFormData({
+        cliente_id: "",
+        nombre: "",
+        celular: "",
+        correo: "",
+        razon_social: "",
+        rfc: "",
+        tipo_cliente: "Normal",
+        direccion_envio: "",
+        recibe: "",
+        atencion: ""
+      });
+      setSearchResults([]);
+      setSearchTerm('');
+    };
+    
+    // Handle normal component mounting
+    const handleNormalMount = () => {
+      console.log("Component mounted normally, trying to load saved data");
+      // Try to load any saved form data from previous sections
+      const savedFormData = sessionStorage.getItem('cotizacion_clienteForm');
+      if (savedFormData) {
+        try {
+          const parsedFormData = JSON.parse(savedFormData);
+          setFormData(parsedFormData);
+          
+          // Set active tab based on whether we have a client ID
+          if (parsedFormData.cliente_id) {
+            setActiveTab("existente");
+            // Mark as changed to trigger notification to parent
+            setFormDataChanged(true);
+          } else if (parsedFormData.nombre || parsedFormData.celular) {
+            setActiveTab("nuevo");
+            // Mark as changed to trigger notification to parent
+            setFormDataChanged(true);
+          }
+        } catch (e) {
+          console.error("Error parsing saved form data:", e);
         }
-        
-        setInitialized(true);
-      } catch (e) {
-        console.error("Error parsing saved form data:", e);
       }
-    } else {
-      // If there's no saved data, we're still initialized
+    };
+    
+    // Only do initialization once
+    if (!initialized) {
+      // If it's a refresh, clear data. Otherwise, try to load saved data
+      if (checkPageRefresh()) {
+        handlePageRefresh();
+      } else {
+        handleNormalMount();
+      }
+      
       setInitialized(true);
     }
-  }, []);
-
-  // Save form data to sessionStorage when it changes
-  useEffect(() => {
-    if ((formData.nombre || formData.celular || formData.cliente_id) && initialized) {
-      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(formData));
-    }
-  }, [formData, initialized]);
-
-  // Add cleanup on unmount
-  useEffect(() => {
+    
+    // Add event listener for beforeunload
+    const handleBeforeUnload = () => {
+      // Don't remove session data, let the next load decide whether to clear or keep
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
-      // This runs when the component unmounts
-      // We don't clear form data here to allow persistence between sections
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  // Save form data to sessionStorage only when user interacts with it
+  useEffect(() => {
+    if ((formData.nombre || formData.celular || formData.cliente_id) && initialized && formDataChanged) {
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(formData));
+    }
+  }, [formData, initialized, formDataChanged]);
 
   // Safe way to notify parent of changes to avoid issues during initialization
   const safeNotifyParent = (cliente: ClienteType | null) => {
