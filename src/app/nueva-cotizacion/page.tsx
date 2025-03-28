@@ -362,7 +362,7 @@ export default function NuevaCotizacionPage() {
                         <SelectTrigger className="w-[100px]">
                           <SelectValue placeholder="Moneda" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white border border-gray-200">
                           <SelectItem value="MXN">MXN</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>
