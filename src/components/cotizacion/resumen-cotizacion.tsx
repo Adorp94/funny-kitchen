@@ -28,6 +28,7 @@ export function ResumenCotizacion({
 }: ResumenCotizacionProps) {
   const { 
     exchangeRate, 
+    baseRate,
     loading, 
     error, 
     convertMXNtoUSD, 
@@ -135,6 +136,22 @@ export function ResumenCotizacion({
     }
   };
 
+  // Helper function to format Banxico date (dd/mm/yyyy)
+  const formatBanxicoDate = (dateStr: string): string => {
+    try {
+      if (!dateStr) return '';
+      const parts = dateStr.split('/');
+      if (parts.length !== 3) return dateStr;
+      
+      // Construct date as yyyy-mm-dd for ISO format
+      const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      return new Date(isoDate).toLocaleDateString();
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return dateStr;
+    }
+  };
+
   return (
     <div className="bg-gray-50 rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-center mb-3">
@@ -151,26 +168,26 @@ export function ResumenCotizacion({
               </SelectContent>
             </Select>
           </div>
-          {exchangeRate && (
+          {exchangeRate ? (
             <div className="text-xs space-y-1">
               <div className="text-gray-600 font-medium">
                 {formatExchangeRateInfo()}
               </div>
               <div className="text-gray-400">
-                Última actualización: {new Date(lastUpdated).toLocaleDateString()}
+                {lastUpdated && 
+                  `Última actualización: ${formatBanxicoDate(lastUpdated)}`
+                }
               </div>
             </div>
-          )}
-          {loading && (
+          ) : loading ? (
             <div className="text-xs text-gray-500">
               Cargando tipo de cambio...
             </div>
-          )}
-          {error && (
+          ) : error ? (
             <div className="text-xs text-red-500">
-              Error al cargar tipo de cambio
+              Error: {error}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
       

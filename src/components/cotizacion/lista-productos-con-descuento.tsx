@@ -38,9 +38,7 @@ export function ListaProductosConDescuento({
   // Convert amount based on selected currency
   const convertAmount = (amount: number): number => {
     if (moneda === 'USD' && exchangeRate) {
-      const result = amount / exchangeRate;
-      console.log(`Converting ${amount} MXN → ${result.toFixed(2)} USD (rate: ${exchangeRate})`);
-      return Number(result.toFixed(2));
+      return convertMXNtoUSD(amount);
     }
     return amount;
   };
