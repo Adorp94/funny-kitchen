@@ -8,11 +8,13 @@ import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileTe
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
+import { ListaProductosConDescuento, ProductoConDescuento } from "@/components/cotizacion/lista-productos-con-descuento";
+import { ResumenCotizacion } from "@/components/cotizacion/resumen-cotizacion";
 import { useProductos } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
 
-// Define the Producto interface locally
+// Define the Producto interface locally with all required properties
 interface Producto {
   id: string;
   nombre: string;
@@ -40,10 +42,15 @@ export default function NuevaCotizacionPage() {
     productos, 
     addProducto, 
     removeProducto, 
+    updateProductoDiscount,
     clearProductos, 
     total,
     moneda,
-    setMoneda
+    setMoneda,
+    subtotal,
+    setGlobalDiscount,
+    setHasIva,
+    setShippingCost
   } = useProductos();
 
   // Use effect to update cliente state after render
@@ -430,7 +437,7 @@ export default function NuevaCotizacionPage() {
                   </Button>
                 </div>
                 
-                {/* Products */}
+                {/* Products with individual discounts */}
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="font-medium text-gray-700">Productos</h3>
@@ -439,10 +446,12 @@ export default function NuevaCotizacionPage() {
                       <span className="text-sm text-gray-500">Moneda: {moneda}</span>
                     </div>
                   </div>
-                  <ListaProductos 
+                  <ListaProductosConDescuento 
                     productos={productos} 
                     onRemoveProduct={removeProducto}
+                    onUpdateProductDiscount={updateProductoDiscount}
                     moneda={moneda}
+                    editMode={true}
                   />
                   <Button 
                     variant="ghost" 
@@ -453,16 +462,14 @@ export default function NuevaCotizacionPage() {
                   </Button>
                 </div>
                 
-                {/* Summary */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-700 mb-3">Resumen</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Total:</span>
-                      <span className="font-medium text-gray-900">{formatCurrency(total)}</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Summary with global discount, IVA and shipping */}
+                <ResumenCotizacion 
+                  subtotal={subtotal}
+                  onGlobalDiscountChange={setGlobalDiscount}
+                  onIvaChange={setHasIva}
+                  onShippingChange={setShippingCost}
+                  moneda={moneda}
+                />
               </div>
               <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
                 <Button 
