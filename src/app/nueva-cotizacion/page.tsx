@@ -163,7 +163,7 @@ export default function NuevaCotizacionPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Update handleSubmit to use MouseEvent instead of FormEvent
+  // Update handleGenerateCotizacion to save quotation to database
   const handleGenerateCotizacion = async () => {
     if (!cliente) {
       toast.error("Por favor, ingresa la información del cliente");
@@ -178,15 +178,58 @@ export default function NuevaCotizacionPage() {
     setIsLoading(true);
 
     try {
-      // In this simplified version, navigate to the PDF view
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push('/ver-cotizacion');
-      }, 1000);
+      // Calculate IVA amount
+      const subtotalAfterDiscount = subtotal * (1 - globalDiscount / 100);
+      const montoIva = hasIva ? subtotalAfterDiscount * 0.16 : 0;
+      
+      // Prepare data for API call
+      const quotationData = {
+        cliente: cliente,
+        productos: productos,
+        moneda: moneda,
+        subtotal: subtotal,
+        descuento_global: globalDiscount,
+        iva: hasIva,
+        monto_iva: montoIva,
+        incluye_envio: shippingCost > 0,
+        costo_envio: shippingCost,
+        total: total,
+        tipo_cambio: exchangeRate
+      };
+      
+      // Call API to save quotation
+      const response = await fetch('/api/cotizaciones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(quotationData),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al guardar la cotización');
+      }
+      
+      // Clear context data after successful save
+      clearProductos();
+      setGlobalDiscount(0);
+      setHasIva(false);
+      setShippingCost(0);
+      
+      // Save the quotation ID and folio in sessionStorage for the PDF view
+      sessionStorage.setItem('cotizacion_id', result.cotizacion_id);
+      sessionStorage.setItem('cotizacion_folio', result.folio);
+      
+      toast.success(`Cotización ${result.folio} generada exitosamente`);
+      
+      // Navigate to the PDF view
+      router.push('/ver-cotizacion');
     } catch (error) {
       console.error('Error generating quotation:', error);
       setIsLoading(false);
-      toast.error("Error al generar la cotización");
+      toast.error(error instanceof Error ? error.message : "Error al generar la cotización");
     }
   };
   
@@ -571,7 +614,7 @@ export default function NuevaCotizacionPage() {
                   onClick={prevStep}
                   className="text-gray-600 border-gray-300"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Volver
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
@@ -579,17 +622,15 @@ export default function NuevaCotizacionPage() {
                   className="bg-teal-500 hover:bg-teal-600 text-white px-5"
                 >
                   {isLoading ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
                       Generando...
-                    </span>
+                    </>
                   ) : (
-                    <span className="flex items-center">
-                      Ver Cotización en PDF <FileText className="ml-2 h-4 w-4" />
-                    </span>
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Generar Cotización
+                    </>
                   )}
                 </Button>
               </div>

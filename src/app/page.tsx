@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, FilePlus, Sparkles, Database, ListChecks, FileText, LucideGithub } from "lucide-react";
+import { ArrowRight, FilePlus, Sparkles, Database, ListChecks, FileText, LucideGithub, ClipboardList } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -26,9 +26,17 @@ export default function HomePage() {
                     Nueva Cotización
                   </Button>
                 </Link>
-                <Link href="https://github.com/adolfojmnz/funny-kitchen" target="_blank" rel="noopener noreferrer">
+                <Link href="/dashboard/cotizaciones">
                   <Button size="lg" variant="outline" className="border-white text-white hover:bg-teal-600 w-full sm:w-auto">
-                    <LucideGithub className="mr-2 h-5 w-5" />
+                    <ClipboardList className="mr-2 h-5 w-5" />
+                    Ver Cotizaciones
+                  </Button>
+                </Link>
+              </div>
+              <div className="mt-4">
+                <Link href="https://github.com/adolfojmnz/funny-kitchen" target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="link" className="text-teal-100 hover:text-white">
+                    <LucideGithub className="mr-2 h-4 w-4" />
                     Ver en GitHub
                   </Button>
                 </Link>
@@ -97,12 +105,20 @@ export default function HomePage() {
           <p className="text-lg mb-8 text-gray-600">
             Simplifique el proceso de cotización para sus proyectos de cocina y muebles con nuestra herramienta fácil de usar.
           </p>
-          <Link href="/nueva-cotizacion">
-            <Button size="lg" className="bg-teal-600 hover:bg-teal-700 text-white">
-              Crear Mi Primera Cotización
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link href="/nueva-cotizacion">
+              <Button size="lg" className="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto">
+                Crear Mi Primera Cotización
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/dashboard/cotizaciones">
+              <Button size="lg" variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50 w-full sm:w-auto">
+                Administrar Cotizaciones
+                <ClipboardList className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

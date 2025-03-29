@@ -1,126 +1,216 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
 
 export async function GET(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id');
-  
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+    const supabase = createClientComponentClient();
+    
     if (id) {
       // Get a specific quote with its products and client
       const { data: cotizacion, error: cotizacionError } = await supabase
         .from('cotizaciones')
-        .select('*, clientes(*), vendedores(*)')
+        .select(`
+          *,
+          cliente:cliente_id(*)
+        `)
         .eq('cotizacion_id', id)
         .single();
         
-      if (cotizacionError) throw cotizacionError;
+      if (cotizacionError) {
+        console.error('Error fetching quotation:', cotizacionError);
+        return NextResponse.json(
+          { error: 'Error al obtener la cotización' }, 
+          { status: 500 }
+        );
+      }
       
+      if (!cotizacion) {
+        return NextResponse.json(
+          { error: 'Cotización no encontrada' }, 
+          { status: 404 }
+        );
+      }
+      
+      // Get the quotation products
       const { data: productos, error: productosError } = await supabase
-        .from('prodsxcotizacion')
-        .select('*, productos(*)')
+        .from('cotizacion_productos')
+        .select(`
+          *,
+          producto:producto_id(*)
+        `)
         .eq('cotizacion_id', id);
-        
-      if (productosError) throw productosError;
       
-      return NextResponse.json({ cotizacion, productos });
+      if (productosError) {
+        console.error('Error fetching quotation products:', productosError);
+        return NextResponse.json(
+          { error: 'Error al obtener los productos de la cotización' }, 
+          { status: 500 }
+        );
+      }
+      
+      // Format the response
+      const formattedProductos = productos.map(item => ({
+        id: item.producto.producto_id.toString(),
+        nombre: item.producto.nombre,
+        cantidad: item.cantidad,
+        precio: item.precio_unitario,
+        descuento: item.descuento_producto,
+        subtotal: item.subtotal,
+        sku: item.producto.sku,
+        descripcion: item.producto.descripcion,
+        colores: item.producto.colores?.split(',') || []
+      }));
+      
+      return NextResponse.json({
+        cotizacion: {
+          ...cotizacion,
+          productos: formattedProductos
+        }
+      });
     } else {
-      // Get all quotes with basic info
+      // Get all cotizaciones with cliente info
       const { data: cotizaciones, error } = await supabase
         .from('cotizaciones')
-        .select('*, clientes(nombre), vendedores(nombre, apellidos)')
-        .order('fecha_cotizacion', { ascending: false });
-        
-      if (error) throw error;
+        .select(`
+          cotizacion_id,
+          folio,
+          fecha_creacion,
+          estado,
+          moneda,
+          total,
+          cliente:cliente_id (
+            cliente_id,
+            nombre,
+            celular
+          )
+        `)
+        .order('fecha_creacion', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching cotizaciones:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
       
       return NextResponse.json({ cotizaciones });
     }
   } catch (error) {
-    console.error('Error fetching cotizaciones:', error);
+    console.error('Unexpected error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch cotizaciones' },
+      { error: 'Error al obtener las cotizaciones' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const body = await request.json();
-  
+export async function POST(req: NextRequest) {
   try {
-    // First insert the client if it's a new client
-    let clienteId = body.cliente_id;
+    const supabase = createClientComponentClient();
+    const data = await req.json();
     
-    if (!clienteId && body.cliente) {
-      const { data: clienteData, error: clienteError } = await supabase
-        .from('clientes')
-        .insert(body.cliente)
-        .select()
-        .single();
-        
-      if (clienteError) throw clienteError;
-      clienteId = clienteData.cliente_id;
+    // Extract data from the request
+    const { 
+      cliente, 
+      productos, 
+      moneda, 
+      subtotal, 
+      descuento_global, 
+      iva, 
+      monto_iva, 
+      incluye_envio, 
+      costo_envio, 
+      total,
+      tipo_cambio
+    } = data;
+
+    // Validate required fields
+    if (!cliente || !cliente.cliente_id || !productos || productos.length === 0) {
+      return NextResponse.json(
+        { error: 'Cliente y productos son requeridos' }, 
+        { status: 400 }
+      );
     }
+
+    // Generate a unique folio
+    const folio = `COT-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
-    // Then prepare the quote data
-    const cotizacionInsertData = {
-      cliente_id: clienteId,
-      vendedor_id: body.vendedor_id,
-      fecha_cotizacion: body.fecha_cotizacion,
-      moneda: body.moneda,
-      tipo_cambio: body.tipo_cambio,
-      iva: body.iva,
-      tipo_cuenta: body.tipo_cuenta,
-      descuento_total: body.descuento_total,
-      precio_total: body.precio_total,
-      tiempo_estimado: body.tiempo_estimado,
-      estatus: 'Pendiente', // Default status
-      envio: body.envio || null,
-      monto_broker: body.monto_broker || null,
-      estatus_pago: 'No completo' // Default payment status
-    };
-    
-    // Insert the quote
-    const { data: cotizacionResult, error: cotizacionError } = await supabase
+    // Set expiration date (30 days from now)
+    const fechaExpiracion = new Date();
+    fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
+
+    // 1. Insert the quotation
+    const { data: cotizacionData, error: cotizacionError } = await supabase
       .from('cotizaciones')
-      .insert(cotizacionInsertData)
-      .select()
+      .insert({
+        cliente_id: cliente.cliente_id,
+        moneda: moneda,
+        subtotal: subtotal,
+        descuento_global: descuento_global || 0,
+        iva: iva || false,
+        monto_iva: monto_iva || 0,
+        incluye_envio: incluye_envio || false,
+        costo_envio: costo_envio || 0,
+        total: total,
+        folio: folio,
+        fecha_expiracion: fechaExpiracion.toISOString(),
+        tipo_cambio: tipo_cambio || null
+      })
+      .select('cotizacion_id')
       .single();
-      
-    if (cotizacionError) throw cotizacionError;
-    
-    // Finally insert all products
-    if (body.productos && body.productos.length > 0) {
-      const productosData = body.productos.map((producto: any) => ({
-        cotizacion_id: cotizacionResult.cotizacion_id,
-        producto_id: producto.producto_id,
-        colores: producto.colores,
-        descuento: producto.descuento,
-        cantidad: producto.cantidad,
-        precio_final: producto.precio_final,
-        acabado: producto.acabado,
-        descripcion: producto.descripcion,
-        cantidad_etiquetas: producto.cantidad_etiquetas,
-        pu_etiqueta: producto.pu_etiqueta
-      }));
-      
-      const { error: productosError } = await supabase
-        .from('prodsxcotizacion')
-        .insert(productosData);
-        
-      if (productosError) throw productosError;
+
+    if (cotizacionError) {
+      console.error('Error inserting quotation:', cotizacionError);
+      return NextResponse.json(
+        { error: 'Error al guardar la cotización' }, 
+        { status: 500 }
+      );
     }
-    
+
+    const cotizacionId = cotizacionData.cotizacion_id;
+
+    // 2. Insert quotation products
+    const productosToInsert = productos.map((producto: ProductoConDescuento) => ({
+      cotizacion_id: cotizacionId,
+      producto_id: Number(producto.id),
+      cantidad: producto.cantidad,
+      precio_unitario: producto.precio,
+      descuento_producto: producto.descuento || 0,
+      subtotal: producto.subtotal
+    }));
+
+    const { error: productosError } = await supabase
+      .from('cotizacion_productos')
+      .insert(productosToInsert);
+
+    if (productosError) {
+      console.error('Error inserting quotation products:', productosError);
+      
+      // If there's an error with products, delete the quotation
+      await supabase
+        .from('cotizaciones')
+        .delete()
+        .eq('cotizacion_id', cotizacionId);
+        
+      return NextResponse.json(
+        { error: 'Error al guardar los productos de la cotización' }, 
+        { status: 500 }
+      );
+    }
+
+    // Return success with the quotation ID and folio
     return NextResponse.json({
       success: true,
-      cotizacion_id: cotizacionResult.cotizacion_id
+      cotizacion_id: cotizacionId,
+      folio: folio
     });
+    
   } catch (error) {
-    console.error('Error creating cotización:', error);
+    console.error('Unexpected error saving quotation:', error);
     return NextResponse.json(
-      { error: 'Failed to create cotización' },
+      { error: 'Error inesperado al guardar la cotización' }, 
       { status: 500 }
     );
   }

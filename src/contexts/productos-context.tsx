@@ -7,6 +7,7 @@ import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface ProductosContextType {
   productos: ProductoConDescuento[];
+  setProductos: (productos: ProductoConDescuento[]) => void;
   addProducto: (producto: Producto) => void;
   removeProducto: (id: string) => void;
   updateProductoDiscount: (id: string, descuento: number) => void;
@@ -22,6 +23,9 @@ interface ProductosContextType {
   moneda: 'MXN' | 'USD';
   setMoneda: (moneda: 'MXN' | 'USD') => void;
   exchangeRate: number | null;
+  ivaAmount: number;
+  hasShipping: boolean;
+  tipoCambio?: number | null;
 }
 
 const ProductosContext = createContext<ProductosContextType | undefined>(undefined);
@@ -149,6 +153,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     <ProductosContext.Provider
       value={{
         productos,
+        setProductos,
         addProducto,
         removeProducto,
         updateProductoDiscount,
@@ -163,7 +168,10 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         total,
         moneda,
         setMoneda,
-        exchangeRate
+        exchangeRate,
+        ivaAmount,
+        hasShipping: shippingCost > 0,
+        tipoCambio: exchangeRate
       }}
     >
       {children}
