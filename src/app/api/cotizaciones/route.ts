@@ -141,19 +141,35 @@ export async function POST(req: NextRequest) {
     const fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
 
+    // Normalize monetary values to be stored consistently
+    // If currency is USD, store both USD values and their MXN equivalents
+    let mxnSubtotal = subtotal;
+    let mxnCostoEnvio = costo_envio || 0;
+    let mxnTotal = total;
+    
+    // Calculate values in base currency (MXN) if the quotation is in USD
+    if (moneda === 'USD' && tipo_cambio) {
+      mxnSubtotal = subtotal * tipo_cambio;
+      mxnCostoEnvio = costo_envio * tipo_cambio;
+      mxnTotal = total * tipo_cambio;
+    }
+
     // 1. Insert the quotation
     const { data: cotizacionData, error: cotizacionError } = await supabase
       .from('cotizaciones')
       .insert({
         cliente_id: cliente.cliente_id,
         moneda: moneda,
-        subtotal: subtotal,
+        subtotal: subtotal,                   // Amount in the chosen currency
+        subtotal_mxn: mxnSubtotal,            // Always in MXN for reporting
         descuento_global: descuento_global || 0,
         iva: iva || false,
         monto_iva: monto_iva || 0,
         incluye_envio: incluye_envio || false,
-        costo_envio: costo_envio || 0,
-        total: total,
+        costo_envio: costo_envio || 0,        // Amount in the chosen currency
+        costo_envio_mxn: mxnCostoEnvio,       // Always in MXN for reporting
+        total: total,                         // Amount in the chosen currency
+        total_mxn: mxnTotal,                  // Always in MXN for reporting
         folio: folio,
         fecha_expiracion: fechaExpiracion.toISOString(),
         tipo_cambio: tipo_cambio || null
@@ -172,14 +188,27 @@ export async function POST(req: NextRequest) {
     const cotizacionId = cotizacionData.cotizacion_id;
 
     // 2. Insert quotation products
-    const productosToInsert = productos.map((producto: ProductoConDescuento) => ({
-      cotizacion_id: cotizacionId,
-      producto_id: Number(producto.id),
-      cantidad: producto.cantidad,
-      precio_unitario: producto.precio,
-      descuento_producto: producto.descuento || 0,
-      subtotal: producto.subtotal
-    }));
+    const productosToInsert = productos.map((producto: ProductoConDescuento) => {
+      let precioMXN = producto.precio;
+      let subtotalMXN = producto.subtotal;
+      
+      // Convert to MXN if currency is USD
+      if (moneda === 'USD' && tipo_cambio) {
+        precioMXN = producto.precio * tipo_cambio;
+        subtotalMXN = producto.subtotal * tipo_cambio;
+      }
+      
+      return {
+        cotizacion_id: cotizacionId,
+        producto_id: Number(producto.id),
+        cantidad: producto.cantidad,
+        precio_unitario: producto.precio,           // Amount in the chosen currency
+        precio_unitario_mxn: precioMXN,             // Always in MXN for reporting
+        descuento_producto: producto.descuento || 0,
+        subtotal: producto.subtotal,                // Amount in the chosen currency
+        subtotal_mxn: subtotalMXN                   // Always in MXN for reporting
+      };
+    });
 
     const { error: productosError } = await supabase
       .from('cotizacion_productos')

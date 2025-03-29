@@ -43,11 +43,23 @@ export function PDFCotizacion({ cliente, folio }: PDFCotizacionProps) {
   // Get current date formatted
   const fechaActual = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es });
   
-  // Format currency
+  // Format currency with proper symbol and formatting based on the currency
   const formatCurrency = (amount: number): string => {
-    return moneda === 'MXN' 
-      ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount)
-      : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    if (moneda === 'MXN') {
+      return new Intl.NumberFormat('es-MX', { 
+        style: 'currency', 
+        currency: 'MXN',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    } else {
+      return new Intl.NumberFormat('en-US', { 
+        style: 'currency', 
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount);
+    }
   };
 
   // Calculate total discounts from products

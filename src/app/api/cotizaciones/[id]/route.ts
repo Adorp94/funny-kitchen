@@ -65,8 +65,10 @@ export async function GET(
       nombre: item.producto.nombre,
       cantidad: item.cantidad,
       precio: item.precio_unitario,
+      precio_mxn: item.precio_unitario_mxn || item.precio_unitario,
       descuento: item.descuento_producto,
       subtotal: item.subtotal,
+      subtotal_mxn: item.subtotal_mxn || item.subtotal,
       sku: item.producto.sku,
       descripcion: item.producto.descripcion,
       colores: item.producto.colores?.split(',') || []
