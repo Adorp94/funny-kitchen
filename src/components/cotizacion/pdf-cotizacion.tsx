@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
 import { PDFService } from "@/services/pdf-service";
 import { useProductos } from "@/contexts/productos-context";
+import Image from "next/image";
 
 interface Cliente {
   nombre: string;
@@ -74,7 +75,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
   } = useProductos();
 
   // Use either the passed cotizacion data or context data
-  const productos = cotizacion?.productos || contextProductos;
+  const productos = (cotizacion?.productos || contextProductos) as Producto[];
   const moneda = cotizacion?.moneda || contextMoneda;
   const subtotal = cotizacion?.subtotal || contextSubtotal;
   const hasIva = cotizacion?.iva !== undefined ? cotizacion.iva : contextHasIva;
@@ -162,150 +163,215 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
       {/* PDF Content */}
       <div 
         ref={pdfRef} 
-        className="bg-white p-8 rounded-lg border border-gray-200 shadow-sm max-w-4xl mx-auto"
+        className="bg-white p-8 rounded-lg max-w-4xl mx-auto font-sans text-sm"
       >
         {/* Header */}
-        <div className="flex justify-between items-start mb-8 border-b pb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">COTIZACIÓN</h1>
-            <p className="text-gray-600">Folio: {displayFolio}</p>
-            <p className="text-gray-600">Fecha: {fechaActual}</p>
-            {tipoCambio && moneda === 'USD' && (
-              <p className="text-gray-600">Tipo de cambio: ${tipoCambio} MXN/USD</p>
-            )}
+        <div className="flex justify-between items-start mb-6 pb-6 border-b border-gray-100">
+          <div className="flex-shrink-0">
+            <img
+              src="/logo.png"
+              alt="Funny Kitchen Logo"
+              className="h-12 object-contain"
+            />
           </div>
           <div className="text-right">
-            <h2 className="text-xl font-bold text-teal-600">Funny Kitchen</h2>
-            <p className="text-gray-600">Tel: (123) 456-7890</p>
-            <p className="text-gray-600">info@funnykitchen.com</p>
-            <p className="text-gray-600">www.funnykitchen.com</p>
+            <h1 className="text-xl font-semibold text-gray-800 mb-1">COTIZACIÓN</h1>
+            <p className="text-gray-600">Folio: <span className="font-medium">{displayFolio}</span></p>
+            <p className="text-gray-600">Fecha: {fechaActual}</p>
+            <p className="text-gray-600">Divisa: <span className="font-medium">{moneda}</span></p>
           </div>
         </div>
         
-        {/* Client Information */}
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 text-gray-800">Información del Cliente</h2>
-          <div className="bg-gray-50 p-4 rounded-md">
-            <p><span className="font-semibold">Cliente:</span> {cliente.nombre}</p>
-            {cliente.razon_social && <p><span className="font-semibold">Razón Social:</span> {cliente.razon_social}</p>}
-            {cliente.rfc && <p><span className="font-semibold">RFC:</span> {cliente.rfc}</p>}
-            <p><span className="font-semibold">Teléfono:</span> {cliente.celular}</p>
-            {cliente.correo && <p><span className="font-semibold">Correo:</span> {cliente.correo}</p>}
-            {cliente.atencion && <p><span className="font-semibold">Atención:</span> {cliente.atencion}</p>}
-            {cliente.direccion_envio && <p><span className="font-semibold">Dirección de envío:</span> {cliente.direccion_envio}</p>}
-            {cliente.recibe && <p><span className="font-semibold">Recibe:</span> {cliente.recibe}</p>}
+        {/* Client and Company Information */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Client Information */}
+          <div>
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Cliente</h2>
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-gray-900">{cliente.nombre}</p>
+              {cliente.razon_social && <p className="text-gray-700">{cliente.razon_social}</p>}
+              {cliente.rfc && <p className="text-gray-700">RFC: {cliente.rfc}</p>}
+              <p className="text-gray-700">{cliente.celular}</p>
+              {cliente.correo && <p className="text-gray-700">{cliente.correo}</p>}
+              {cliente.atencion && <p className="text-gray-700">Atención: {cliente.atencion}</p>}
+              {cliente.direccion_envio && <p className="text-gray-700">{cliente.direccion_envio}</p>}
+              {cliente.recibe && <p className="text-gray-700">Recibe: {cliente.recibe}</p>}
+            </div>
+          </div>
+          
+          {/* Company Information */}
+          <div className="text-right">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Emisor</h2>
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-gray-900">Funny Kitchen S.A. de C.V.</p>
+              <p className="text-gray-700">AZUCENAS #439 LOS GIRASOLES</p>
+              <p className="text-gray-700">ZAPOPAN, JALISCO 45138</p>
+              <p className="text-gray-700">(33) 1055 6554</p>
+              <p className="text-gray-700">hola@funnykitchen.mx</p>
+            </div>
           </div>
         </div>
         
         {/* Products */}
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 text-gray-800">Productos</h2>
+        <div className="mb-6">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Productos</h2>
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-gray-200 px-4 py-2 text-left">Descripción</th>
-                <th className="border border-gray-200 px-4 py-2 text-center">Cantidad</th>
-                <th className="border border-gray-200 px-4 py-2 text-right">Precio Unitario</th>
+              <tr className="border-b border-gray-200">
+                <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                <th className="py-2 px-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P. Unitario</th>
                 {productos.some(p => p.descuento && p.descuento > 0) && (
-                  <th className="border border-gray-200 px-4 py-2 text-right">Descuento</th>
+                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Desc.</th>
                 )}
-                <th className="border border-gray-200 px-4 py-2 text-right">Subtotal</th>
+                <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-xs">
               {productos.map((producto) => (
-                <tr key={producto.id} className="border-b border-gray-200">
-                  <td className="border border-gray-200 px-4 py-2">
+                <tr key={producto.id} className="border-b border-gray-100">
+                  <td className="py-2 px-2">
                     <div>
-                      <div className="font-medium">{producto.nombre}</div>
-                      {producto.descripcion && <div className="text-sm text-gray-600">{producto.descripcion}</div>}
-                      {producto.sku && <div className="text-xs text-gray-500">SKU: {producto.sku}</div>}
+                      <p className="font-medium text-gray-800">{producto.nombre}</p>
+                      {typeof producto.descripcion === 'string' && producto.descripcion && (
+                        <p className="text-xs text-gray-600">{producto.descripcion}</p>
+                      )}
+                      {typeof producto.sku === 'string' && producto.sku && (
+                        <p className="text-xs text-gray-500">SKU: {producto.sku}</p>
+                      )}
                     </div>
                   </td>
-                  <td className="border border-gray-200 px-4 py-2 text-center">{producto.cantidad}</td>
-                  <td className="border border-gray-200 px-4 py-2 text-right">{formatCurrency(producto.precio)}</td>
+                  <td className="py-2 px-2 text-center text-gray-800">{producto.cantidad}</td>
+                  <td className="py-2 px-2 text-right text-gray-800">{formatCurrency(producto.precio)}</td>
                   {productos.some(p => p.descuento && p.descuento > 0) && (
-                    <td className="border border-gray-200 px-4 py-2 text-right">
+                    <td className="py-2 px-2 text-right text-gray-800">
                       {producto.descuento ? `${producto.descuento}%` : '-'}
                     </td>
                   )}
-                  <td className="border border-gray-200 px-4 py-2 text-right">
+                  <td className="py-2 px-2 text-right text-gray-800">
                     {producto.descuento && producto.descuento > 0 
-                      ? <div>
-                          <span className="line-through text-gray-500 text-sm mr-2">
-                            {formatCurrency(producto.cantidad * producto.precio)}
-                          </span>
-                          <span>
-                            {formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))}
-                          </span>
-                        </div>
+                      ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))
                       : formatCurrency(producto.cantidad * producto.precio)
                     }
                   </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className="bg-gray-50">
-                <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-semibold">Subtotal:</td>
-                <td className="border border-gray-200 px-4 py-2 text-right">{formatCurrency(subtotal)}</td>
-              </tr>
-              
-              {totalProductDiscounts > 0 && (
-                <tr className="bg-gray-50">
-                  <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-semibold">Descuentos por producto:</td>
-                  <td className="border border-gray-200 px-4 py-2 text-right text-red-600">-{formatCurrency(totalProductDiscounts)}</td>
-                </tr>
-              )}
-              
-              {globalDiscount > 0 && (
-                <tr className="bg-gray-50">
-                  <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-semibold">Descuento global ({globalDiscount}%):</td>
-                  <td className="border border-gray-200 px-4 py-2 text-right text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</td>
-                </tr>
-              )}
-              
-              {hasIva && (
-                <tr className="bg-gray-50">
-                  <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-semibold">IVA (16%):</td>
-                  <td className="border border-gray-200 px-4 py-2 text-right">{formatCurrency(ivaAmount)}</td>
-                </tr>
-              )}
-              
-              {hasShipping && shippingCost > 0 && (
-                <tr className="bg-gray-50">
-                  <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-semibold">Costo de envío:</td>
-                  <td className="border border-gray-200 px-4 py-2 text-right">{formatCurrency(shippingCost)}</td>
-                </tr>
-              )}
-              
-              <tr className="bg-gray-100">
-                <td colSpan={productos.some(p => p.descuento && p.descuento > 0) ? 4 : 3} className="border border-gray-200 px-4 py-2 text-right font-bold">Total:</td>
-                <td className="border border-gray-200 px-4 py-2 text-right font-bold text-lg">{formatCurrency(total)}</td>
-              </tr>
-            </tfoot>
           </table>
         </div>
         
+        {/* Totals */}
+        <div className="mb-6 pl-0 pr-0 md:pl-auto md:pr-0 lg:w-1/2 ml-auto">
+          <div className="space-y-1 text-right">
+            <div className="flex justify-between py-1 text-gray-700">
+              <span>Subtotal:</span>
+              <span>{formatCurrency(subtotal)}</span>
+            </div>
+            
+            {totalProductDiscounts > 0 && (
+              <div className="flex justify-between py-1 text-gray-700">
+                <span>Descuentos por producto:</span>
+                <span className="text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
+              </div>
+            )}
+            
+            {globalDiscount > 0 && (
+              <div className="flex justify-between py-1 text-gray-700">
+                <span>Descuento global ({globalDiscount}%):</span>
+                <span className="text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
+              </div>
+            )}
+            
+            {hasIva && (
+              <div className="flex justify-between py-1 text-gray-700">
+                <span>IVA (16%):</span>
+                <span>{formatCurrency(ivaAmount)}</span>
+              </div>
+            )}
+            
+            {hasShipping && shippingCost > 0 && (
+              <div className="flex justify-between py-1 text-gray-700">
+                <span>Costo de envío:</span>
+                <span>{formatCurrency(shippingCost)}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between py-2 font-medium text-gray-900 border-t border-gray-200">
+              <span>Total:</span>
+              <span className="text-base">{formatCurrency(total)}</span>
+            </div>
+          </div>
+        </div>
+        
         {/* Notes */}
-        <div className="mb-8">
-          <h2 className="text-lg font-bold mb-2 text-gray-800">Notas</h2>
-          <div className="bg-gray-50 p-4 rounded-md text-sm text-gray-600">
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Esta cotización tiene una validez de 30 días a partir de la fecha de emisión.</li>
-              <li>Los precios están expresados en {moneda === 'MXN' ? 'Pesos Mexicanos' : 'Dólares Americanos'}.</li>
-              <li>Tiempo de entrega: 15-20 días hábiles después de confirmado el pedido.</li>
-              <li>Se requiere un 50% de anticipo para iniciar el proyecto.</li>
-              {hasIva && <li>Precios incluyen IVA del 16%.</li>}
-              {!hasIva && <li>Precios no incluyen IVA.</li>}
+        <div className="mb-6">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Notas</h2>
+          <div className="bg-gray-50 p-3 rounded-md text-gray-700 text-xs">
+            <ul className="space-y-1 list-none">
+              <li>A) Precios sujetos a cambio sin previo aviso.</li>
+              <li>B) El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</li>
+              <li>C) Fecha de la cotización: 18/03/2025</li>
+              <li>D) Tiempo de Envío estimado: 6 semanas</li>
             </ul>
           </div>
         </div>
         
-        {/* Footer */}
-        <div className="text-center text-gray-500 text-sm mt-12 pt-6 border-t">
-          <p>Gracias por su preferencia</p>
-          <p className="mt-1">Funny Kitchen © {new Date().getFullYear()}</p>
+        {/* Terms and Payment Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Terms */}
+          <div>
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Términos y cuidados</h2>
+            <div className="text-xs text-gray-700 space-y-1">
+              <p>Términos completos: <a href="https://funnykitchen.mx/pages/terminos-y-condiciones" className="text-teal-600 hover:underline">funnykitchen.mx/pages/terminos-y-condiciones</a></p>
+              <div className="bg-gray-50 p-3 rounded-md mt-2">
+                <p className="font-medium mb-1">CUIDADOS:</p>
+                <p>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.</p>
+                <p className="mt-1">TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Payment Info */}
+          <div>
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 text-right">Datos bancarios</h2>
+            <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-md">
+              {moneda === 'MXN' ? (
+                <div className="space-y-1">
+                  <p className="font-medium">BBVA</p>
+                  <p>FUNNY KITCHEN S.A. DE C.V</p>
+                  <p>CUENTA: 012 244 0415</p>
+                  <p>CLABE: 012 320 00122440415 9</p>
+                  <p className="mt-1 font-medium">ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-medium">LEAD BANK</p>
+                  <p>PABLO ANAYA</p>
+                  <p>210319511130</p>
+                  <p>ABA 101019644</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Signature */}
+        <div className="border-t border-gray-100 pt-4">
+          <div className="text-xs text-gray-700">
+            <p className="font-medium mb-1">ATENTAMENTE:</p>
+            <div className="flex justify-between">
+              <div>
+                <p>PABLO ANAYA - DIRECTOR GENERAL</p>
+                <p>pablo@funnykitchen.mx</p>
+                <p>(33) 1055 6554</p>
+              </div>
+              <div className="text-right">
+                <p>HTTPS://FUNNYKITCHEN.MX</p>
+                <p>AZUCENAS #439 LOS GIRASOLES.</p>
+                <p>ZAPOPAN, JALISCO 45138</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
