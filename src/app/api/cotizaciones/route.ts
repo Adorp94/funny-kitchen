@@ -255,6 +255,7 @@ export async function POST(req: NextRequest) {
           displaySubtotal = producto_subtotal_mxn / tipo_cambio;
         }
         
+        // Only include fields that exist in the database schema
         return {
           cotizacion_id: cotizacionId,
           producto_id: productoId,
@@ -263,8 +264,8 @@ export async function POST(req: NextRequest) {
           precio_unitario_mxn: precio_unitario_mxn,  // Price always in MXN
           descuento_producto: Number(producto.descuento) || 0,
           subtotal: displaySubtotal,            // Subtotal in display currency (USD or MXN)
-          subtotal_mxn: producto_subtotal_mxn,     // Subtotal always in MXN
-          nombre_producto: producto.nombre      // Store the product name as a fallback
+          subtotal_mxn: producto_subtotal_mxn     // Subtotal always in MXN
+          // nombre_producto field removed as it doesn't exist in the database schema
         };
       } catch (error) {
         console.error(`Error processing product at index ${index}:`, error);
@@ -293,10 +294,8 @@ export async function POST(req: NextRequest) {
           // Use negative numbers to indicate temporary IDs
           product.producto_id = -(idx + 1);
           
-          // Make sure to include the name for reference
-          if (!product.nombre_producto) {
-            product.nombre_producto = `Producto temporal ${idx + 1}`;
-          }
+          // Log product info for reference without storing in database
+          console.log(`Added temporary ID ${product.producto_id} for product at index ${idx}`);
         }
       });
     }
