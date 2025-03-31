@@ -20,25 +20,71 @@ interface Cliente {
   recibe?: string | null;
 }
 
-interface PDFCotizacionProps {
-  cliente: Cliente;
-  folio: string;
+interface Producto {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  precio: number;
+  precio_mxn?: number;
+  descuento: number;
+  subtotal: number;
+  subtotal_mxn?: number;
+  sku?: string;
+  descripcion?: string;
+  colores?: string[];
 }
 
-export function PDFCotizacion({ cliente, folio }: PDFCotizacionProps) {
+interface Cotizacion {
+  id?: string;
+  folio?: string;
+  moneda?: 'MXN' | 'USD';
+  subtotal?: number;
+  subtotal_mxn?: number;
+  descuento_global?: number;
+  iva?: boolean;
+  monto_iva?: number;
+  incluye_envio?: boolean;
+  costo_envio?: number;
+  costo_envio_mxn?: number;
+  total?: number;
+  total_mxn?: number;
+  tipo_cambio?: number;
+  productos?: Producto[];
+}
+
+interface PDFCotizacionProps {
+  cliente: Cliente;
+  folio?: string;
+  cotizacion?: Cotizacion;
+}
+
+export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const { 
-    productos, 
-    moneda, 
-    subtotal, 
-    hasIva, 
-    ivaAmount, 
-    globalDiscount, 
-    total, 
-    hasShipping, 
-    shippingCost,
-    tipoCambio
+    productos: contextProductos, 
+    moneda: contextMoneda, 
+    subtotal: contextSubtotal, 
+    hasIva: contextHasIva, 
+    ivaAmount: contextIvaAmount, 
+    globalDiscount: contextGlobalDiscount, 
+    total: contextTotal, 
+    hasShipping: contextHasShipping, 
+    shippingCost: contextShippingCost,
+    tipoCambio: contextTipoCambio
   } = useProductos();
+
+  // Use either the passed cotizacion data or context data
+  const productos = cotizacion?.productos || contextProductos;
+  const moneda = cotizacion?.moneda || contextMoneda;
+  const subtotal = cotizacion?.subtotal || contextSubtotal;
+  const hasIva = cotizacion?.iva !== undefined ? cotizacion.iva : contextHasIva;
+  const ivaAmount = cotizacion?.monto_iva || contextIvaAmount;
+  const globalDiscount = cotizacion?.descuento_global || contextGlobalDiscount;
+  const total = cotizacion?.total || contextTotal;
+  const hasShipping = cotizacion?.incluye_envio !== undefined ? cotizacion.incluye_envio : contextHasShipping;
+  const shippingCost = cotizacion?.costo_envio || contextShippingCost;
+  const tipoCambio = cotizacion?.tipo_cambio || contextTipoCambio;
+  const displayFolio = cotizacion?.folio || folio;
 
   // Get current date formatted
   const fechaActual = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es });
@@ -80,7 +126,7 @@ export function PDFCotizacion({ cliente, folio }: PDFCotizacionProps) {
     
     try {
       await PDFService.generatePDFFromElement(pdfRef.current, {
-        filename: `cotizacion-${folio}-${format(new Date(), 'dd-MM-yyyy')}.pdf`,
+        filename: `cotizacion-${displayFolio}-${format(new Date(), 'dd-MM-yyyy')}.pdf`,
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -122,7 +168,7 @@ export function PDFCotizacion({ cliente, folio }: PDFCotizacionProps) {
         <div className="flex justify-between items-start mb-8 border-b pb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">COTIZACIÓN</h1>
-            <p className="text-gray-600">Folio: {folio}</p>
+            <p className="text-gray-600">Folio: {displayFolio}</p>
             <p className="text-gray-600">Fecha: {fechaActual}</p>
             {tipoCambio && moneda === 'USD' && (
               <p className="text-gray-600">Tipo de cambio: ${tipoCambio} MXN/USD</p>

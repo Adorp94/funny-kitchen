@@ -74,12 +74,18 @@ export async function GET(
       colores: item.producto.colores?.split(',') || []
     }));
     
+    // Include MXN values in the response
+    const cotizacionWithMXN = {
+      ...cotizacion,
+      subtotal_mxn: cotizacion.subtotal_mxn || cotizacion.subtotal,
+      costo_envio_mxn: cotizacion.costo_envio_mxn || cotizacion.costo_envio,
+      total_mxn: cotizacion.total_mxn || cotizacion.total,
+      productos: formattedProductos
+    };
+    
     // Return the formatted response
     return NextResponse.json({
-      cotizacion: {
-        ...cotizacion,
-        productos: formattedProductos
-      }
+      cotizacion: cotizacionWithMXN
     });
     
   } catch (error) {

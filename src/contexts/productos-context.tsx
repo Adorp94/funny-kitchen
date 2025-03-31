@@ -1,29 +1,39 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo } from "react";
 import { Producto } from "@/components/cotizacion/producto-simplificado";
 import { ProductoConDescuento } from "@/components/cotizacion/lista-productos-con-descuento";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface ProductosContextType {
+  // Basic product management
   productos: ProductoConDescuento[];
   setProductos: (productos: ProductoConDescuento[]) => void;
   addProducto: (producto: Producto) => void;
   removeProducto: (id: string) => void;
   updateProductoDiscount: (id: string, descuento: number) => void;
   clearProductos: () => void;
+  
+  // Financial values in the selected currency
   subtotal: number;
   globalDiscount: number;
+  ivaAmount: number;
+  total: number;
+  
+  // Same values in MXN for consistency (if currency is USD)
+  subtotalMXN: number;
+  ivaAmountMXN: number;
+  totalMXN: number;
+  
+  // Settings
   setGlobalDiscount: (discount: number) => void;
   hasIva: boolean;
   setHasIva: (hasIva: boolean) => void;
   shippingCost: number;
   setShippingCost: (cost: number) => void;
-  total: number;
   moneda: 'MXN' | 'USD';
   setMoneda: (moneda: 'MXN' | 'USD') => void;
   exchangeRate: number | null;
-  ivaAmount: number;
   hasShipping: boolean;
   tipoCambio?: number | null;
 }
@@ -42,14 +52,9 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     exchangeRate, 
     loading: exchangeRateLoading, 
     error: exchangeRateError, 
-    convertMXNtoUSD 
+    convertMXNtoUSD,
+    convertUSDtoMXN
   } = useExchangeRate();
-
-  // Log currency and exchange rate changes
-  useEffect(() => {
-    console.log('Currency changed in context:', moneda);
-    console.log('Exchange rate in context:', exchangeRate);
-  }, [moneda, exchangeRate]);
 
   // Load products and settings from sessionStorage on first mount
   useEffect(() => {
@@ -137,17 +142,54 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('cotizacion_productos');
   };
 
-  // Calculate subtotal (sum of all products subtotals after their individual discounts)
-  const subtotal = productos.reduce((sum, producto) => {
-    const discount = producto.descuento || 0;
-    const priceAfterDiscount = producto.precio * (1 - discount / 100);
-    return sum + (priceAfterDiscount * producto.cantidad);
-  }, 0);
+  // Calculate all financial values using useMemo to avoid circular dependencies
+  const financialValues = useMemo(() => {
+    // Calculate subtotal (sum of all products subtotals after their individual discounts)
+    const subtotal = productos.reduce((sum, producto) => {
+      const discount = producto.descuento || 0;
+      const priceAfterDiscount = producto.precio * (1 - discount / 100);
+      return sum + (priceAfterDiscount * producto.cantidad);
+    }, 0);
 
-  // Calculate final total
-  const subtotalAfterGlobalDiscount = subtotal * (1 - globalDiscount / 100);
-  const ivaAmount = hasIva ? subtotalAfterGlobalDiscount * 0.16 : 0;
-  const total = subtotalAfterGlobalDiscount + ivaAmount + shippingCost;
+    // Calculate final total
+    const subtotalAfterGlobalDiscount = subtotal * (1 - globalDiscount / 100);
+    const ivaAmount = hasIva ? subtotalAfterGlobalDiscount * 0.16 : 0;
+    const total = subtotalAfterGlobalDiscount + ivaAmount + shippingCost;
+
+    // Calculate MXN equivalents if in USD
+    let subtotalMXN = subtotal;
+    let ivaAmountMXN = ivaAmount;
+    let totalMXN = total;
+
+    // No conversion needed for MXN values as we're already working in MXN
+    
+    return {
+      subtotal,
+      subtotalAfterGlobalDiscount,
+      ivaAmount,
+      total,
+      subtotalMXN,
+      ivaAmountMXN,
+      totalMXN
+    };
+  }, [productos, globalDiscount, hasIva, shippingCost, moneda, exchangeRate]);
+
+  // Log currency and exchange rate changes
+  useEffect(() => {
+    console.log('Currency changed in context:', moneda);
+    console.log('Exchange rate in context:', exchangeRate);
+    
+    // Log current values in both currencies
+    if (moneda === 'USD' && exchangeRate) {
+      console.log('Current context values (USD):');
+      console.log(`- Subtotal MXN: ${financialValues.subtotal}, Display USD: ${financialValues.subtotal / exchangeRate}`);
+      console.log(`- Total MXN: ${financialValues.total}, Display USD: ${financialValues.total / exchangeRate}`);
+    } else {
+      console.log('Current context values (MXN):');
+      console.log(`- Subtotal: ${financialValues.subtotal}`);
+      console.log(`- Total: ${financialValues.total}`);
+    }
+  }, [moneda, exchangeRate, financialValues]);
 
   return (
     <ProductosContext.Provider
@@ -158,20 +200,24 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         removeProducto,
         updateProductoDiscount,
         clearProductos,
-        subtotal,
+        subtotal: financialValues.subtotal,
         globalDiscount,
         setGlobalDiscount,
         hasIva,
         setHasIva,
         shippingCost,
         setShippingCost,
-        total,
+        total: financialValues.total,
         moneda,
         setMoneda,
         exchangeRate,
-        ivaAmount,
+        ivaAmount: financialValues.ivaAmount,
         hasShipping: shippingCost > 0,
-        tipoCambio: exchangeRate
+        tipoCambio: exchangeRate,
+        // Add the MXN equivalents
+        subtotalMXN: financialValues.subtotalMXN,
+        ivaAmountMXN: financialValues.ivaAmountMXN,
+        totalMXN: financialValues.totalMXN
       }}
     >
       {children}

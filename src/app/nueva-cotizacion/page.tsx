@@ -251,7 +251,7 @@ export default function NuevaCotizacionPage() {
     // Convert to USD if needed
     if (moneda === 'USD' && exchangeRate) {
       displayAmount = amount / exchangeRate;
-      console.log(`Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
+      console.log(`formatCurrency - Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
     }
     
     return `$${displayAmount.toFixed(2)} ${moneda}`;

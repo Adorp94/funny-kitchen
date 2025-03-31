@@ -126,6 +126,14 @@ export async function POST(req: NextRequest) {
       tipo_cambio
     } = data;
 
+    console.log("==== QUOTATION DATA RECEIVED ====");
+    console.log(`Currency: ${moneda}`);
+    console.log(`Subtotal: ${subtotal} ${moneda}`);
+    console.log(`Shipping: ${costo_envio} ${moneda}`);
+    console.log(`Total: ${total} ${moneda}`);
+    console.log(`Exchange Rate: ${tipo_cambio}`);
+    console.log("===============================");
+
     // Validate required fields
     if (!cliente || !cliente.cliente_id || !productos || productos.length === 0) {
       return NextResponse.json(
@@ -141,18 +149,42 @@ export async function POST(req: NextRequest) {
     const fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
 
-    // Normalize monetary values to be stored consistently
-    // If currency is USD, store both USD values and their MXN equivalents
-    let mxnSubtotal = subtotal;
-    let mxnCostoEnvio = costo_envio || 0;
-    let mxnTotal = total;
+    // In our application architecture:
+    // 1. All monetary values in the context are stored in MXN
+    // 2. The UI displays them in USD if moneda is USD (by dividing by exchange rate)
+    // 3. We store both the display currency values and MXN equivalents
     
-    // Calculate values in base currency (MXN) if the quotation is in USD
+    // Calculate display values based on the selected currency
+    let displaySubtotal = subtotal;
+    let displayShippingCost = costo_envio || 0;
+    let displayTotal = total;
+    
+    // MXN values are already in the right currency
+    let subtotal_mxn = subtotal;
+    let costo_envio_mxn = costo_envio || 0;
+    let total_mxn = total;
+    
+    // If currency is USD, convert display values for storage
     if (moneda === 'USD' && tipo_cambio) {
-      mxnSubtotal = subtotal * tipo_cambio;
-      mxnCostoEnvio = costo_envio * tipo_cambio;
-      mxnTotal = total * tipo_cambio;
+      // Convert from MXN to USD for display currency values
+      displaySubtotal = subtotal / tipo_cambio;
+      displayShippingCost = costo_envio / tipo_cambio;
+      displayTotal = total / tipo_cambio;
+      
+      console.log(`Converting from MXN to USD for display: Rate ${tipo_cambio}`);
+      console.log(`Subtotal MXN: ${subtotal} → USD: ${displaySubtotal.toFixed(2)}`);
+      console.log(`Total MXN: ${total} → USD: ${displayTotal.toFixed(2)}`);
     }
+    
+    console.log("==== COTIZACION DATA TO SAVE ====");
+    console.log(`Currency: ${moneda}`);
+    console.log(`Subtotal (${moneda}): ${displaySubtotal.toFixed(2)}`);
+    console.log(`Subtotal_MXN: ${subtotal_mxn.toFixed(2)}`);
+    console.log(`Shipping (${moneda}): ${displayShippingCost.toFixed(2)}`);
+    console.log(`Shipping_MXN: ${costo_envio_mxn.toFixed(2)}`);
+    console.log(`Total (${moneda}): ${displayTotal.toFixed(2)}`);
+    console.log(`Total_MXN: ${total_mxn.toFixed(2)}`);
+    console.log("===============================");
 
     // 1. Insert the quotation
     const { data: cotizacionData, error: cotizacionError } = await supabase
@@ -160,16 +192,16 @@ export async function POST(req: NextRequest) {
       .insert({
         cliente_id: cliente.cliente_id,
         moneda: moneda,
-        subtotal: subtotal,                   // Amount in the chosen currency
-        subtotal_mxn: mxnSubtotal,            // Always in MXN for reporting
+        subtotal: displaySubtotal,         // Amount in the display currency (USD or MXN)
+        subtotal_mxn: subtotal_mxn,        // Always in MXN for reporting
         descuento_global: descuento_global || 0,
         iva: iva || false,
         monto_iva: monto_iva || 0,
         incluye_envio: incluye_envio || false,
-        costo_envio: costo_envio || 0,        // Amount in the chosen currency
-        costo_envio_mxn: mxnCostoEnvio,       // Always in MXN for reporting
-        total: total,                         // Amount in the chosen currency
-        total_mxn: mxnTotal,                  // Always in MXN for reporting
+        costo_envio: displayShippingCost,  // Amount in the display currency (USD or MXN)
+        costo_envio_mxn: costo_envio_mxn,  // Always in MXN for reporting
+        total: displayTotal,               // Amount in the display currency (USD or MXN)
+        total_mxn: total_mxn,              // Always in MXN for reporting
         folio: folio,
         fecha_expiracion: fechaExpiracion.toISOString(),
         tipo_cambio: tipo_cambio || null
@@ -189,24 +221,30 @@ export async function POST(req: NextRequest) {
 
     // 2. Insert quotation products
     const productosToInsert = productos.map((producto: ProductoConDescuento) => {
-      let precioMXN = producto.precio;
-      let subtotalMXN = producto.subtotal;
+      // All product prices and subtotals in context are in MXN
+      // Store them in MXN for the _mxn fields
+      const precio_unitario_mxn = producto.precio;
+      const subtotal_mxn = producto.subtotal;
       
-      // Convert to MXN if currency is USD
+      // For display currency fields, convert if needed
+      let displayPrecio = producto.precio;
+      let displaySubtotal = producto.subtotal;
+      
+      // Convert to display currency if moneda is USD
       if (moneda === 'USD' && tipo_cambio) {
-        precioMXN = producto.precio * tipo_cambio;
-        subtotalMXN = producto.subtotal * tipo_cambio;
+        displayPrecio = producto.precio / tipo_cambio;
+        displaySubtotal = producto.subtotal / tipo_cambio;
       }
       
       return {
         cotizacion_id: cotizacionId,
         producto_id: Number(producto.id),
         cantidad: producto.cantidad,
-        precio_unitario: producto.precio,           // Amount in the chosen currency
-        precio_unitario_mxn: precioMXN,             // Always in MXN for reporting
+        precio_unitario: displayPrecio,        // Price in display currency (USD or MXN)
+        precio_unitario_mxn: precio_unitario_mxn,  // Price always in MXN
         descuento_producto: producto.descuento || 0,
-        subtotal: producto.subtotal,                // Amount in the chosen currency
-        subtotal_mxn: subtotalMXN                   // Always in MXN for reporting
+        subtotal: displaySubtotal,            // Subtotal in display currency (USD or MXN)
+        subtotal_mxn: subtotal_mxn            // Subtotal always in MXN
       };
     });
 
