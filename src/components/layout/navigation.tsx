@@ -17,16 +17,17 @@ const navigation = [
     href: "/cotizaciones",
     icon: ClipboardList,
   },
-  {
-    name: "Productos",
-    href: "/productos",
-    icon: ChefHat,
-  },
-  {
-    name: "Clientes",
-    href: "/clientes",
-    icon: Users,
-  },
+  // Productos and Clientes modules temporarily disabled
+  // {
+  //   name: "Productos",
+  //   href: "/productos",
+  //   icon: ChefHat,
+  // },
+  // {
+  //   name: "Clientes",
+  //   href: "/clientes",
+  //   icon: Users,
+  // },
   {
     name: "Configuración",
     href: "/configuracion",

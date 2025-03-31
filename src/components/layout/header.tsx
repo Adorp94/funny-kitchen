@@ -19,17 +19,18 @@ const navigation = [
     name: "Cotizaciones",
     href: "/dashboard/cotizaciones",
     icon: FileText,
-  },
-  {
-    name: "Productos",
-    href: "/dashboard/productos",
-    icon: ShoppingBag,
-  },
-  {
-    name: "Clientes",
-    href: "/dashboard/clientes",
-    icon: Users,
   }
+  // Productos and Clientes modules temporarily disabled
+  // {
+  //   name: "Productos",
+  //   href: "/dashboard/productos",
+  //   icon: ShoppingBag,
+  // },
+  // {
+  //   name: "Clientes",
+  //   href: "/dashboard/clientes",
+  //   icon: Users,
+  // }
 ];
 
 export function Header() {

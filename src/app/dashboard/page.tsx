@@ -169,7 +169,8 @@ export default function DashboardPage() {
           </CardFooter>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        {/* Productos card disabled - uncomment when module is complete */}
+        <Card className="hover:shadow-md transition-shadow opacity-60">
           <CardHeader>
             <div className="rounded-full bg-emerald-50 w-10 h-10 flex items-center justify-center mb-3">
               <ShoppingBag className="h-5 w-5 text-emerald-600" />
@@ -184,15 +185,16 @@ export default function DashboardPage() {
           </CardContent>
           <CardFooter>
             <Button 
-              onClick={() => handleNavigate('/dashboard/productos')}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled
+              className="w-full bg-gray-300 text-gray-600 cursor-not-allowed"
             >
-              Ir a Productos
+              Próximamente
             </Button>
           </CardFooter>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        {/* Clientes card disabled - uncomment when module is complete */}
+        <Card className="hover:shadow-md transition-shadow opacity-60">
           <CardHeader>
             <div className="rounded-full bg-emerald-50 w-10 h-10 flex items-center justify-center mb-3">
               <Users className="h-5 w-5 text-emerald-600" />
@@ -207,10 +209,10 @@ export default function DashboardPage() {
           </CardContent>
           <CardFooter>
             <Button 
-              onClick={() => handleNavigate('/dashboard/clientes')}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled
+              className="w-full bg-gray-300 text-gray-600 cursor-not-allowed"
             >
-              Ir a Clientes
+              Próximamente
             </Button>
           </CardFooter>
         </Card>
