@@ -68,13 +68,22 @@ export default function CotizacionesPage() {
     const fetchCotizaciones = async () => {
       try {
         setLoading(true);
+        console.log("Fetching cotizaciones from API...");
         const response = await fetch("/api/cotizaciones");
         
         if (!response.ok) {
-          throw new Error("Error al obtener las cotizaciones");
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error(`API responded with status ${response.status}:`, errorData);
+          throw new Error(`Error al obtener las cotizaciones (${response.status}): ${errorData.error || 'Unknown error'}`);
         }
         
         const data = await response.json();
+        console.log("Cotizaciones received:", data);
+        
+        if (!data.cotizaciones || !Array.isArray(data.cotizaciones)) {
+          console.error("Invalid cotizaciones data received:", data);
+          throw new Error("Invalid data structure received from API");
+        }
         
         // Map the data to match our Cotizacion interface if needed
         const formattedCotizaciones = data.cotizaciones.map((cot: any) => ({
@@ -113,7 +122,10 @@ export default function CotizacionesPage() {
         });
       } catch (error) {
         console.error("Error fetching quotations:", error);
-        toast.error("No se pudieron cargar las cotizaciones");
+        toast.error(`No se pudieron cargar las cotizaciones: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+        // Set empty data to avoid UI issues
+        setCotizaciones([]);
+        setFilteredCotizaciones([]);
       } finally {
         setLoading(false);
       }

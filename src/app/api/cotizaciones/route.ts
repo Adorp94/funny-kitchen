@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
-    const supabase = createClientComponentClient();
+    const supabase = createServerSupabaseClient();
     
     if (id) {
       // Get a specific quote with its products and client
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClientComponentClient();
+    const supabase = createServerSupabaseClient();
     const data = await req.json();
     
     // Extract data from the request
