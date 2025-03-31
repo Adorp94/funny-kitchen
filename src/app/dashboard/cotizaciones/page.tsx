@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search } from "lucide-react";
@@ -64,75 +64,92 @@ export default function CotizacionesPage() {
     montoTotalUSD: 0
   });
   
-  useEffect(() => {
-    const fetchCotizaciones = async () => {
-      try {
-        setLoading(true);
-        console.log("Fetching cotizaciones from API...");
-        const response = await fetch("/api/cotizaciones");
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  
+  const fetchCotizaciones = useCallback(async () => {
+    try {
+      setLoading(true);
+      setErrorDetails(null);
+      console.log("Fetching cotizaciones from API...");
+      
+      const response = await fetch("/api/cotizaciones");
+      
+      if (!response.ok) {
+        const errorStatus = response.status;
+        let errorText = "";
         
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-          console.error(`API responded with status ${response.status}:`, errorData);
-          throw new Error(`Error al obtener las cotizaciones (${response.status}): ${errorData.error || 'Unknown error'}`);
+        try {
+          const errorData = await response.json();
+          errorText = errorData.error || 'Unknown error';
+        } catch (jsonError) {
+          errorText = await response.text();
         }
         
-        const data = await response.json();
-        console.log("Cotizaciones received:", data);
-        
-        if (!data.cotizaciones || !Array.isArray(data.cotizaciones)) {
-          console.error("Invalid cotizaciones data received:", data);
-          throw new Error("Invalid data structure received from API");
-        }
-        
-        // Map the data to match our Cotizacion interface if needed
-        const formattedCotizaciones = data.cotizaciones.map((cot: any) => ({
-          cotizacion_id: cot.cotizacion_id,
-          folio: cot.folio,
-          fecha_creacion: cot.fecha_creacion,
-          estado: cot.estado,
-          cliente: cot.cliente,
-          moneda: cot.moneda,
-          total: cot.total
-        }));
-        
-        setCotizaciones(formattedCotizaciones);
-        setFilteredCotizaciones(formattedCotizaciones);
-        
-        // Calculate metrics
-        const totalCotizaciones = formattedCotizaciones.length;
-        const cotizacionesPendientes = formattedCotizaciones.filter(c => c.estado === 'pendiente').length;
-        const cotizacionesAceptadas = formattedCotizaciones.filter(c => c.estado === 'aceptada').length;
-        
-        // Calculate total amounts by currency
-        const montoTotalMXN = formattedCotizaciones
-          .filter(c => c.moneda === 'MXN')
-          .reduce((sum, c) => sum + c.total, 0);
-          
-        const montoTotalUSD = formattedCotizaciones
-          .filter(c => c.moneda === 'USD')
-          .reduce((sum, c) => sum + c.total, 0);
-        
-        setMetrics({
-          totalCotizaciones,
-          cotizacionesPendientes,
-          cotizacionesAceptadas,
-          montoTotalMXN,
-          montoTotalUSD
-        });
-      } catch (error) {
-        console.error("Error fetching quotations:", error);
-        toast.error(`No se pudieron cargar las cotizaciones: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-        // Set empty data to avoid UI issues
-        setCotizaciones([]);
-        setFilteredCotizaciones([]);
-      } finally {
-        setLoading(false);
+        console.error(`API responded with status ${errorStatus}:`, errorText);
+        const errorDetail = `Server error ${errorStatus}: ${errorText}`;
+        setErrorDetails(errorDetail);
+        throw new Error(errorDetail);
       }
-    };
-    
-    fetchCotizaciones();
+      
+      const data = await response.json();
+      console.log("Cotizaciones received:", data);
+      
+      if (!data.cotizaciones || !Array.isArray(data.cotizaciones)) {
+        const errorDetail = "Invalid data structure received from API";
+        console.error(errorDetail, data);
+        setErrorDetails(errorDetail);
+        throw new Error(errorDetail);
+      }
+      
+      // Map the data to match our Cotizacion interface if needed
+      const formattedCotizaciones = data.cotizaciones.map((cot: any) => ({
+        cotizacion_id: cot.cotizacion_id,
+        folio: cot.folio,
+        fecha_creacion: cot.fecha_creacion,
+        estado: cot.estado,
+        cliente: cot.cliente,
+        moneda: cot.moneda,
+        total: cot.total
+      }));
+      
+      setCotizaciones(formattedCotizaciones);
+      setFilteredCotizaciones(formattedCotizaciones);
+      
+      // Calculate metrics
+      const totalCotizaciones = formattedCotizaciones.length;
+      const cotizacionesPendientes = formattedCotizaciones.filter(c => c.estado === 'pendiente').length;
+      const cotizacionesAceptadas = formattedCotizaciones.filter(c => c.estado === 'aceptada').length;
+      
+      // Calculate total amounts by currency
+      const montoTotalMXN = formattedCotizaciones
+        .filter(c => c.moneda === 'MXN')
+        .reduce((sum, c) => sum + c.total, 0);
+        
+      const montoTotalUSD = formattedCotizaciones
+        .filter(c => c.moneda === 'USD')
+        .reduce((sum, c) => sum + c.total, 0);
+      
+      setMetrics({
+        totalCotizaciones,
+        cotizacionesPendientes,
+        cotizacionesAceptadas,
+        montoTotalMXN,
+        montoTotalUSD
+      });
+    } catch (error) {
+      console.error("Error fetching quotations:", error);
+      toast.error(`No se pudieron cargar las cotizaciones: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      // Set empty data to avoid UI issues
+      setCotizaciones([]);
+      setFilteredCotizaciones([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+  
+  useEffect(() => {
+    fetchCotizaciones();
+  }, [fetchCotizaciones]);
   
   useEffect(() => {
     // Apply filters and sorting whenever search term, estado filter, or sort criteria changes
@@ -247,6 +264,25 @@ export default function CotizacionesPage() {
     }
   };
   
+  const renderErrorDetails = () => {
+    if (!errorDetails) return null;
+    
+    return (
+      <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded-md">
+        <h3 className="text-lg font-medium text-red-800 mb-2">Error al conectar con la base de datos</h3>
+        <p className="text-red-700 text-sm whitespace-pre-wrap break-words font-mono">{errorDetails}</p>
+        <div className="mt-4">
+          <Button 
+            onClick={() => fetchCotizaciones()}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Reintentar conexión
+          </Button>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
       {/* Header with title and actions */}
@@ -264,6 +300,9 @@ export default function CotizacionesPage() {
           <span className="whitespace-nowrap">Nueva Cotización</span>
         </Button>
       </div>
+      
+      {/* Error details section */}
+      {errorDetails && renderErrorDetails()}
       
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
