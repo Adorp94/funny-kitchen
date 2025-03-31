@@ -220,34 +220,89 @@ export async function POST(req: NextRequest) {
     const cotizacionId = cotizacionData.cotizacion_id;
 
     // 2. Insert quotation products
-    const productosToInsert = productos.map((producto: ProductoConDescuento) => {
-      // All product prices and subtotals in context are in MXN
-      // Store them in MXN for the _mxn fields
-      const precio_unitario_mxn = producto.precio;
-      const subtotal_mxn = producto.subtotal;
-      
-      // For display currency fields, convert if needed
-      let displayPrecio = producto.precio;
-      let displaySubtotal = producto.subtotal;
-      
-      // Convert to display currency if moneda is USD
-      if (moneda === 'USD' && tipo_cambio) {
-        displayPrecio = producto.precio / tipo_cambio;
-        displaySubtotal = producto.subtotal / tipo_cambio;
+    const productosToInsert = productos.map((producto: any, index: number) => {
+      try {
+        console.log(`Processing product ${index}:`, producto);
+        
+        // Ensure producto.id exists and can be converted to a number
+        let productoId = null;
+        try {
+          productoId = producto.id ? Number(producto.id) : null;
+          if (isNaN(productoId)) {
+            console.error(`Invalid producto_id for product ${index}:`, producto.id);
+            productoId = null;
+          }
+        } catch (error) {
+          console.error(`Error converting producto_id for product ${index}:`, error);
+        }
+        
+        if (!productoId && !producto.nombre) {
+          throw new Error(`Product at index ${index} has no ID or name`);
+        }
+        
+        // All product prices and subtotals in context are in MXN
+        // Store them in MXN for the _mxn fields
+        const precio_unitario_mxn = Number(producto.precio) || 0;
+        const producto_subtotal_mxn = Number(producto.subtotal) || 0;
+        
+        // For display currency fields, convert if needed
+        let displayPrecio = precio_unitario_mxn;
+        let displaySubtotal = producto_subtotal_mxn;
+        
+        // Convert to display currency if moneda is USD
+        if (moneda === 'USD' && tipo_cambio) {
+          displayPrecio = precio_unitario_mxn / tipo_cambio;
+          displaySubtotal = producto_subtotal_mxn / tipo_cambio;
+        }
+        
+        return {
+          cotizacion_id: cotizacionId,
+          producto_id: productoId,
+          cantidad: Number(producto.cantidad) || 1,
+          precio_unitario: displayPrecio,        // Price in display currency (USD or MXN)
+          precio_unitario_mxn: precio_unitario_mxn,  // Price always in MXN
+          descuento_producto: Number(producto.descuento) || 0,
+          subtotal: displaySubtotal,            // Subtotal in display currency (USD or MXN)
+          subtotal_mxn: producto_subtotal_mxn,     // Subtotal always in MXN
+          nombre_producto: producto.nombre      // Store the product name as a fallback
+        };
+      } catch (error) {
+        console.error(`Error processing product at index ${index}:`, error);
+        throw error;
       }
-      
-      return {
-        cotizacion_id: cotizacionId,
-        producto_id: Number(producto.id),
-        cantidad: producto.cantidad,
-        precio_unitario: displayPrecio,        // Price in display currency (USD or MXN)
-        precio_unitario_mxn: precio_unitario_mxn,  // Price always in MXN
-        descuento_producto: producto.descuento || 0,
-        subtotal: displaySubtotal,            // Subtotal in display currency (USD or MXN)
-        subtotal_mxn: subtotal_mxn            // Subtotal always in MXN
-      };
     });
 
+    // Fetch the cotizacion_productos table schema to see if producto_id is required
+    const { data: schemaData, error: schemaError } = await supabase
+      .from('cotizacion_productos')
+      .select('*')
+      .limit(0);
+    
+    if (schemaError) {
+      console.warn('Could not check table schema:', schemaError);
+    }
+    
+    // Check if any product doesn't have a valid ID
+    const hasProductsWithoutId = productosToInsert.some(p => p.producto_id === null);
+    if (hasProductsWithoutId) {
+      console.warn('Some products do not have valid IDs. Adding temporary IDs for database insertion.');
+      
+      // Modify products to have temporary IDs if needed
+      productosToInsert.forEach((product, idx) => {
+        if (product.producto_id === null) {
+          // Use negative numbers to indicate temporary IDs
+          product.producto_id = -(idx + 1);
+          
+          // Make sure to include the name for reference
+          if (!product.nombre_producto) {
+            product.nombre_producto = `Producto temporal ${idx + 1}`;
+          }
+        }
+      });
+    }
+
+    console.log(`Inserting ${productosToInsert.length} products for quotation ${cotizacionId}`);
+    
     const { error: productosError } = await supabase
       .from('cotizacion_productos')
       .insert(productosToInsert);
@@ -262,7 +317,7 @@ export async function POST(req: NextRequest) {
         .eq('cotizacion_id', cotizacionId);
         
       return NextResponse.json(
-        { error: 'Error al guardar los productos de la cotización' }, 
+        { error: `Error al guardar los productos de la cotización: ${productosError.message}` }, 
         { status: 500 }
       );
     }
