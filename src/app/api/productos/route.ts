@@ -87,9 +87,26 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   
   try {
+    // First, get the next ID for the product
+    const { data: maxIdData, error: maxIdError } = await supabase
+      .from('productos')
+      .select('producto_id')
+      .order('producto_id', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (maxIdError && maxIdError.code !== 'PGRST116') { // PGRST116 is returned when no rows found
+      throw maxIdError;
+    }
+    
+    // Calculate next ID (if no products exist, start with 1)
+    const nextId = maxIdData ? maxIdData.producto_id + 1 : 1;
+    
+    // Now insert with the explicitly specified ID
     const { data, error } = await supabase
       .from('productos')
       .insert({
+        producto_id: nextId,
         nombre: body.nombre.trim(),
         tipo_ceramica: body.tipo_ceramica || null,
         precio: body.precio || 0,
@@ -114,6 +131,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating producto:', error);
+    // If it's a Supabase error, include more details
+    if (error && typeof error === 'object' && 'code' in error) {
+      return NextResponse.json(
+        { error: `Database error: ${error.code} - ${error.message || 'Failed to create producto'}` },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to create producto' },
       { status: 500 }

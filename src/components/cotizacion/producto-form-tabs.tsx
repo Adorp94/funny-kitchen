@@ -168,7 +168,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   }, []);
   
   // Safe way to notify parent of changes to avoid issues during initialization
-  const safeNotifyParent = (producto: ProductoType | null, cantidad?: number) => {
+  const safeNotifyParent = (producto: any, cantidad?: number) => {
     if (onProductoChange && producto) {
       // Create a modified product with the cantidad field
       const productoWithCantidad = {
@@ -605,6 +605,125 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
+  // Save new product to database
+  const handleSaveProduct = async () => {
+    // Validate form first
+    const validationErrors = validateForm(formData);
+    setErrors(validationErrors);
+    
+    // Mark all fields as touched
+    setTouched({
+      nombre: true,
+      precio: true,
+      capacidad: true,
+      cantidad: true
+    });
+    
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error("Por favor corrige los errores antes de guardar");
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // Create producto object for API
+      const productoToCreate = {
+        nombre: formData.nombre,
+        tipo_ceramica: formData.tipo_ceramica || null,
+        precio: formData.precio ? parseFloat(formData.precio) : null,
+        sku: formData.sku || null,
+        capacidad: formData.capacidad ? parseInt(formData.capacidad) : null,
+        unidad: formData.unidad || null,
+        tipo_producto: formData.tipo_producto || null,
+        descripcion: formData.descripcion || null,
+        colores: formData.colores || null,
+        // Not setting these fields as they're not in the form
+        tiempo_produccion: null, 
+        cantidad_inventario: 0,
+        inventario: null
+      };
+      
+      console.log("Creating new product:", productoToCreate);
+      
+      // Insert the product using the API
+      const response = await fetch('/api/productos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productoToCreate),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create product');
+      }
+      
+      const data = await response.json();
+      console.log("Create response:", data);
+      
+      if (data.success && data.producto) {
+        // Update the form with the new product ID
+        setFormData(prev => ({
+          ...prev,
+          producto_id: data.producto.producto_id.toString()
+        }));
+        
+        // Show success message
+        toast.success("Producto creado exitosamente");
+        
+        // Prepare the product for adding to cart
+        const nuevoProducto = {
+          id: data.producto.producto_id.toString(),
+          nombre: data.producto.nombre,
+          precio: data.producto.precio || 0,
+          cantidad: parseInt(formData.cantidad) || 1,
+          descuento: 0,
+          subtotal: (data.producto.precio || 0) * (parseInt(formData.cantidad) || 1),
+          sku: data.producto.sku || "",
+          descripcion: data.producto.descripcion || "",
+          colores: data.producto.colores ? data.producto.colores.split(',') : [],
+          acabado: formData.acabado || ""
+        };
+        
+        // Add to cart
+        safeNotifyParent(nuevoProducto);
+        
+        // Reset form after saving
+        setFormData({
+          producto_id: "",
+          nombre: "",
+          tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+          precio: "",
+          sku: "",
+          capacidad: "",
+          unidad: "ml",
+          tipo_producto: "Personalizado",
+          descripcion: "",
+          colores: "",
+          acabado: "",
+          cantidad: "1"
+        });
+        
+        // Clear touched state
+        setTouched({});
+        
+        // Clear session storage
+        sessionStorage.removeItem('cotizacion_productoForm');
+      }
+    } catch (error) {
+      console.error("Error creating product:", error);
+      if (error instanceof Error) {
+        toast.error(`Error al crear el producto: ${error.message}`);
+      } else {
+        toast.error("Error al crear el producto");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Modify handleAddToCart to not open search after adding product
   const handleAddToCart = () => {
     // Validate form first
@@ -993,9 +1112,8 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   
                   <Button
                     type="button"
-                    onClick={handleAddToCart}
-                    // Only require product_id, name, and valid quantity for existing products
-                    disabled={!formData.producto_id || !formData.nombre || !formData.cantidad || Object.keys(errors).length > 0}
+                    onClick={handleSaveProduct}
+                    disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0}
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
@@ -1255,16 +1373,25 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
             </div>
             
             {/* Add button at the end */}
-            <div className="md:col-span-2 mt-6 flex justify-end">
+            <div className="md:col-span-2 mt-6 flex justify-end space-x-2">
               <Button
                 type="button"
-                onClick={handleAddToCart}
-                disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                onClick={handleSaveProduct}
+                disabled={isSaving || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
                 variant="default"
                 className="bg-teal-500 hover:bg-teal-600 text-white"
               >
-                <Package className="h-4 w-4 mr-2" />
-                Agregar al Carrito
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar y Agregar
+                  </>
+                )}
               </Button>
             </div>
           </div>

@@ -25,3 +25,7 @@ export function formatDate(date: string | Date): string {
     day: 'numeric',
   });
 }
+
+export function generateCotizacionId(id: number): string {
+  return `COT-${new Date().getFullYear()}-${String(id).padStart(4, '0')}`;
+}
