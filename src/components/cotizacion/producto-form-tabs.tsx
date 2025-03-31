@@ -1104,12 +1104,13 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                       {isSaving ? (
                         <>
                           <span className="animate-spin mr-2">⏳</span>
-                          Actualizando...
+                          <span className="hidden xs:inline">Actualizando...</span>
+                          <span className="inline xs:hidden">...</span>
                         </>
                       ) : (
                         <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Actualizar
+                          <Save className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Actualizar</span>
                         </>
                       )}
                     </Button>
@@ -1122,8 +1123,9 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
-                    <Package className="h-4 w-4 mr-2" />
-                    Agregar al Carrito
+                    <Package className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Agregar al Carrito</span>
+                    <span className="inline sm:hidden">Agregar</span>
                   </Button>
                 </div>
               </div>
@@ -1388,13 +1390,15 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               >
                 {isSaving ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
+                    <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Guardando...</span>
+                    <span className="inline sm:hidden">...</span>
                   </>
                 ) : (
                   <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar y Agregar
+                    <Save className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Guardar y Agregar</span>
+                    <span className="inline sm:hidden">Guardar</span>
                   </>
                 )}
               </Button>

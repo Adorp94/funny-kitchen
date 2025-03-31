@@ -6,7 +6,8 @@ export async function GET(
   context: { params: { id: string } }
 ) {
   try {
-    const id = context.params.id;
+    // Destructure and access the id properly from params
+    const { id } = context.params;
     
     if (!id) {
       return NextResponse.json(

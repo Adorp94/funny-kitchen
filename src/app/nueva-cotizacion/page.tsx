@@ -518,14 +518,16 @@ function NuevaCotizacionClient() {
                   onClick={prevStep}
                   className="w-full sm:w-auto text-gray-600 border-gray-300"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Regresar</span>
+                  <ArrowLeft className="h-4 w-4 sm:mr-2" /> 
+                  <span className="hidden sm:inline">Regresar</span>
                 </Button>
                 <Button 
                   onClick={nextStep} 
                   disabled={productos.length === 0} 
                   className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
                 >
-                  <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Continuar</span> 
+                  <ArrowRight className="h-4 w-4 sm:ml-2" />
                 </Button>
               </div>
             </div>
@@ -589,7 +591,8 @@ function NuevaCotizacionClient() {
                   onClick={prevStep}
                   className="w-full sm:w-auto text-gray-600 border-gray-300"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Regresar</span>
+                  <ArrowLeft className="h-4 w-4 sm:mr-2" /> 
+                  <span className="hidden sm:inline">Regresar</span>
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
@@ -597,10 +600,15 @@ function NuevaCotizacionClient() {
                   className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
                 >
                   {isLoading ? (
-                    <>Generando cotización...</>
+                    <>
+                      <div className="animate-spin mr-2">⏳</div>
+                      <span className="hidden sm:inline">Generando...</span>
+                    </>
                   ) : (
                     <>
-                      <Save className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Generar Cotización</span>
+                      <Save className="h-4 w-4 sm:mr-2" /> 
+                      <span className="hidden sm:inline">Generar Cotización</span>
+                      <span className="inline sm:hidden">Generar</span>
                     </>
                   )}
                 </Button>
