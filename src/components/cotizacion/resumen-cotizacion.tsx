@@ -1,30 +1,48 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Truck, Receipt, Percent } from 'lucide-react';
+import { DollarSign, Truck, Receipt, Percent, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 
+interface Cliente {
+  nombre: string;
+  celular: string;
+  correo?: string | null;
+  atencion?: string | null;
+  [key: string]: any;
+}
+
 interface ResumenCotizacionProps {
+  cliente: Cliente | null;
+  productos: any[];
   subtotal: number;
-  onGlobalDiscountChange: (value: number) => void;
-  onIvaChange: (hasIva: boolean) => void;
-  onShippingChange: (value: number) => void;
+  globalDiscount: number;
+  setGlobalDiscount: (value: number) => void;
+  hasIva: boolean;
+  setHasIva: (hasIva: boolean) => void;
+  shippingCost: number;
+  setShippingCost: (value: number) => void;
+  total: number;
   moneda: 'MXN' | 'USD';
-  onCurrencyChange: (currency: 'MXN' | 'USD') => void;
 }
 
 export function ResumenCotizacion({
+  cliente,
+  productos,
   subtotal,
-  onGlobalDiscountChange,
-  onIvaChange,
-  onShippingChange,
-  moneda,
-  onCurrencyChange
+  globalDiscount,
+  setGlobalDiscount,
+  hasIva,
+  setHasIva,
+  shippingCost,
+  setShippingCost,
+  total,
+  moneda
 }: ResumenCotizacionProps) {
   const { 
     exchangeRate, 
@@ -39,53 +57,22 @@ export function ResumenCotizacion({
 
   // State for the form - using string values for inputs
   const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
-  const [hasIva, setHasIva] = useState<boolean>(false);
   const [hasShipping, setHasShipping] = useState<boolean>(false);
   const [shippingCostStr, setShippingCostStr] = useState<string>('0');
 
-  // Parse numeric values from strings
-  const globalDiscount = parseFloat(globalDiscountStr) || 0;
-  const shippingCost = parseFloat(shippingCostStr) || 0;
-
-  // Convert amounts based on selected currency
-  const convertAmount = (amount: number): number => {
-    if (moneda === 'USD' && exchangeRate) {
-      return convertMXNtoUSD(amount);
-    }
-    return amount;
-  };
+  // Initialize form values from props
+  useEffect(() => {
+    setGlobalDiscountStr(globalDiscount.toString());
+    setHasShipping(shippingCost > 0);
+    setShippingCostStr(shippingCost.toString());
+  }, [globalDiscount, shippingCost]);
 
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    const convertedAmount = convertAmount(amount);
-    return `${moneda === 'MXN' ? '$' : '$'}${convertedAmount.toFixed(2)} ${moneda}`;
-  };
-
-  // Calculate discount amount
-  const discountAmount = subtotal * (globalDiscount / 100);
-  
-  // Subtotal after global discount
-  const subtotalAfterDiscount = subtotal - discountAmount;
-  
-  // Calculate IVA amount (16%)
-  const ivaAmount = hasIva ? subtotalAfterDiscount * 0.16 : 0;
-  
-  // Calculate shipping cost (only if shipping is enabled)
-  const shippingAmount = hasShipping ? (moneda === 'USD' ? convertUSDtoMXN(shippingCost) : shippingCost) : 0;
-  
-  // Total amount
-  const total = subtotalAfterDiscount + ivaAmount + shippingAmount;
-
-  // Handle currency change
-  const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
-    if (hasShipping && shippingCost > 0) {
-      const newShippingCost = newCurrency === 'USD' 
-        ? Number((shippingCost / (exchangeRate || 1)).toFixed(2))
-        : Number((shippingCost * (exchangeRate || 1)).toFixed(2));
-      setShippingCostStr(newShippingCost.toString());
-      onShippingChange(newShippingCost);
-    }
-    onCurrencyChange(newCurrency);
+    const displayAmount = moneda === 'USD' && exchangeRate 
+      ? amount / exchangeRate 
+      : amount;
+    return `$${displayAmount.toFixed(2)} ${moneda}`;
   };
 
   // Handle global discount change
@@ -99,14 +86,13 @@ export function ResumenCotizacion({
       // Convert to number for the callback
       const numValue = value === '' ? 0 : parseFloat(value);
       const boundedValue = Math.min(Math.max(numValue, 0), 100);
-      onGlobalDiscountChange(boundedValue);
+      setGlobalDiscount(boundedValue);
     }
   };
 
   // Handle IVA toggle
   const handleIvaToggle = (checked: boolean) => {
     setHasIva(checked);
-    onIvaChange(checked);
   };
 
   // Handle shipping toggle
@@ -114,7 +100,7 @@ export function ResumenCotizacion({
     setHasShipping(checked);
     if (!checked) {
       setShippingCostStr('0');
-      onShippingChange(0);
+      setShippingCost(0);
     }
   };
 
@@ -130,9 +116,7 @@ export function ResumenCotizacion({
       const numValue = value === '' ? 0 : parseFloat(value);
       const boundedValue = Math.max(numValue, 0);
       
-      // Convert to MXN if in USD mode
-      const mxnValue = moneda === 'USD' ? convertUSDtoMXN(boundedValue) : boundedValue;
-      onShippingChange(mxnValue);
+      setShippingCost(boundedValue);
     }
   };
 
@@ -153,21 +137,94 @@ export function ResumenCotizacion({
   };
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="font-medium text-gray-700">Resumen</h3>
-        <div className="flex flex-col items-end space-y-2">
-          <div className="flex items-center space-x-2">
-            <Select value={moneda} onValueChange={handleCurrencyChange}>
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="Moneda" />
-              </SelectTrigger>
-              <SelectContent className="bg-white border border-gray-200">
-                <SelectItem value="MXN">MXN</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-              </SelectContent>
-            </Select>
+    <div className="space-y-6">
+      {/* Client Info */}
+      {cliente && (
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <div className="flex items-center mb-3">
+            <User className="h-5 w-5 text-emerald-600 mr-2" />
+            <h3 className="font-medium text-gray-700">Información del Cliente</h3>
           </div>
+          <ul className="space-y-2 text-sm">
+            <li className="flex flex-col sm:flex-row sm:items-center">
+              <span className="text-gray-500 w-20 mb-1 sm:mb-0">Nombre:</span>
+              <span className="font-medium text-gray-900">{cliente?.nombre}</span>
+            </li>
+            <li className="flex flex-col sm:flex-row sm:items-center">
+              <span className="text-gray-500 w-20 mb-1 sm:mb-0">Teléfono:</span>
+              <span className="font-medium text-gray-900">{cliente?.celular}</span>
+            </li>
+            {cliente?.correo && (
+              <li className="flex flex-col sm:flex-row sm:items-center">
+                <span className="text-gray-500 w-20 mb-1 sm:mb-0">Correo:</span>
+                <span className="font-medium text-gray-900">{cliente?.correo}</span>
+              </li>
+            )}
+            {cliente?.atencion && (
+              <li className="flex flex-col sm:flex-row sm:items-center">
+                <span className="text-gray-500 w-20 mb-1 sm:mb-0">Atención:</span>
+                <span className="font-medium text-gray-900">{cliente?.atencion}</span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      
+      {/* Products with individual discounts */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center">
+            <Receipt className="h-5 w-5 text-emerald-600 mr-2" />
+            <h3 className="font-medium text-gray-700">Productos</h3>
+          </div>
+          <div className="flex items-center">
+            <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
+            <span className="text-sm text-gray-500">Moneda: {moneda}</span>
+          </div>
+        </div>
+        
+        <div className="overflow-hidden rounded-lg border border-gray-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Producto</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {productos.map((producto) => (
+                  <tr key={producto.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-900 max-w-[150px] sm:max-w-none">
+                      <div className="truncate">{producto.nombre}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
+                      {producto.cantidad}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
+                      <span className="whitespace-nowrap">{formatCurrency(producto.precio)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
+                      {producto.descuento > 0 ? `${producto.descuento}%` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
+                      <span className="whitespace-nowrap">{formatCurrency(producto.subtotal)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      {/* Summary calculations */}
+      <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-medium text-gray-700">Resumen</h3>
           {exchangeRate ? (
             <div className="text-xs space-y-1">
               <div className="text-gray-600 font-medium">
@@ -189,100 +246,102 @@ export function ResumenCotizacion({
             </div>
           ) : null}
         </div>
-      </div>
-      
-      {/* Global Discount */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Percent className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Descuento global:</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <Input
-            type="text"
-            inputMode="numeric"
-            value={globalDiscountStr}
-            onChange={handleGlobalDiscountChange}
-            className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            placeholder="0"
-          />
-          <span className="text-gray-500">%</span>
-        </div>
-      </div>
-      
-      {/* IVA Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Receipt className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Incluir IVA (16%):</span>
-        </div>
-        <Switch 
-          checked={hasIva} 
-          onCheckedChange={handleIvaToggle}
-        />
-      </div>
-      
-      {/* Shipping Toggle & Cost */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Truck className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Incluir envío:</span>
-        </div>
-        <Switch 
-          checked={hasShipping} 
-          onCheckedChange={handleShippingToggle}
-        />
-      </div>
-      
-      {hasShipping && (
-        <div className="flex items-center justify-between pl-6">
-          <span className="text-sm text-gray-600">Costo de envío:</span>
-          <div className="flex items-center space-x-1">
-            <span className="text-gray-500">${''}</span>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={shippingCostStr}
-              onChange={handleShippingCostChange}
-              className="w-20 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              placeholder="0"
-            />
-            <span className="text-gray-500">{moneda}</span>
-          </div>
-        </div>
-      )}
-      
-      {/* Summary Calculations */}
-      <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Subtotal:</span>
+        
+        {/* Subtotal */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-600">Subtotal:</span>
           <span className="font-medium">{formatCurrency(subtotal)}</span>
         </div>
         
+        {/* Global Discount */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Percent className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Descuento global:</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={globalDiscountStr}
+              onChange={handleGlobalDiscountChange}
+              className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              placeholder="0"
+            />
+            <span className="text-gray-500">%</span>
+          </div>
+        </div>
+        
+        {/* Discount Amount */}
         {globalDiscount > 0 && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">Descuento ({globalDiscount}%):</span>
-            <span className="font-medium text-green-600">-{formatCurrency(discountAmount)}</span>
+          <div className="flex items-center justify-between pl-6">
+            <span className="text-sm text-gray-600">Monto de descuento:</span>
+            <span className="text-red-600">-{formatCurrency(subtotal * (globalDiscount / 100))}</span>
           </div>
         )}
         
+        {/* Subtotal after discount */}
+        {globalDiscount > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-200 pt-2">
+            <span className="text-sm text-gray-600">Subtotal con descuento:</span>
+            <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100))}</span>
+          </div>
+        )}
+        
+        {/* IVA Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Receipt className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Incluir IVA (16%):</span>
+          </div>
+          <Switch 
+            checked={hasIva} 
+            onCheckedChange={handleIvaToggle}
+          />
+        </div>
+        
+        {/* IVA Amount */}
         {hasIva && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">IVA (16%):</span>
-            <span className="font-medium">{formatCurrency(ivaAmount)}</span>
+          <div className="flex items-center justify-between pl-6">
+            <span className="text-sm text-gray-600">Monto IVA (16%):</span>
+            <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100) * 0.16)}</span>
           </div>
         )}
         
-        {hasShipping && shippingAmount > 0 && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">Envío:</span>
-            <span className="font-medium">{formatCurrency(shippingAmount)}</span>
+        {/* Shipping Toggle & Cost */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Truck className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Incluir envío:</span>
+          </div>
+          <Switch 
+            checked={hasShipping} 
+            onCheckedChange={handleShippingToggle}
+          />
+        </div>
+        
+        {hasShipping && (
+          <div className="flex items-center justify-between pl-6">
+            <span className="text-sm text-gray-600">Costo de envío:</span>
+            <div className="flex items-center space-x-1">
+              <span className="text-gray-500">${''}</span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={shippingCostStr}
+                onChange={handleShippingCostChange}
+                className="w-20 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="0"
+              />
+              <span className="text-gray-500">{moneda}</span>
+            </div>
           </div>
         )}
         
-        <div className="flex justify-between pt-2 border-t border-gray-200">
-          <span className="font-bold">Total:</span>
-          <span className="font-bold">{formatCurrency(total)}</span>
+        {/* Total */}
+        <div className="flex items-center justify-between border-t border-gray-200 pt-2 mt-4">
+          <span className="font-medium text-gray-700">Total:</span>
+          <span className="font-bold text-lg text-emerald-600">{formatCurrency(total)}</span>
         </div>
       </div>
     </div>

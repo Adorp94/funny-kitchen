@@ -386,9 +386,9 @@ export default function NuevaCotizacionPage() {
                 <Button 
                   onClick={nextStep} 
                   disabled={!cliente} 
-                  className="bg-teal-500 hover:bg-teal-600 text-white px-5"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5"
                 >
-                  Continuar <ArrowRight className="ml-2 h-4 w-4" />
+                  <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -399,9 +399,9 @@ export default function NuevaCotizacionPage() {
             <div className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center">
-                      <Package className="h-5 w-5 text-teal-600 mr-2" />
+                      <Package className="h-5 w-5 text-emerald-600 mr-2" />
                       <h2 className="text-lg font-medium text-gray-900">Agregar Productos</h2>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -497,139 +497,89 @@ export default function NuevaCotizacionPage() {
                 </div>
               )}
               
-              {/* Products list */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <h2 className="text-lg font-medium text-gray-900">Productos Agregados</h2>
+              {/* Listed products */}
+              {productos.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100">
+                    <div className="flex items-center">
+                      <Receipt className="h-5 w-5 text-emerald-600 mr-2" />
+                      <h2 className="text-lg font-medium text-gray-900">Productos Seleccionados</h2>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <ListaProductos 
+                      productos={productos}
+                      onRemoveProduct={(id) => removeProducto(id)}
+                      moneda={moneda}
+                    />
+                  </div>
                 </div>
-                <div className="p-6">
-                  <ListaProductos 
-                    productos={productos} 
-                    onRemoveProduct={removeProducto}
-                    moneda={moneda} 
-                  />
-                </div>
-                <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
-                  <Button 
-                    variant="outline" 
-                    onClick={prevStep}
-                    className="text-gray-600 border-gray-300"
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
-                  </Button>
-                  <Button 
-                    onClick={nextStep} 
-                    disabled={productos.length === 0}
-                    className="bg-teal-500 hover:bg-teal-600 text-white px-5"
-                  >
-                    Continuar <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
+              )}
+              
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 sm:gap-0 px-0 py-4">
+                <Button 
+                  variant="outline" 
+                  onClick={prevStep}
+                  className="w-full sm:w-auto text-gray-600 border-gray-300"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Regresar</span>
+                </Button>
+                <Button 
+                  onClick={nextStep} 
+                  disabled={productos.length === 0} 
+                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
+                >
+                  <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             </div>
           )}
           
-          {/* Step 3: Resumen y Finalizar */}
+          {/* Step 3: Resumen */}
           {activeStep === 3 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <div className="flex items-center">
-                  <Receipt className="h-5 w-5 text-teal-600 mr-2" />
-                  <h2 className="text-lg font-medium text-gray-900">Resumen de la Cotización</h2>
-                </div>
-              </div>
-              <div className="p-6">
-                {/* Client Info */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <h3 className="font-medium text-gray-700 mb-3">Información del Cliente</h3>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex">
-                      <span className="text-gray-500 w-20">Nombre:</span>
-                      <span className="font-medium text-gray-900">{cliente?.nombre}</span>
-                    </li>
-                    <li className="flex">
-                      <span className="text-gray-500 w-20">Teléfono:</span>
-                      <span className="font-medium text-gray-900">{cliente?.celular}</span>
-                    </li>
-                    {cliente?.correo && (
-                      <li className="flex">
-                        <span className="text-gray-500 w-20">Correo:</span>
-                        <span className="font-medium text-gray-900">{cliente?.correo}</span>
-                      </li>
-                    )}
-                    {cliente?.atencion && (
-                      <li className="flex">
-                        <span className="text-gray-500 w-20">Atención:</span>
-                        <span className="font-medium text-gray-900">{cliente?.atencion}</span>
-                      </li>
-                    )}
-                  </ul>
-                  <Button 
-                    variant="ghost" 
-                    className="text-teal-600 p-0 h-auto mt-3 text-xs" 
-                    onClick={() => setActiveStep(1)}
-                  >
-                    Editar cliente
-                  </Button>
-                </div>
-                
-                {/* Products with individual discounts */}
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-medium text-gray-700">Productos</h3>
-                    <div className="flex items-center">
-                      <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-                      <span className="text-sm text-gray-500">Moneda: {moneda}</span>
-                    </div>
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 text-emerald-600 mr-2" />
+                    <h2 className="text-lg font-medium text-gray-900">Resumen de Cotización</h2>
                   </div>
-                  <ListaProductosConDescuento 
-                    productos={productos} 
-                    onRemoveProduct={removeProducto}
-                    onUpdateProductDiscount={handleUpdateProductDiscount}
-                    moneda={moneda}
-                    editMode={true}
-                  />
-                  <Button 
-                    variant="ghost" 
-                    className="text-teal-600 p-0 h-auto mt-3 text-xs" 
-                    onClick={() => setActiveStep(2)}
-                  >
-                    Editar productos
-                  </Button>
                 </div>
-                
-                {/* Summary with global discount, IVA and shipping */}
-                <ResumenCotizacion 
-                  subtotal={subtotal}
-                  onGlobalDiscountChange={setGlobalDiscount}
-                  onIvaChange={setHasIva}
-                  onShippingChange={setShippingCost}
-                  moneda={moneda}
-                  onCurrencyChange={handleCurrencyChange}
-                />
+                <div className="p-6">
+                  <ResumenCotizacion 
+                    cliente={cliente}
+                    productos={productos}
+                    subtotal={subtotal}
+                    globalDiscount={globalDiscount}
+                    setGlobalDiscount={setGlobalDiscount}
+                    hasIva={hasIva}
+                    setHasIva={setHasIva}
+                    shippingCost={shippingCost}
+                    setShippingCost={setShippingCost}
+                    total={total}
+                    moneda={moneda}
+                  />
+                </div>
               </div>
-              <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
+              
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 sm:gap-0 px-0 py-4">
                 <Button 
                   variant="outline" 
                   onClick={prevStep}
-                  className="text-gray-600 border-gray-300"
+                  className="w-full sm:w-auto text-gray-600 border-gray-300"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Volver
+                  <ArrowLeft className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Regresar</span>
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
-                  disabled={isLoading || !cliente || productos.length === 0}
-                  className="bg-teal-500 hover:bg-teal-600 text-white px-5"
+                  disabled={isLoading || productos.length === 0} 
+                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
                 >
                   {isLoading ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Generando...
-                    </>
+                    <>Generando cotización...</>
                   ) : (
                     <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Generar Cotización
+                      <Save className="mr-2 h-4 w-4" /> <span className="whitespace-nowrap">Generar Cotización</span>
                     </>
                   )}
                 </Button>

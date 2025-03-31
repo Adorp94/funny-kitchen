@@ -61,71 +61,87 @@ export function ProductosTable({
   };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12 text-center">#</TableHead>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Colores</TableHead>
-            <TableHead className="text-right">Cantidad</TableHead>
-            <TableHead className="text-right">Precio</TableHead>
-            <TableHead className="text-right">Descuento</TableHead>
-            <TableHead className="text-right">Subtotal</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.length > 0 ? (
-            products.map((product) => (
-              <TableRow key={product.prodsxc_id}>
-                <TableCell className="text-center">{product.item}</TableCell>
-                <TableCell>{product.nombre || product.producto}</TableCell>
-                <TableCell>{product.colores}</TableCell>
-                <TableCell className="text-right">{product.cantidad}</TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(getDisplayPrice(product.precio_final), currency)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="w-16 text-right bg-transparent border-b border-gray-300 focus:border-primary focus:outline-none"
-                    value={
-                      editingDescount?.id === product.prodsxc_id
-                        ? editingDescount.value * 100
-                        : product.descuento * 100
-                    }
-                    onChange={(e) => handleDescuentoChange(product.prodsxc_id, e.target.value)}
-                    onBlur={handleDescuentoBlur}
-                  />
-                  %
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(calculateSubtotal(product), currency)}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => onDelete(product.prodsxc_id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+    <div className="rounded-md border overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 text-center whitespace-nowrap">#</TableHead>
+              <TableHead className="whitespace-nowrap">Nombre</TableHead>
+              <TableHead className="whitespace-nowrap">Colores</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Cantidad</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Precio</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Descuento</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Subtotal</TableHead>
+              <TableHead className="w-12 whitespace-nowrap"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {products.length > 0 ? (
+              products.map((product) => (
+                <TableRow key={product.prodsxc_id}>
+                  <TableCell className="text-center whitespace-nowrap">{product.item}</TableCell>
+                  <TableCell className="max-w-[150px] sm:max-w-none">
+                    <div className="truncate">
+                      {product.nombre || product.producto}
+                    </div>
+                  </TableCell>
+                  <TableCell className="max-w-[120px] sm:max-w-none">
+                    <div className="truncate">
+                      {product.colores}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">{product.cantidad}</TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <span className="whitespace-nowrap">
+                      {formatCurrency(getDisplayPrice(product.precio_final), currency)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="w-12 sm:w-16 text-right bg-transparent border-b border-gray-300 focus:border-emerald-500 focus:outline-none"
+                      value={
+                        editingDescount?.id === product.prodsxc_id
+                          ? editingDescount.value * 100
+                          : product.descuento * 100
+                      }
+                      onChange={(e) => handleDescuentoChange(product.prodsxc_id, e.target.value)}
+                      onBlur={handleDescuentoBlur}
+                    />
+                    <span className="ml-1">%</span>
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <span className="whitespace-nowrap">
+                      {formatCurrency(calculateSubtotal(product), currency)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => onDelete(product.prodsxc_id)}
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Eliminar</span>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-6 text-gray-500">
+                  Sin registros
                 </TableCell>
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-6 text-gray-500">
-                Sin registros
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

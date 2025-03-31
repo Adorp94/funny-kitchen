@@ -225,7 +225,7 @@ export default function CotizacionesPage() {
       case 'pendiente':
         return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Pendiente</Badge>;
       case 'aceptada':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50 border-green-200">Aceptada</Badge>;
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200">Aceptada</Badge>;
       case 'rechazada':
         return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50 border-red-200">Rechazada</Badge>;
       case 'vencida':
@@ -242,10 +242,10 @@ export default function CotizacionesPage() {
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-indigo-600 hover:bg-indigo-700"
+          className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white"
         >
           <Plus className="mr-2 h-4 w-4" />
-          Nueva Cotización
+          <span className="whitespace-nowrap">Nueva Cotización</span>
         </Button>
       </div>
       
@@ -258,7 +258,7 @@ export default function CotizacionesPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="rounded-full p-1.5 bg-gray-100 w-fit">
-              <FileText className="h-4 w-4 text-indigo-600" />
+              <FileText className="h-4 w-4 text-emerald-600" />
             </div>
           </CardContent>
         </Card>
@@ -278,11 +278,11 @@ export default function CotizacionesPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total MXN</CardDescription>
-            <CardTitle className="text-2xl text-green-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
+            <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-green-50 w-fit">
-              <DollarSign className="h-4 w-4 text-green-600" />
+            <div className="rounded-full p-1.5 bg-emerald-50 w-fit">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
             </div>
           </CardContent>
         </Card>
@@ -290,11 +290,11 @@ export default function CotizacionesPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total USD</CardDescription>
-            <CardTitle className="text-2xl text-indigo-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</CardTitle>
+            <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-indigo-50 w-fit">
-              <DollarSign className="h-4 w-4 text-indigo-600" />
+            <div className="rounded-full p-1.5 bg-emerald-50 w-fit">
+              <DollarSign className="h-4 w-4 text-emerald-600" />
             </div>
           </CardContent>
         </Card>
@@ -345,7 +345,7 @@ export default function CotizacionesPage() {
         <Card>
           <CardContent className="py-10">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-4"></div>
               <p className="text-gray-500">Cargando cotizaciones...</p>
             </div>
           </CardContent>
@@ -358,108 +358,111 @@ export default function CotizacionesPage() {
               <Button 
                 onClick={handleNewCotizacion}
                 variant="outline" 
-                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Crear nueva cotización
+                <span className="whitespace-nowrap">Crear nueva cotización</span>
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0 sm:p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-gray-50/50">
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort('folio')}
-                  >
-                    <div className="flex items-center">
-                      Folio
-                      {sortBy.field === 'folio' && (
-                        sortBy.direction === 'asc' ? 
-                          <ArrowUp className="ml-1 h-3 w-3" /> : 
-                          <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort('fecha_creacion')}
-                  >
-                    <div className="flex items-center">
-                      Fecha
-                      {sortBy.field === 'fecha_creacion' && (
-                        sortBy.direction === 'asc' ? 
-                          <ArrowUp className="ml-1 h-3 w-3" /> : 
-                          <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort('cliente')}
-                  >
-                    <div className="flex items-center">
-                      Cliente
-                      {sortBy.field === 'cliente' && (
-                        sortBy.direction === 'asc' ? 
-                          <ArrowUp className="ml-1 h-3 w-3" /> : 
-                          <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead 
-                    className="cursor-pointer"
-                    onClick={() => handleSort('total')}
-                  >
-                    <div className="flex items-center">
-                      Total
-                      {sortBy.field === 'total' && (
-                        sortBy.direction === 'asc' ? 
-                          <ArrowUp className="ml-1 h-3 w-3" /> : 
-                          <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCotizaciones.map((cotizacion) => (
-                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium text-indigo-600">{cotizacion.folio}</TableCell>
-                    <TableCell>{formatDate(cotizacion.fecha_creacion)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{cotizacion.cliente.nombre}</div>
-                        <div className="text-sm text-gray-500">{cotizacion.cliente.celular}</div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-gray-50/50">
+                    <TableHead 
+                      className="cursor-pointer whitespace-nowrap"
+                      onClick={() => handleSort('folio')}
+                    >
+                      <div className="flex items-center">
+                        Folio
+                        {sortBy.field === 'folio' && (
+                          sortBy.direction === 'asc' ? 
+                            <ArrowUp className="ml-1 h-3 w-3" /> : 
+                            <ArrowDown className="ml-1 h-3 w-3" />
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(cotizacion.estado)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(cotizacion.total, cotizacion.moneda)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
-                        className="h-8 w-8 p-0 hover:bg-indigo-50 hover:text-indigo-700"
-                        title="Ver cotización"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer whitespace-nowrap"
+                      onClick={() => handleSort('fecha_creacion')}
+                    >
+                      <div className="flex items-center">
+                        Fecha
+                        {sortBy.field === 'fecha_creacion' && (
+                          sortBy.direction === 'asc' ? 
+                            <ArrowUp className="ml-1 h-3 w-3" /> : 
+                            <ArrowDown className="ml-1 h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer whitespace-nowrap"
+                      onClick={() => handleSort('cliente')}
+                    >
+                      <div className="flex items-center">
+                        Cliente
+                        {sortBy.field === 'cliente' && (
+                          sortBy.direction === 'asc' ? 
+                            <ArrowUp className="ml-1 h-3 w-3" /> : 
+                            <ArrowDown className="ml-1 h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap">Estado</TableHead>
+                    <TableHead 
+                      className="cursor-pointer whitespace-nowrap"
+                      onClick={() => handleSort('total')}
+                    >
+                      <div className="flex items-center">
+                        Total
+                        {sortBy.field === 'total' && (
+                          sortBy.direction === 'asc' ? 
+                            <ArrowUp className="ml-1 h-3 w-3" /> : 
+                            <ArrowDown className="ml-1 h-3 w-3" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredCotizaciones.map((cotizacion) => (
+                    <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium text-emerald-600 whitespace-nowrap">{cotizacion.folio}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium truncate max-w-[120px] sm:max-w-none">{cotizacion.cliente.nombre}</div>
+                          <div className="text-sm text-gray-500 truncate max-w-[120px] sm:max-w-none">{cotizacion.cliente.celular}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {getStatusBadge(cotizacion.estado)}
+                      </TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {formatCurrency(cotizacion.total, cotizacion.moneda)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
+                          className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-700"
+                          title="Ver cotización"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">Ver cotización</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

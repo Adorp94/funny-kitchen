@@ -51,7 +51,7 @@ export function Header() {
                 href={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors ${
                   isActive(item.href)
-                    ? "text-indigo-600 bg-indigo-50"
+                    ? "text-emerald-600 bg-emerald-50"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
@@ -88,7 +88,7 @@ export function Header() {
                 href={item.href}
                 className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive(item.href)
-                    ? "text-indigo-600 bg-indigo-50"
+                    ? "text-emerald-600 bg-emerald-50"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
