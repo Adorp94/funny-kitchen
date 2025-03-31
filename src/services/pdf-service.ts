@@ -49,6 +49,21 @@ export const generatePDFFromElement = async (
       useCORS: true, // Enable CORS for images
       logging: false, // Disable logging
       allowTaint: true, // Allow tainted canvas
+      onclone: (clonedDoc) => {
+        // Find all links in the cloned document and make them absolute
+        const links = clonedDoc.querySelectorAll('a');
+        links.forEach(link => {
+          // Store the original href as a data attribute
+          const href = link.getAttribute('href');
+          if (href && !href.startsWith('data:')) {
+            // Make the link more visible in the PDF
+            link.style.color = '#0891b2'; // Teal-600
+            link.style.fontWeight = '500';
+            link.style.textDecoration = 'underline';
+          }
+        });
+        return clonedDoc;
+      }
     });
     
     // Calculate PDF dimensions based on format

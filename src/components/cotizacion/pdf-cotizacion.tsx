@@ -151,13 +151,6 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           <Download className="mr-2 h-4 w-4" />
           Descargar PDF
         </Button>
-        <Button 
-          onClick={handlePrint} 
-          variant="outline"
-        >
-          <Printer className="mr-2 h-4 w-4" />
-          Imprimir
-        </Button>
       </div>
       
       {/* PDF Content */}
@@ -171,7 +164,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
             <img
               src="/logo.png"
               alt="Funny Kitchen Logo"
-              className="h-12 object-contain"
+              className="h-14 object-contain"
             />
           </div>
           <div className="text-right">
@@ -186,8 +179,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         <div className="grid grid-cols-2 gap-6 mb-6">
           {/* Client Information */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Cliente</h2>
-            <div className="space-y-1 text-sm">
+            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Cliente</h2>
+            <div className="space-y-1">
               <p className="font-medium text-gray-900">{cliente.nombre}</p>
               {cliente.razon_social && <p className="text-gray-700">{cliente.razon_social}</p>}
               {cliente.rfc && <p className="text-gray-700">RFC: {cliente.rfc}</p>}
@@ -201,8 +194,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           
           {/* Company Information */}
           <div className="text-right">
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Emisor</h2>
-            <div className="space-y-1 text-sm">
+            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Emisor</h2>
+            <div className="space-y-1">
               <p className="font-medium text-gray-900">Funny Kitchen S.A. de C.V.</p>
               <p className="text-gray-700">AZUCENAS #439 LOS GIRASOLES</p>
               <p className="text-gray-700">ZAPOPAN, JALISCO 45138</p>
@@ -214,7 +207,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         
         {/* Products */}
         <div className="mb-6">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Productos</h2>
+          <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Productos</h2>
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-gray-200">
@@ -227,17 +220,17 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
                 <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
               </tr>
             </thead>
-            <tbody className="text-xs">
+            <tbody>
               {productos.map((producto) => (
                 <tr key={producto.id} className="border-b border-gray-100">
                   <td className="py-2 px-2">
                     <div>
                       <p className="font-medium text-gray-800">{producto.nombre}</p>
                       {typeof producto.descripcion === 'string' && producto.descripcion && (
-                        <p className="text-xs text-gray-600">{producto.descripcion}</p>
+                        <p className="text-sm text-gray-600">{producto.descripcion}</p>
                       )}
                       {typeof producto.sku === 'string' && producto.sku && (
-                        <p className="text-xs text-gray-500">SKU: {producto.sku}</p>
+                        <p className="text-sm text-gray-500">SKU: {producto.sku}</p>
                       )}
                     </div>
                   </td>
@@ -305,8 +298,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         
         {/* Notes */}
         <div className="mb-6">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Notas</h2>
-          <div className="bg-gray-50 p-3 rounded-md text-gray-700 text-xs">
+          <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Notas</h2>
+          <div className="bg-gray-50 p-3 rounded-md text-gray-700">
             <ul className="space-y-1 list-none">
               <li>A) Precios sujetos a cambio sin previo aviso.</li>
               <li>B) El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</li>
@@ -317,12 +310,25 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Terms and Payment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           {/* Terms */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2">Términos y cuidados</h2>
-            <div className="text-xs text-gray-700 space-y-1">
-              <p>Términos completos: <a href="https://funnykitchen.mx/pages/terminos-y-condiciones" className="text-teal-600 hover:underline">funnykitchen.mx/pages/terminos-y-condiciones</a></p>
+            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Términos y cuidados</h2>
+            <div className="text-sm text-gray-700 space-y-1">
+              <p>Términos completos: <a 
+                href="https://funnykitchen.mx/pages/terminos-y-condiciones" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-teal-600 underline font-medium"
+                onClick={(e) => {
+                  // Prevent default action in PDF view
+                  e.preventDefault();
+                  // Open the link in a new tab
+                  window.open("https://funnykitchen.mx/pages/terminos-y-condiciones", "_blank");
+                }}
+              >
+                funnykitchen.mx/pages/terminos-y-condiciones
+              </a></p>
               <div className="bg-gray-50 p-3 rounded-md mt-2">
                 <p className="font-medium mb-1">CUIDADOS:</p>
                 <p>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.</p>
@@ -333,8 +339,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           
           {/* Payment Info */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-2 text-right">Datos bancarios</h2>
-            <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-md">
+            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2 text-right">Datos bancarios</h2>
+            <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md">
               {moneda === 'MXN' ? (
                 <div className="space-y-1">
                   <p className="font-medium">BBVA</p>
@@ -356,9 +362,9 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Signature */}
-        <div className="border-t border-gray-100 pt-4">
-          <div className="text-xs text-gray-700">
-            <p className="font-medium mb-1">ATENTAMENTE:</p>
+        <div className="border-t border-gray-100 pt-4 mt-auto">
+          <div className="text-sm text-gray-700">
+            <p className="font-medium mb-2">ATENTAMENTE:</p>
             <div className="flex justify-between">
               <div>
                 <p>PABLO ANAYA - DIRECTOR GENERAL</p>
