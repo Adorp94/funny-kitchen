@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ClipboardCheck, Menu, X, Plus, BarChart3, FileText } from "lucide-react";
+import { LayoutDashboard, Menu, X, BarChart3, FileText } from "lucide-react";
 
 // Improved navigation items
 const navigation = [
@@ -39,9 +39,8 @@ export function Header() {
             <img
               src="/logo.png"
               alt="Funny Kitchen"
-              className="h-8 mr-2"
+              className="h-10 object-contain"
             />
-            <span className="font-semibold text-lg text-gray-800">Funny Kitchen</span>
           </Link>
           
           {/* Desktop Navigation */}
@@ -52,7 +51,7 @@ export function Header() {
                 href={item.href}
                 className={`px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors ${
                   isActive(item.href)
-                    ? "text-teal-700 bg-teal-50"
+                    ? "text-indigo-600 bg-indigo-50"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
@@ -63,34 +62,20 @@ export function Header() {
           </nav>
         </div>
         
-        {/* Right section with actions */}
-        <div className="flex items-center">
-          {/* Create New Quotation Button */}
-          <Link href="/nueva-cotizacion" className="hidden sm:flex">
-            <Button 
-              size="sm" 
-              className="bg-teal-600 hover:bg-teal-700 text-white rounded-md"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Nueva cotización
-            </Button>
-          </Link>
-          
-          {/* Mobile menu button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden rounded-md"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-            <span className="sr-only">Toggle menu</span>
-          </Button>
-        </div>
+        {/* Mobile menu button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden rounded-md"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
+          <span className="sr-only">Toggle menu</span>
+        </Button>
       </div>
       
       {/* Mobile menu */}
@@ -103,7 +88,7 @@ export function Header() {
                 href={item.href}
                 className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive(item.href)
-                    ? "text-teal-700 bg-teal-50"
+                    ? "text-indigo-600 bg-indigo-50"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}

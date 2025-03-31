@@ -21,6 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -187,12 +195,6 @@ export default function CotizacionesPage() {
     router.push('/ver-cotizacion');
   };
   
-  const handleEditCotizacion = (id: number) => {
-    // Store ID in session storage and navigate to edit page
-    sessionStorage.setItem('cotizacion_id', id.toString());
-    router.push('/editar-cotizacion');
-  };
-  
   const handleNewCotizacion = () => {
     // Clear any existing session storage data and navigate to new quote page
     sessionStorage.removeItem('cotizacion_id');
@@ -217,6 +219,22 @@ export default function CotizacionesPage() {
     }
   };
   
+  // Status badge styles based on estado
+  const getStatusBadge = (estado: string) => {
+    switch (estado) {
+      case 'pendiente':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Pendiente</Badge>;
+      case 'aceptada':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50 border-green-200">Aceptada</Badge>;
+      case 'rechazada':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50 border-red-200">Rechazada</Badge>;
+      case 'vencida':
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 hover:bg-gray-50 border-gray-200">Vencida</Badge>;
+      default:
+        return <Badge variant="outline">{estado.charAt(0).toUpperCase() + estado.slice(1)}</Badge>;
+    }
+  };
+  
   return (
     <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -224,7 +242,7 @@ export default function CotizacionesPage() {
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-teal-600 hover:bg-teal-700"
+          className="flex items-center bg-indigo-600 hover:bg-indigo-700"
         >
           <Plus className="mr-2 h-4 w-4" />
           Nueva Cotización
@@ -233,213 +251,217 @@ export default function CotizacionesPage() {
       
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white shadow-sm rounded-lg p-5 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Cotizaciones</p>
-              <p className="text-2xl font-bold text-gray-900">{metrics.totalCotizaciones}</p>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Cotizaciones</CardDescription>
+            <CardTitle className="text-2xl">{metrics.totalCotizaciones}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-full p-1.5 bg-gray-100 w-fit">
+              <FileText className="h-4 w-4 text-indigo-600" />
             </div>
-            <div className="rounded-full p-2 bg-teal-50">
-              <FileText className="h-6 w-6 text-teal-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white shadow-sm rounded-lg p-5 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Cotizaciones Pendientes</p>
-              <p className="text-2xl font-bold text-blue-600">{metrics.cotizacionesPendientes}</p>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Cotizaciones Pendientes</CardDescription>
+            <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-full p-1.5 bg-blue-50 w-fit">
+              <Calendar className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="rounded-full p-2 bg-blue-50">
-              <Calendar className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white shadow-sm rounded-lg p-5 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total MXN</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</p>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total MXN</CardDescription>
+            <CardTitle className="text-2xl text-green-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-full p-1.5 bg-green-50 w-fit">
+              <DollarSign className="h-4 w-4 text-green-600" />
             </div>
-            <div className="rounded-full p-2 bg-green-50">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
         
-        <div className="bg-white shadow-sm rounded-lg p-5 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total USD</p>
-              <p className="text-2xl font-bold text-indigo-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</p>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total USD</CardDescription>
+            <CardTitle className="text-2xl text-indigo-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-full p-1.5 bg-indigo-50 w-fit">
+              <DollarSign className="h-4 w-4 text-indigo-600" />
             </div>
-            <div className="rounded-full p-2 bg-indigo-50">
-              <DollarSign className="h-6 w-6 text-indigo-600" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
       
       {/* Filters */}
-      <div className="bg-white shadow-sm rounded-lg border border-gray-100 p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-4">Cotizaciones</h2>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Buscar por folio o cliente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Cotizaciones</CardTitle>
+          <CardDescription>Busca y filtra las cotizaciones existentes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar por folio o cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <div className="w-full sm:w-56 flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <Select
+                value={filterEstado}
+                onValueChange={setFilterEstado}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="aceptada">Aceptada</SelectItem>
+                  <SelectItem value="rechazada">Rechazada</SelectItem>
+                  <SelectItem value="vencida">Vencida</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          <div className="w-full sm:w-56 flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <Select
-              value={filterEstado}
-              onValueChange={setFilterEstado}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="aceptada">Aceptada</SelectItem>
-                <SelectItem value="rechazada">Rechazada</SelectItem>
-                <SelectItem value="vencida">Vencida</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
       
       {/* Cotizaciones Table */}
       {loading ? (
-        <div className="bg-white shadow-sm rounded-lg border border-gray-100 p-4">
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-4"></div>
-            <p className="text-gray-500">Cargando cotizaciones...</p>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="py-10">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+              <p className="text-gray-500">Cargando cotizaciones...</p>
+            </div>
+          </CardContent>
+        </Card>
       ) : filteredCotizaciones.length === 0 ? (
-        <div className="bg-white shadow-sm rounded-lg border border-gray-100 p-4">
-          <div className="text-center py-8">
-            <p className="text-gray-500">No se encontraron cotizaciones</p>
-            <Button 
-              onClick={handleNewCotizacion}
-              variant="outline" 
-              className="mt-4"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Crear nueva cotización
-            </Button>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="py-10">
+            <div className="text-center">
+              <p className="text-gray-500 mb-4">No se encontraron cotizaciones</p>
+              <Button 
+                onClick={handleNewCotizacion}
+                variant="outline" 
+                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Crear nueva cotización
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="bg-white shadow-sm rounded-lg border border-gray-100 overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead 
-                  className="cursor-pointer"
-                  onClick={() => handleSort('folio')}
-                >
-                  <div className="flex items-center">
-                    Folio
-                    {sortBy.field === 'folio' && (
-                      sortBy.direction === 'asc' ? 
-                        <ArrowUp className="ml-1 h-3 w-3" /> : 
-                        <ArrowDown className="ml-1 h-3 w-3" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="cursor-pointer"
-                  onClick={() => handleSort('fecha_creacion')}
-                >
-                  <div className="flex items-center">
-                    Fecha
-                    {sortBy.field === 'fecha_creacion' && (
-                      sortBy.direction === 'asc' ? 
-                        <ArrowUp className="ml-1 h-3 w-3" /> : 
-                        <ArrowDown className="ml-1 h-3 w-3" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="cursor-pointer"
-                  onClick={() => handleSort('cliente')}
-                >
-                  <div className="flex items-center">
-                    Cliente
-                    {sortBy.field === 'cliente' && (
-                      sortBy.direction === 'asc' ? 
-                        <ArrowUp className="ml-1 h-3 w-3" /> : 
-                        <ArrowDown className="ml-1 h-3 w-3" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead 
-                  className="cursor-pointer"
-                  onClick={() => handleSort('total')}
-                >
-                  <div className="flex items-center">
-                    Total
-                    {sortBy.field === 'total' && (
-                      sortBy.direction === 'asc' ? 
-                        <ArrowUp className="ml-1 h-3 w-3" /> : 
-                        <ArrowDown className="ml-1 h-3 w-3" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCotizaciones.map((cotizacion) => (
-                <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{cotizacion.folio}</TableCell>
-                  <TableCell>{formatDate(cotizacion.fecha_creacion)}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{cotizacion.cliente.nombre}</div>
-                      <div className="text-sm text-gray-500">{cotizacion.cliente.celular}</div>
+        <Card>
+          <CardContent className="p-0 sm:p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-gray-50/50">
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort('folio')}
+                  >
+                    <div className="flex items-center">
+                      Folio
+                      {sortBy.field === 'folio' && (
+                        sortBy.direction === 'asc' ? 
+                          <ArrowUp className="ml-1 h-3 w-3" /> : 
+                          <ArrowDown className="ml-1 h-3 w-3" />
+                      )}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                      ${cotizacion.estado === 'pendiente' ? 'bg-blue-100 text-blue-800' : ''}
-                      ${cotizacion.estado === 'aceptada' ? 'bg-green-100 text-green-800' : ''}
-                      ${cotizacion.estado === 'rechazada' ? 'bg-red-100 text-red-800' : ''}
-                      ${cotizacion.estado === 'vencida' ? 'bg-gray-100 text-gray-800' : ''}
-                    `}>
-                      {cotizacion.estado.charAt(0).toUpperCase() + cotizacion.estado.slice(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {formatCurrency(cotizacion.total, cotizacion.moneda)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
-                      className="h-8 w-8 p-0"
-                      title="Ver cotización"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort('fecha_creacion')}
+                  >
+                    <div className="flex items-center">
+                      Fecha
+                      {sortBy.field === 'fecha_creacion' && (
+                        sortBy.direction === 'asc' ? 
+                          <ArrowUp className="ml-1 h-3 w-3" /> : 
+                          <ArrowDown className="ml-1 h-3 w-3" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort('cliente')}
+                  >
+                    <div className="flex items-center">
+                      Cliente
+                      {sortBy.field === 'cliente' && (
+                        sortBy.direction === 'asc' ? 
+                          <ArrowUp className="ml-1 h-3 w-3" /> : 
+                          <ArrowDown className="ml-1 h-3 w-3" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead 
+                    className="cursor-pointer"
+                    onClick={() => handleSort('total')}
+                  >
+                    <div className="flex items-center">
+                      Total
+                      {sortBy.field === 'total' && (
+                        sortBy.direction === 'asc' ? 
+                          <ArrowUp className="ml-1 h-3 w-3" /> : 
+                          <ArrowDown className="ml-1 h-3 w-3" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredCotizaciones.map((cotizacion) => (
+                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
+                    <TableCell className="font-medium text-indigo-600">{cotizacion.folio}</TableCell>
+                    <TableCell>{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{cotizacion.cliente.nombre}</div>
+                        <div className="text-sm text-gray-500">{cotizacion.cliente.celular}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(cotizacion.estado)}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {formatCurrency(cotizacion.total, cotizacion.moneda)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
+                        className="h-8 w-8 p-0 hover:bg-indigo-50 hover:text-indigo-700"
+                        title="Ver cotización"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
