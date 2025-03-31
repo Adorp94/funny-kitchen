@@ -158,7 +158,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
       {/* PDF Content */}
       <div 
         ref={pdfRef} 
-        className="bg-white p-6 sm:p-8 rounded-lg max-w-[215.9mm] mx-auto font-sans text-sm shadow-sm border border-gray-200 print:shadow-none print:border-0 print:p-4 print:max-w-full"
+        className="bg-white p-6 sm:p-8 rounded-lg max-w-[215.9mm] mx-auto font-sans text-sm shadow-sm border border-gray-200 print:shadow-none print:border-0 print:p-4 print:max-w-full flex flex-col"
         style={{ 
           minHeight: '279.4mm',
           /* Fix for Firefox's print handling */
@@ -167,7 +167,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         }}
       >
         {/* Header */}
-        <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-200">
+        <div className="flex justify-between items-start mb-3 pb-3 border-b border-gray-200">
           <div className="flex-shrink-0">
             <img
               src="/logo.png"
@@ -175,20 +175,20 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
               className="h-12 object-contain"
             />
           </div>
-          <div className="text-right leading-tight">
+          <div className="text-right leading-none">
             <h1 className="text-xl font-semibold text-gray-800">COTIZACIÓN</h1>
-            <p className="text-gray-600 mt-1">Folio: <span className="font-medium">{displayFolio}</span></p>
+            <p className="text-gray-600 mt-0.5">Folio: <span className="font-medium">{displayFolio}</span></p>
             <p className="text-gray-600">Fecha: {fechaActual}</p>
             <p className="text-gray-600">Divisa: <span className="font-medium">{moneda}</span></p>
           </div>
         </div>
         
         {/* Client and Company Information */}
-        <div className="grid grid-cols-2 gap-6 mb-4">
+        <div className="grid grid-cols-2 gap-4 mb-3">
           {/* Client Information */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Cliente</h2>
-            <div className="leading-tight">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5">Cliente</h2>
+            <div className="leading-none">
               <p className="font-medium text-gray-900">{cliente.nombre}</p>
               {cliente.razon_social && <p className="text-gray-700 text-xs">{cliente.razon_social}</p>}
               {cliente.rfc && <p className="text-gray-700 text-xs">RFC: {cliente.rfc}</p>}
@@ -202,8 +202,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           
           {/* Company Information */}
           <div className="text-right">
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Emisor</h2>
-            <div className="leading-tight">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5">Emisor</h2>
+            <div className="leading-none">
               <p className="font-medium text-gray-900">Funny Kitchen S.A. de C.V.</p>
               <p className="text-gray-700 text-xs">AZUCENAS #439 LOS GIRASOLES</p>
               <p className="text-gray-700 text-xs">ZAPOPAN, JALISCO 45138</p>
@@ -214,26 +214,26 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Products */}
-        <div className="mb-4">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Productos</h2>
+        <div className="mb-3">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5">Productos</h2>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="py-1.5 px-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-5/12">Descripción</th>
-                  <th className="py-1.5 px-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Cant.</th>
-                  <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">P. Unitario</th>
+                  <th className="py-1 px-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-5/12">Descripción</th>
+                  <th className="py-1 px-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Cant.</th>
+                  <th className="py-1 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">P. Unitario</th>
                   {productos.some(p => p.descuento && p.descuento > 0) && (
-                    <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Desc.</th>
+                    <th className="py-1 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Desc.</th>
                   )}
-                  <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-3/12">Subtotal</th>
+                  <th className="py-1 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-3/12">Subtotal</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {productos.map((producto) => (
                   <tr key={producto.id}>
-                    <td className="py-1 px-1">
-                      <div className="leading-tight">
+                    <td className="py-0.5 px-1">
+                      <div className="leading-none">
                         <p className="font-medium text-gray-800">{producto.nombre}</p>
                         {typeof producto.descripcion === 'string' && producto.descripcion && (
                           <p className="text-xs text-gray-600">{producto.descripcion}</p>
@@ -243,14 +243,14 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
                         )}
                       </div>
                     </td>
-                    <td className="py-1 px-1 text-center text-gray-800">{producto.cantidad}</td>
-                    <td className="py-1 px-1 text-right text-gray-800 whitespace-nowrap">{formatCurrency(producto.precio)}</td>
+                    <td className="py-0.5 px-1 text-center text-gray-800">{producto.cantidad}</td>
+                    <td className="py-0.5 px-1 text-right text-gray-800 whitespace-nowrap">{formatCurrency(producto.precio)}</td>
                     {productos.some(p => p.descuento && p.descuento > 0) && (
-                      <td className="py-1 px-1 text-right text-gray-800">
+                      <td className="py-0.5 px-1 text-right text-gray-800">
                         {producto.descuento ? `${producto.descuento}%` : '-'}
                       </td>
                     )}
-                    <td className="py-1 px-1 text-right text-gray-800 whitespace-nowrap">
+                    <td className="py-0.5 px-1 text-right text-gray-800 whitespace-nowrap">
                       {producto.descuento && producto.descuento > 0 
                         ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))
                         : formatCurrency(producto.cantidad * producto.precio)
@@ -264,8 +264,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Totals */}
-        <div className="mb-4 md:w-1/2 ml-auto">
-          <div className="text-right text-xs leading-tight">
+        <div className="mb-3 md:w-1/2 ml-auto">
+          <div className="text-right text-xs leading-none">
             <div className="flex justify-between py-0.5 text-gray-700">
               <span>Subtotal:</span>
               <span className="font-medium">{formatCurrency(subtotal)}</span>
@@ -299,7 +299,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
               </div>
             )}
             
-            <div className="flex justify-between py-1 text-gray-900 border-t border-gray-200 mt-1">
+            <div className="flex justify-between py-0.5 text-gray-900 border-t border-gray-200 mt-0.5">
               <span className="font-medium">Total:</span>
               <span className="font-bold text-base">{formatCurrency(total)}</span>
             </div>
@@ -307,9 +307,9 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Notes */}
-        <div className="mb-4">
-          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Notas</h2>
-          <div className="bg-gray-50 p-2 rounded-md text-gray-700 text-xs leading-tight">
+        <div className="mb-3">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5">Notas</h2>
+          <div className="bg-gray-50 p-2 rounded-md text-gray-700 text-xs leading-none">
             <ul className="space-y-0.5 list-none">
               <li>A) Precios sujetos a cambio sin previo aviso.</li>
               <li>B) El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</li>
@@ -320,11 +320,11 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Terms and Payment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 text-xs">
           {/* Terms */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Términos y cuidados</h2>
-            <div className="text-xs text-gray-700 leading-tight">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5">Términos y cuidados</h2>
+            <div className="text-xs text-gray-700 leading-none">
               <p>Términos completos: <a 
                 href="https://funnykitchen.mx/pages/terminos-y-condiciones" 
                 target="_blank" 
@@ -333,7 +333,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
               >
                 funnykitchen.mx/terminos-y-condiciones
               </a></p>
-              <div className="bg-gray-50 p-2 rounded-md mt-1">
+              <div className="bg-gray-50 p-2 rounded-md mt-0.5">
                 <p className="font-medium mb-0.5">CUIDADOS:</p>
                 <p>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.</p>
                 <p className="mt-0.5">TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</p>
@@ -343,8 +343,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           
           {/* Payment Info */}
           <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1 text-right">Datos bancarios</h2>
-            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded-md leading-tight">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-0.5 text-right">Datos bancarios</h2>
+            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded-md leading-none">
               {moneda === 'MXN' ? (
                 <div className="space-y-0.5">
                   <p className="font-medium">BBVA</p>
@@ -365,9 +365,9 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           </div>
         </div>
         
-        {/* Signature */}
-        <div className="border-t border-gray-200 pt-2 mt-auto text-xs">
-          <div className="text-xs text-gray-700 leading-tight">
+        {/* Footer with flex-grow to push it to the bottom */}
+        <div className="border-t border-gray-200 pt-2 mt-auto text-xs flex-grow">
+          <div className="text-xs text-gray-700 leading-none">
             <p className="font-medium mb-0.5">ATENTAMENTE:</p>
             <div className="flex justify-between">
               <div>

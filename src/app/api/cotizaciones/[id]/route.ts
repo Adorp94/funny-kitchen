@@ -3,10 +3,10 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
+    const id = context.params.id;
     
     if (!id) {
       return NextResponse.json(

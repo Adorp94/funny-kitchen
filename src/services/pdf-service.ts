@@ -45,11 +45,49 @@ export const generatePDFFromElement = async (
     
     // Use html2canvas to render the element to a canvas
     const canvas = await html2canvas(element, {
-      scale: 2, // Higher scale for better quality
+      scale: 3, // Higher scale for better quality and text rendering
       useCORS: true, // Enable CORS for images
       logging: false, // Disable logging
       allowTaint: true, // Allow tainted canvas
+      windowWidth: 1200, // Set a fixed window width for consistent rendering
       onclone: (clonedDoc) => {
+        // Apply additional styles to the cloned document for PDF generation
+        const style = clonedDoc.createElement('style');
+        style.textContent = `
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          p, div {
+            line-height: 1.2 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0.25rem !important;
+          }
+          table {
+            border-collapse: collapse !important;
+          }
+          th, td {
+            padding-top: 0.125rem !important;
+            padding-bottom: 0.125rem !important;
+          }
+          h1, h2 {
+            margin-bottom: 0.25rem !important;
+          }
+          .leading-tight {
+            line-height: 1.2 !important;
+          }
+          .space-y-0.5 > * + * {
+            margin-top: 0.125rem !important;
+          }
+          .bg-gray-50 {
+            background-color: #f9fafb !important;
+            padding: 0.5rem !important;
+            border-radius: 0.25rem !important;
+          }
+        `;
+        clonedDoc.head.appendChild(style);
+        
         // Find all links in the cloned document and make them absolute
         const links = clonedDoc.querySelectorAll('a');
         links.forEach(link => {
@@ -74,7 +112,8 @@ export const generatePDFFromElement = async (
     const pdf = new jsPDF({
       orientation: orientation,
       unit: 'mm',
-      format: format
+      format: format,
+      compress: true // Enable compression for smaller file size
     });
     
     // Calculate positioning
@@ -82,7 +121,7 @@ export const generatePDFFromElement = async (
     const imgHeight = canvas.height * imgWidth / canvas.width;
     
     // Add the canvas as an image to the PDF
-    const imgData = canvas.toDataURL('image/png');
+    const imgData = canvas.toDataURL('image/png', 0.95); // Use slightly compressed image for better performance
     pdf.addImage(imgData, 'PNG', margin.left, margin.top, imgWidth, imgHeight);
     
     // Save the PDF
