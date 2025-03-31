@@ -10,7 +10,7 @@ import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
 import { ListaProductosConDescuento, ProductoConDescuento } from "@/components/cotizacion/lista-productos-con-descuento";
 import { ResumenCotizacion } from "@/components/cotizacion/resumen-cotizacion";
-import { useProductos } from "@/contexts/productos-context";
+import { useProductos, ProductosProvider } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
@@ -60,7 +60,8 @@ interface ExtendedProducto extends ProductoBase {
   acabado: string;
 }
 
-export default function NuevaCotizacionPage() {
+// Create a client component that uses the context
+function NuevaCotizacionClient() {
   const router = useRouter();
   const [activeStep, setActiveStep] = useState<number>(1);
   
@@ -404,18 +405,6 @@ export default function NuevaCotizacionPage() {
                       <Package className="h-5 w-5 text-emerald-600 mr-2" />
                       <h2 className="text-lg font-medium text-gray-900">Agregar Productos</h2>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">Moneda:</span>
-                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Moneda" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-gray-200">
-                          <SelectItem value="MXN">MXN</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                 </div>
                 <div className="p-6">
@@ -540,12 +529,37 @@ export default function NuevaCotizacionPage() {
             <div className="space-y-6">
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex items-center">
-                    <FileText className="h-5 w-5 text-emerald-600 mr-2" />
-                    <h2 className="text-lg font-medium text-gray-900">Resumen de Cotización</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center">
+                      <FileText className="h-5 w-5 text-emerald-600 mr-2" />
+                      <h2 className="text-lg font-medium text-gray-900">Resumen de Cotización</h2>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-500">Moneda:</span>
+                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue placeholder="Moneda" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200">
+                          <SelectItem value="MXN">MXN</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
                 <div className="p-6">
+                  {/* Add ListaProductosConDescuento to allow individual product discounts */}
+                  <div className="mb-6">
+                    <h3 className="text-base font-medium text-gray-700 mb-4">Productos con Descuento Individual</h3>
+                    <ListaProductosConDescuento 
+                      productos={productos}
+                      onRemoveProduct={(id) => removeProducto(id)}
+                      onUpdateProductDiscount={handleUpdateProductDiscount}
+                      moneda={moneda}
+                    />
+                  </div>
+                  
                   <ResumenCotizacion 
                     cliente={cliente}
                     productos={productos}
@@ -589,5 +603,14 @@ export default function NuevaCotizacionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Create the wrapper component that includes the Provider
+export default function NuevaCotizacionPage() {
+  return (
+    <ProductosProvider>
+      <NuevaCotizacionClient />
+    </ProductosProvider>
   );
 }

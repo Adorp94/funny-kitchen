@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export interface RouteContext {
+  params: {
+    id: string;
+  };
+}
+
+export async function GET(request: NextRequest, { params }: RouteContext) {
   const supabase = createServerSupabaseClient();
   const id = params.id;
   
@@ -28,10 +31,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, { params }: RouteContext) {
   const supabase = createServerSupabaseClient();
   const clienteId = params.id;
   const body = await request.json();

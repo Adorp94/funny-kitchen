@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { PDFCotizacion } from "@/components/cotizacion/pdf-cotizacion";
+import { ProductosProvider } from "@/contexts/productos-context";
 
 interface Cliente {
   cliente_id?: number;
@@ -88,41 +89,47 @@ export default function VerCotizacionPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-10 flex flex-col items-center justify-center min-h-[70vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
-        <p className="text-gray-500">Cargando cotización...</p>
-      </div>
+      <ProductosProvider>
+        <div className="container mx-auto py-10 flex flex-col items-center justify-center min-h-[70vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
+          <p className="text-gray-500">Cargando cotización...</p>
+        </div>
+      </ProductosProvider>
     );
   }
 
   if (error || !cotizacion) {
     return (
-      <div className="container mx-auto py-10 flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="text-center max-w-md mx-auto">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
-          <p className="text-gray-600 mb-6">{error || "No se pudo cargar la cotización"}</p>
-          <Button onClick={handleBack} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <span className="whitespace-nowrap">Volver al Dashboard</span>
-          </Button>
+      <ProductosProvider>
+        <div className="container mx-auto py-10 flex flex-col items-center justify-center min-h-[70vh]">
+          <div className="text-center max-w-md mx-auto">
+            <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
+            <p className="text-gray-600 mb-6">{error || "No se pudo cargar la cotización"}</p>
+            <Button onClick={handleBack} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <span className="whitespace-nowrap">Volver al Dashboard</span>
+            </Button>
+          </div>
         </div>
-      </div>
+      </ProductosProvider>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-6xl">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold">Cotización {cotizacion.folio}</h1>
-        <Button onClick={handleBack} variant="outline" className="w-full sm:w-auto border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          <span className="whitespace-nowrap">Volver al Dashboard</span>
-        </Button>
+    <ProductosProvider>
+      <div className="container mx-auto py-6 max-w-6xl">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <h1 className="text-2xl font-bold">Cotización {cotizacion.folio}</h1>
+          <Button onClick={handleBack} variant="outline" className="w-full sm:w-auto border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            <span className="whitespace-nowrap">Volver al Dashboard</span>
+          </Button>
+        </div>
+        
+        <PDFCotizacion 
+          cliente={cotizacion.cliente} 
+          cotizacion={cotizacion}
+        />
       </div>
-      
-      <PDFCotizacion 
-        cliente={cotizacion.cliente} 
-        cotizacion={cotizacion}
-      />
-    </div>
+    </ProductosProvider>
   );
 } 

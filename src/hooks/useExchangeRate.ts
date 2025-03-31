@@ -24,69 +24,54 @@ export function useExchangeRate() {
   useEffect(() => {
     const fetchExchangeRate = async () => {
       try {
-        console.log('Fetching exchange rate from Banxico...');
+        console.log('Fetching exchange rate from Banxico API...');
         
-        const response = await fetch(
-          'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno',
-          {
-            headers: {
-              'Bmx-Token': '66c15536eef14c33ee04957d8ac9fc8fc7c6a3fa819c6fc4d3d6515448f14433'
-            }
-          }
-        );
-
-        console.log('Banxico API response status:', response.status);
+        // Set fallback values to use in case of error
+        const fallbackRate = 20.4003;
+        const fallbackDate = '28/06/2024';
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch exchange rate: ${response.status} ${response.statusText}`);
-        }
-
-        // Get the response as text first to validate
-        const responseText = await response.text();
-        console.log('Raw API response:', responseText);
-        
-        // Then parse the JSON
-        let data: BanxicoResponse;
         try {
-          data = JSON.parse(responseText);
-        } catch (jsonError) {
-          console.error('Failed to parse JSON response:', jsonError);
-          throw new Error('Invalid JSON response from API');
+          // Use server-side API route as a proxy to fetch Banxico data
+          // This avoids CORS issues in the browser
+          const response = await fetch('/api/exchange-rate');
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch exchange rate: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          if (!data.success) {
+            throw new Error(data.error || 'API returned unsuccessful response');
+          }
+          
+          const rate = data.rate;
+          const date = data.date;
+          
+          if (!rate || isNaN(parseFloat(rate))) {
+            throw new Error('Invalid exchange rate value received');
+          }
+          
+          // Save the base rate
+          const parsedRate = parseFloat(rate);
+          setBaseRate(parsedRate);
+          
+          // Calculate rate with markup
+          const rateWithMarkup = parsedRate + MARKUP;
+          setExchangeRate(rateWithMarkup);
+          setLastUpdated(date || fallbackDate);
+          
+          console.log('Successfully fetched exchange rate:', parsedRate, 'with markup:', rateWithMarkup);
+          console.log('Last updated date:', date);
+        } catch (apiError) {
+          console.error('Error fetching exchange rate, using fallback values:', apiError);
+          setError(apiError instanceof Error ? apiError.message : 'Failed to fetch exchange rate');
+          
+          // Use fallback values
+          setBaseRate(fallbackRate);
+          setExchangeRate(fallbackRate + MARKUP);
+          setLastUpdated(fallbackDate);
         }
-        
-        // Validate the data structure
-        if (!data.bmx?.series?.[0]?.datos?.[0]?.dato) {
-          console.error('Invalid data structure:', data);
-          throw new Error('Invalid API response format');
-        }
-
-        const latestData = data.bmx.series[0].datos[0];
-        console.log('Latest data:', latestData);
-        
-        const rate = parseFloat(latestData.dato);
-        
-        if (isNaN(rate)) {
-          throw new Error('Invalid exchange rate value');
-        }
-
-        // Save the base rate
-        setBaseRate(rate);
-        
-        // Add markup to the exchange rate
-        const rateWithMarkup = rate + MARKUP;
-        setExchangeRate(rateWithMarkup);
-        setLastUpdated(latestData.fecha);
-        console.log('Successfully fetched exchange rate:', rate, 'with markup:', rateWithMarkup);
-        console.log('Last updated date:', latestData.fecha);
-      } catch (err) {
-        console.error('Error fetching exchange rate:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch exchange rate');
-        
-        // Set fallback values for development
-        const fallbackRate = 20.4003; // From the last successful API call
-        setBaseRate(fallbackRate);
-        setExchangeRate(fallbackRate + MARKUP);
-        setLastUpdated('28/03/2025'); // Fallback date
       } finally {
         setLoading(false);
       }
