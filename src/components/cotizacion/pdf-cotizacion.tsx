@@ -128,6 +128,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
     try {
       await PDFService.generatePDFFromElement(pdfRef.current, {
         filename: `cotizacion-${displayFolio}-${format(new Date(), 'dd-MM-yyyy')}.pdf`,
+        format: 'letter',
+        orientation: 'portrait',
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -156,201 +158,203 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
       {/* PDF Content */}
       <div 
         ref={pdfRef} 
-        className="bg-white p-8 rounded-lg max-w-4xl mx-auto font-sans text-sm"
+        className="bg-white p-6 sm:p-8 rounded-lg max-w-[215.9mm] mx-auto font-sans text-sm shadow-sm border border-gray-200 print:shadow-none print:border-0 print:p-4 print:max-w-full"
+        style={{ 
+          minHeight: '279.4mm',
+          /* Fix for Firefox's print handling */
+          printColorAdjust: 'exact',
+          WebkitPrintColorAdjust: 'exact'
+        }}
       >
         {/* Header */}
-        <div className="flex justify-between items-start mb-6 pb-6 border-b border-gray-100">
+        <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-200">
           <div className="flex-shrink-0">
             <img
               src="/logo.png"
               alt="Funny Kitchen Logo"
-              className="h-14 object-contain"
+              className="h-12 object-contain"
             />
           </div>
-          <div className="text-right">
-            <h1 className="text-xl font-semibold text-gray-800 mb-1">COTIZACIÓN</h1>
-            <p className="text-gray-600">Folio: <span className="font-medium">{displayFolio}</span></p>
+          <div className="text-right leading-tight">
+            <h1 className="text-xl font-semibold text-gray-800">COTIZACIÓN</h1>
+            <p className="text-gray-600 mt-1">Folio: <span className="font-medium">{displayFolio}</span></p>
             <p className="text-gray-600">Fecha: {fechaActual}</p>
             <p className="text-gray-600">Divisa: <span className="font-medium">{moneda}</span></p>
           </div>
         </div>
         
         {/* Client and Company Information */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-2 gap-6 mb-4">
           {/* Client Information */}
           <div>
-            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Cliente</h2>
-            <div className="space-y-1">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Cliente</h2>
+            <div className="leading-tight">
               <p className="font-medium text-gray-900">{cliente.nombre}</p>
-              {cliente.razon_social && <p className="text-gray-700">{cliente.razon_social}</p>}
-              {cliente.rfc && <p className="text-gray-700">RFC: {cliente.rfc}</p>}
-              <p className="text-gray-700">{cliente.celular}</p>
-              {cliente.correo && <p className="text-gray-700">{cliente.correo}</p>}
-              {cliente.atencion && <p className="text-gray-700">Atención: {cliente.atencion}</p>}
-              {cliente.direccion_envio && <p className="text-gray-700">{cliente.direccion_envio}</p>}
-              {cliente.recibe && <p className="text-gray-700">Recibe: {cliente.recibe}</p>}
+              {cliente.razon_social && <p className="text-gray-700 text-xs">{cliente.razon_social}</p>}
+              {cliente.rfc && <p className="text-gray-700 text-xs">RFC: {cliente.rfc}</p>}
+              <p className="text-gray-700 text-xs">{cliente.celular}</p>
+              {cliente.correo && <p className="text-gray-700 text-xs">{cliente.correo}</p>}
+              {cliente.atencion && <p className="text-gray-700 text-xs">Atención: {cliente.atencion}</p>}
+              {cliente.direccion_envio && <p className="text-gray-700 text-xs">{cliente.direccion_envio}</p>}
+              {cliente.recibe && <p className="text-gray-700 text-xs">Recibe: {cliente.recibe}</p>}
             </div>
           </div>
           
           {/* Company Information */}
           <div className="text-right">
-            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Emisor</h2>
-            <div className="space-y-1">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Emisor</h2>
+            <div className="leading-tight">
               <p className="font-medium text-gray-900">Funny Kitchen S.A. de C.V.</p>
-              <p className="text-gray-700">AZUCENAS #439 LOS GIRASOLES</p>
-              <p className="text-gray-700">ZAPOPAN, JALISCO 45138</p>
-              <p className="text-gray-700">(33) 1055 6554</p>
-              <p className="text-gray-700">hola@funnykitchen.mx</p>
+              <p className="text-gray-700 text-xs">AZUCENAS #439 LOS GIRASOLES</p>
+              <p className="text-gray-700 text-xs">ZAPOPAN, JALISCO 45138</p>
+              <p className="text-gray-700 text-xs">(33) 1055 6554</p>
+              <p className="text-gray-700 text-xs">hola@funnykitchen.mx</p>
             </div>
           </div>
         </div>
         
         {/* Products */}
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Productos</h2>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">P. Unitario</th>
-                {productos.some(p => p.descuento && p.descuento > 0) && (
-                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Desc.</th>
-                )}
-                <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productos.map((producto) => (
-                <tr key={producto.id} className="border-b border-gray-100">
-                  <td className="py-2 px-2">
-                    <div>
-                      <p className="font-medium text-gray-800">{producto.nombre}</p>
-                      {typeof producto.descripcion === 'string' && producto.descripcion && (
-                        <p className="text-sm text-gray-600">{producto.descripcion}</p>
-                      )}
-                      {typeof producto.sku === 'string' && producto.sku && (
-                        <p className="text-sm text-gray-500">SKU: {producto.sku}</p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 px-2 text-center text-gray-800">{producto.cantidad}</td>
-                  <td className="py-2 px-2 text-right text-gray-800">{formatCurrency(producto.precio)}</td>
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Productos</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="py-1.5 px-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-5/12">Descripción</th>
+                  <th className="py-1.5 px-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Cant.</th>
+                  <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">P. Unitario</th>
                   {productos.some(p => p.descuento && p.descuento > 0) && (
-                    <td className="py-2 px-2 text-right text-gray-800">
-                      {producto.descuento ? `${producto.descuento}%` : '-'}
-                    </td>
+                    <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Desc.</th>
                   )}
-                  <td className="py-2 px-2 text-right text-gray-800">
-                    {producto.descuento && producto.descuento > 0 
-                      ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))
-                      : formatCurrency(producto.cantidad * producto.precio)
-                    }
-                  </td>
+                  <th className="py-1.5 px-1 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-3/12">Subtotal</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {productos.map((producto) => (
+                  <tr key={producto.id}>
+                    <td className="py-1 px-1">
+                      <div className="leading-tight">
+                        <p className="font-medium text-gray-800">{producto.nombre}</p>
+                        {typeof producto.descripcion === 'string' && producto.descripcion && (
+                          <p className="text-xs text-gray-600">{producto.descripcion}</p>
+                        )}
+                        {typeof producto.sku === 'string' && producto.sku && (
+                          <p className="text-xs text-gray-500">SKU: {producto.sku}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-1 px-1 text-center text-gray-800">{producto.cantidad}</td>
+                    <td className="py-1 px-1 text-right text-gray-800 whitespace-nowrap">{formatCurrency(producto.precio)}</td>
+                    {productos.some(p => p.descuento && p.descuento > 0) && (
+                      <td className="py-1 px-1 text-right text-gray-800">
+                        {producto.descuento ? `${producto.descuento}%` : '-'}
+                      </td>
+                    )}
+                    <td className="py-1 px-1 text-right text-gray-800 whitespace-nowrap">
+                      {producto.descuento && producto.descuento > 0 
+                        ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))
+                        : formatCurrency(producto.cantidad * producto.precio)
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
         
         {/* Totals */}
-        <div className="mb-6 pl-0 pr-0 md:pl-auto md:pr-0 lg:w-1/2 ml-auto">
-          <div className="space-y-1 text-right">
-            <div className="flex justify-between py-1 text-gray-700">
+        <div className="mb-4 md:w-1/2 ml-auto">
+          <div className="text-right text-xs leading-tight">
+            <div className="flex justify-between py-0.5 text-gray-700">
               <span>Subtotal:</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span className="font-medium">{formatCurrency(subtotal)}</span>
             </div>
             
             {totalProductDiscounts > 0 && (
-              <div className="flex justify-between py-1 text-gray-700">
+              <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Descuentos por producto:</span>
-                <span className="text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
+                <span className="font-medium text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
               </div>
             )}
             
             {globalDiscount > 0 && (
-              <div className="flex justify-between py-1 text-gray-700">
+              <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Descuento global ({globalDiscount}%):</span>
-                <span className="text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
+                <span className="font-medium text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
               </div>
             )}
             
             {hasIva && (
-              <div className="flex justify-between py-1 text-gray-700">
+              <div className="flex justify-between py-0.5 text-gray-700">
                 <span>IVA (16%):</span>
-                <span>{formatCurrency(ivaAmount)}</span>
+                <span className="font-medium">{formatCurrency(ivaAmount)}</span>
               </div>
             )}
             
             {hasShipping && shippingCost > 0 && (
-              <div className="flex justify-between py-1 text-gray-700">
+              <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Costo de envío:</span>
-                <span>{formatCurrency(shippingCost)}</span>
+                <span className="font-medium">{formatCurrency(shippingCost)}</span>
               </div>
             )}
             
-            <div className="flex justify-between py-2 font-medium text-gray-900 border-t border-gray-200">
-              <span>Total:</span>
-              <span className="text-base">{formatCurrency(total)}</span>
+            <div className="flex justify-between py-1 text-gray-900 border-t border-gray-200 mt-1">
+              <span className="font-medium">Total:</span>
+              <span className="font-bold text-base">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
         
         {/* Notes */}
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Notas</h2>
-          <div className="bg-gray-50 p-3 rounded-md text-gray-700">
-            <ul className="space-y-1 list-none">
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Notas</h2>
+          <div className="bg-gray-50 p-2 rounded-md text-gray-700 text-xs leading-tight">
+            <ul className="space-y-0.5 list-none">
               <li>A) Precios sujetos a cambio sin previo aviso.</li>
               <li>B) El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</li>
-              <li>C) Fecha de la cotización: 18/03/2025</li>
-              <li>D) Tiempo de Envío estimado: 6 semanas</li>
+              <li>C) Fecha de la cotización: {fechaActual}</li>
+              <li>D) Tiempo de Entrega estimado: 6 semanas después de la confirmación de pago.</li>
             </ul>
           </div>
         </div>
         
         {/* Terms and Payment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-xs">
           {/* Terms */}
           <div>
-            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2">Términos y cuidados</h2>
-            <div className="text-sm text-gray-700 space-y-1">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Términos y cuidados</h2>
+            <div className="text-xs text-gray-700 leading-tight">
               <p>Términos completos: <a 
                 href="https://funnykitchen.mx/pages/terminos-y-condiciones" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-teal-600 underline font-medium"
-                onClick={(e) => {
-                  // Prevent default action in PDF view
-                  e.preventDefault();
-                  // Open the link in a new tab
-                  window.open("https://funnykitchen.mx/pages/terminos-y-condiciones", "_blank");
-                }}
               >
-                funnykitchen.mx/pages/terminos-y-condiciones
+                funnykitchen.mx/terminos-y-condiciones
               </a></p>
-              <div className="bg-gray-50 p-3 rounded-md mt-2">
-                <p className="font-medium mb-1">CUIDADOS:</p>
+              <div className="bg-gray-50 p-2 rounded-md mt-1">
+                <p className="font-medium mb-0.5">CUIDADOS:</p>
                 <p>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.</p>
-                <p className="mt-1">TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</p>
+                <p className="mt-0.5">TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</p>
               </div>
             </div>
           </div>
           
           {/* Payment Info */}
           <div>
-            <h2 className="text-sm font-semibold uppercase text-gray-500 mb-2 text-right">Datos bancarios</h2>
-            <div className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md">
+            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1 text-right">Datos bancarios</h2>
+            <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded-md leading-tight">
               {moneda === 'MXN' ? (
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <p className="font-medium">BBVA</p>
                   <p>FUNNY KITCHEN S.A. DE C.V</p>
                   <p>CUENTA: 012 244 0415</p>
                   <p>CLABE: 012 320 00122440415 9</p>
-                  <p className="mt-1 font-medium">ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</p>
+                  <p className="mt-0.5 font-medium">ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</p>
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <p className="font-medium">LEAD BANK</p>
                   <p>PABLO ANAYA</p>
                   <p>210319511130</p>
@@ -362,9 +366,9 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Signature */}
-        <div className="border-t border-gray-100 pt-4 mt-auto">
-          <div className="text-sm text-gray-700">
-            <p className="font-medium mb-2">ATENTAMENTE:</p>
+        <div className="border-t border-gray-200 pt-2 mt-auto text-xs">
+          <div className="text-xs text-gray-700 leading-tight">
+            <p className="font-medium mb-0.5">ATENTAMENTE:</p>
             <div className="flex justify-between">
               <div>
                 <p>PABLO ANAYA - DIRECTOR GENERAL</p>
