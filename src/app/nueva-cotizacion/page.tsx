@@ -28,6 +28,7 @@ interface ExtendedProductoBase extends ProductoBase {
 // Define the Producto interface properly
 interface Producto extends ExtendedProductoBase {
   subtotal: number;
+  producto_id?: number | null;
 }
 
 // Define the form data interface to fix the 'formData' errors
@@ -186,7 +187,11 @@ function NuevaCotizacionClient() {
       // Prepare data for API call
       const quotationData = {
         cliente: cliente,
-        productos: productos,
+        productos: productos.map(p => ({
+          ...p,
+          // Use the database producto_id if available
+          producto_id: p.producto_id || p.id
+        })),
         moneda: moneda,
         subtotal: subtotal,
         descuento_global: globalDiscount,
@@ -412,7 +417,7 @@ function NuevaCotizacionClient() {
                     if (producto) {
                       // Format product data for addProducto
                       const productoToAdd = {
-                        id: String(producto.producto_id || Date.now()), // Use product ID or timestamp
+                        id: producto.producto_id ? String(producto.producto_id) : String(Date.now()), // Use the actual database ID if it exists
                         nombre: producto.nombre || '',
                         cantidad: Number(producto.cantidad) || 1,
                         precio: producto.precio || 0,
@@ -426,6 +431,8 @@ function NuevaCotizacionClient() {
                             ? producto.colores.split(',') 
                             : [],
                         acabado: producto.acabado || '',
+                        // Add the original producto_id for database reference
+                        producto_id: producto.producto_id || null
                       };
                       
                       // Check if this product already exists in the cart by ID

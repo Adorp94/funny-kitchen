@@ -745,7 +745,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     
     // If valid, notify parent with the quantity
     const cantidad = parseInt(formData.cantidad) || 1;
-    safeNotifyParent(formDataToProducto(formData), cantidad);
+    
+    // Get the product data with the correct ID preserved
+    const producto = formDataToProducto(formData);
+    
+    // Make sure we're passing the original database ID for existing products
+    safeNotifyParent(producto, cantidad);
     
     // Fully reset the form after adding to cart
     setFormData({
@@ -1112,7 +1117,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   
                   <Button
                     type="button"
-                    onClick={handleSaveProduct}
+                    onClick={handleAddToCart}
                     disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0}
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"

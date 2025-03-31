@@ -12,6 +12,7 @@ export interface Producto {
   cantidad: number;
   precio: number;
   subtotal: number;
+  producto_id?: number | null;
 }
 
 interface ProductoFormErrors {
