@@ -442,21 +442,17 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     }
   };
 
-  // Add additional debugging effect to monitor sessionStorage
+  // Add additional debugging effect to monitor sessionStorage (only in dev mode)
   useEffect(() => {
+    // Only log in development environment
+    if (process.env.NODE_ENV !== 'development') return;
+    
     // Check saved data on tab change or other updates to help debug persistence
     const savedData = sessionStorage.getItem('cotizacion_clienteForm');
-    console.log("Current sessionStorage state:", savedData ? JSON.parse(savedData) : "No data");
-    
-    // Listen for tab changes in the form
-    const handleTabChange = () => {
-      const currentData = sessionStorage.getItem('cotizacion_clienteForm');
-      console.log("After tab change, sessionStorage:", currentData ? JSON.parse(currentData) : "No data");
-    };
     
     // Listen for storage events from other tabs/windows
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'cotizacion_clienteForm') {
+      if (e.key === 'cotizacion_clienteForm' && process.env.NODE_ENV === 'development') {
         console.log("Storage changed in another tab:", e.newValue ? JSON.parse(e.newValue) : "No data");
       }
     };

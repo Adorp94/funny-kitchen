@@ -1,12 +1,15 @@
 import "@/app/globals.css";
 import type { Metadata } from "next";
-import { ClientLayout } from "@/components/layout/client-layout";
-import { Toaster } from "@/components/ui/toaster";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Funny Kitchen",
-  description: "Sistema de cotizaciones para Funny Kitchen",
+  title: "Funny Kitchen - Sistema de Cotizaciones",
+  description: "Sistema de gestión de cotizaciones para Funny Kitchen",
 };
+
+import ClientLayout from "./client-layout";
 
 export default function RootLayout({
   children,
@@ -15,9 +18,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-gray-50">
+      <body className="bg-gray-50 min-h-screen">
         <ClientLayout>{children}</ClientLayout>
-        <Toaster />
       </body>
     </html>
   );

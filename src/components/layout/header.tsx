@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Menu, X, BarChart3, FileText, ShoppingBag, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn } from "lucide-react";
+import UserDropdown from "@/components/auth/user-dropdown";
 
 // Improved navigation items for a more general app with multiple modules
 const navigation = [
@@ -33,6 +35,7 @@ const navigation = [
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isLoading, loginWithRedirect } = useAuth0();
   
   // Check if a given path is active
   const isActive = (path: string) => {
@@ -72,20 +75,37 @@ export function Header() {
           </nav>
         </div>
         
-        {/* Mobile menu button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden rounded-md"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? (
-            <X className="h-5 w-5" />
+        {/* Right section with authentication */}
+        <div className="flex items-center space-x-4">
+          {isLoading ? (
+            <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+          ) : user ? (
+            <UserDropdown />
           ) : (
-            <Menu className="h-5 w-5" />
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => loginWithRedirect()}
+            >
+              <LogIn className="mr-2 h-4 w-4" />
+              <span className="whitespace-nowrap">Iniciar Sesión</span>
+            </Button>
           )}
-          <span className="sr-only">Toggle menu</span>
-        </Button>
+          
+          {/* Mobile menu button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden rounded-md"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
+            <span className="sr-only">Toggle menu</span>
+          </Button>
+        </div>
       </div>
       
       {/* Mobile menu */}
@@ -107,6 +127,19 @@ export function Header() {
                 {item.name}
               </Link>
             ))}
+            
+            {/* Mobile authentication */}
+            {!user && !isLoading && (
+              <div className="px-3 py-3 mt-2">
+                <Button 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => loginWithRedirect()}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  <span className="whitespace-nowrap">Iniciar Sesión</span>
+                </Button>
+              </div>
+            )}
           </nav>
         </div>
       )}
