@@ -4,19 +4,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Menu, X, BarChart3, FileText } from "lucide-react";
+import { LayoutDashboard, Menu, X, BarChart3, FileText, ShoppingBag, Settings, Users } from "lucide-react";
 
-// Improved navigation items
+// Improved navigation items for a more general app with multiple modules
 const navigation = [
   {
     name: "Dashboard",
-    href: "/dashboard/cotizaciones",
-    icon: BarChart3,
+    href: "/dashboard",
+    icon: LayoutDashboard,
   },
   {
-    name: "Nueva Cotización",
-    href: "/nueva-cotizacion",
+    name: "Cotizaciones",
+    href: "/dashboard/cotizaciones",
     icon: FileText,
+  },
+  {
+    name: "Productos",
+    href: "/dashboard/productos",
+    icon: ShoppingBag,
+  },
+  {
+    name: "Clientes",
+    href: "/dashboard/clientes",
+    icon: Users,
   }
 ];
 
@@ -31,11 +41,11 @@ export function Header() {
   };
 
   return (
-    <header className="w-full mx-auto max-w-[1440px] bg-white border-b border-gray-100">
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+    <header className="w-full bg-white border-b border-gray-100">
+      <div className="flex h-16 items-center justify-between max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
         {/* Left section with logo */}
         <div className="flex items-center">
-          <Link href="/dashboard/cotizaciones" className="flex items-center mr-8">
+          <Link href="/dashboard" className="flex items-center mr-10">
             <img
               src="/logo.png"
               alt="Funny Kitchen"
@@ -44,7 +54,7 @@ export function Header() {
           </Link>
           
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-4">
+          <nav className="hidden md:flex items-center space-x-6">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -81,7 +91,7 @@ export function Header() {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 py-2 px-4">
-          <nav className="flex flex-col space-y-1">
+          <nav className="flex flex-col space-y-1 max-w-[1440px] mx-auto">
             {navigation.map((item) => (
               <Link
                 key={item.name}

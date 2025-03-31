@@ -11,8 +11,8 @@ export default function HomePage() {
   const router = useRouter();
   
   useEffect(() => {
-    // Redirect to dashboard on component mount
-    router.push('/dashboard/cotizaciones');
+    // Redirect to general dashboard instead of cotizaciones
+    router.push('/dashboard');
   }, [router]);
 
   return (

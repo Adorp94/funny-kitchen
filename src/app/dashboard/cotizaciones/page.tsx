@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, DollarSign, Calendar, BarChart, FileText } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -236,31 +236,30 @@ export default function CotizacionesPage() {
   };
   
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto">
+    <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
+      {/* Header with title and actions */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Dashboard de Cotizaciones</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Cotizaciones</h1>
+          <p className="text-gray-500">Gestión de cotizaciones y pedidos</p>
+        </div>
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white mt-4 sm:mt-0"
         >
           <Plus className="mr-2 h-4 w-4" />
           <span className="whitespace-nowrap">Nueva Cotización</span>
         </Button>
       </div>
       
-      {/* Metrics Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Cotizaciones</CardDescription>
             <CardTitle className="text-2xl">{metrics.totalCotizaciones}</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-gray-100 w-fit">
-              <FileText className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardContent>
         </Card>
         
         <Card>
@@ -268,11 +267,6 @@ export default function CotizacionesPage() {
             <CardDescription>Cotizaciones Pendientes</CardDescription>
             <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-blue-50 w-fit">
-              <Calendar className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardContent>
         </Card>
         
         <Card>
@@ -280,11 +274,6 @@ export default function CotizacionesPage() {
             <CardDescription>Total MXN</CardDescription>
             <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-emerald-50 w-fit">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardContent>
         </Card>
         
         <Card>
@@ -292,19 +281,13 @@ export default function CotizacionesPage() {
             <CardDescription>Total USD</CardDescription>
             <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-full p-1.5 bg-emerald-50 w-fit">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
-            </div>
-          </CardContent>
         </Card>
       </div>
       
       {/* Filters */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Cotizaciones</CardTitle>
-          <CardDescription>Busca y filtra las cotizaciones existentes</CardDescription>
+          <CardTitle>Buscar Cotizaciones</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
