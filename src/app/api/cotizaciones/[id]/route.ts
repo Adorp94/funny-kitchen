@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +16,7 @@ export async function GET(
       );
     }
     
-    const supabase = createClientComponentClient();
+    const supabase = createServerSupabaseClient();
     
     // Get the cotizacion with its client
     const { data: cotizacion, error: cotizacionError } = await supabase

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { Database } from './types';
 
 export function createServerSupabaseClient() {
+  // Using regular function syntax instead of async
   const cookieStore = cookies();
   
   return createServerClient(
@@ -10,11 +11,13 @@ export function createServerSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: (name, value, options) => {
+        get(name) {
+          return cookieStore.get(name)?.value;
+        },
+        set(name, value, options) {
           cookieStore.set({ name, value, ...options });
         },
-        remove: (name, options) => {
+        remove(name, options) {
           cookieStore.set({ name, value: '', ...options });
         },
       },

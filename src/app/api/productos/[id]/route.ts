@@ -3,12 +3,12 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
-  const supabase = createServerSupabaseClient();
-  const id = params.id;
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const id = context.params.id;
+    
     // Get a specific product
     const { data, error } = await supabase
       .from('productos')
@@ -30,20 +30,20 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
-  const supabase = createServerSupabaseClient();
-  const productoId = params.id;
-  const body = await request.json();
-  
-  if (!productoId) {
-    return NextResponse.json(
-      { error: 'Producto ID is required' },
-      { status: 400 }
-    );
-  }
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const productoId = context.params.id;
+    const body = await request.json();
+    
+    if (!productoId) {
+      return NextResponse.json(
+        { error: 'Producto ID is required' },
+        { status: 400 }
+      );
+    }
+    
     console.log(`Updating product with ID: ${productoId}`, body);
     
     const { data, error } = await supabase

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-export async function GET() {
-  const supabase = createServerSupabaseClient();
-  
+export async function GET(request: NextRequest) {
   try {
+    const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('vendedores')
       .select('*')
@@ -23,10 +22,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const body = await request.json();
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
+    
     const { data, error } = await supabase
       .from('vendedores')
       .insert({

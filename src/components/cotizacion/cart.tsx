@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import { CurrencySwitcher } from '@/components/cotizacion/currency-switcher';
+import { ResponsiveTable } from '@/components/ui/responsive-table';
 
 interface CartItem {
   id: number;
@@ -71,74 +72,76 @@ export function Cart({
       </div>
       
       <div className="max-h-[400px] overflow-y-auto">
-        <Table>
-          <TableHeader className="sticky top-0 bg-white z-10">
-            <TableRow>
-              <TableHead className="w-[40%]">Producto</TableHead>
-              <TableHead className="text-center">Cant.</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Desc.</TableHead>
-              <TableHead className="text-right">Subtotal</TableHead>
-              <TableHead className="w-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id} className="group">
-                <TableCell className="align-top">
-                  <div className="font-medium text-sm">{item.nombre}</div>
-                  {item.colores && (
-                    <div className="text-xs text-gray-500">Colores: {item.colores}</div>
-                  )}
-                </TableCell>
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-center">
-                    <button
-                      className="w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center"
-                      onClick={() => onUpdateQuantity(item.id, Math.max(1, item.cantidad - 1))}
-                    >
-                      -
-                    </button>
-                    <span className="mx-2 text-sm min-w-[20px] text-center">{item.cantidad}</span>
-                    <button
-                      className="w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center"
-                      onClick={() => onUpdateQuantity(item.id, item.cantidad + 1)}
-                    >
-                      +
-                    </button>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right text-sm">
-                  {formatCurrency(getDisplayPrice(item.precio_final), currency)}
-                </TableCell>
-                <TableCell className="text-right">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="w-12 text-right bg-transparent border-b border-gray-300 focus:border-primary focus:outline-none text-sm p-1"
-                    value={item.descuento * 100}
-                    onChange={(e) => onUpdateDiscount(item.id, Number(e.target.value) / 100)}
-                  />
-                  <span className="text-xs">%</span>
-                </TableCell>
-                <TableCell className="text-right text-sm font-semibold">
-                  {formatCurrency(getDisplayPrice(calculateSubtotal(item)), currency)}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => onRemoveItem(item.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </TableCell>
+        <ResponsiveTable>
+          <Table>
+            <TableHeader className="sticky top-0 bg-white z-10">
+              <TableRow>
+                <TableHead className="w-[40%] whitespace-nowrap">Producto</TableHead>
+                <TableHead className="text-center whitespace-nowrap">Cant.</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Precio</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Desc.</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Subtotal</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id} className="group">
+                  <TableCell className="align-top">
+                    <div className="font-medium text-sm">{item.nombre}</div>
+                    {item.colores && (
+                      <div className="text-xs text-gray-500">Colores: {item.colores}</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center">
+                      <button
+                        className="w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center"
+                        onClick={() => onUpdateQuantity(item.id, Math.max(1, item.cantidad - 1))}
+                      >
+                        -
+                      </button>
+                      <span className="mx-2 text-sm min-w-[20px] text-center">{item.cantidad}</span>
+                      <button
+                        className="w-6 h-6 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center"
+                        onClick={() => onUpdateQuantity(item.id, item.cantidad + 1)}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-sm whitespace-nowrap">
+                    {formatCurrency(getDisplayPrice(item.precio_final), currency)}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="w-12 text-right bg-transparent border-b border-gray-300 focus:border-primary focus:outline-none text-sm p-1"
+                      value={item.descuento * 100}
+                      onChange={(e) => onUpdateDiscount(item.id, Number(e.target.value) / 100)}
+                    />
+                    <span className="text-xs">%</span>
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-semibold whitespace-nowrap">
+                    {formatCurrency(getDisplayPrice(calculateSubtotal(item)), currency)}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => onRemoveItem(item.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ResponsiveTable>
       </div>
     </div>
   );

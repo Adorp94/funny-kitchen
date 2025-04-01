@@ -29,6 +29,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -403,7 +404,7 @@ export default function CotizacionesPage() {
       ) : (
         <Card className="overflow-hidden">
           <CardContent className="p-0 sm:p-0">
-            <div className="overflow-x-auto">
+            <ResponsiveTable>
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-gray-50/50">
@@ -496,7 +497,7 @@ export default function CotizacionesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </ResponsiveTable>
           </CardContent>
         </Card>
       )}

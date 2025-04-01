@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow 
 } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 export function CartTable() {
   const { 
@@ -37,16 +38,16 @@ export function CartTable() {
   };
 
   return (
-    <div className="overflow-x-auto">
+    <ResponsiveTable>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Producto</TableHead>
-            <TableHead>Colores</TableHead>
-            <TableHead className="text-center">Cantidad</TableHead>
-            <TableHead className="text-right">Precio</TableHead>
-            <TableHead className="text-center">Desc. %</TableHead>
-            <TableHead className="text-right">Subtotal</TableHead>
+            <TableHead className="whitespace-nowrap">Producto</TableHead>
+            <TableHead className="whitespace-nowrap">Colores</TableHead>
+            <TableHead className="text-center whitespace-nowrap">Cantidad</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Precio</TableHead>
+            <TableHead className="text-center whitespace-nowrap">Desc. %</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Subtotal</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -60,7 +61,7 @@ export function CartTable() {
                 </div>
               </TableCell>
               <TableCell className="text-sm">{item.colores || "-"}</TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <div className="flex items-center justify-center">
                   <Button
                     variant="outline"
@@ -87,10 +88,10 @@ export function CartTable() {
                   </Button>
                 </div>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right whitespace-nowrap">
                 {formatCurrency(getDisplayPrice(item.precio), currency)}
               </TableCell>
-              <TableCell>
+              <TableCell className="whitespace-nowrap">
                 <Input
                   type="number"
                   min="0"
@@ -100,7 +101,7 @@ export function CartTable() {
                   className="h-8 w-16 text-center mx-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </TableCell>
-              <TableCell className="text-right font-medium">
+              <TableCell className="text-right font-medium whitespace-nowrap">
                 {formatCurrency(getDisplayPrice(item.subtotal), currency)}
               </TableCell>
               <TableCell>
@@ -117,6 +118,6 @@ export function CartTable() {
           ))}
         </TableBody>
       </Table>
-    </div>
+    </ResponsiveTable>
   );
 } 

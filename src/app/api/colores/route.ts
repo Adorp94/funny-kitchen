@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET() {
-  const supabase = createServerSupabaseClient();
-  
   try {
+    const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from('colores')
       .select('*')
@@ -23,17 +22,17 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const body = await request.json();
-  
-  if (!body.color) {
-    return NextResponse.json(
-      { error: 'Color name is required' },
-      { status: 400 }
-    );
-  }
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
+    
+    if (!body.color) {
+      return NextResponse.json(
+        { error: 'Color name is required' },
+        { status: 400 }
+      );
+    }
+    
     const { data, error } = await supabase
       .from('colores')
       .insert({ color: body.color })

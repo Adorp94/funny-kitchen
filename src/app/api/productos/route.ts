@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const searchParams = request.nextUrl.searchParams;
-  const id = searchParams.get('id');
-  const query = searchParams.get('query');
-  const page = parseInt(searchParams.get('page') || '0');
-  const pageSize = parseInt(searchParams.get('pageSize') || '20');
-  const from = page * pageSize;
-  
-  console.log(`API request received for productos: id=${id}, query=${query}, page=${page}, pageSize=${pageSize}`);
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+    const query = searchParams.get('query');
+    const page = parseInt(searchParams.get('page') || '0');
+    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+    const from = page * pageSize;
+    
+    console.log(`API request received for productos: id=${id}, query=${query}, page=${page}, pageSize=${pageSize}`);
+    
     if (id) {
       // Get a specific product
       const { data, error } = await supabase
@@ -83,10 +83,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  const body = await request.json();
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const body = await request.json();
+    
     // First, get the next ID for the product
     const { data: maxIdData, error: maxIdError } = await supabase
       .from('productos')
@@ -187,6 +187,18 @@ export async function PATCH(request: NextRequest) {
     console.error('Error updating producto:', error);
     return NextResponse.json(
       { error: 'Failed to update producto' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = createServerSupabaseClient();
+  } catch (error) {
+    console.error('Error deleting producto:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete producto' },
       { status: 500 }
     );
   }

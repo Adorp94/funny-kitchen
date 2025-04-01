@@ -6,6 +6,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Producto } from './producto-simplificado';
 import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { ResponsiveTable } from '../ui/responsive-table';
 
 // Extended product interface with discount
 export interface ProductoConDescuento extends Producto {
@@ -113,19 +114,19 @@ export function ListaProductosConDescuento({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border border-gray-200">
+      <ResponsiveTable>
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-              <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cant.</th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Precio</th>
+              <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
+              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
               {editMode && (
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Descuento</th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
               )}
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
               {editMode && (
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Acciones</th>
               )}
             </tr>
           </thead>
@@ -135,18 +136,18 @@ export function ListaProductosConDescuento({
                 <td className="px-4 py-3 text-sm text-gray-900">
                   {producto.nombre}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
                   {producto.cantidad}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
                   {formatCurrency(producto.precio)}
                 </td>
                 {editMode && (
-                  <td className="px-4 py-3 text-sm text-center">
+                  <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
                     {renderDiscountInput(producto)}
                   </td>
                 )}
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
                   {formatCurrency(getSubtotalAfterDiscount(producto))}
                   {producto.descuento ? (
                     <div className="text-xs text-green-600">
@@ -155,7 +156,7 @@ export function ListaProductosConDescuento({
                   ) : null}
                 </td>
                 {editMode && (
-                  <td className="px-4 py-3 text-sm text-center">
+                  <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
                     <Button
                       variant="ghost"
                       size="sm" 
@@ -182,7 +183,7 @@ export function ListaProductosConDescuento({
             </tr>
           </tfoot>
         </table>
-      </div>
+      </ResponsiveTable>
     </div>
   );
 }

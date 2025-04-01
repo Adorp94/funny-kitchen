@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils/currency";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 interface Product {
   prodsxc_id: number;
@@ -62,7 +63,7 @@ export function ProductosTable({
 
   return (
     <div className="rounded-md border overflow-hidden">
-      <div className="overflow-x-auto">
+      <ResponsiveTable noBorder>
         <Table>
           <TableHeader>
             <TableRow>
@@ -141,7 +142,7 @@ export function ProductosTable({
             )}
           </TableBody>
         </Table>
-      </div>
+      </ResponsiveTable>
     </div>
   );
 }

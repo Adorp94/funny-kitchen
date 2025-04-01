@@ -5,10 +5,10 @@ export async function GET(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
-  const supabase = createServerSupabaseClient();
-  const id = context.params.id;
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const id = context.params.id;
+    
     // Get a specific client
     const { data, error } = await supabase
       .from('clientes')
@@ -32,18 +32,18 @@ export async function PUT(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
-  const supabase = createServerSupabaseClient();
-  const clienteId = context.params.id;
-  const body = await request.json();
-  
-  if (!clienteId) {
-    return NextResponse.json(
-      { error: 'Cliente ID is required' },
-      { status: 400 }
-    );
-  }
-  
   try {
+    const supabase = createServerSupabaseClient();
+    const clienteId = context.params.id;
+    const body = await request.json();
+    
+    if (!clienteId) {
+      return NextResponse.json(
+        { error: 'Cliente ID is required' },
+        { status: 400 }
+      );
+    }
+    
     console.log(`Updating client with ID: ${clienteId}`, body);
     
     const { data, error } = await supabase

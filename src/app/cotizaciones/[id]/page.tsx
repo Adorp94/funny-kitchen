@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 interface Producto {
   id: string
@@ -333,43 +334,45 @@ export default function CotizacionDetailPage() {
           
           {cotizacion.productos.length > 0 ? (
             <div className="border rounded-md">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descripción
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cantidad
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Precio Unitario
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {cotizacion.productos.map((producto, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {producto.descripcion}
-                        {producto.color && <span className="ml-2 text-gray-500">({producto.color})</span>}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {producto.cantidad}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {formatCurrency(producto.precio_unitario, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {formatCurrency(producto.precio_total, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
-                      </td>
+              <ResponsiveTable noBorder>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Descripción
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Cantidad
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Precio Unitario
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Total
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {cotizacion.productos.map((producto, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {producto.descripcion}
+                          {producto.color && <span className="ml-2 text-gray-500">({producto.color})</span>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                          {producto.cantidad}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                          {formatCurrency(producto.precio_unitario, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                          {formatCurrency(producto.precio_total, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ResponsiveTable>
             </div>
           ) : (
             <div className="bg-gray-50 text-center py-8 rounded-md border border-gray-200">

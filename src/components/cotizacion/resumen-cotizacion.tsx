@@ -8,6 +8,7 @@ import { DollarSign, Truck, Receipt, Percent, User } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
+import { ResponsiveTable } from '../ui/responsive-table';
 
 interface Cliente {
   nombre: string;
@@ -183,42 +184,40 @@ export function ResumenCotizacion({
           </div>
         </div>
         
-        <div className="overflow-hidden rounded-lg border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Producto</th>
-                  <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
+        <ResponsiveTable>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Producto</th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {productos.map((producto) => (
+                <tr key={producto.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm text-gray-900 max-w-[150px] sm:max-w-none">
+                    <div className="truncate">{producto.nombre}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
+                    {producto.cantidad}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
+                    <span className="whitespace-nowrap">{formatCurrency(producto.precio)}</span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
+                    {producto.descuento > 0 ? `${producto.descuento}%` : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
+                    <span className="whitespace-nowrap">{formatCurrency(producto.subtotal)}</span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {productos.map((producto) => (
-                  <tr key={producto.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900 max-w-[150px] sm:max-w-none">
-                      <div className="truncate">{producto.nombre}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
-                      {producto.cantidad}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                      <span className="whitespace-nowrap">{formatCurrency(producto.precio)}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                      {producto.descuento > 0 ? `${producto.descuento}%` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
-                      <span className="whitespace-nowrap">{formatCurrency(producto.subtotal)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              ))}
+            </tbody>
+          </table>
+        </ResponsiveTable>
       </div>
       
       {/* Summary calculations */}

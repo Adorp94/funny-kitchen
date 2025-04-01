@@ -31,6 +31,7 @@ import {
   Plus,
   Eye
 } from "lucide-react";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -198,86 +199,88 @@ export default function CotizacionesPage() {
         </div>
         
         <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-20">ID</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Vendedor</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Estatus</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+          <ResponsiveTable noBorder>
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">Cargando cotizaciones...</p>
-                  </TableCell>
+                  <TableHead className="w-20 whitespace-nowrap">ID</TableHead>
+                  <TableHead className="whitespace-nowrap">Cliente</TableHead>
+                  <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                  <TableHead className="whitespace-nowrap">Vendedor</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Total</TableHead>
+                  <TableHead className="whitespace-nowrap">Estatus</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                 </TableRow>
-              ) : getCurrentPageItems().length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10 text-gray-500">
-                    {searchTerm || statusFilter 
-                      ? "No se encontraron resultados con los filtros aplicados"
-                      : "No hay cotizaciones disponibles"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                getCurrentPageItems().map((cotizacion) => (
-                  <TableRow key={cotizacion.cotizacion_id}>
-                    <TableCell className="font-medium">CT{cotizacion.cotizacion_id}</TableCell>
-                    <TableCell>{cotizacion.cliente_nombre}</TableCell>
-                    <TableCell>{formatDate(cotizacion.fecha_cotizacion)}</TableCell>
-                    <TableCell>{cotizacion.vendedor_nombre}</TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(cotizacion.precio_total, cotizacion.moneda)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          cotizacion.estatus === 'Pendiente'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : cotizacion.estatus === 'Aceptada'
-                            ? 'bg-green-100 text-green-800'
-                            : cotizacion.estatus === 'Rechazada'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {cotizacion.estatus}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => router.push(`/cotizaciones/${cotizacion.cotizacion_id}`)}
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">Ver</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleDownloadPdf(cotizacion.cotizacion_id)}
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Descargar</span>
-                        </Button>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10">
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
                       </div>
+                      <p className="mt-2 text-sm text-gray-500">Cargando cotizaciones...</p>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : getCurrentPageItems().length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10 text-gray-500">
+                      {searchTerm || statusFilter 
+                        ? "No se encontraron resultados con los filtros aplicados"
+                        : "No hay cotizaciones disponibles"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  getCurrentPageItems().map((cotizacion) => (
+                    <TableRow key={cotizacion.cotizacion_id}>
+                      <TableCell className="font-medium whitespace-nowrap">CT{cotizacion.cotizacion_id}</TableCell>
+                      <TableCell>{cotizacion.cliente_nombre}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_cotizacion)}</TableCell>
+                      <TableCell>{cotizacion.vendedor_nombre}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        {formatCurrency(cotizacion.precio_total, cotizacion.moneda)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            cotizacion.estatus === 'Pendiente'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : cotizacion.estatus === 'Aceptada'
+                              ? 'bg-green-100 text-green-800'
+                              : cotizacion.estatus === 'Rechazada'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {cotizacion.estatus}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => router.push(`/cotizaciones/${cotizacion.cotizacion_id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">Ver</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleDownloadPdf(cotizacion.cotizacion_id)}
+                          >
+                            <Download className="h-4 w-4" />
+                            <span className="sr-only">Descargar</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ResponsiveTable>
         </div>
         
         {totalPages > 1 && (
