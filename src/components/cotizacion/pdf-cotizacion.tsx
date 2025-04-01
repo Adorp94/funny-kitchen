@@ -59,6 +59,15 @@ interface PDFCotizacionProps {
   cotizacion?: Cotizacion;
 }
 
+// Add function to detect mobile devices
+const isMobileDevice = () => {
+  return (
+    typeof window !== 'undefined' && 
+    (window.innerWidth <= 768 || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+  );
+};
+
 export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps) {
   const pdfRef = useRef<HTMLDivElement>(null);
   const { 
@@ -126,11 +135,15 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
     if (!pdfRef.current) return;
     
     try {
-      await PDFService.generatePDFFromElement(pdfRef.current, {
+      // For mobile devices, we'll use the download option
+      const options = {
         filename: `cotizacion-${displayFolio}-${format(new Date(), 'dd-MM-yyyy')}.pdf`,
         format: 'letter',
         orientation: 'portrait',
-      });
+        download: isMobileDevice(), // Force download on mobile
+      };
+      
+      await PDFService.generatePDFFromElement(pdfRef.current, options);
     } catch (error) {
       console.error("Error generating PDF:", error);
     }

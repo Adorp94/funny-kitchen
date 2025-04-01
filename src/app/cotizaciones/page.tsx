@@ -50,6 +50,15 @@ interface Cotizacion {
   vendedor_nombre: string;
 }
 
+// Add function to detect mobile devices
+const isMobileDevice = () => {
+  return (
+    typeof window !== 'undefined' && 
+    (window.innerWidth <= 768 || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+  );
+};
+
 export default function CotizacionesPage() {
   const router = useRouter();
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
@@ -147,8 +156,18 @@ export default function CotizacionesPage() {
   
   const handleDownloadPdf = async (id: number) => {
     try {
-      // Open the direct-pdf endpoint in a new tab for immediate download
-      window.open(`/api/direct-pdf/${id}`, '_blank');
+      if (isMobileDevice()) {
+        // For mobile devices, create an anchor element and trigger download
+        const link = document.createElement('a');
+        link.href = `/api/direct-pdf/${id}`;
+        link.setAttribute('download', `cotizacion-${id}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // For desktop, open in a new tab
+        window.open(`/api/direct-pdf/${id}`, '_blank');
+      }
     } catch (error) {
       console.error(`Error downloading PDF for cotización ${id}:`, error);
     }

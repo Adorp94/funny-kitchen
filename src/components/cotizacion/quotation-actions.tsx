@@ -3,7 +3,16 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/use-toast'
-import { Loader2, FileText } from 'lucide-react'
+import { Loader2, FileText, Download } from 'lucide-react'
+
+// Add function to detect mobile devices
+const isMobileDevice = () => {
+  return (
+    typeof window !== 'undefined' && 
+    (window.innerWidth <= 768 || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+  );
+};
 
 interface QuotationActionsProps {
   cotizacionId: number;
@@ -44,9 +53,20 @@ export default function QuotationActions({
         onPdfGenerated(data.pdfUrl)
       }
       
-      // Optionally open the PDF in a new tab
+      // View or download the PDF based on device
       if (data.pdfUrl) {
-        window.open(data.pdfUrl, '_blank')
+        if (isMobileDevice()) {
+          // For mobile devices, trigger download
+          const link = document.createElement('a');
+          link.href = data.pdfUrl;
+          link.setAttribute('download', `cotizacion-${cotizacionId}.pdf`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          // For desktop, open in a new tab
+          window.open(data.pdfUrl, '_blank');
+        }
       }
     } catch (error) {
       console.error('Error generating PDF:', error)

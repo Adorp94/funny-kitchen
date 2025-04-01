@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
-import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText } from 'lucide-react'
+import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
@@ -38,6 +38,15 @@ interface Cotizacion {
   created_at: string
   pdf_url?: string
 }
+
+// Add function to detect mobile devices
+const isMobileDevice = () => {
+  return (
+    typeof window !== 'undefined' && 
+    (window.innerWidth <= 768 || 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+  );
+};
 
 export default function CotizacionDetailPage() {
   const params = useParams()
@@ -152,13 +161,24 @@ export default function CotizacionDetailPage() {
   
   const openPdf = () => {
     if (cotizacion?.pdf_url) {
-      window.open(cotizacion.pdf_url, '_blank')
+      if (isMobileDevice()) {
+        // For mobile devices, trigger download instead of opening in a new tab
+        const link = document.createElement('a');
+        link.href = cotizacion.pdf_url;
+        link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // For desktop, open in a new tab
+        window.open(cotizacion.pdf_url, '_blank');
+      }
     } else {
       toast({
         title: 'PDF no disponible',
         description: 'Esta cotización aún no tiene un PDF generado',
         variant: 'destructive',
-      })
+      });
     }
   }
   
@@ -238,11 +258,22 @@ export default function CotizacionDetailPage() {
           <Button 
             variant="default"
             onClick={() => {
-              // Open the direct-pdf endpoint in a new tab for immediate download
-              window.open(`/api/direct-pdf/${cotizacion.id}`, '_blank');
+              // Use direct-pdf endpoint for immediate download
+              if (isMobileDevice()) {
+                // For mobile devices, create an anchor element and trigger download
+                const link = document.createElement('a');
+                link.href = `/api/direct-pdf/${cotizacion.id}`;
+                link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              } else {
+                // For desktop, open in a new tab
+                window.open(`/api/direct-pdf/${cotizacion.id}`, '_blank');
+              }
             }}
           >
-            <FileText className="mr-2 h-4 w-4" />
+            <Download className="mr-2 h-4 w-4" />
             Descargar PDF
           </Button>
           
@@ -279,9 +310,20 @@ export default function CotizacionDetailPage() {
                   description: "El PDF ha sido generado y guardado correctamente.",
                 });
                 
-                // Open the PDF in a new tab
+                // Handle viewing/downloading the PDF based on device
                 if (data.pdfUrl) {
-                  window.open(data.pdfUrl, '_blank');
+                  if (isMobileDevice()) {
+                    // For mobile devices, trigger download
+                    const link = document.createElement('a');
+                    link.href = data.pdfUrl;
+                    link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  } else {
+                    // For desktop, open in a new tab
+                    window.open(data.pdfUrl, '_blank');
+                  }
                 }
               } catch (error) {
                 console.error('Error generating PDF:', error);

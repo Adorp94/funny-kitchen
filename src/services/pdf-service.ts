@@ -13,6 +13,7 @@ export interface PDFGenerationOptions {
     bottom: number;
     left: number;
   };
+  download?: boolean; // Option to force download instead of opening in new tab
 }
 
 const defaultOptions: PDFGenerationOptions = {
@@ -24,7 +25,8 @@ const defaultOptions: PDFGenerationOptions = {
     right: 10,
     bottom: 10,
     left: 10
-  }
+  },
+  download: false // Default to opening in new tab
 };
 
 /**
@@ -125,7 +127,15 @@ export const generatePDFFromElement = async (
     pdf.addImage(imgData, 'PNG', margin.left, margin.top, imgWidth, imgHeight);
     
     // Save the PDF
-    pdf.save(filename);
+    if (mergedOptions.download) {
+      // Force download
+      pdf.save(filename);
+    } else {
+      // On desktop, open in a new tab first
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    }
     
     // Remove the loading indicator
     element.classList.remove('generating-pdf');
