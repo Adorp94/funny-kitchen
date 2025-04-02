@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, FileText } from 'lucide-react';
+import { CreditCard, FileText } from 'lucide-react';
 import { CotizacionStatusModal } from './cotizacion-status-modal';
 import { useToast } from '@/components/ui/use-toast';
 import { updateCotizacionStatus, getCotizacionDetails } from '@/app/actions/cotizacion-actions';
@@ -148,11 +148,12 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
         onClick={handleOpenModal}
         disabled={isLoading}
         className="p-0 h-8 w-8"
+        title="Procesar pago / Cambiar estado"
       >
         {isLoading ? (
           <span className="h-4 w-4 animate-spin rounded-full border-b-2 border-emerald-600"></span>
         ) : (
-          <MoreHorizontal className="h-4 w-4" />
+          <CreditCard className="h-4 w-4 text-emerald-600" />
         )}
       </Button>
       

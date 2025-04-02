@@ -299,7 +299,7 @@ export function CotizacionStatusModal({
   };
 
   const renderPaymentForm = () => (
-    <div className="rounded-lg bg-white p-6 border border-gray-200 shadow-sm space-y-5">
+    <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-sm space-y-4 sm:space-y-5">
       <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
         <div className="bg-blue-50 p-2 rounded-lg">
           <CreditCard className="h-5 w-5 text-blue-600" />
@@ -310,7 +310,7 @@ export function CotizacionStatusModal({
       </div>
       
       <div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-1">
           <Label htmlFor="monto" className="text-sm text-gray-700 font-medium">Monto de anticipo</Label>
           {cotizacion && paymentData.monto ? (
             <span className="text-xs text-gray-500">
@@ -394,18 +394,18 @@ export function CotizacionStatusModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
-      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col">
-        <DialogHeader className="p-6 border-b border-gray-100 flex-shrink-0">
+      <DialogContent className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col">
+        <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="bg-gray-50 p-2 rounded-lg">
                 <FileText className="h-5 w-5 text-gray-600" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-semibold text-gray-900">
+                <DialogTitle className="text-lg sm:text-xl font-semibold text-gray-900">
                   Cotización {cotizacion.folio || `#${cotizacion.cotizacion_id}`}
                 </DialogTitle>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                   {formatDate(cotizacion.fecha_creacion)} • {cotizacion.cliente.nombre}
                 </p>
               </div>
@@ -415,8 +415,8 @@ export function CotizacionStatusModal({
         </DialogHeader>
 
         <div className="overflow-y-auto flex-grow" style={{ maxHeight: 'calc(92vh - 184px)' }}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-6">
-            <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-5">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-4 sm:p-6">
+            <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-4 sm:mb-5 w-full">
               <TabsTrigger value="resumen" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                 Resumen
               </TabsTrigger>
@@ -425,17 +425,17 @@ export function CotizacionStatusModal({
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="resumen" className="space-y-6 mt-0">
+            <TabsContent value="resumen" className="space-y-4 sm:space-y-6 mt-0">
               <div className="rounded-lg bg-white border border-gray-200 shadow-sm overflow-hidden">
-                <div className="grid grid-cols-2 divide-x divide-gray-100">
-                  <div className="p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+                  <div className="p-4 sm:p-5">
                     <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
                     <p className="font-medium text-gray-900">{cotizacion.cliente.nombre}</p>
                     {cotizacion.cliente.celular && (
                       <p className="text-sm text-gray-500 mt-1">{cotizacion.cliente.celular}</p>
                     )}
                   </div>
-                  <div className="p-5">
+                  <div className="p-4 sm:p-5">
                     <h3 className="text-sm font-medium text-gray-500 mb-1">Monto Total</h3>
                     <p className="font-semibold text-lg text-emerald-600">
                       {safeCurrency(cotizacion.total, cotizacion.moneda)}
@@ -448,7 +448,7 @@ export function CotizacionStatusModal({
                   </div>
                 </div>
                 
-                <div className="bg-gray-50 p-4 border-t border-gray-100">
+                <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-100">
                   <div className="flex items-center gap-2">
                     <FileClock className="h-4 w-4 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Estado de Pago:</span>
@@ -473,21 +473,23 @@ export function CotizacionStatusModal({
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                          <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                          <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                          <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {cotizacion.productos.map((producto) => (
                           <tr key={producto.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900">{producto.nombre}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600 text-center">{producto.cantidad}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                            <td className="px-3 sm:px-4 py-3 text-sm text-gray-900">
+                              <div className="truncate max-w-[100px] sm:max-w-none">{producto.nombre}</div>
+                            </td>
+                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 text-center">{producto.cantidad}</td>
+                            <td className="px-3 sm:px-4 py-3 text-sm text-gray-600 text-right">
                               {safeCurrency(producto.precio_unitario || producto.precio, cotizacion.moneda)}
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                            <td className="px-3 sm:px-4 py-3 text-sm font-medium text-gray-900 text-right">
                               {safeCurrency(producto.subtotal || producto.precio_total || (producto.cantidad * (producto.precio_unitario || producto.precio)), cotizacion.moneda)}
                             </td>
                           </tr>
@@ -497,8 +499,8 @@ export function CotizacionStatusModal({
                         {cotizacion.iva && cotizacion.monto_iva && cotizacion.monto_iva > 0 && (
                           <tr>
                             <td colSpan={2}></td>
-                            <td className="px-4 py-2 text-sm font-medium text-gray-700 text-right">IVA (16%):</td>
-                            <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
+                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 text-right">IVA (16%):</td>
+                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-900 text-right">
                               {safeCurrency(cotizacion.monto_iva, cotizacion.moneda)}
                             </td>
                           </tr>
@@ -506,21 +508,21 @@ export function CotizacionStatusModal({
                         {cotizacion.incluye_envio && cotizacion.costo_envio && cotizacion.costo_envio > 0 && (
                           <tr>
                             <td colSpan={2}></td>
-                            <td className="px-4 py-2 text-sm font-medium text-gray-700 text-right">
+                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <TruckIcon className="h-3.5 w-3.5 text-gray-500" />
                                 <span>Envío:</span>
                               </div>
                             </td>
-                            <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
+                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-900 text-right">
                               {safeCurrency(cotizacion.costo_envio, cotizacion.moneda)}
                             </td>
                           </tr>
                         )}
                         <tr className="bg-gray-100">
                           <td colSpan={2}></td>
-                          <td className="px-4 py-3 text-sm font-bold text-gray-700 text-right">Total:</td>
-                          <td className="px-4 py-3 text-sm font-bold text-emerald-600 text-right">
+                          <td className="px-3 sm:px-4 py-3 text-sm font-bold text-gray-700 text-right">Total:</td>
+                          <td className="px-3 sm:px-4 py-3 text-sm font-bold text-emerald-600 text-right">
                             {safeCurrency(cotizacion.total, cotizacion.moneda)}
                           </td>
                         </tr>
@@ -531,8 +533,8 @@ export function CotizacionStatusModal({
               )}
             </TabsContent>
             
-            <TabsContent value="acciones" className="space-y-6 mt-0">
-              <div className="rounded-lg bg-white p-6 border border-gray-200 shadow-sm">
+            <TabsContent value="acciones" className="space-y-4 sm:space-y-6 mt-0">
+              <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-sm">
                 <h3 className="font-medium text-gray-900 mb-3">Cambiar estado de cotización</h3>
                 <Select 
                   value={newStatus} 
@@ -557,12 +559,12 @@ export function CotizacionStatusModal({
           </Tabs>
         </div>
 
-        <DialogFooter className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between flex-shrink-0">
+        <DialogFooter className="p-4 sm:p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center flex-shrink-0">
           <Button 
             variant="outline" 
             onClick={() => onClose()} 
             disabled={loading}
-            className="h-11 rounded-lg bg-white"
+            className="h-11 rounded-lg bg-white w-full sm:w-auto order-2 sm:order-1"
           >
             <X className="mr-2 h-4 w-4" />
             Cancelar
@@ -570,7 +572,7 @@ export function CotizacionStatusModal({
           <Button 
             onClick={handleStatusChange}
             disabled={loading || newStatus === cotizacion.estado} 
-            className="bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg w-full sm:w-auto order-1 sm:order-2"
           >
             {loading ? (
               <div className="flex items-center">

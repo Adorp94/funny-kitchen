@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -350,155 +350,176 @@ export default function CotizacionesPage() {
       </div>
       
       {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Buscar Cotizaciones</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por folio o cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <div className="w-full sm:w-56 flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-gray-400" />
-              <Select
-                value={filterEstado}
-                onValueChange={setFilterEstado}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filtrar por estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los estados</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="aceptada">Aceptada</SelectItem>
-                  <SelectItem value="rechazada">Rechazada</SelectItem>
-                  <SelectItem value="vencida">Vencida</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Input
+            placeholder="Buscar por folio o cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-10"
+          />
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        
+        <div className="flex gap-4">
+          <div className="w-full sm:w-[180px]">
+            <Select value={filterEstado} onValueChange={setFilterEstado}>
+              <SelectTrigger className="h-10">
+                <div className="flex items-center">
+                  <Filter className="mr-2 h-4 w-4 text-gray-500" />
+                  <span className="truncate">
+                    {filterEstado === "todos" ? "Todos los estados" : 
+                     filterEstado.charAt(0).toUpperCase() + filterEstado.slice(1)}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent className="min-w-[180px]">
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+                <SelectItem value="aprobada">Aprobada</SelectItem>
+                <SelectItem value="rechazada">Rechazada</SelectItem>
+                <SelectItem value="cerrada">Cerrada</SelectItem>
+                <SelectItem value="vencida">Vencida</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
       
-      {/* Cotizaciones Table */}
       {loading ? (
-        <Card>
-          <CardContent className="py-10">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-4"></div>
-              <p className="text-gray-500">Cargando cotizaciones...</p>
+        <Card className="shadow-sm">
+          <CardContent className="p-6 text-center">
+            <div className="flex justify-center my-6">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
             </div>
+            <p className="text-gray-500">Cargando cotizaciones...</p>
           </CardContent>
         </Card>
       ) : filteredCotizaciones.length === 0 ? (
-        <Card>
-          <CardContent className="py-10">
-            <div className="text-center">
-              <p className="text-gray-500 mb-4">No se encontraron cotizaciones</p>
-              <Button 
-                onClick={handleNewCotizacion}
-                variant="outline" 
-                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                <span className="whitespace-nowrap">Crear nueva cotización</span>
-              </Button>
+        <Card className="shadow-sm">
+          <CardContent className="p-6 text-center">
+            <div className="flex justify-center my-6">
+              <div className="bg-gray-100 p-3 rounded-full">
+                <FileText className="h-6 w-6 text-gray-400" />
+              </div>
             </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No hay cotizaciones</h3>
+            <p className="text-gray-500">
+              {searchTerm || filterEstado !== "todos" 
+                ? "No se encontraron cotizaciones con los filtros aplicados"
+                : "Aún no hay cotizaciones registradas"}
+            </p>
+            
+            {(searchTerm || filterEstado !== "todos") && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterEstado("todos");
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <CardContent className="p-0 sm:p-0">
+        <Card className="shadow-sm">
+          <CardHeader className="pb-0 pt-5 px-6">
+            <div className="flex items-center justify-between mb-1">
+              <CardTitle>Lista de Cotizaciones</CardTitle>
+              <p className="text-sm text-gray-500">{filteredCotizaciones.length} cotizaciones</p>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
             <ResponsiveTable>
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-gray-50/50">
-                    <TableHead 
-                      className="cursor-pointer whitespace-nowrap"
-                      onClick={() => handleSort('folio')}
-                    >
+                  <TableRow>
+                    <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[90px] sm:w-auto whitespace-nowrap">
                       <div className="flex items-center">
                         Folio
                         {sortBy.field === 'folio' && (
-                          sortBy.direction === 'asc' ? 
-                            <ArrowUp className="ml-1 h-3 w-3" /> : 
-                            <ArrowDown className="ml-1 h-3 w-3" />
+                          sortBy.direction === 'asc' 
+                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                            : <ArrowDown className="ml-1 h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer whitespace-nowrap"
-                      onClick={() => handleSort('fecha_creacion')}
-                    >
+                    <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap">
                       <div className="flex items-center">
                         Fecha
                         {sortBy.field === 'fecha_creacion' && (
-                          sortBy.direction === 'asc' ? 
-                            <ArrowUp className="ml-1 h-3 w-3" /> : 
-                            <ArrowDown className="ml-1 h-3 w-3" />
+                          sortBy.direction === 'asc' 
+                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                            : <ArrowDown className="ml-1 h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
-                    <TableHead 
-                      className="cursor-pointer whitespace-nowrap"
-                      onClick={() => handleSort('cliente')}
-                    >
+                    <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer whitespace-nowrap lg:table-cell hidden">
                       <div className="flex items-center">
                         Cliente
                         {sortBy.field === 'cliente' && (
-                          sortBy.direction === 'asc' ? 
-                            <ArrowUp className="ml-1 h-3 w-3" /> : 
-                            <ArrowDown className="ml-1 h-3 w-3" />
+                          sortBy.direction === 'asc' 
+                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                            : <ArrowDown className="ml-1 h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
-                    <TableHead className="whitespace-nowrap">Estado</TableHead>
-                    <TableHead className="whitespace-nowrap">Moneda</TableHead>
-                    <TableHead 
-                      className="cursor-pointer whitespace-nowrap"
-                      onClick={() => handleSort('total')}
-                    >
-                      <div className="flex items-center">
+                    <TableHead className="whitespace-nowrap lg:table-cell hidden">Estado</TableHead>
+                    <TableHead className="whitespace-nowrap sm:table-cell hidden">Moneda</TableHead>
+                    <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end">
                         Total
                         {sortBy.field === 'total' && (
-                          sortBy.direction === 'asc' ? 
-                            <ArrowUp className="ml-1 h-3 w-3" /> : 
-                            <ArrowDown className="ml-1 h-3 w-3" />
+                          sortBy.direction === 'asc' 
+                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                            : <ArrowDown className="ml-1 h-4 w-4" />
                         )}
                       </div>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredCotizaciones.map((cotizacion) => (
                     <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium text-emerald-600 whitespace-nowrap">{cotizacion.folio}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_creacion)}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium truncate max-w-[120px] sm:max-w-none">{cotizacion.cliente.nombre}</div>
-                          <div className="text-sm text-gray-500 truncate max-w-[120px] sm:max-w-none">{cotizacion.cliente.celular}</div>
+                      <TableCell className="font-medium text-emerald-600 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          {cotizacion.folio}
+                          <span className="lg:hidden text-xs text-gray-500 mt-1">
+                            {cotizacion.cliente.nombre}
+                          </span>
+                          <span className="lg:hidden text-xs text-gray-500 mt-0.5">
+                            {getStatusBadge(cotizacion.estado)}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                      <TableCell className="lg:table-cell hidden">
+                        <div>
+                          <div className="font-medium truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.nombre}</div>
+                          <div className="text-sm text-gray-500 truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.celular}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap lg:table-cell hidden">
                         {getStatusBadge(cotizacion.estado)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap sm:table-cell hidden">
                         <Badge variant="outline" className="bg-gray-50 text-gray-700">
                           {cotizacion.moneda}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {formatCurrency(cotizacion.total, cotizacion.moneda)}
+                      <TableCell className="font-medium text-right whitespace-nowrap">
+                        <div className="flex flex-col">
+                          {formatCurrency(cotizacion.total, cotizacion.moneda)}
+                          <span className="sm:hidden text-xs text-gray-500 mt-1">
+                            {cotizacion.moneda}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end items-center space-x-2">
@@ -508,7 +529,7 @@ export default function CotizacionesPage() {
                             onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
                             className="h-8 px-2"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4 text-gray-600" />
                             <span className="sr-only md:not-sr-only md:ml-2">Ver</span>
                           </Button>
                           <CotizacionActionsButton 
