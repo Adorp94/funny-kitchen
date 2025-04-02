@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, CreditCard, DollarSign, FileClock, FileText, Check, X, ArrowRight } from 'lucide-react';
+import { AlertCircle, CreditCard, DollarSign, FileClock, FileText, Check, X, ArrowRight, TruckIcon } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { formatDate } from '@/lib/utils';
@@ -28,6 +28,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// Add global styles for number inputs to remove steppers
+const noStepperStyle = {
+  WebkitAppearance: 'none',
+  MozAppearance: 'textfield',
+  appearance: 'textfield'
+};
+
 interface Cliente {
   nombre: string;
   celular?: string;
@@ -39,6 +46,8 @@ interface Producto {
   nombre: string;
   cantidad: number;
   precio: number;
+  precio_unitario?: number;
+  precio_total?: number;
   descuento?: number;
   subtotal: number;
 }
@@ -54,6 +63,10 @@ interface Cotizacion {
   total_mxn?: number;
   productos?: Producto[];
   estatus_pago?: string;
+  iva?: boolean;
+  monto_iva?: number;
+  incluye_envio?: boolean;
+  costo_envio?: number;
 }
 
 interface PaymentFormData {
@@ -277,10 +290,18 @@ export function CotizacionStatusModal({
     }
   };
 
+  // Helper function to safely format currency values
+  const safeCurrency = (value: any, currency: string) => {
+    if (value === undefined || value === null || isNaN(Number(value))) {
+      return formatCurrency(0, currency);
+    }
+    return formatCurrency(Number(value), currency);
+  };
+
   const renderPaymentForm = () => (
-    <div className="rounded-xl bg-white p-6 border border-gray-200 shadow-sm space-y-5">
+    <div className="rounded-lg bg-white p-6 border border-gray-200 shadow-sm space-y-5">
       <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-        <div className="bg-blue-50 p-2 rounded-md">
+        <div className="bg-blue-50 p-2 rounded-lg">
           <CreditCard className="h-5 w-5 text-blue-600" />
         </div>
         <h3 className="font-medium text-gray-900">
@@ -289,7 +310,14 @@ export function CotizacionStatusModal({
       </div>
       
       <div>
-        <Label htmlFor="monto" className="text-sm text-gray-700 font-medium">Monto de anticipo</Label>
+        <div className="flex justify-between items-center">
+          <Label htmlFor="monto" className="text-sm text-gray-700 font-medium">Monto de anticipo</Label>
+          {cotizacion && paymentData.monto ? (
+            <span className="text-xs text-gray-500">
+              Aproximadamente el {Math.round((paymentData.monto / cotizacion.total) * 100)}% del total
+            </span>
+          ) : null}
+        </div>
         <div className="relative mt-1.5">
           <Input
             id="monto"
@@ -304,27 +332,20 @@ export function CotizacionStatusModal({
                 monto: value
               });
             }}
-            className={`pl-7 h-11 ${errors.monto ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
+            className={`pl-7 pr-12 h-11 text-right bg-white ${errors.monto ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
+            style={{ ...noStepperStyle, transform: 'translateZ(0)' }}
           />
           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
             <DollarSign className="h-4 w-4 text-gray-500" />
           </div>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
-            {cotizacion?.moneda || 'MXN'}
+            <span>{cotizacion?.moneda || 'MXN'}</span>
           </div>
         </div>
-        {errors.monto ? (
+        {errors.monto && (
           <div className="text-red-500 text-xs mt-1.5 flex items-center">
             <AlertCircle className="h-3 w-3 mr-1" />
             {errors.monto}
-          </div>
-        ) : (
-          <div className="text-xs text-gray-500 mt-1.5">
-            {cotizacion && paymentData.monto ? (
-              <>
-                Aproximadamente el {Math.round((paymentData.monto / cotizacion.total) * 100)}% del total
-              </>
-            ) : null}
           </div>
         )}
       </div>
@@ -335,10 +356,10 @@ export function CotizacionStatusModal({
           value={paymentData.metodo_pago} 
           onValueChange={value => setPaymentData({...paymentData, metodo_pago: value})}
         >
-          <SelectTrigger className={`mt-1.5 h-11 ${errors.metodo_pago ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}>
+          <SelectTrigger className={`mt-1.5 h-11 bg-white ${errors.metodo_pago ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}>
             <SelectValue placeholder="Seleccionar método de pago" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white rounded-lg">
             <SelectItem value="efectivo">Efectivo</SelectItem>
             <SelectItem value="transferencia">Transferencia Bancaria</SelectItem>
             <SelectItem value="tarjeta">Tarjeta de Crédito/Débito</SelectItem>
@@ -361,7 +382,7 @@ export function CotizacionStatusModal({
           placeholder="Ingrese detalles del pago, número de referencia, o notas adicionales"
           value={paymentData.notas}
           onChange={e => setPaymentData({...paymentData, notas: e.target.value})}
-          className="mt-1.5 resize-none"
+          className="mt-1.5 resize-none bg-white rounded-lg"
           rows={3}
         />
       </div>
@@ -373,11 +394,11 @@ export function CotizacionStatusModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
-      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-xl shadow-xl border-0 p-0">
-        <DialogHeader className="p-6 border-b border-gray-100">
+      <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col">
+        <DialogHeader className="p-6 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-gray-50 p-2 rounded-md">
+              <div className="bg-gray-50 p-2 rounded-lg">
                 <FileText className="h-5 w-5 text-gray-600" />
               </div>
               <div>
@@ -393,140 +414,155 @@ export function CotizacionStatusModal({
           </div>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="p-6">
-          <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-5">
-            <TabsTrigger value="resumen" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              Resumen
-            </TabsTrigger>
-            <TabsTrigger value="acciones" className="rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm">
-              Cambiar Estado
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="resumen" className="space-y-6 mt-0">
-            <div className="rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden">
-              <div className="grid grid-cols-2 divide-x divide-gray-100">
-                <div className="p-5">
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
-                  <p className="font-medium text-gray-900">{cotizacion.cliente.nombre}</p>
-                  {cotizacion.cliente.celular && (
-                    <p className="text-sm text-gray-500 mt-1">{cotizacion.cliente.celular}</p>
-                  )}
-                </div>
-                <div className="p-5">
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Monto Total</h3>
-                  <p className="font-semibold text-lg text-emerald-600">
-                    {formatCurrency(cotizacion.total, cotizacion.moneda)}
-                  </p>
-                  {cotizacion.total_mxn && cotizacion.moneda !== 'MXN' && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      Equivalente: {formatCurrency(cotizacion.total_mxn, 'MXN')}
+        <div className="overflow-y-auto flex-grow" style={{ maxHeight: 'calc(92vh - 184px)' }}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-6">
+            <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-5">
+              <TabsTrigger value="resumen" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                Resumen
+              </TabsTrigger>
+              <TabsTrigger value="acciones" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                Cambiar Estado
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="resumen" className="space-y-6 mt-0">
+              <div className="rounded-lg bg-white border border-gray-200 shadow-sm overflow-hidden">
+                <div className="grid grid-cols-2 divide-x divide-gray-100">
+                  <div className="p-5">
+                    <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
+                    <p className="font-medium text-gray-900">{cotizacion.cliente.nombre}</p>
+                    {cotizacion.cliente.celular && (
+                      <p className="text-sm text-gray-500 mt-1">{cotizacion.cliente.celular}</p>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-sm font-medium text-gray-500 mb-1">Monto Total</h3>
+                    <p className="font-semibold text-lg text-emerald-600">
+                      {safeCurrency(cotizacion.total, cotizacion.moneda)}
                     </p>
-                  )}
+                    {cotizacion.total_mxn && cotizacion.moneda !== 'MXN' && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Equivalente: {safeCurrency(cotizacion.total_mxn, 'MXN')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <FileClock className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">Estado de Pago:</span>
+                    {cotizacion.estatus_pago === 'pagado' ? (
+                      <span className="text-sm text-emerald-600 font-medium">Pagado completamente</span>
+                    ) : cotizacion.estatus_pago === 'anticipo' ? (
+                      <span className="text-sm text-blue-600 font-medium">Con anticipo</span>
+                    ) : (
+                      <span className="text-sm text-amber-600 font-medium">Pendiente de pago</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              
-              <div className="bg-gray-50 p-4 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                  <FileClock className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Estado de Pago:</span>
-                  {cotizacion.estatus_pago === 'pagado' ? (
-                    <span className="text-sm text-emerald-600 font-medium">Pagado completamente</span>
-                  ) : cotizacion.estatus_pago === 'anticipo' ? (
-                    <span className="text-sm text-blue-600 font-medium">Con anticipo</span>
-                  ) : (
-                    <span className="text-sm text-amber-600 font-medium">Pendiente de pago</span>
-                  )}
-                </div>
-              </div>
-            </div>
 
-            {/* Products table */}
-            {cotizacion.productos && cotizacion.productos.length > 0 && (
-              <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-                <div className="p-4 bg-white border-b border-gray-100">
-                  <h3 className="font-medium text-gray-900">Productos</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {cotizacion.productos.map((producto) => (
-                        <tr key={producto.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{producto.nombre}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 text-center">{producto.cantidad}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                            {formatCurrency(producto.precio, cotizacion.moneda)}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                            {formatCurrency(producto.subtotal, cotizacion.moneda)}
+              {/* Products table */}
+              {cotizacion.productos && cotizacion.productos.length > 0 && (
+                <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                  <div className="p-4 bg-white border-b border-gray-100">
+                    <h3 className="font-medium text-gray-900">Productos</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {cotizacion.productos.map((producto) => (
+                          <tr key={producto.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">{producto.nombre}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600 text-center">{producto.cantidad}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                              {safeCurrency(producto.precio_unitario || producto.precio, cotizacion.moneda)}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                              {safeCurrency(producto.subtotal || producto.precio_total || (producto.cantidad * (producto.precio_unitario || producto.precio)), cotizacion.moneda)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50">
+                        {cotizacion.iva && cotizacion.monto_iva && cotizacion.monto_iva > 0 && (
+                          <tr>
+                            <td colSpan={2}></td>
+                            <td className="px-4 py-2 text-sm font-medium text-gray-700 text-right">IVA (16%):</td>
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
+                              {safeCurrency(cotizacion.monto_iva, cotizacion.moneda)}
+                            </td>
+                          </tr>
+                        )}
+                        {cotizacion.incluye_envio && cotizacion.costo_envio && cotizacion.costo_envio > 0 && (
+                          <tr>
+                            <td colSpan={2}></td>
+                            <td className="px-4 py-2 text-sm font-medium text-gray-700 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <TruckIcon className="h-3.5 w-3.5 text-gray-500" />
+                                <span>Envío:</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
+                              {safeCurrency(cotizacion.costo_envio, cotizacion.moneda)}
+                            </td>
+                          </tr>
+                        )}
+                        <tr className="bg-gray-100">
+                          <td colSpan={2}></td>
+                          <td className="px-4 py-3 text-sm font-bold text-gray-700 text-right">Total:</td>
+                          <td className="px-4 py-3 text-sm font-bold text-emerald-600 text-right">
+                            {safeCurrency(cotizacion.total, cotizacion.moneda)}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="acciones" className="space-y-6 mt-0">
-            <div className="rounded-xl bg-white p-6 border border-gray-200 shadow-sm">
-              <h3 className="font-medium text-gray-900 mb-3">Cambiar estado de cotización</h3>
-              <Select 
-                value={newStatus} 
-                onValueChange={setNewStatus}
-              >
-                <SelectTrigger className="w-full h-11">
-                  <SelectValue placeholder="Seleccionar nuevo estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="aprobada">Aprobada (con anticipo)</SelectItem>
-                  <SelectItem value="rechazada">Rechazada</SelectItem>
-                  <SelectItem value="cerrada">Cerrada (con anticipo)</SelectItem>
-                  <SelectItem value="vencida">Vencida</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              )}
+            </TabsContent>
             
-            {/* Status guide */}
-            <div className="rounded-xl bg-gray-50 p-5 border border-gray-200">
-              <h3 className="font-medium text-gray-700 mb-3">Guía de estados</h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Badge className="mt-0.5 bg-blue-50 text-blue-700 border-blue-200">Pendiente</Badge>
-                  <p className="text-sm text-gray-600">Cotización creada, esperando respuesta del cliente.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge className="mt-0.5 bg-emerald-50 text-emerald-700 border-emerald-200">Aprobada</Badge>
-                  <p className="text-sm text-gray-600">Cliente aprobó la cotización y pagó un anticipo.</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge className="mt-0.5 bg-purple-50 text-purple-700 border-purple-200">Cerrada</Badge>
-                  <p className="text-sm text-gray-600">Producto entregado, proceso completado con pago de anticipo.</p>
-                </div>
+            <TabsContent value="acciones" className="space-y-6 mt-0">
+              <div className="rounded-lg bg-white p-6 border border-gray-200 shadow-sm">
+                <h3 className="font-medium text-gray-900 mb-3">Cambiar estado de cotización</h3>
+                <Select 
+                  value={newStatus} 
+                  onValueChange={setNewStatus}
+                >
+                  <SelectTrigger className="w-full h-11 bg-white rounded-lg">
+                    <SelectValue placeholder="Seleccionar nuevo estado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white rounded-lg">
+                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="aprobada">Aprobada (con anticipo)</SelectItem>
+                    <SelectItem value="rechazada">Rechazada</SelectItem>
+                    <SelectItem value="cerrada">Cerrada (con anticipo)</SelectItem>
+                    <SelectItem value="vencida">Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
 
-            {/* Payment form for 'aprobada' and 'cerrada' statuses */}
-            {(newStatus === 'cerrada' || newStatus === 'aprobada') && renderPaymentForm()}
-          </TabsContent>
-        </Tabs>
+              {/* Payment form for 'aprobada' and 'cerrada' statuses */}
+              {(newStatus === 'cerrada' || newStatus === 'aprobada') && renderPaymentForm()}
+            </TabsContent>
+          </Tabs>
+        </div>
 
-        <DialogFooter className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between">
+        <DialogFooter className="p-6 bg-gray-50 border-t border-gray-100 flex justify-between flex-shrink-0">
           <Button 
             variant="outline" 
             onClick={() => onClose()} 
             disabled={loading}
-            className="h-11"
+            className="h-11 rounded-lg bg-white"
           >
             <X className="mr-2 h-4 w-4" />
             Cancelar
@@ -534,7 +570,7 @@ export function CotizacionStatusModal({
           <Button 
             onClick={handleStatusChange}
             disabled={loading || newStatus === cotizacion.estado} 
-            className="bg-blue-600 hover:bg-blue-700 text-white h-11"
+            className="bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg"
           >
             {loading ? (
               <div className="flex items-center">

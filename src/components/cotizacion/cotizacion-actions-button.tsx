@@ -21,6 +21,10 @@ interface Cotizacion {
   total: number;
   total_mxn?: number;
   estatus_pago?: string;
+  iva?: boolean;
+  monto_iva?: number;
+  incluye_envio?: boolean;
+  costo_envio?: number;
 }
 
 interface PaymentFormData {
