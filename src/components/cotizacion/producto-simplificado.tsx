@@ -101,11 +101,12 @@ export function ProductoSimplificado({ onAddProduct }: ProductoFormProps) {
     if (Object.keys(formErrors).length === 0) {
       // Create new product with ID and subtotal
       const newProduct: Producto = {
-        id: Date.now().toString(), // Simple ID generation
+        id: 'new', // Simple marker for new products
         nombre: producto.nombre,
         cantidad: producto.cantidad,
         precio: producto.precio,
-        subtotal: producto.cantidad * producto.precio
+        subtotal: producto.cantidad * producto.precio,
+        producto_id: null // Explicitly set to null for new custom products
       };
       
       // Call onAddProduct callback

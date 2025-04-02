@@ -417,7 +417,8 @@ function NuevaCotizacionClient() {
                     if (producto) {
                       // Format product data for addProducto
                       const productoToAdd = {
-                        id: producto.producto_id ? String(producto.producto_id) : String(Date.now()), // Use the actual database ID if it exists
+                        // Use 'new' for new products, real ID for existing ones
+                        id: producto.producto_id ? String(producto.producto_id) : 'new',
                         nombre: producto.nombre || '',
                         cantidad: Number(producto.cantidad) || 1,
                         precio: producto.precio || 0,
@@ -437,7 +438,9 @@ function NuevaCotizacionClient() {
                       
                       // Check if this product already exists in the cart by ID
                       const existingProductIndex = productos.findIndex(
-                        p => p.id === productoToAdd.id
+                        // For new products, check both id='new' and if the name matches
+                        p => (p.id === productoToAdd.id) || 
+                             (productoToAdd.id === 'new' && p.id === 'new' && p.nombre === productoToAdd.nombre)
                       );
                       
                       if (existingProductIndex >= 0) {

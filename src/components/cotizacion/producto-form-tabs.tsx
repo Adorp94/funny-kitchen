@@ -167,13 +167,34 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     };
   }, []);
   
+  // Convert form data to Producto object for parent component
+  const formDataToProducto = (data: ProductoFormData): ProductoType => {
+    return {
+      producto_id: data.producto_id ? parseInt(data.producto_id) : 0,
+      nombre: data.nombre,
+      tipo_ceramica: data.tipo_ceramica || null,
+      precio: data.precio ? parseFloat(data.precio) : null,
+      sku: data.sku || null,
+      capacidad: data.capacidad ? parseInt(data.capacidad) : null,
+      unidad: data.unidad || null,
+      tipo_producto: data.tipo_producto || null,
+      descripcion: data.descripcion || null,
+      colores: data.colores || null,
+      tiempo_produccion: null,
+      cantidad_inventario: null,
+      inventario: null
+    };
+  };
+
   // Safe way to notify parent of changes to avoid issues during initialization
   const safeNotifyParent = (producto: any, cantidad?: number) => {
     if (onProductoChange && producto) {
-      // Create a modified product with the cantidad field
+      // Create a modified product with the cantidad field and a clear marker for new products
       const productoWithCantidad = {
         ...producto,
-        cantidad: cantidad || parseInt(formData.cantidad) || 1
+        cantidad: cantidad || parseInt(formData.cantidad) || 1,
+        // For new products without a producto_id, ensure id is set to 'new'
+        id: producto.producto_id ? String(producto.producto_id) : 'new'
       };
       
       // Use setTimeout to move the state update out of the render cycle
@@ -236,25 +257,6 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
     
     return newErrors;
-  };
-
-  // Convert form data to Producto object for parent component
-  const formDataToProducto = (data: ProductoFormData): ProductoType => {
-    return {
-      producto_id: data.producto_id ? parseInt(data.producto_id) : 0,
-      nombre: data.nombre,
-      tipo_ceramica: data.tipo_ceramica || null,
-      precio: data.precio ? parseFloat(data.precio) : null,
-      sku: data.sku || null,
-      capacidad: data.capacidad ? parseInt(data.capacidad) : null,
-      unidad: data.unidad || null,
-      tipo_producto: data.tipo_producto || null,
-      descripcion: data.descripcion || null,
-      colores: data.colores || null,
-      tiempo_produccion: null,
-      cantidad_inventario: null,
-      inventario: null
-    };
   };
 
   // Handle input changes

@@ -234,14 +234,30 @@ export async function POST(req: NextRequest) {
     
     const productoIds = productos
       .map(p => {
+        // Skip products that are clearly new/custom
+        if (p.id === 'new' || 
+            p.producto_id === null || 
+            (typeof p.id === 'string' && p.id.startsWith('custom-'))) {
+          return null;
+        }
+        
         // First check if producto_id is available
         if (p.producto_id) {
-          return Number(p.producto_id);
+          // Ensure it's a valid integer ID (not a timestamp)
+          const id = Number(p.producto_id);
+          if (!isNaN(id) && id > 0 && id < 1000000000) {
+            return id;
+          }
+        } 
+        
+        // Fall back to id if producto_id is not available and it's a valid numeric ID
+        if (p.id && typeof p.id !== 'object') {
+          const id = Number(p.id);
+          if (!isNaN(id) && id > 0 && id < 1000000000) {
+            return id;
+          }
         }
-        // Fall back to id if producto_id is not available
-        else if (p.id) {
-          return Number(p.id);
-        }
+        
         return null;
       })
       .filter(id => id !== null && !isNaN(id));
@@ -252,7 +268,7 @@ export async function POST(req: NextRequest) {
     const { data: existingProducts, error: productsCheckError } = await supabase
       .from('productos')
       .select('producto_id')
-      .in('producto_id', productoIds);
+      .in('producto_id', productoIds.length > 0 ? productoIds : [0]); // Prevent empty IN clause
     
     if (productsCheckError) {
       console.error("Error checking existing products:", productsCheckError);
@@ -274,16 +290,153 @@ export async function POST(req: NextRequest) {
     
     console.log("Existing product IDs in database:", Array.from(existingProductIds));
     
-    // Map and filter products to only include those that exist in the database
-    const validProductosToInsert = productos.map((producto: any, index: number) => {
-        try {
+    // Map and filter products to handle both existing and new products
+    const validProductosToInsert = [];
+    const processedCustomProducts = new Set(); // Track processed custom products by name
+
+    // First identify and create new products that need to be inserted
+    for (let i = 0; i < productos.length; i++) {
+      const producto = productos[i];
+      try {
+        // Check if this is a new product that needs to be inserted
+        const isCustomProduct = 
+          // Our intended marker for new products
+          producto.id === 'new' || 
+          // If producto_id is explicitly null, it's a new product
+          producto.producto_id === null ||
+          // If id is a string that looks like a timestamp (large number or starts with 'custom-')
+          (typeof producto.id === 'string' && 
+            ((producto.id.startsWith('custom-')) || 
+              (!isNaN(Number(producto.id)) && Number(producto.id) > 1000000000))) ||
+          // If id is a number that's too large to be a valid database ID (likely a timestamp)
+          (typeof producto.id === 'number' && producto.id > 1000000000);
+
+        if (isCustomProduct) {
+          // Skip if we've already processed a custom product with this name
+          if (processedCustomProducts.has(producto.nombre)) {
+            console.log(`Skipping duplicate custom product with name: ${producto.nombre}`);
+            continue;
+          }
+          
+          // Check if this product already exists in the database by name
+          const { data: existingProductByName, error: nameCheckError } = await supabase
+            .from('productos')
+            .select('producto_id')
+            .ilike('nombre', producto.nombre)
+            .limit(1);
+            
+          if (nameCheckError) {
+            console.error("Error checking if product exists by name:", nameCheckError);
+          }
+          
+          // If the product already exists, use that ID instead of creating a new one
+          if (existingProductByName && existingProductByName.length > 0) {
+            console.log(`Found existing product with name "${producto.nombre}", using ID: ${existingProductByName[0].producto_id}`);
+            
+            // Add product to the list using the existing producto_id
+            const precio_unitario_mxn = Number(producto.precio) || 0;
+            const producto_subtotal_mxn = Number(producto.subtotal) || 0;
+            
+            // For display currency fields, convert if needed
+            let displayPrecio = precio_unitario_mxn;
+            let displaySubtotal = producto_subtotal_mxn;
+            
+            // Convert to display currency if moneda is USD
+            if (moneda === 'USD' && tipo_cambio) {
+              displayPrecio = precio_unitario_mxn / tipo_cambio;
+              displaySubtotal = producto_subtotal_mxn / tipo_cambio;
+            }
+            
+            validProductosToInsert.push({
+              cotizacion_id: cotizacionId,
+              producto_id: existingProductByName[0].producto_id,
+              cantidad: Number(producto.cantidad) || 1,
+              precio_unitario: displayPrecio,
+              precio_unitario_mxn: precio_unitario_mxn,
+              descuento_producto: Number(producto.descuento) || 0,
+              subtotal: displaySubtotal,
+              subtotal_mxn: producto_subtotal_mxn
+            });
+            
+            // Add to processed set to avoid duplicates
+            processedCustomProducts.add(producto.nombre);
+            continue;
+          }
+          
+          console.log(`Custom product at index ${i} detected, will insert it:`, producto.nombre);
+          
+          // Add to processed set
+          processedCustomProducts.add(producto.nombre);
+          
+          // First, get the maximum producto_id to determine the next ID
+          const { data: maxIdData, error: maxIdError } = await supabase
+            .from('productos')
+            .select('producto_id')
+            .order('producto_id', { ascending: false })
+            .limit(1)
+            .single();
+            
+          if (maxIdError && !maxIdError.message.includes('No rows found')) {
+            console.error(`Error getting max producto_id:`, maxIdError);
+            continue; // Skip this product if we can't get the max ID
+          }
+          
+          // Calculate the next ID (if no products exist yet, start with 1)
+          const nextId = maxIdData ? maxIdData.producto_id + 1 : 1;
+          console.log(`Using next producto_id: ${nextId} for new product`);
+          
+          // Insert the new product into productos table with the specific ID
+          const { data: newProduct, error: newProductError } = await supabase
+            .from('productos')
+            .insert({
+              producto_id: nextId,
+              nombre: producto.nombre,
+              precio: Number(producto.precio) || 0,
+              tipo_producto: 'Personalizado'
+            })
+            .select('producto_id')
+            .single();
+            
+          if (newProductError) {
+            console.error(`Error inserting custom product at index ${i}:`, newProductError);
+            continue; // Skip this product if insert failed
+          }
+          
+          console.log(`Successfully inserted custom product, got ID: ${newProduct.producto_id}`);
+          
+          // Add product to the list using the newly generated producto_id
+          const precio_unitario_mxn = Number(producto.precio) || 0;
+          const producto_subtotal_mxn = Number(producto.subtotal) || 0;
+          
+          // For display currency fields, convert if needed
+          let displayPrecio = precio_unitario_mxn;
+          let displaySubtotal = producto_subtotal_mxn;
+          
+          // Convert to display currency if moneda is USD
+          if (moneda === 'USD' && tipo_cambio) {
+            displayPrecio = precio_unitario_mxn / tipo_cambio;
+            displaySubtotal = producto_subtotal_mxn / tipo_cambio;
+          }
+          
+          validProductosToInsert.push({
+            cotizacion_id: cotizacionId,
+            producto_id: newProduct.producto_id,
+            cantidad: Number(producto.cantidad) || 1,
+            precio_unitario: displayPrecio,
+            precio_unitario_mxn: precio_unitario_mxn,
+            descuento_producto: Number(producto.descuento) || 0,
+            subtotal: displaySubtotal,
+            subtotal_mxn: producto_subtotal_mxn
+          });
+        } else {
+          // Handle existing products with valid database IDs
           // Use producto_id from the request if available, otherwise use the id field
           const productoId = producto.producto_id || producto.id;
           
-          // Skip products that don't have a valid ID or don't exist in the database
+          // Skip products that don't have a valid ID
           if (!productoId) {
-            console.error(`Product at index ${index} has no ID. Skipping.`);
-            return null;
+            console.error(`Product at index ${i} has no ID. Skipping.`);
+            continue;
           }
           
           // Ensure the product ID is a number for the database
@@ -292,7 +445,7 @@ export async function POST(req: NextRequest) {
           // Skip if the product ID is not in our validated set of existing products
           if (!existingProductIds.has(numericProductId)) {
             console.error(`Product ID ${numericProductId} does not exist in the database. Skipping.`);
-            return null;
+            continue;
           }
           
           // All product prices and subtotals in context are in MXN
@@ -310,22 +463,21 @@ export async function POST(req: NextRequest) {
             displaySubtotal = producto_subtotal_mxn / tipo_cambio;
           }
           
-          return {
+          validProductosToInsert.push({
             cotizacion_id: cotizacionId,
             producto_id: numericProductId,
             cantidad: Number(producto.cantidad) || 1,
-            precio_unitario: displayPrecio,        // Price in display currency (USD or MXN)
-            precio_unitario_mxn: precio_unitario_mxn,  // Price always in MXN
+            precio_unitario: displayPrecio,
+            precio_unitario_mxn: precio_unitario_mxn,
             descuento_producto: Number(producto.descuento) || 0,
-            subtotal: displaySubtotal,            // Subtotal in display currency (USD or MXN)
-            subtotal_mxn: producto_subtotal_mxn     // Subtotal always in MXN
-          };
-        } catch (error) {
-          console.error(`Error processing product at index ${index}:`, error);
-          return null;
+            subtotal: displaySubtotal,
+            subtotal_mxn: producto_subtotal_mxn
+          });
         }
-      })
-      .filter(product => product !== null); // Remove nulls
+      } catch (error) {
+        console.error(`Error processing product at index ${i}:`, error);
+      }
+    }
 
     // Check if we have any valid products left
     if (validProductosToInsert.length === 0) {
