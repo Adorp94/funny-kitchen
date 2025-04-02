@@ -413,14 +413,16 @@ function NuevaCotizacionClient() {
                 <Button 
                   variant="outline" 
                   onClick={() => router.push('/')}
-                  className="text-gray-600 border-gray-300"
+                  className="text-gray-600 border-gray-300 px-4 h-10 text-sm font-medium"
+                  size="md"
                 >
                   Cancelar
                 </Button>
                 <Button 
                   onClick={nextStep} 
                   disabled={!cliente} 
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium"
+                  size="md"
                 >
                   <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -543,22 +545,25 @@ function NuevaCotizacionClient() {
                 </div>
               )}
               
-              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 sm:gap-0 px-0 py-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4 px-0 py-4">
                 <Button 
                   variant="outline" 
                   onClick={prevStep}
-                  className="w-full sm:w-auto text-gray-600 border-gray-300"
+                  className="w-full sm:w-auto"
+                  size="action"
                 >
-                  <ArrowLeft className="h-4 w-4 sm:mr-2" /> 
-                  <span className="hidden sm:inline">Regresar</span>
+                  <ArrowLeft className="h-4 w-4 mr-2" /> 
+                  <span>Regresar</span>
                 </Button>
                 <Button 
                   onClick={nextStep} 
                   disabled={productos.length === 0} 
-                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
+                  className="w-full sm:w-auto"
+                  variant="default"
+                  size="action"
                 >
-                  <span className="hidden sm:inline">Continuar</span> 
-                  <ArrowRight className="h-4 w-4 sm:ml-2" />
+                  <span>Continuar</span> 
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
             </div>
@@ -616,31 +621,33 @@ function NuevaCotizacionClient() {
                 </div>
               </div>
               
-              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-4 sm:gap-0 px-0 py-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4 px-0 py-4">
                 <Button 
                   variant="outline" 
                   onClick={prevStep}
-                  className="w-full sm:w-auto text-gray-600 border-gray-300"
+                  className="w-full sm:w-auto"
+                  size="action"
                 >
-                  <ArrowLeft className="h-4 w-4 sm:mr-2" /> 
-                  <span className="hidden sm:inline">Regresar</span>
+                  <ArrowLeft className="h-4 w-4 mr-2" /> 
+                  <span>Regresar</span>
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
                   disabled={isLoading || productos.length === 0} 
-                  className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white px-5"
+                  className="w-full sm:w-auto"
+                  variant="success"
+                  size="action"
                 >
                   {isLoading ? (
-                    <>
-                      <div className="animate-spin mr-2">⏳</div>
-                      <span className="hidden sm:inline">Generando...</span>
-                    </>
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      <span>Generando...</span>
+                    </div>
                   ) : (
-                    <>
-                      <Save className="h-4 w-4 sm:mr-2" /> 
-                      <span className="hidden sm:inline">Generar Cotización</span>
-                      <span className="inline sm:hidden">Generar</span>
-                    </>
+                    <div className="flex items-center justify-center">
+                      <Save className="h-4 w-4 mr-2" /> 
+                      <span>Generar Cotización</span>
+                    </div>
                   )}
                 </Button>
               </div>

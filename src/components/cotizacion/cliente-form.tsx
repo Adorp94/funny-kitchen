@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Mail, Phone, User, Building, FileText, MapPin, Search, AlertCircle, Save, Check, ChevronsUpDown, Plus, Loader2 } from 'lucide-react';
+import { Mail, Phone, User, Building, FileText, MapPin, Search, AlertCircle, Save, Check, ChevronsUpDown, Plus, Loader2, X } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -384,6 +384,9 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     // Save to sessionStorage
     sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
     console.log("Client selected, saved to sessionStorage:", updatedFormData);
+    
+    // Notify parent immediately with the selected client
+    safeNotifyParent(cliente);
     
     // Close combobox
     setComboboxOpen(false);
@@ -847,269 +850,95 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     }
   }, [comboboxOpen, fetchClients]);
 
+  // Define a more readable validation error message
+  const getErrorMessage = (field: string) => {
+    if (errors[field as keyof FormErrors] && touched[field]) {
+      return errors[field as keyof FormErrors];
+    }
+    return undefined;
+  };
+
+  // Define button styles for better mobile experience
+  const tabButtonClass = (isActive: boolean) => cn(
+    "px-4 py-3 text-sm font-medium relative transition-colors",
+    isActive 
+      ? "text-emerald-600 border-b-2 border-emerald-500" 
+      : "text-gray-500 hover:text-gray-700"
+  );
+
   return (
-    <div className="bg-white rounded-lg shadow p-6 w-full">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="mb-4 grid grid-cols-2">
-          <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
-          <TabsTrigger value="existente">Existente</TabsTrigger>
-        </TabsList>
+    <div className="space-y-6">
+      <div>
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 mb-6">
+          <button
+            onClick={() => handleTabChange('buscar')}
+            className={tabButtonClass(activeTab === 'buscar')}
+          >
+            Buscar Existente
+          </button>
+          <button
+            onClick={() => handleTabChange('nuevo')}
+            className={tabButtonClass(activeTab === 'nuevo')}
+          >
+            Nuevo Cliente
+          </button>
+        </div>
         
-        <TabsContent value="nuevo">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Nombre */}
-            <FormControl>
-              <FormLabel required>Nombre</FormLabel>
-              <Input
-                name="nombre"
-                value={formData.nombre}
-                onChange={handleInputChange}
-                onBlur={() => handleBlur('nombre')}
-                placeholder="Ingresa el nombre del cliente"
-                icon={<User className="h-4 w-4" />}
-                className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                required
-              />
-              {touched.nombre && errors.nombre && (
-                <div className="text-red-500 text-xs mt-1 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.nombre}
-                </div>
-              )}
-            </FormControl>
-            
-            {/* Celular */}
-            <FormControl>
-              <FormLabel required>Celular</FormLabel>
-              <div className={`flex h-10 w-full rounded-md border ${touched.celular && errors.celular ? 'border-red-500' : 'border-input'} bg-background text-sm ring-offset-background`}>
-                <PhoneInput
-                  className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
-                  country="MX"
-                  value={formData.celular}
-                  onChange={handlePhoneChange}
-                  onBlur={() => handleBlur('celular')}
-                  placeholder="+52"
-                  required
+        {/* Buscar Tab */}
+        {activeTab === 'buscar' && (
+          <div>
+            {/* Cliente search with improved styling */}
+            <div className="relative w-full">
+              <div 
+                className="flex items-center border border-gray-300 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-emerald-500"
+                onClick={() => setComboboxOpen(true)}
+              >
+                <Search className="h-5 w-5 text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Buscar cliente por nombre, teléfono o correo"
+                  className="flex-1 outline-none text-sm"
+                  value={searchTerm}
+                  onChange={(e) => handleSearchTermChange(e.target.value)}
+                  onFocus={() => setComboboxOpen(true)}
                 />
               </div>
-              {touched.celular && errors.celular && (
-                <div className="text-red-500 text-xs mt-1 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.celular}
-                </div>
-              )}
-            </FormControl>
-            
-            {/* Correo */}
-            <FormControl>
-              <FormLabel>Correo</FormLabel>
-              <Input
-                type="email"
-                name="correo"
-                value={formData.correo}
-                onChange={handleInputChange}
-                onBlur={() => handleBlur('correo')}
-                placeholder="cliente@ejemplo.com"
-                icon={<Mail className="h-4 w-4" />}
-                className={`${touched.correo && errors.correo ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-              />
-              {touched.correo && errors.correo && (
-                <div className="text-red-500 text-xs mt-1 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.correo}
-                </div>
-              )}
-            </FormControl>
-            
-            {/* Razón Social */}
-            <FormControl>
-              <FormLabel>Razón Social</FormLabel>
-              <Input
-                name="razon_social"
-                value={formData.razon_social}
-                onChange={handleInputChange}
-                placeholder="Nombre legal de la empresa"
-                icon={<Building className="h-4 w-4" />}
-              />
-            </FormControl>
-            
-            {/* RFC */}
-            <FormControl>
-              <FormLabel>RFC</FormLabel>
-              <Input
-                name="rfc"
-                value={formData.rfc}
-                onChange={handleInputChange}
-                onBlur={() => handleBlur('rfc')}
-                placeholder="Ej: XAXX010101000"
-                icon={<FileText className="h-4 w-4" />}
-                className={`${touched.rfc && errors.rfc ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-              />
-              {touched.rfc && errors.rfc && (
-                <div className="text-red-500 text-xs mt-1 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.rfc}
-                </div>
-              )}
-            </FormControl>
-            
-            {/* Tipo Cliente */}
-            <FormControl>
-              <FormLabel>Tipo de Cliente</FormLabel>
-              <select
-                name="tipo_cliente"
-                value={formData.tipo_cliente}
-                onChange={handleInputChange}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="Normal">Normal</option>
-                <option value="Premium">Premium</option>
-                <option value="Corporativo">Corporativo</option>
-                <option value="Mayorista">Mayorista</option>
-              </select>
-            </FormControl>
-            
-            {/* Dirección de envío */}
-            <FormControl className="md:col-span-2">
-              <FormLabel>Dirección de Envío</FormLabel>
-              <Input
-                name="direccion_envio"
-                value={formData.direccion_envio}
-                onChange={handleInputChange}
-                placeholder="Dirección completa de envío"
-                icon={<MapPin className="h-4 w-4" />}
-              />
-            </FormControl>
-            
-            {/* Recibe */}
-            <FormControl>
-              <FormLabel>Recibe</FormLabel>
-              <Input
-                name="recibe"
-                value={formData.recibe}
-                onChange={handleInputChange}
-                placeholder="Persona que recibe"
-                icon={<User className="h-4 w-4" />}
-              />
-            </FormControl>
-            
-            {/* Atención */}
-            <FormControl>
-              <FormLabel>Atención</FormLabel>
-              <Input
-                name="atencion"
-                value={formData.atencion}
-                onChange={handleInputChange}
-                placeholder="Dirigirme con..."
-                icon={<User className="h-4 w-4" />}
-              />
-            </FormControl>
-            
-            {/* Action buttons for nuevo tab */}
-            <div className="md:col-span-2 mt-4 flex justify-center">
-              <Button 
-                onClick={() => {
-                  // Clear any previously selected client data when switching to existente tab
-                  // This prevents confusion between new clients and selected existing clients
-                  if (formData.cliente_id) {
-                    // If we already have a client ID, it means we're editing a selected existing client
-                    // Instead of saving, we'll clear the form and switch to existente tab
-                    const emptyFormData = {
-                      cliente_id: "",
-                      nombre: "",
-                      celular: "",
-                      correo: "",
-                      razon_social: "",
-                      rfc: "",
-                      tipo_cliente: "Normal",
-                      direccion_envio: "",
-                      recibe: "",
-                      atencion: ""
-                    };
-                    setFormData(emptyFormData);
-                    sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(emptyFormData));
-                    safeNotifyParent(null);
-                    setActiveTab("existente");
-                    return;
-                  }
-                  
-                  // If we have valid new client data but no ID, save it first
-                  if (formData.nombre && formData.celular) {
-                    const errors = validateForm(formData);
-                    if (Object.keys(errors).length === 0) {
-                      toast.promise(handleSaveClient(), {
-                        loading: "Guardando cliente...",
-                        success: "Cliente guardado correctamente",
-                        error: "Error al guardar el cliente"
-                      });
-                    } else {
-                      toast.error("Por favor corrige los errores antes de continuar");
-                      return;
-                    }
-                  }
-                  
-                  // Switch to existente tab to search
-                  setActiveTab("existente");
-                }}
-                variant="default"
-                className="bg-teal-500 hover:bg-teal-600 text-white"
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Ver Clientes Existentes
-              </Button>
-            </div>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="existente">
-          <div className="space-y-6">
-            <div className="text-sm text-gray-500 mb-4">
-              Busca y selecciona un cliente existente para usar en esta cotización. Si no encuentras al cliente, puedes crear uno nuevo en la pestaña "Nuevo".
-            </div>
-            
-            {/* Cliente search with ultra-simplified combobox */}
-            <div className="relative w-full">
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                onClick={() => setComboboxOpen(!comboboxOpen)}
-                className={`w-full flex items-center justify-between ${
-                  errors.cliente_id ? 'border-red-500' : ''
-                }`}
-              >
-                {formData.nombre || 'Seleccionar cliente'}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
+
               {comboboxOpen && (
                 <div 
                   ref={dropdownRef}
-                  className="absolute z-30 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-300"
+                  className="absolute z-30 mt-1 w-full bg-white rounded-md shadow-lg max-h-80 overflow-auto focus:outline-none border border-gray-200"
                 >
-                  <div className="p-2 border-b">
-                    <div className="flex items-center">
-                      <Search className="h-4 w-4 mr-2" />
+                  <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+                    <div className="flex items-center px-4 py-2">
+                      <Search className="h-4 w-4 text-gray-400 mr-2" />
                       <input
-                        className="w-full p-2 outline-none"
-                        placeholder="Buscar por nombre, teléfono o correo..."
+                        type="text"
+                        placeholder="Buscar cliente por nombre, teléfono o correo"
+                        className="flex-1 outline-none text-sm py-1"
                         value={searchTerm}
                         onChange={(e) => handleSearchTermChange(e.target.value)}
                         autoFocus
                       />
+                      <button 
+                        onClick={() => setComboboxOpen(false)}
+                        className="ml-2 text-gray-400 hover:text-gray-500 focus:outline-none"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <div 
-                    ref={listRef}
-                    className="max-h-[300px] overflow-y-auto" 
-                  >
+                  
+                  <div ref={listRef} className="px-1 py-2 max-h-60 overflow-y-auto">
                     {(isSearching || isDebouncing) && searchResults.length === 0 ? (
-                      <div className="flex items-center justify-center p-4">
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      <div className="px-4 py-2 text-sm text-gray-500 flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         <span>{isDebouncing ? "Esperando para buscar..." : "Buscando clientes..."}</span>
                       </div>
                     ) : searchResults.length === 0 ? (
-                      <div className="p-4">
-                        <p className="text-center mb-2">No se encontraron clientes</p>
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-gray-500 mb-4">No se encontraron clientes</p>
                         {searchTerm.trim() !== '' && (
                           <div className="text-center text-sm text-amber-600 mt-2 p-2 bg-amber-50 rounded-md border border-amber-200">
                             <p>Para crear un nuevo cliente, ve a la pestaña <strong>Nuevo</strong> y completa los datos.</p>
@@ -1121,26 +950,41 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                         {searchResults.map((cliente, index) => (
                           <div
                             key={`${cliente.cliente_id}-${index}`}
-                            className="p-2 hover:bg-gray-100 cursor-pointer"
+                            className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100 rounded-md mx-1 group transition-colors"
                             onClick={() => handleClienteClick(cliente)}
                           >
-                            <div className="font-medium">
-                              {searchTerm && searchTerm.length > 1
-                                ? highlightMatch(cliente.nombre, searchTerm)
-                                : cliente.nombre}
+                            <div className="flex items-center">
+                              <User className="flex-shrink-0 h-5 w-5 text-gray-400 group-hover:text-emerald-500 mr-3" />
+                              <div className="flex-1 truncate">
+                                <div className="flex">
+                                  <span className="truncate font-medium text-gray-900">
+                                    {searchTerm && searchTerm.length > 1
+                                      ? highlightMatch(cliente.nombre, searchTerm)
+                                      : cliente.nombre}
+                                  </span>
+                                  {formData.cliente_id && formData.cliente_id === cliente.cliente_id.toString() && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-emerald-600">
+                                      <Check className="h-5 w-5" />
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex text-xs text-gray-500 mt-0.5">
+                                  <span className="truncate">{cliente.celular}</span>
+                                  {cliente.correo && (
+                                    <>
+                                      <span className="mx-1">•</span>
+                                      <span className="truncate">{cliente.correo}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            {cliente.celular && (
-                              <div className="text-sm">{cliente.celular}</div>
-                            )}
-                            {cliente.correo && (
-                              <div className="text-sm">{cliente.correo}</div>
-                            )}
                           </div>
                         ))}
                         {(isSearching || isDebouncing) && hasMoreResults && (
-                          <div className="flex items-center justify-center p-2 text-sm text-gray-500">
+                          <div className="px-4 py-2 text-sm text-gray-500 flex items-center justify-center">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            {isDebouncing ? "Esperando para buscar..." : "Cargando más resultados..."}
+                            <span>{isDebouncing ? "Esperando para buscar..." : "Cargando más resultados..."}</span>
                           </div>
                         )}
                       </>
@@ -1151,6 +995,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                       size="sm"
                       variant="outline"
                       onClick={() => setComboboxOpen(false)}
+                      className="h-9 px-4 text-sm font-medium"
                     >
                       Cerrar
                     </Button>
@@ -1158,235 +1003,245 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 </div>
               )}
             </div>
-            
-            {/* Client form fields - always visible */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              {/* Nombre */}
-              <FormControl>
-                <FormLabel required>Nombre</FormLabel>
-                <Input
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('nombre')}
-                  placeholder="Ingresa el nombre del cliente"
-                  icon={<User className="h-4 w-4" />}
-                  className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  required
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                  onClick={() => !formData.cliente_id && setComboboxOpen(true)}
-                />
-                {touched.nombre && errors.nombre && (
-                  <div className="text-red-500 text-xs mt-1 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.nombre}
-                  </div>
-                )}
-              </FormControl>
-              
-              {/* Celular */}
-              <FormControl>
-                <FormLabel required>Celular</FormLabel>
-                <div className={`flex h-10 w-full rounded-md border ${touched.celular && errors.celular ? 'border-red-500' : 'border-input'} bg-background text-sm ring-offset-background`}>
-                  <PhoneInput
-                    className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
-                    country="MX"
-                    value={formData.celular}
-                    onChange={handlePhoneChange}
-                    onBlur={() => handleBlur('celular')}
-                    placeholder="+52"
-                    required
-                    disabled={!formData.cliente_id && !comboboxOpen}
-                  />
-                </div>
-                {touched.celular && errors.celular && (
-                  <div className="text-red-500 text-xs mt-1 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.celular}
-                  </div>
-                )}
-              </FormControl>
-              
-              {/* Correo */}
-              <FormControl>
-                <FormLabel>Correo</FormLabel>
-                <Input
-                  type="email"
-                  name="correo"
-                  value={formData.correo}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('correo')}
-                  placeholder="cliente@ejemplo.com"
-                  icon={<Mail className="h-4 w-4" />}
-                  className={`${touched.correo && errors.correo ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-                {touched.correo && errors.correo && (
-                  <div className="text-red-500 text-xs mt-1 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.correo}
-                  </div>
-                )}
-              </FormControl>
-              
-              {/* Razón Social */}
-              <FormControl>
-                <FormLabel>Razón Social</FormLabel>
-                <Input
-                  name="razon_social"
-                  value={formData.razon_social}
-                  onChange={handleInputChange}
-                  placeholder="Nombre legal de la empresa"
-                  icon={<Building className="h-4 w-4" />}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-              </FormControl>
-              
-              {/* RFC */}
-              <FormControl>
-                <FormLabel>RFC</FormLabel>
-                <Input
-                  name="rfc"
-                  value={formData.rfc}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('rfc')}
-                  placeholder="Ej: XAXX010101000"
-                  icon={<FileText className="h-4 w-4" />}
-                  className={`${touched.rfc && errors.rfc ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-                {touched.rfc && errors.rfc && (
-                  <div className="text-red-500 text-xs mt-1 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.rfc}
-                  </div>
-                )}
-              </FormControl>
-              
-              {/* Tipo Cliente */}
-              <FormControl>
-                <FormLabel>Tipo de Cliente</FormLabel>
-                <select
-                  name="tipo_cliente"
-                  value={formData.tipo_cliente}
-                  onChange={handleInputChange}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!formData.cliente_id && !comboboxOpen}
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="Premium">Premium</option>
-                  <option value="Corporativo">Corporativo</option>
-                  <option value="Mayorista">Mayorista</option>
-                </select>
-              </FormControl>
-              
-              {/* Dirección de envío */}
-              <FormControl className="md:col-span-2">
-                <FormLabel>Dirección de Envío</FormLabel>
-                <Input
-                  name="direccion_envio"
-                  value={formData.direccion_envio}
-                  onChange={handleInputChange}
-                  placeholder="Dirección completa de envío"
-                  icon={<MapPin className="h-4 w-4" />}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-              </FormControl>
-              
-              {/* Recibe */}
-              <FormControl>
-                <FormLabel>Recibe</FormLabel>
-                <Input
-                  name="recibe"
-                  value={formData.recibe}
-                  onChange={handleInputChange}
-                  placeholder="Persona que recibe"
-                  icon={<User className="h-4 w-4" />}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-              </FormControl>
-              
-              {/* Atención */}
-              <FormControl>
-                <FormLabel>Atención</FormLabel>
-                <Input
-                  name="atencion"
-                  value={formData.atencion}
-                  onChange={handleInputChange}
-                  placeholder="Dirigirme con..."
-                  icon={<User className="h-4 w-4" />}
-                  readOnly={!formData.cliente_id && !comboboxOpen}
-                />
-              </FormControl>
-              
-              {/* Action buttons */}
-              <div className="md:col-span-2 mt-4 flex justify-between">
-                {!formData.cliente_id ? (
-                  <Button 
-                    onClick={() => setComboboxOpen(true)}
-                    variant="default"
-                    className="bg-teal-500 hover:bg-teal-600 text-white"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Buscar Cliente
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      // Clear the client selection
-                      const updatedFormData = {
-                        ...formData,
-                        cliente_id: ""
-                      };
-                      
-                      setFormData(updatedFormData);
-                      setFormDataChanged(true);
-                      
-                      // Save to sessionStorage
-                      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
-                      console.log("Client selection cleared");
-                      
-                      setComboboxOpen(true);
-                    }}
-                  >
-                    Cambiar cliente
-                  </Button>
-                )}
-                
-                {formData.cliente_id && (
-                  <Button
-                    type="button"
-                    onClick={handleUpdateClient}
-                    disabled={isSearching || !formData.nombre || !formData.celular || Object.keys(errors).length > 0}
-                    variant="default"
-                    className="bg-teal-500 hover:bg-teal-600 text-white"
-                  >
-                    {isSearching ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        <span>Actualizando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        <span>Actualizar Cliente</span>
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {!formData.cliente_id && searchResults.length === 0 && !isSearching && searchTerm.length > 0 && (
-              <div className="border border-amber-300 bg-amber-50 p-4 rounded-md mt-4 text-sm">
-                <p className="font-medium text-amber-800 mb-2">No se encontraron clientes con ese nombre</p>
-                <p className="text-amber-700">Para crear un nuevo cliente, utiliza la pestaña "Nuevo" y completa los datos necesarios.</p>
-              </div>
-            )}
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
+
+      {/* Client form fields - always visible */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* Nombre */}
+        <FormControl>
+          <FormLabel required>Nombre</FormLabel>
+          <Input
+            name="nombre"
+            value={formData.nombre}
+            onChange={handleInputChange}
+            onBlur={() => handleBlur('nombre')}
+            placeholder="Ingresa el nombre del cliente"
+            icon={<User className="h-4 w-4" />}
+            className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+            required
+            readOnly={!formData.cliente_id && !comboboxOpen}
+            onClick={() => !formData.cliente_id && setComboboxOpen(true)}
+          />
+          {touched.nombre && errors.nombre && (
+            <div className="text-red-500 text-xs mt-1 flex items-center">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              {errors.nombre}
+            </div>
+          )}
+        </FormControl>
+        
+        {/* Celular */}
+        <FormControl>
+          <FormLabel required>Celular</FormLabel>
+          <div className={`flex h-10 w-full rounded-md border ${touched.celular && errors.celular ? 'border-red-500' : 'border-input'} bg-background text-sm ring-offset-background`}>
+            <PhoneInput
+              className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
+              country="MX"
+              value={formData.celular}
+              onChange={handlePhoneChange}
+              onBlur={() => handleBlur('celular')}
+              placeholder="+52"
+              required
+              disabled={!formData.cliente_id && !comboboxOpen}
+            />
+          </div>
+          {touched.celular && errors.celular && (
+            <div className="text-red-500 text-xs mt-1 flex items-center">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              {errors.celular}
+            </div>
+          )}
+        </FormControl>
+        
+        {/* Correo */}
+        <FormControl>
+          <FormLabel>Correo</FormLabel>
+          <Input
+            type="email"
+            name="correo"
+            value={formData.correo}
+            onChange={handleInputChange}
+            onBlur={() => handleBlur('correo')}
+            placeholder="cliente@ejemplo.com"
+            icon={<Mail className="h-4 w-4" />}
+            className={`${touched.correo && errors.correo ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+          {touched.correo && errors.correo && (
+            <div className="text-red-500 text-xs mt-1 flex items-center">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              {errors.correo}
+            </div>
+          )}
+        </FormControl>
+        
+        {/* Razón Social */}
+        <FormControl>
+          <FormLabel>Razón Social</FormLabel>
+          <Input
+            name="razon_social"
+            value={formData.razon_social}
+            onChange={handleInputChange}
+            placeholder="Nombre legal de la empresa"
+            icon={<Building className="h-4 w-4" />}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+        </FormControl>
+        
+        {/* RFC */}
+        <FormControl>
+          <FormLabel>RFC</FormLabel>
+          <Input
+            name="rfc"
+            value={formData.rfc}
+            onChange={handleInputChange}
+            onBlur={() => handleBlur('rfc')}
+            placeholder="Ej: XAXX010101000"
+            icon={<FileText className="h-4 w-4" />}
+            className={`${touched.rfc && errors.rfc ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+          {touched.rfc && errors.rfc && (
+            <div className="text-red-500 text-xs mt-1 flex items-center">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              {errors.rfc}
+            </div>
+          )}
+        </FormControl>
+        
+        {/* Tipo Cliente */}
+        <FormControl>
+          <FormLabel>Tipo de Cliente</FormLabel>
+          <select
+            name="tipo_cliente"
+            value={formData.tipo_cliente}
+            onChange={handleInputChange}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!formData.cliente_id && !comboboxOpen}
+          >
+            <option value="Normal">Normal</option>
+            <option value="Premium">Premium</option>
+            <option value="Corporativo">Corporativo</option>
+            <option value="Mayorista">Mayorista</option>
+          </select>
+        </FormControl>
+        
+        {/* Dirección de envío */}
+        <FormControl className="md:col-span-2">
+          <FormLabel>Dirección de Envío</FormLabel>
+          <Input
+            name="direccion_envio"
+            value={formData.direccion_envio}
+            onChange={handleInputChange}
+            placeholder="Dirección completa de envío"
+            icon={<MapPin className="h-4 w-4" />}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+        </FormControl>
+        
+        {/* Recibe */}
+        <FormControl>
+          <FormLabel>Recibe</FormLabel>
+          <Input
+            name="recibe"
+            value={formData.recibe}
+            onChange={handleInputChange}
+            placeholder="Persona que recibe"
+            icon={<User className="h-4 w-4" />}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+        </FormControl>
+        
+        {/* Atención */}
+        <FormControl>
+          <FormLabel>Atención</FormLabel>
+          <Input
+            name="atencion"
+            value={formData.atencion}
+            onChange={handleInputChange}
+            placeholder="Dirigirme con..."
+            icon={<User className="h-4 w-4" />}
+            readOnly={!formData.cliente_id && !comboboxOpen}
+          />
+        </FormControl>
+        
+        {/* Action buttons - organized in a consistent grid */}
+        <div className="md:col-span-2 mt-6 space-y-4">
+          {!formData.cliente_id ? (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => setComboboxOpen(true)}
+                variant="outline"
+                size="action"
+                className="w-full sm:w-auto"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Buscar Cliente
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
+              <Button
+                variant="outline"
+                size="action"
+                onClick={() => {
+                  // Clear the client selection
+                  const updatedFormData = {
+                    ...formData,
+                    cliente_id: ""
+                  };
+                  
+                  setFormData(updatedFormData);
+                  setFormDataChanged(true);
+                  
+                  // Save to sessionStorage
+                  sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
+                  console.log("Client selection cleared");
+                  
+                  // Explicitly notify parent that client was cleared
+                  safeNotifyParent(null);
+                  
+                  setComboboxOpen(true);
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Cambiar cliente
+              </Button>
+              
+              <Button
+                type="button"
+                onClick={handleUpdateClient}
+                disabled={isSearching || !formData.nombre || !formData.celular || Object.keys(errors).length > 0}
+                variant="default"
+                size="action"
+                className="w-full sm:w-auto"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span>Actualizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    <span>Actualizar Cliente</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {!formData.cliente_id && searchResults.length === 0 && !isSearching && searchTerm.length > 0 && (
+            <div className="border border-amber-300 bg-amber-50 p-4 rounded-md mt-4 text-sm">
+              <p className="font-medium text-amber-800 mb-2">No se encontraron clientes con ese nombre</p>
+              <p className="text-amber-700">Para crear un nuevo cliente, utiliza la pestaña "Nuevo" y completa los datos necesarios.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

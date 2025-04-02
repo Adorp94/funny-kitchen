@@ -223,9 +223,9 @@ export function ResumenCotizacion({
       </div>
       
       {/* Summary calculations */}
-      <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-medium text-gray-700">Resumen</h3>
+      <div className="bg-gray-50 rounded-lg p-4 md:p-6 space-y-5">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base font-medium text-gray-700">Resumen</h3>
           {exchangeRate ? (
             <div className="text-xs space-y-1">
               <div className="text-gray-600 font-medium">
@@ -249,16 +249,16 @@ export function ResumenCotizacion({
         </div>
         
         {/* Subtotal */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600">Subtotal:</span>
+        <div className="flex items-center justify-between py-2">
+          <span className="text-sm font-medium text-gray-600">Subtotal:</span>
           <span className="font-medium">{formatCurrency(subtotal)}</span>
         </div>
         
         {/* Global Discount */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           <div className="flex items-center space-x-2">
             <Percent className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Descuento global:</span>
+            <span className="text-sm font-medium text-gray-600">Descuento global:</span>
           </div>
           <div className="flex items-center space-x-1">
             <Input
@@ -266,7 +266,7 @@ export function ResumenCotizacion({
               inputMode="numeric"
               value={globalDiscountStr}
               onChange={handleGlobalDiscountChange}
-              className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
               placeholder="0"
             />
             <span className="text-gray-500">%</span>
@@ -275,63 +275,65 @@ export function ResumenCotizacion({
         
         {/* Discount Amount */}
         {globalDiscount > 0 && (
-          <div className="flex items-center justify-between pl-6">
+          <div className="flex items-center justify-between pl-6 py-2">
             <span className="text-sm text-gray-600">Monto de descuento:</span>
-            <span className="text-red-600">-{formatCurrency(subtotal * (globalDiscount / 100))}</span>
+            <span className="text-red-600 font-medium">-{formatCurrency(subtotal * (globalDiscount / 100))}</span>
           </div>
         )}
         
         {/* Subtotal after discount */}
         {globalDiscount > 0 && (
-          <div className="flex items-center justify-between border-t border-gray-200 pt-2">
-            <span className="text-sm text-gray-600">Subtotal con descuento:</span>
+          <div className="flex items-center justify-between border-t border-gray-200 pt-3 pb-2">
+            <span className="text-sm font-medium text-gray-600">Subtotal con descuento:</span>
             <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100))}</span>
           </div>
         )}
         
         {/* IVA Toggle */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           <div className="flex items-center space-x-2">
             <Receipt className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Incluir IVA (16%):</span>
+            <span className="text-sm font-medium text-gray-600">Incluir IVA (16%):</span>
           </div>
           <Switch 
             checked={hasIva} 
             onCheckedChange={handleIvaToggle}
+            className="data-[state=checked]:bg-emerald-500"
           />
         </div>
         
         {/* IVA Amount */}
         {hasIva && (
-          <div className="flex items-center justify-between pl-6">
+          <div className="flex items-center justify-between pl-6 py-2">
             <span className="text-sm text-gray-600">Monto IVA (16%):</span>
             <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100) * 0.16)}</span>
           </div>
         )}
         
         {/* Shipping Toggle & Cost */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between py-2">
           <div className="flex items-center space-x-2">
             <Truck className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-600">Incluir envío:</span>
+            <span className="text-sm font-medium text-gray-600">Incluir envío:</span>
           </div>
           <Switch 
             checked={hasShipping} 
             onCheckedChange={handleShippingToggle}
+            className="data-[state=checked]:bg-emerald-500"
           />
         </div>
         
         {hasShipping && (
-          <div className="flex items-center justify-between pl-6">
+          <div className="flex items-center justify-between pl-6 py-2">
             <span className="text-sm text-gray-600">Costo de envío:</span>
             <div className="flex items-center space-x-1">
-              <span className="text-gray-500">${''}</span>
+              <span className="text-gray-500">$</span>
               <Input
                 type="text"
                 inputMode="decimal"
                 value={shippingCostStr}
                 onChange={handleShippingCostChange}
-                className="w-20 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-20 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
                 placeholder="0"
               />
               <span className="text-gray-500">{moneda}</span>
@@ -340,7 +342,7 @@ export function ResumenCotizacion({
         )}
         
         {/* Total */}
-        <div className="flex items-center justify-between border-t border-gray-200 pt-2 mt-4">
+        <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
           <span className="font-medium text-gray-700">Total:</span>
           <span className="font-bold text-lg text-emerald-600">{formatCurrency(total)}</span>
         </div>

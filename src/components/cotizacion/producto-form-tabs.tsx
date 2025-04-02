@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Package, FileText, Search, AlertCircle, Save, Check, ChevronsUpDown, Banknote, Box, Layers, Hash, X, User, Loader2 } from 'lucide-react';
+import { Package, FileText, Search, AlertCircle, Save, Check, ChevronsUpDown, Banknote, Box, Layers, Hash, X, User, Loader2, RefreshCw, Plus } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -1447,25 +1447,34 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
             </div>
             
             {/* Add button at the end */}
-            <div className="md:col-span-2 mt-6 flex justify-end space-x-2">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-between items-center">
               <Button
+                variant="outline"
+                size="action"
+                onClick={() => onProductoChange && onProductoChange(null)}
+                className="w-full sm:w-auto"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
+              </Button>
+              
+              <Button 
                 type="button"
                 onClick={handleSaveProduct}
-                disabled={isSaving || !formData.nombre || !formData.precio || Object.keys(errors).length > 0}
-                variant="default"
-                className="bg-teal-500 hover:bg-teal-600 text-white"
+                disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0 || isSaving}
+                variant="success"
+                size="action"
+                className="w-full sm:w-auto"
               >
                 {isSaving ? (
                   <>
-                    <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Guardando...</span>
-                    <span className="inline sm:hidden">...</span>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span>Agregando...</span>
                   </>
                 ) : (
                   <>
-                    <Save className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Guardar y Agregar</span>
-                    <span className="inline sm:hidden">Guardar</span>
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span>Agregar Producto</span>
                   </>
                 )}
               </Button>
