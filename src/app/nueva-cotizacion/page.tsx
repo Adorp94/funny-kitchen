@@ -191,6 +191,17 @@ function NuevaCotizacionClient() {
       const subtotalAfterDiscount = subtotal * (1 - globalDiscount / 100);
       const montoIva = hasIva ? subtotalAfterDiscount * 0.16 : 0;
       
+      // Handle shipping cost based on currency
+      // If in USD, the shippingCost is already in USD, but our context works in MXN
+      // We need to pass shipping cost in the way the API expects it
+      // The API will further handle the conversion as needed
+      
+      console.log("Preparing quotation data:");
+      console.log(`Currency: ${moneda}`);
+      console.log(`Shipping cost: ${shippingCost} ${moneda}`);
+      console.log(`Exchange rate: ${exchangeRate}`);
+      console.log(`Total: ${total}`);
+      
       // Prepare data for API call, including all client data
       // This passes the client information to the API, which can create the client if needed
       const quotationData = {

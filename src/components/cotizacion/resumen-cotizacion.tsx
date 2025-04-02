@@ -117,6 +117,8 @@ export function ResumenCotizacion({
       const numValue = value === '' ? 0 : parseFloat(value);
       const boundedValue = Math.max(numValue, 0);
       
+      // Store shipping cost in the selected currency
+      // This ensures the value is interpreted correctly in the products context
       setShippingCost(boundedValue);
     }
   };

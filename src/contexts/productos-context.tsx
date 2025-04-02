@@ -154,20 +154,40 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     // Calculate final total
     const subtotalAfterGlobalDiscount = subtotal * (1 - globalDiscount / 100);
     const ivaAmount = hasIva ? subtotalAfterGlobalDiscount * 0.16 : 0;
-    const total = subtotalAfterGlobalDiscount + ivaAmount + shippingCost;
-
-    // Calculate MXN equivalents if in USD
-    let subtotalMXN = subtotal;
-    let ivaAmountMXN = ivaAmount;
-    let totalMXN = total;
-
-    // No conversion needed for MXN values as we're already working in MXN
+    
+    // Always store the original values in MXN
+    const subtotalMXN = subtotal;
+    const ivaAmountMXN = ivaAmount;
+    
+    // The total depends on the currency for shipping cost
+    let totalMXN;
+    
+    if (moneda === 'MXN') {
+      // When currency is MXN, use the shipping cost directly
+      totalMXN = subtotalAfterGlobalDiscount + ivaAmount + shippingCost;
+    } else if (moneda === 'USD' && exchangeRate) {
+      // When currency is USD, we need to convert the shipping cost from USD to MXN
+      // The shipping cost input is in USD in this case
+      const shippingCostMXN = shippingCost * exchangeRate;
+      totalMXN = subtotalAfterGlobalDiscount + ivaAmount + shippingCostMXN;
+      
+      console.log('USD calculation:');
+      console.log(`Shipping cost (USD): ${shippingCost}`);
+      console.log(`Exchange rate: ${exchangeRate}`);
+      console.log(`Shipping cost (MXN): ${shippingCostMXN}`);
+      console.log(`Subtotal after discount (MXN): ${subtotalAfterGlobalDiscount}`);
+      console.log(`IVA amount (MXN): ${ivaAmount}`);
+      console.log(`Total (MXN): ${totalMXN}`);
+    } else {
+      // Fallback if exchange rate is not available
+      totalMXN = subtotalAfterGlobalDiscount + ivaAmount + shippingCost;
+    }
     
     return {
       subtotal,
       subtotalAfterGlobalDiscount,
       ivaAmount,
-      total,
+      total: totalMXN, // Keep total in MXN for consistency
       subtotalMXN,
       ivaAmountMXN,
       totalMXN
