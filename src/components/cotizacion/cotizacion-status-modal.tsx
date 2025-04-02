@@ -13,7 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogOverlay,
+  DialogClose,
 } from '@/components/ui/dialog';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -27,13 +29,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-// Add global styles for number inputs to remove steppers
-const noStepperStyle = {
-  WebkitAppearance: 'none',
-  MozAppearance: 'textfield',
-  appearance: 'textfield'
-};
 
 interface Cliente {
   nombre: string;
@@ -105,15 +100,13 @@ export function CotizacionStatusModal({
     if (cotizacion) {
       setNewStatus(cotizacion.estado || 'pendiente');
       
-      // Set default payment amount to 50% of total
-      if (cotizacion.total) {
-        const defaultAmount = Math.round(cotizacion.total * 0.5 * 100) / 100; // Round to 2 decimals
-        setPaymentData(prev => ({
-          ...prev,
-          monto: defaultAmount,
-          porcentaje: 50
-        }));
-      }
+      // Reset payment data to empty instead of setting a default value
+      setPaymentData(prev => ({
+        ...prev,
+        monto: 0,
+        porcentaje: 50
+      }));
+      
       console.log('Cotizacion loaded in modal:', cotizacion);
     }
   }, [cotizacion]);
@@ -324,7 +317,8 @@ export function CotizacionStatusModal({
             type="number"
             step="0.01"
             min="0"
-            value={paymentData.monto}
+            placeholder="0.00"
+            value={paymentData.monto || ''}
             onChange={e => {
               const value = Number(e.target.value);
               setPaymentData({
@@ -332,13 +326,12 @@ export function CotizacionStatusModal({
                 monto: value
               });
             }}
-            className={`pl-7 pr-12 h-11 text-right bg-white ${errors.monto ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
-            style={{ ...noStepperStyle, transform: 'translateZ(0)' }}
+            className={`pl-7 pr-14 h-11 text-right bg-white ${errors.monto ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
           />
           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
             <DollarSign className="h-4 w-4 text-gray-500" />
           </div>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none z-10">
             <span>{cotizacion?.moneda || 'MXN'}</span>
           </div>
         </div>
@@ -394,10 +387,12 @@ export function CotizacionStatusModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
-      <DialogContent className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col">
+      <DialogPrimitive.Content
+        className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+      >
         <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-start flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-2">
               <div className="bg-gray-50 p-2 rounded-lg">
                 <FileText className="h-5 w-5 text-gray-600" />
               </div>
@@ -408,11 +403,15 @@ export function CotizacionStatusModal({
                 <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                   {formatDate(cotizacion.fecha_creacion)} • {cotizacion.cliente.nombre}
                 </p>
+                <div className="mt-1">
+                  {getStatusBadge(cotizacion.estado)}
+                </div>
               </div>
             </div>
-            <div className="ml-7 sm:ml-0 mt-1 sm:mt-0">
-              {getStatusBadge(cotizacion.estado)}
-            </div>
+            <DialogClose className="rounded-full h-7 w-7 p-0 flex items-center justify-center text-gray-400 hover:text-gray-500 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Cerrar</span>
+            </DialogClose>
           </div>
         </DialogHeader>
 
@@ -564,7 +563,7 @@ export function CotizacionStatusModal({
         <DialogFooter className="p-4 sm:p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center flex-shrink-0">
           <Button 
             variant="outline" 
-            onClick={() => onClose()} 
+            onClick={onClose} 
             disabled={loading}
             className="h-11 rounded-lg bg-white w-full sm:w-auto order-2 sm:order-1"
           >
@@ -596,7 +595,7 @@ export function CotizacionStatusModal({
             )}
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogPrimitive.Content>
     </Dialog>
   );
 }

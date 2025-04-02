@@ -269,19 +269,21 @@ export default function CotizacionesPage() {
     }
   };
   
-  // Status badge styles based on estado
+  // Get status badge component
   const getStatusBadge = (estado: string) => {
-    switch (estado) {
+    switch (estado?.toLowerCase()) {
       case 'pendiente':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-blue-200">Pendiente</Badge>;
-      case 'aceptada':
-        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200">Aceptada</Badge>;
+        return <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-medium">Pendiente</Badge>;
+      case 'aprobada':
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Aprobada</Badge>;
       case 'rechazada':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50 border-red-200">Rechazada</Badge>;
+        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Rechazada</Badge>;
+      case 'cerrada':
+        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Cerrada</Badge>;
       case 'vencida':
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 hover:bg-gray-50 border-gray-200">Vencida</Badge>;
+        return <Badge className="bg-gray-50 text-gray-700 border-gray-200 font-medium">Vencida</Badge>;
       default:
-        return <Badge variant="outline">{estado.charAt(0).toUpperCase() + estado.slice(1)}</Badge>;
+        return <Badge className="bg-gray-50">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'No definido'}</Badge>;
     }
   };
   
@@ -315,7 +317,7 @@ export default function CotizacionesPage() {
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white mt-4 sm:mt-0"
+          className="flex items-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white mt-4 sm:mt-0 border-0 shadow-sm"
         >
           <Plus className="mr-2 h-4 w-4" />
           <span className="whitespace-nowrap">Nueva Cotización</span>
@@ -327,21 +329,21 @@ export default function CotizacionesPage() {
       
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <Card>
+        <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription>Total Cotizaciones</CardDescription>
             <CardTitle className="text-2xl">{metrics.totalCotizaciones}</CardTitle>
           </CardHeader>
         </Card>
         
-        <Card>
+        <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription>Cotizaciones Pendientes</CardDescription>
             <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
           </CardHeader>
         </Card>
         
-        <Card>
+        <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription>Monto Total (MXN)</CardDescription>
             <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
@@ -389,162 +391,163 @@ export default function CotizacionesPage() {
       </div>
       
       {loading ? (
-        <Card className="shadow-sm">
-          <CardContent className="p-6 text-center">
-            <div className="flex justify-center my-6">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
-            </div>
-            <p className="text-gray-500">Cargando cotizaciones...</p>
-          </CardContent>
-        </Card>
+        <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6 text-center">
+          <div className="flex justify-center my-6">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
+          </div>
+          <p className="text-gray-500">Cargando cotizaciones...</p>
+        </div>
       ) : filteredCotizaciones.length === 0 ? (
-        <Card className="shadow-sm">
-          <CardContent className="p-6 text-center">
-            <div className="flex justify-center my-6">
-              <div className="bg-gray-100 p-3 rounded-full">
-                <FileText className="h-6 w-6 text-gray-400" />
-              </div>
+        <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6 text-center">
+          <div className="flex justify-center my-6">
+            <div className="bg-gray-50 p-3 rounded-full">
+              <FileText className="h-6 w-6 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No hay cotizaciones</h3>
-            <p className="text-gray-500">
-              {searchTerm || filterEstado !== "todos" 
-                ? "No se encontraron cotizaciones con los filtros aplicados"
-                : "Aún no hay cotizaciones registradas"}
-            </p>
-            
-            {(searchTerm || filterEstado !== "todos") && (
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterEstado("todos");
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No hay cotizaciones</h3>
+          <p className="text-gray-500">
+            {searchTerm || filterEstado !== "todos" 
+              ? "No se encontraron cotizaciones con los filtros aplicados"
+              : "Aún no hay cotizaciones registradas"}
+          </p>
+          
+          {(searchTerm || filterEstado !== "todos") && (
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterEstado("todos");
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
       ) : (
-        <Card className="shadow-sm">
-          <CardHeader className="pb-0 pt-5 px-6">
-            <div className="flex items-center justify-between mb-1">
-              <CardTitle>Lista de Cotizaciones</CardTitle>
-              <p className="text-sm text-gray-500">{filteredCotizaciones.length} cotizaciones</p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ResponsiveTable>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[90px] sm:w-auto whitespace-nowrap">
-                      <div className="flex items-center">
-                        Folio
-                        {sortBy.field === 'folio' && (
-                          sortBy.direction === 'asc' 
-                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                            : <ArrowDown className="ml-1 h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap">
-                      <div className="flex items-center">
-                        Fecha
-                        {sortBy.field === 'fecha_creacion' && (
-                          sortBy.direction === 'asc' 
-                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                            : <ArrowDown className="ml-1 h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer whitespace-nowrap lg:table-cell hidden">
-                      <div className="flex items-center">
-                        Cliente
-                        {sortBy.field === 'cliente' && (
-                          sortBy.direction === 'asc' 
-                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                            : <ArrowDown className="ml-1 h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap lg:table-cell hidden">Estado</TableHead>
-                    <TableHead className="whitespace-nowrap sm:table-cell hidden">Moneda</TableHead>
-                    <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end">
-                        Total
-                        {sortBy.field === 'total' && (
-                          sortBy.direction === 'asc' 
-                            ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                            : <ArrowDown className="ml-1 h-4 w-4" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCotizaciones.map((cotizacion) => (
-                    <TableRow key={cotizacion.cotizacion_id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium text-emerald-600 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          {cotizacion.folio}
-                          <span className="lg:hidden text-xs text-gray-500 mt-1">
-                            {cotizacion.cliente.nombre}
-                          </span>
-                          <span className="lg:hidden text-xs text-gray-500 mt-0.5">
-                            {getStatusBadge(cotizacion.estado)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_creacion)}</TableCell>
-                      <TableCell className="lg:table-cell hidden">
-                        <div>
-                          <div className="font-medium truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.nombre}</div>
-                          <div className="text-sm text-gray-500 truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.celular}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap lg:table-cell hidden">
+        <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
+          <div className="p-4 px-6 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="font-medium text-gray-900">Lista de Cotizaciones</h2>
+            <p className="text-sm text-gray-500">{filteredCotizaciones.length} cotizaciones</p>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th onClick={() => handleSort('folio')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3">
+                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Folio
+                      {sortBy.field === 'folio' && (
+                        sortBy.direction === 'asc' 
+                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                          : <ArrowDown className="ml-1 h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3">
+                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fecha
+                      {sortBy.field === 'fecha_creacion' && (
+                        sortBy.direction === 'asc' 
+                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                          : <ArrowDown className="ml-1 h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th onClick={() => handleSort('cliente')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell">
+                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cliente
+                      {sortBy.field === 'cliente' && (
+                        sortBy.direction === 'asc' 
+                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                          : <ArrowDown className="ml-1 h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell">
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </div>
+                  </th>
+                  <th className="whitespace-nowrap text-left px-6 py-3 hidden sm:table-cell">
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Moneda
+                    </div>
+                  </th>
+                  <th onClick={() => handleSort('total')} className="cursor-pointer whitespace-nowrap text-right px-6 py-3">
+                    <div className="flex items-center justify-end text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total
+                      {sortBy.field === 'total' && (
+                        sortBy.direction === 'asc' 
+                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
+                          : <ArrowDown className="ml-1 h-4 w-4" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="whitespace-nowrap text-right px-6 py-3">
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredCotizaciones.map((cotizacion) => (
+                  <tr key={cotizacion.cotizacion_id} className="hover:bg-gray-50 transition-colors">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <button 
+                        onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
+                        className="font-medium text-emerald-600 hover:text-emerald-800"
+                      >
+                        {cotizacion.folio}
+                      </button>
+                      <span className="block lg:hidden text-xs text-gray-500 mt-1">
+                        {cotizacion.cliente.nombre}
+                      </span>
+                      <span className="block lg:hidden text-xs mt-0.5">
                         {getStatusBadge(cotizacion.estado)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap sm:table-cell hidden">
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                      {formatDate(cotizacion.fecha_creacion)}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 hidden lg:table-cell">
+                      <div>
+                        <div className="font-medium truncate max-w-[180px] sm:max-w-none text-gray-800">{cotizacion.cliente.nombre}</div>
+                        <div className="text-sm text-gray-500 truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.celular}</div>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 hidden lg:table-cell">
+                      {getStatusBadge(cotizacion.estado)}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 hidden sm:table-cell">
+                      <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                        {cotizacion.moneda}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-800">{formatCurrency(cotizacion.total, cotizacion.moneda)}</span>
+                        <span className="sm:hidden text-xs text-gray-500 mt-1">
                           {cotizacion.moneda}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium text-right whitespace-nowrap">
-                        <div className="flex flex-col">
-                          {formatCurrency(cotizacion.total, cotizacion.moneda)}
-                          <span className="sm:hidden text-xs text-gray-500 mt-1">
-                            {cotizacion.moneda}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end items-center space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
-                            className="h-8 px-2"
-                          >
-                            <Eye className="h-4 w-4 text-gray-600" />
-                            <span className="sr-only md:not-sr-only md:ml-2">Ver</span>
-                          </Button>
-                          <CotizacionActionsButton 
-                            cotizacion={cotizacion}
-                            onStatusChanged={fetchCotizaciones}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ResponsiveTable>
-          </CardContent>
-        </Card>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                      <div className="flex justify-end">
+                        <CotizacionActionsButton 
+                          cotizacion={cotizacion}
+                          onStatusChanged={fetchCotizaciones}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

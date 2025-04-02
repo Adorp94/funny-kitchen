@@ -56,3 +56,24 @@ html, body {
   width: 100%;
   max-width: 100vw;
 }
+
+/* Prevent scroll events from affecting number inputs */
+input[type=number] {
+  /* Create a proper stacking context to prevent scroll events from affecting the input */
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  transform: translateZ(0);
+}
+
+/* Remove up/down arrows from number inputs */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

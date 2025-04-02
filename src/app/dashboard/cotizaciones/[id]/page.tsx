@@ -134,16 +134,16 @@ export default function CotizacionDetailPage() {
   
   return (
     <div className="py-6 px-4 sm:py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/cotizaciones" className="rounded-full bg-white shadow-sm border border-gray-100 p-2 hover:bg-gray-50 transition-colors">
+          <Link href="/dashboard/cotizaciones" className="rounded-full bg-white shadow-sm border border-gray-100 p-2 hover:bg-gray-50 transition-colors flex-shrink-0">
             <ArrowLeft className="h-4 w-4 text-gray-600" />
           </Link>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{cotizacion.folio || `Cotización #${cotizacion.cotizacion_id}`}</h1>
-            <div className="flex items-center gap-2 mt-1">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 truncate">{cotizacion.folio || `Cotización #${cotizacion.cotizacion_id}`}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <p className="text-sm text-gray-500">{formatDate(cotizacion.fecha_creacion || cotizacion.fecha_cotizacion)}</p>
-              <span className="text-gray-300">•</span>
+              <span className="text-gray-300 hidden sm:inline">•</span>
               {getStatusBadge(cotizacion.estado)}
             </div>
           </div>
@@ -151,25 +151,25 @@ export default function CotizacionDetailPage() {
         
         <Button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-sm"
+          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-sm w-full sm:w-auto"
         >
           <FileText className="mr-2 h-4 w-4" />
           Cambiar Estado
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Client information */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-medium text-gray-900">Información del Cliente</h2>
+          <div className="bg-gradient-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900">Información del Cliente</h2>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {cotizacion.cliente ? (
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Nombre</p>
-                  <p className="font-medium text-gray-800">{cotizacion.cliente.nombre}</p>
+                  <p className="font-medium text-gray-800 break-words">{cotizacion.cliente.nombre}</p>
                 </div>
                 
                 <div>
@@ -180,7 +180,7 @@ export default function CotizacionDetailPage() {
                 {cotizacion.cliente.correo && (
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Correo</p>
-                    <p className="font-medium text-gray-800">{cotizacion.cliente.correo}</p>
+                    <p className="font-medium text-gray-800 break-words">{cotizacion.cliente.correo}</p>
                   </div>
                 )}
               </div>
@@ -192,10 +192,10 @@ export default function CotizacionDetailPage() {
         
         {/* Cotizacion details */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-medium text-gray-900">Detalles de la Cotización</h2>
+          <div className="bg-gradient-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900">Detalles de la Cotización</h2>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-4">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Fecha</p>
@@ -236,11 +236,11 @@ export default function CotizacionDetailPage() {
         
         {/* Financial summary */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-medium text-gray-900">Resumen Financiero</h2>
+          <div className="bg-gradient-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900">Resumen Financiero</h2>
           </div>
-          <div className="p-6">
-            <div className="space-y-4">
+          <div className="p-4 sm:p-6">
+            <div className="space-y-3 sm:space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-medium text-gray-800">
@@ -329,78 +329,127 @@ export default function CotizacionDetailPage() {
       </div>
       
       {/* Products section */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-medium text-gray-900">Productos</h2>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6 sm:mb-8">
+        <div className="bg-gradient-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+          <h2 className="text-base sm:text-lg font-medium text-gray-900">Productos</h2>
         </div>
-        
-        <div className="p-6">
+        <div className="overflow-x-auto">
           {cotizacion.productos && cotizacion.productos.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50 rounded-tl-lg">
-                      Producto
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
-                      Cantidad
-                    </th>
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
-                      Precio
-                    </th>
-                    {cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) && (
-                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
-                        Descuento
-                      </th>
-                    )}
-                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50 rounded-tr-lg">
-                      Subtotal
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {cotizacion.productos.map((producto: any, index: number) => (
-                    <tr key={producto.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                        <div className="truncate max-w-[150px] sm:max-w-none">{producto.nombre}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 text-center">
-                        {producto.cantidad}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 text-right whitespace-nowrap">
-                        {formatCurrency(producto.precio_unitario || 0, cotizacion.moneda)}
-                      </td>
-                      {cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) && (
-                        <td className="px-4 py-3 text-sm text-red-600 text-right whitespace-nowrap">
-                          {producto.descuento ? `${producto.descuento}%` : '-'}
-                        </td>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Producto
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cantidad
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Precio
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Subtotal
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cotizacion.productos.map((producto: any, index: number) => (
+                  <tr key={producto.id || index} className="hover:bg-gray-50">
+                    <td className="px-4 sm:px-6 py-3 text-sm text-gray-900">
+                      <div className="font-medium truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px]">
+                        {producto.nombre}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600 text-center">
+                      {producto.cantidad}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 text-sm text-gray-600 text-right whitespace-nowrap">
+                      {formatCurrency(
+                        producto.precio_unitario || 
+                        (producto.precio ? producto.precio : 0), 
+                        cotizacion.moneda
                       )}
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
-                        {formatCurrency(producto.precio_total || 0, cotizacion.moneda)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50">
-                    <td colSpan={cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) ? 4 : 3} className="px-4 py-3 text-sm font-medium text-gray-700 text-right">
-                      Total
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-emerald-600 text-right whitespace-nowrap">
-                      {formatCurrency(cotizacion.total || cotizacion.precio_total || 0, cotizacion.moneda)}
+                    <td className="px-4 sm:px-6 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
+                      {formatCurrency(
+                        producto.subtotal || 
+                        producto.precio_total || 
+                        (producto.cantidad * (producto.precio_unitario || (producto.precio ? producto.precio : 0))), 
+                        cotizacion.moneda
+                      )}
                     </td>
                   </tr>
-                </tfoot>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           ) : (
-            <div className="text-center py-8 px-4">
-              <p className="text-gray-500">No hay productos registrados en esta cotización</p>
+            <div className="p-4 sm:p-6 text-center text-gray-500">
+              No hay productos registrados para esta cotización
             </div>
           )}
         </div>
       </div>
+      
+      {/* Payment history */}
+      {cotizacion.pagos && cotizacion.pagos.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+            <h2 className="text-base sm:text-lg font-medium text-gray-900">Historial de Pagos</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Fecha
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Método
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Monto
+                  </th>
+                  <th scope="col" className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    % del Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cotizacion.pagos.map((pago: any, index: number) => (
+                  <tr key={pago.pago_id || index} className="hover:bg-gray-50">
+                    <td className="px-4 sm:px-6 py-3 text-sm text-gray-900 whitespace-nowrap">
+                      {formatDate(pago.fecha_pago)}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 text-sm text-center">
+                      <span className="capitalize inline-flex items-center">
+                        {pago.metodo_pago === 'transferencia' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                            Transferencia
+                          </span>
+                        ) : pago.metodo_pago === 'efectivo' ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                            Efectivo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-700">
+                            {pago.metodo_pago}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
+                      {formatCurrency(pago.monto, pago.moneda || cotizacion.moneda)}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 text-sm font-medium text-gray-900 text-right">
+                      {pago.porcentaje ? `${pago.porcentaje}%` : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       
       <CotizacionStatusModal
         isOpen={isModalOpen}
