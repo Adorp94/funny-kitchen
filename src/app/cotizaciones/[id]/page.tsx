@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText, Download } from 'lucide-react'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate } from '@/lib/utils'
@@ -13,30 +13,28 @@ import { formatCurrency } from '@/lib/utils'
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 
 interface Producto {
-  id: string
-  descripcion: string
-  precio_unitario: number
-  cantidad: number
-  precio_total: number
-  color?: string
-  descuento?: number
+  id: string;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  precio_total: number;
+  descuento?: number;
 }
 
 interface Cotizacion {
-  id: number
-  cliente_id: string
-  productos: Producto[]
-  subtotal: number
-  descuento: number
-  iva: number
-  envio: number
-  total: number
-  moneda: 'Pesos' | 'Dólares'
-  valor_iva: '16%' | '0%'
-  tiempo_entrega: string
-  estatus: string
-  created_at: string
-  pdf_url?: string
+  cotizacion_id: number;
+  cliente_id: number;
+  fecha_cotizacion: string;
+  moneda: string;
+  tipo_cambio: number;
+  iva: number;
+  precio_total: number;
+  descuento_total: number;
+  tiempo_estimado: string;
+  estatus: string;
+  envio: number | null;
+  productos: Producto[];
+  estatus_pago?: string;
 }
 
 // Add function to detect mobile devices
@@ -53,10 +51,11 @@ export default function CotizacionDetailPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
-  const [cliente, setCliente] = useState<{ nombre: string; telefono: string; atencion?: string } | null>(null)
+  const [cliente, setCliente] = useState<{ nombre: string; celular: string; correo?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   
+  const supabase = createClient();
   const cotizacionId = typeof params.id === 'string' ? parseInt(params.id, 10) : 0
   
   useEffect(() => {
@@ -73,28 +72,55 @@ export default function CotizacionDetailPage() {
       const { data: cotizacionData, error: cotizacionError } = await supabase
         .from('cotizaciones')
         .select('*')
-        .eq('id', cotizacionId)
+        .eq('cotizacion_id', cotizacionId)
         .single()
       
       if (cotizacionError) throw cotizacionError
       
       if (cotizacionData) {
+        // Fetch productos for this cotizacion
+        const { data: productosData, error: productosError } = await supabase
+          .from('cotizacion_productos')
+          .select(`
+            cotizacion_producto_id,
+            producto_id,
+            cantidad,
+            precio_unitario,
+            descuento_producto,
+            subtotal,
+            productos:producto_id (nombre)
+          `)
+          .eq('cotizacion_id', cotizacionId)
+        
+        if (productosError) {
+          console.error('Error fetching products:', productosError)
+        }
+        
+        // Format productos
+        const productos = productosData ? productosData.map(item => ({
+          id: item.cotizacion_producto_id.toString(),
+          nombre: item.productos?.nombre || 'Producto sin nombre',
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+          precio_total: item.subtotal,
+          descuento: item.descuento_producto
+        })) : [];
+        
         // Format the cotizacion data
         const formattedCotizacion: Cotizacion = {
-          id: cotizacionData.id,
+          cotizacion_id: cotizacionData.cotizacion_id,
           cliente_id: cotizacionData.cliente_id,
-          productos: cotizacionData.productos || [],
-          subtotal: cotizacionData.subtotal || 0,
-          descuento: cotizacionData.descuento || 0,
-          iva: cotizacionData.iva || 0,
-          envio: cotizacionData.envio || 0,
-          total: cotizacionData.total || 0,
-          moneda: cotizacionData.moneda || 'Pesos',
-          valor_iva: cotizacionData.valor_iva || '16%',
-          tiempo_entrega: cotizacionData.tiempo_entrega || '7 días',
-          estatus: cotizacionData.estatus || 'Pendiente',
-          created_at: cotizacionData.created_at,
-          pdf_url: cotizacionData.pdf_url,
+          fecha_cotizacion: cotizacionData.fecha_cotizacion,
+          moneda: cotizacionData.moneda,
+          tipo_cambio: cotizacionData.tipo_cambio,
+          iva: cotizacionData.iva,
+          descuento_total: cotizacionData.descuento_total,
+          precio_total: cotizacionData.precio_total,
+          tiempo_estimado: cotizacionData.tiempo_estimado,
+          estatus: cotizacionData.estatus,
+          envio: cotizacionData.envio,
+          estatus_pago: cotizacionData.estatus_pago,
+          productos: productos
         }
         
         setCotizacion(formattedCotizacion)
@@ -103,8 +129,8 @@ export default function CotizacionDetailPage() {
         if (cotizacionData.cliente_id) {
           const { data: clienteData, error: clienteError } = await supabase
             .from('clientes')
-            .select('nombre, telefono, atencion')
-            .eq('id', cotizacionData.cliente_id)
+            .select('nombre, celular, correo')
+            .eq('cliente_id', cotizacionData.cliente_id)
             .single()
           
           if (clienteError) {
@@ -137,7 +163,7 @@ export default function CotizacionDetailPage() {
       const { error } = await supabase
         .from('cotizaciones')
         .delete()
-        .eq('id', cotizacionId)
+        .eq('cotizacion_id', cotizacionId)
       
       if (error) throw error
       
@@ -165,7 +191,7 @@ export default function CotizacionDetailPage() {
         // For mobile devices, trigger download instead of opening in a new tab
         const link = document.createElement('a');
         link.href = cotizacion.pdf_url;
-        link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+        link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -216,14 +242,16 @@ export default function CotizacionDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Cotización #{cotizacion.id}</h1>
+          <h1 className="text-2xl font-bold">Cotización #{cotizacion.cotizacion_id}</h1>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            cotizacion.estatus === 'Pendiente'
+            cotizacion.estatus.toLowerCase() === 'pendiente'
               ? 'bg-yellow-100 text-yellow-800'
-              : cotizacion.estatus === 'Aceptada'
+              : cotizacion.estatus.toLowerCase() === 'aprobada'
               ? 'bg-green-100 text-green-800'
-              : cotizacion.estatus === 'Rechazada'
+              : cotizacion.estatus.toLowerCase() === 'rechazada'
               ? 'bg-red-100 text-red-800'
+              : cotizacion.estatus.toLowerCase() === 'cerrada'
+              ? 'bg-purple-100 text-purple-800'
               : 'bg-gray-100 text-gray-800'
           }`}>
             {cotizacion.estatus}
@@ -237,7 +265,7 @@ export default function CotizacionDetailPage() {
               Ver PDF
             </Button>
           )}
-          <Button variant="outline" onClick={() => router.push(`/cotizaciones/editar/${cotizacion.id}`)}>
+          <Button variant="outline" onClick={() => router.push(`/cotizaciones/editar/${cotizacion.cotizacion_id}`)}>
             <Pen className="mr-2 h-4 w-4" />
             Editar
           </Button>
@@ -262,14 +290,14 @@ export default function CotizacionDetailPage() {
               if (isMobileDevice()) {
                 // For mobile devices, create an anchor element and trigger download
                 const link = document.createElement('a');
-                link.href = `/api/direct-pdf/${cotizacion.id}`;
-                link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+                link.href = `/api/direct-pdf/${cotizacion.cotizacion_id}`;
+                link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
               } else {
                 // For desktop, open in a new tab
-                window.open(`/api/direct-pdf/${cotizacion.id}`, '_blank');
+                window.open(`/api/direct-pdf/${cotizacion.cotizacion_id}`, '_blank');
               }
             }}
           >
@@ -288,7 +316,7 @@ export default function CotizacionDetailPage() {
                 });
                 
                 // Make the API call
-                const response = await fetch(`/api/cotizaciones/${cotizacion.id}/pdf`, {
+                const response = await fetch(`/api/cotizaciones/${cotizacion.cotizacion_id}/pdf`, {
                   method: 'POST',
                 });
                 
@@ -316,7 +344,7 @@ export default function CotizacionDetailPage() {
                     // For mobile devices, trigger download
                     const link = document.createElement('a');
                     link.href = data.pdfUrl;
-                    link.setAttribute('download', `cotizacion-${cotizacion.id}.pdf`);
+                    link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
@@ -341,86 +369,66 @@ export default function CotizacionDetailPage() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-lg border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Información General</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-lg border shadow-sm p-6">
+          <h2 className="text-lg font-semibold mb-4">Información del Cliente</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <p className="text-sm text-gray-500">Cliente</p>
-              <p className="font-medium">{cliente?.nombre || 'No especificado'}</p>
+          {cliente ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-500">Nombre</p>
+                <p className="font-medium">{cliente.nombre}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Teléfono</p>
+                <p className="font-medium">{cliente.celular}</p>
+              </div>
+              
+              {cliente.correo && (
+                <div>
+                  <p className="text-sm text-gray-500">Correo</p>
+                  <p className="font-medium">{cliente.correo}</p>
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="text-gray-500">No se encontró información del cliente</p>
+          )}
+        </div>
+        
+        <div className="bg-white rounded-lg border shadow-sm p-6">
+          <h2 className="text-lg font-semibold mb-4">Detalles de la Cotización</h2>
+          
+          <div className="space-y-3">
             <div>
-              <p className="text-sm text-gray-500">Teléfono</p>
-              <p className="font-medium">{cliente?.telefono || 'No especificado'}</p>
+              <p className="text-sm text-gray-500">Fecha</p>
+              <p className="font-medium">{formatDate(cotizacion.fecha_cotizacion)}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Atención a</p>
-              <p className="font-medium">{cliente?.atencion || 'No especificado'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Fecha de creación</p>
-              <p className="font-medium">{formatDate(cotizacion.created_at)}</p>
-            </div>
+            
             <div>
               <p className="text-sm text-gray-500">Moneda</p>
               <p className="font-medium">{cotizacion.moneda}</p>
             </div>
+            
             <div>
-              <p className="text-sm text-gray-500">Tiempo de entrega</p>
-              <p className="font-medium">{cotizacion.tiempo_entrega}</p>
+              <p className="text-sm text-gray-500">Tiempo de Entrega</p>
+              <p className="font-medium">{cotizacion.tiempo_estimado}</p>
             </div>
+            
+            {cotizacion.estatus_pago && (
+              <div>
+                <p className="text-sm text-gray-500">Estado de Pago</p>
+                <p className="font-medium">{
+                  cotizacion.estatus_pago === 'anticipo' 
+                    ? 'Con anticipo' 
+                    : cotizacion.estatus_pago === 'pagado' 
+                    ? 'Pagado' 
+                    : 'Pendiente'
+                }</p>
+              </div>
+            )}
           </div>
-          
-          <h2 className="text-lg font-semibold mb-4">Productos</h2>
-          
-          {cotizacion.productos.length > 0 ? (
-            <div className="border rounded-md">
-              <ResponsiveTable noBorder>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Descripción
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Cantidad
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Precio Unitario
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {cotizacion.productos.map((producto, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {producto.descripcion}
-                          {producto.color && <span className="ml-2 text-gray-500">({producto.color})</span>}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          {producto.cantidad}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          {formatCurrency(producto.precio_unitario, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          {formatCurrency(producto.precio_total, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ResponsiveTable>
-            </div>
-          ) : (
-            <div className="bg-gray-50 text-center py-8 rounded-md border border-gray-200">
-              <p className="text-gray-500">No hay productos en esta cotización</p>
-            </div>
-          )}
         </div>
         
         <div className="bg-white rounded-lg border shadow-sm p-6">
@@ -430,71 +438,106 @@ export default function CotizacionDetailPage() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Subtotal</span>
               <span className="font-medium">
-                {formatCurrency(cotizacion.subtotal, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                {formatCurrency(cotizacion.precio_total - (cotizacion.iva || 0) - (cotizacion.envio || 0), cotizacion.moneda)}
               </span>
             </div>
             
-            {cotizacion.descuento > 0 && (
+            {cotizacion.descuento_total > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Descuento</span>
                 <span className="font-medium text-red-600">
-                  -{formatCurrency(cotizacion.descuento, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                  -{formatCurrency(cotizacion.descuento_total, cotizacion.moneda)}
                 </span>
               </div>
             )}
             
             {cotizacion.iva > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">IVA ({cotizacion.valor_iva})</span>
+                <span className="text-gray-600">IVA (16%)</span>
                 <span className="font-medium">
-                  {formatCurrency(cotizacion.iva, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                  {formatCurrency(cotizacion.iva, cotizacion.moneda)}
                 </span>
               </div>
             )}
             
-            {cotizacion.envio > 0 && (
+            {cotizacion.envio && cotizacion.envio > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Envío</span>
                 <span className="font-medium">
-                  {formatCurrency(cotizacion.envio, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+                  {formatCurrency(cotizacion.envio, cotizacion.moneda)}
                 </span>
               </div>
             )}
             
             <Separator />
             
-            <div className="flex justify-between items-center font-semibold text-lg">
+            <div className="flex justify-between items-center font-bold">
               <span>Total</span>
-              <span className="text-green-700">
-                {formatCurrency(cotizacion.total, cotizacion.moneda === 'Dólares' ? 'USD' : 'MXN')}
+              <span>
+                {formatCurrency(cotizacion.precio_total, cotizacion.moneda)}
               </span>
             </div>
           </div>
-          
-          <QuotationActions
-            cotizacionId={cotizacion.id}
-            clienteId={cotizacion.cliente_id}
-            productos={cotizacion.productos}
-            descuento={cotizacion.descuento}
-            envio={cotizacion.envio}
-            moneda={cotizacion.moneda}
-            valor_iva={cotizacion.valor_iva}
-            tiempo_entrega={cotizacion.tiempo_entrega}
-            hasExistingPdf={!!cotizacion.pdf_url}
-            onPdfGenerated={(pdfUrl) => {
-              // Update the cotizacion state with the new PDF URL
-              setCotizacion({
-                ...cotizacion,
-                pdf_url: pdfUrl
-              });
-              
-              toast({
-                title: "PDF Guardado",
-                description: "La URL del PDF ha sido actualizada en la cotización.",
-              });
-            }}
-          />
         </div>
+      </div>
+      
+      <div className="bg-white rounded-lg border shadow-sm p-6">
+        <h2 className="text-lg font-semibold mb-4">Productos</h2>
+        
+        {cotizacion.productos && cotizacion.productos.length > 0 ? (
+          <ResponsiveTable>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Producto
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cantidad
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Precio Unitario
+                  </th>
+                  {cotizacion.productos.some(p => p.descuento && p.descuento > 0) && (
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Descuento
+                    </th>
+                  )}
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Subtotal
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cotizacion.productos.map((producto) => (
+                  <tr key={producto.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {producto.nombre}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {producto.cantidad}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                      {formatCurrency(producto.precio_unitario, cotizacion.moneda)}
+                    </td>
+                    {cotizacion.productos.some(p => p.descuento && p.descuento > 0) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                        {producto.descuento ? `${producto.descuento}%` : '-'}
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                      {formatCurrency(producto.precio_total, cotizacion.moneda)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ResponsiveTable>
+        ) : (
+          <div className="bg-gray-50 p-4 rounded-md text-gray-500">
+            No hay productos asociados a esta cotización
+          </div>
+        )}
       </div>
     </div>
   )

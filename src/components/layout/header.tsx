@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn } from "lucide-react";
+import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn, DollarSign } from "lucide-react";
 import UserDropdown from "@/components/auth/user-dropdown";
 
 // Improved navigation items for a more general app with multiple modules
@@ -19,6 +19,11 @@ const navigation = [
     name: "Cotizaciones",
     href: "/dashboard/cotizaciones",
     icon: FileText,
+  },
+  {
+    name: "Finanzas",
+    href: "/dashboard/finanzas",
+    icon: DollarSign,
   }
   // Productos and Clientes modules temporarily disabled
   // {

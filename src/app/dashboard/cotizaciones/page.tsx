@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
+import { CotizacionActionsButton } from '@/components/cotizacion/cotizacion-actions-button';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -499,17 +500,22 @@ export default function CotizacionesPage() {
                       <TableCell className="font-medium whitespace-nowrap">
                         {formatCurrency(cotizacion.total, cotizacion.moneda)}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
-                          className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-700"
-                          title="Ver cotización"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">Ver cotización</span>
-                        </Button>
+                      <TableCell>
+                        <div className="flex justify-end items-center space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
+                            className="h-8 px-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only md:not-sr-only md:ml-2">Ver</span>
+                          </Button>
+                          <CotizacionActionsButton 
+                            cotizacion={cotizacion}
+                            onStatusChanged={fetchCotizaciones}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

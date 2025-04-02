@@ -1,98 +1,98 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    // Destructure and access the id properly from params
-    const { id } = context.params;
-    
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Cotización ID es requerido' }, 
-        { status: 400 }
-      );
-    }
-    
     const supabase = createServerSupabaseClient();
     
-    // Get the cotizacion with its client
+    const cotizacionId = params.id;
+    
+    // Get cotizacion details
     const { data: cotizacion, error: cotizacionError } = await supabase
       .from('cotizaciones')
       .select(`
         *,
-        cliente:cliente_id(*)
+        cliente:cliente_id (
+          nombre,
+          celular,
+          correo
+        )
       `)
-      .eq('cotizacion_id', id)
+      .eq('cotizacion_id', cotizacionId)
       .single();
-      
+    
     if (cotizacionError) {
-      console.error('Error fetching quotation:', cotizacionError);
+      console.error('Error fetching cotizacion:', cotizacionError);
       return NextResponse.json(
-        { error: 'Error al obtener la cotización' }, 
+        { error: cotizacionError.message },
         { status: 500 }
       );
     }
     
-    if (!cotizacion) {
-      return NextResponse.json(
-        { error: 'Cotización no encontrada' }, 
-        { status: 404 }
-      );
-    }
-    
-    // Get the quotation products
+    // Get products for this cotizacion
     const { data: productos, error: productosError } = await supabase
       .from('cotizacion_productos')
       .select(`
-        *,
-        producto:producto_id(*)
+        cotizacion_producto_id,
+        producto_id,
+        cantidad,
+        precio_unitario,
+        descuento_producto,
+        subtotal,
+        productos:producto_id (
+          nombre,
+          tipo_producto
+        )
       `)
-      .eq('cotizacion_id', id);
+      .eq('cotizacion_id', cotizacionId);
     
     if (productosError) {
-      console.error('Error fetching quotation products:', productosError);
+      console.error('Error fetching products:', productosError);
       return NextResponse.json(
-        { error: 'Error al obtener los productos de la cotización' }, 
+        { error: productosError.message },
         { status: 500 }
       );
     }
     
-    // Format the products to match the expected structure
+    // Format productos
     const formattedProductos = productos.map(item => ({
-      id: item.producto.producto_id.toString(),
-      nombre: item.producto.nombre,
+      id: item.cotizacion_producto_id.toString(),
+      nombre: item.productos?.nombre || 'Producto sin nombre',
       cantidad: item.cantidad,
-      precio: item.precio_unitario,
-      precio_mxn: item.precio_unitario_mxn || item.precio_unitario,
+      precio_unitario: item.precio_unitario,
+      precio_total: item.subtotal,
       descuento: item.descuento_producto,
-      subtotal: item.subtotal,
-      subtotal_mxn: item.subtotal_mxn || item.subtotal,
-      sku: item.producto.sku,
-      descripcion: item.producto.descripcion,
-      colores: item.producto.colores?.split(',') || []
+      tipo: item.productos?.tipo_producto
     }));
     
-    // Include MXN values in the response
-    const cotizacionWithMXN = {
+    // Get advance payments if any
+    const { data: pagos, error: pagosError } = await supabase
+      .from('pagos_anticipos')
+      .select('*')
+      .eq('cotizacion_id', cotizacionId)
+      .order('fecha_pago', { ascending: false });
+    
+    if (pagosError) {
+      console.error('Error fetching payments:', pagosError);
+      // Continue anyway, just log the error
+    }
+    
+    const cotizacionData = {
       ...cotizacion,
-      subtotal_mxn: cotizacion.subtotal_mxn || cotizacion.subtotal,
-      costo_envio_mxn: cotizacion.costo_envio_mxn || cotizacion.costo_envio,
-      total_mxn: cotizacion.total_mxn || cotizacion.total,
-      productos: formattedProductos
+      productos: formattedProductos,
+      pagos: pagos || []
     };
     
-    // Return the formatted response
-    return NextResponse.json({
-      cotizacion: cotizacionWithMXN
-    });
+    return NextResponse.json({ cotizacion: cotizacionData });
     
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error in cotizacion details API:', error);
     return NextResponse.json(
-      { error: 'Error inesperado al obtener la cotización' },
+      { error: error instanceof Error ? error.message : 'Error desconocido' },
       { status: 500 }
     );
   }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, ShoppingBag, Users, TrendingUp, ClipboardList } from "lucide-react";
+import { FileText, ShoppingBag, Users, TrendingUp, ClipboardList, DollarSign } from "lucide-react";
 import { 
   Card, 
   CardContent, 
@@ -165,6 +165,29 @@ export default function DashboardPage() {
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               Ir a Cotizaciones
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <CardHeader>
+            <div className="rounded-full bg-emerald-50 w-10 h-10 flex items-center justify-center mb-3">
+              <DollarSign className="h-5 w-5 text-emerald-600" />
+            </div>
+            <CardTitle className="text-lg">Finanzas</CardTitle>
+            <CardDescription>Gestión de pagos y anticipos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500">
+              Administra pagos, anticipos y el estado financiero de las cotizaciones.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={() => handleNavigate('/dashboard/finanzas')}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              Ir a Finanzas
             </Button>
           </CardFooter>
         </Card>

@@ -16,14 +16,26 @@ export function formatCurrency(amount: number | string, currency: "MXN" | "USD" 
   }).format(numericAmount);
 }
 
-export function formatDate(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return 'Fecha no disponible';
   
-  return dateObj.toLocaleDateString('es-MX', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is invalid
+    if (isNaN(dateObj.getTime())) {
+      return 'Fecha inválida';
+    }
+    
+    return dateObj.toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Error en formato de fecha';
+  }
 }
 
 export function generateCotizacionId(id: number): string {
