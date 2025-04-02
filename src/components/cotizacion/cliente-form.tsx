@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Mail, Phone, User, Building, FileText, MapPin, Search, AlertCircle, Save, Check, ChevronsUpDown } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Mail, Phone, User, Building, FileText, MapPin, Search, AlertCircle, Save, Check, ChevronsUpDown, Plus, Loader2 } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -51,6 +51,8 @@ interface FormErrors {
   celular?: string;
   correo?: string;
   rfc?: string;
+  tipo_cliente?: string;
+  cliente_id?: string;
 }
 
 interface ClienteFormProps {
@@ -64,15 +66,15 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const [initialized, setInitialized] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [searchTerm, setSearchTerm] = useState<string>('');
   const [searchResults, setSearchResults] = useState<ClienteType[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
-  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [hasMoreResults, setHasMoreResults] = useState(true);
   const pageSize = 20;
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   
   // Initialize Supabase client
   const supabase = createClientComponentClient();
@@ -339,12 +341,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   };
 
   // Handle selection of an existing client
-  const handleSelectClient = (clienteId: string) => {
-    const cliente = searchResults.find(c => c.cliente_id.toString() === clienteId);
-    
-    if (!cliente) return;
-    
-    // Completely replace the form data with the selected client
+  const handleClienteClick = (cliente: ClienteType) => {
     const updatedFormData = {
       cliente_id: cliente.cliente_id.toString(),
       nombre: cliente.nombre || "",
@@ -388,7 +385,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       return;
     }
     
-    setIsSaving(true);
+    setIsSearching(true);
     
     try {
       if (!formData.cliente_id) {
@@ -438,7 +435,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       console.error("Error updating client:", error);
       toast.error("Error al actualizar el cliente");
     } finally {
-      setIsSaving(false);
+      setIsSearching(false);
     }
   };
 
@@ -463,6 +460,104 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [activeTab]);
+
+  // Replace the existing handleSearchClientes with this updated fetchClients function
+  const fetchClients = useCallback(async (
+    searchTerm: string, 
+    page: number, 
+    append: boolean = false
+  ) => {
+    try {
+      setIsSearching(true);
+      let endpoint = searchTerm 
+        ? `/api/clientes?query=${encodeURIComponent(searchTerm)}&page=${page}&pageSize=10` 
+        : `/api/clientes?page=${page}&pageSize=10`;
+      
+      console.log(`Fetching clients from: ${endpoint}`);
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        throw new Error('Error al buscar clientes');
+      }
+      
+      const result = await response.json();
+      
+      setHasMoreResults(result.hasMore);
+      setSearchResults(prev => append ? [...prev, ...(result.data || [])] : (result.data || []));
+      
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      toast.error("No se pudieron cargar los clientes");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [toast]);
+
+  // Handler for search term changes
+  const handleSearchTermChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(0);
+    setHasMoreResults(true);
+    fetchClients(value, 0, false);
+  }, [fetchClients]);
+
+  // Handle scroll to load more results
+  const handleScroll = useCallback(() => {
+    if (listRef.current && !isSearching && hasMoreResults) {
+      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+      
+      // When user has scrolled to the bottom (or near bottom)
+      if (scrollTop + clientHeight >= scrollHeight - 50) {
+        console.log('Near bottom, loading more results');
+        setCurrentPage(prevPage => {
+          const nextPage = prevPage + 1;
+          fetchClients(searchTerm, nextPage, true);
+          return nextPage;
+        });
+      }
+    }
+  }, [fetchClients, hasMoreResults, isSearching, searchTerm]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setComboboxOpen(false);
+      }
+    };
+
+    if (comboboxOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [comboboxOpen]);
+
+  // Attach scroll listener to the results list
+  useEffect(() => {
+    const currentListRef = listRef.current;
+    
+    if (comboboxOpen && currentListRef) {
+      currentListRef.addEventListener('scroll', handleScroll);
+    }
+    
+    return () => {
+      if (currentListRef) {
+        currentListRef.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [comboboxOpen, handleScroll]);
+
+  // Initial fetch when combobox opens
+  useEffect(() => {
+    if (comboboxOpen) {
+      setCurrentPage(0);
+      setHasMoreResults(true);
+      fetchClients(searchTerm, 0, false);
+    }
+  }, [comboboxOpen, fetchClients, searchTerm]);
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
@@ -632,151 +727,105 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
             
             {/* Cliente search with ultra-simplified combobox */}
             <div className="relative w-full">
-              <div className="w-full">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    // Reset and load initial data when opening
-                    setSearchTerm('');
-                    setSearchResults([]);
-                    setIsSearching(true);
-                    setComboboxOpen(true);
-                    
-                    // Fetch all clients on open
-                    fetch('/api/clientes')
-                      .then(res => res.json())
-                      .then(data => {
-                        console.log("Loaded initial clients:", data?.data?.length || 0);
-                        setSearchResults(data?.data || []);
-                        setIsSearching(false);
-                      })
-                      .catch(err => {
-                        console.error("Error loading clients:", err);
-                        setIsSearching(false);
-                      });
-                  }}
-                  className="w-full flex justify-between items-center"
-                >
-                  {formData.cliente_id ? (
-                    <span className="truncate">{formData.nombre}</span>
-                  ) : (
-                    <span className="text-muted-foreground">Buscar cliente por nombre, teléfono o correo...</span>
-                  )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </div>
-              
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                onClick={() => setComboboxOpen(!comboboxOpen)}
+                className={`w-full flex items-center justify-between ${
+                  errors.cliente_id ? 'border-red-500' : ''
+                }`}
+              >
+                {formData.nombre || 'Seleccionar cliente'}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
               {comboboxOpen && (
-                <div className="absolute z-50 bg-white border border-gray-200 rounded-md shadow-lg w-full max-w-[400px] mt-1">
-                  <div className="border-b p-2">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <div 
+                  ref={dropdownRef}
+                  className="absolute z-30 mt-1 w-full bg-white rounded-md shadow-lg border border-gray-300"
+                >
+                  <div className="p-2 border-b">
+                    <div className="flex items-center">
+                      <Search className="h-4 w-4 mr-2" />
                       <input
-                        value={searchTerm}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setSearchTerm(value);
-                          setIsSearching(true);
-                          
-                          if (value.trim() === '') {
-                            // If empty query, load all clients
-                            fetch('/api/clientes')
-                              .then(res => res.json())
-                              .then(data => {
-                                console.log("Loaded all clients:", data?.data?.length || 0);
-                                setSearchResults(data?.data || []);
-                                setIsSearching(false);
-                              })
-                              .catch(err => {
-                                console.error("Error loading clients:", err);
-                                setIsSearching(false);
-                              });
-                          } else {
-                            // Search with query parameter
-                            fetch(`/api/clientes?query=${encodeURIComponent(value)}`)
-                              .then(res => res.json())
-                              .then(data => {
-                                console.log(`Search results for "${value}":`, data?.data?.length || 0);
-                                setSearchResults(data?.data || []);
-                                setIsSearching(false);
-                              })
-                              .catch(err => {
-                                console.error("Error searching clients:", err);
-                                setIsSearching(false);
-                              });
-                          }
-                        }}
-                        autoFocus
+                        className="w-full p-2 outline-none"
                         placeholder="Buscar por nombre, teléfono o correo..."
-                        className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        value={searchTerm}
+                        onChange={(e) => handleSearchTermChange(e.target.value)}
+                        autoFocus
                       />
                     </div>
                   </div>
-                  
-                  <div className="max-h-[300px] overflow-auto">
-                    {isSearching ? (
-                      <div className="py-6 text-center text-sm text-muted-foreground">
-                        <div className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
-                        Buscando clientes...
+                  <div 
+                    ref={listRef}
+                    className="max-h-[300px] overflow-y-auto" 
+                  >
+                    {isSearching && searchResults.length === 0 ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        <span>Buscando clientes...</span>
                       </div>
                     ) : searchResults.length === 0 ? (
-                      <div className="py-4 text-center">
-                        <p className="text-sm text-muted-foreground mb-2">No se encontraron clientes</p>
-                        <Button 
-                          size="sm" 
-                          onClick={() => {
-                            // Create new client with the search term as name
-                            const newFormData = {
-                              cliente_id: "",
-                              nombre: searchTerm,
-                              celular: "",
-                              correo: "",
-                              razon_social: "",
-                              rfc: "",
-                              tipo_cliente: "Normal",
-                              direccion_envio: "",
-                              recibe: "",
-                              atencion: ""
-                            };
-                            
-                            setActiveTab("nuevo");
-                            setFormData(newFormData);
-                            setFormDataChanged(true);
-                            
-                            // Save to sessionStorage
-                            sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
-                            
-                            setComboboxOpen(false);
-                          }}
-                          className="bg-teal-500 hover:bg-teal-600 text-white"
-                        >
-                          Crear nuevo cliente
-                        </Button>
+                      <div className="p-4">
+                        <p className="text-center mb-2">No se encontraron clientes</p>
+                        {searchTerm.trim() !== '' && (
+                          <Button 
+                            onClick={() => {
+                              // Create new client with the search term as name
+                              const newFormData = {
+                                cliente_id: "",
+                                nombre: searchTerm,
+                                celular: "",
+                                correo: "",
+                                razon_social: "",
+                                rfc: "",
+                                tipo_cliente: "Normal",
+                                direccion_envio: "",
+                                recibe: "",
+                                atencion: ""
+                              };
+                              
+                              setActiveTab("nuevo");
+                              setFormData(newFormData);
+                              setFormDataChanged(true);
+                              
+                              // Save to sessionStorage
+                              sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
+                            }}
+                            className="w-full mt-2"
+                            variant="outline"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Crear nuevo cliente con "{searchTerm}"
+                          </Button>
+                        )}
                       </div>
                     ) : (
-                      searchResults.map((cliente) => (
-                        <div
-                          key={cliente.cliente_id}
-                          className="flex items-center px-3 py-2 cursor-pointer hover:bg-slate-100"
-                          onClick={() => handleSelectClient(cliente.cliente_id.toString())}
-                        >
-                          <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span className="flex-1">
-                            {searchTerm && searchTerm.length > 1
-                              ? highlightMatch(cliente.nombre, searchTerm)
-                              : cliente.nombre}
-                          </span>
-                        </div>
-                      ))
+                      <>
+                        {searchResults.map((cliente, index) => (
+                          <div
+                            key={`${cliente.cliente_id}-${index}`}
+                            className="p-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => handleClienteClick(cliente)}
+                          >
+                            <div className="font-medium">{cliente.nombre}</div>
+                            {cliente.celular && <div className="text-sm">{cliente.celular}</div>}
+                            {cliente.correo && <div className="text-sm">{cliente.correo}</div>}
+                          </div>
+                        ))}
+                        {isSearching && hasMoreResults && (
+                          <div className="flex items-center justify-center p-2 text-sm text-gray-500">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Cargando más resultados...
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-                  
-                  <div className="border-t p-2">
-                    <Button 
-                      variant="outline"
+                  <div className="p-2 border-t flex justify-end">
+                    <Button
                       size="sm"
-                      className="w-full"
+                      variant="outline"
                       onClick={() => setComboboxOpen(false)}
                     >
                       Cerrar
@@ -985,11 +1034,11 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                   <Button
                     type="button"
                     onClick={handleUpdateClient}
-                    disabled={isSaving || !formData.nombre || !formData.celular || Object.keys(errors).length > 0}
+                    disabled={isSearching || !formData.nombre || !formData.celular || Object.keys(errors).length > 0}
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
-                    {isSaving ? (
+                    {isSearching ? (
                       <>
                         <span className="animate-spin mr-2">⏳</span>
                         Actualizando...
