@@ -60,6 +60,23 @@ interface ClienteFormProps {
   onClienteChange?: (cliente: ClienteType | null) => void;
 }
 
+// Add a debounce function
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<F>): Promise<ReturnType<F>> => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+    return new Promise(resolve => {
+      timeout = setTimeout(() => {
+        const result = func(...args);
+        resolve(result);
+      }, waitFor);
+    });
+  };
+}
+
 export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const [activeTab, setActiveTab] = useState<string>("nuevo");
   const [formDataChanged, setFormDataChanged] = useState<boolean>(false);
@@ -72,7 +89,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMoreResults, setHasMoreResults] = useState(true);
-  const pageSize = 20;
+  const pageSize = 10;
   const listRef = useRef<HTMLDivElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   
@@ -91,6 +108,11 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     recibe: "",
     atencion: ""
   });
+
+  // Add state to track if search is active
+  const [isDebouncing, setIsDebouncing] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRequestIdRef = useRef<number>(0);
 
   // Completely rewritten persistence logic
   useEffect(() => {
@@ -461,45 +483,114 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     };
   }, [activeTab]);
 
-  // Replace the existing handleSearchClientes with this updated fetchClients function
+  // Replace the existing fetchClients function with this improved version
   const fetchClients = useCallback(async (
     searchTerm: string, 
     page: number, 
     append: boolean = false
   ) => {
+    // Create a unique ID for this request
+    const requestId = ++lastRequestIdRef.current;
+    
     try {
       setIsSearching(true);
+      // Try with both pageSize and limit parameters to support different API versions
       let endpoint = searchTerm 
-        ? `/api/clientes?query=${encodeURIComponent(searchTerm)}&page=${page}&pageSize=10` 
-        : `/api/clientes?page=${page}&pageSize=10`;
+        ? `/api/clientes?query=${encodeURIComponent(searchTerm)}&page=${page}&pageSize=${pageSize}` 
+        : `/api/clientes?page=${page}&pageSize=${pageSize}`;
       
-      console.log(`Fetching clients from: ${endpoint}`);
+      console.log(`[Request #${requestId}] Fetching clients from: ${endpoint}`);
       const response = await fetch(endpoint);
       
+      // If a newer request has already started, ignore this one
+      if (requestId < lastRequestIdRef.current) {
+        console.log(`[Request #${requestId}] Abandoned - newer request in progress`);
+        return;
+      }
+      
       if (!response.ok) {
-        throw new Error('Error al buscar clientes');
+        console.error(`[Request #${requestId}] API response not OK:`, response.status, response.statusText);
+        toast.error("No se pudieron cargar los clientes");
+        return;
       }
       
       const result = await response.json();
       
-      setHasMoreResults(result.hasMore);
-      setSearchResults(prev => append ? [...prev, ...(result.data || [])] : (result.data || []));
+      // Check again if this is still the most recent request
+      if (requestId < lastRequestIdRef.current) {
+        console.log(`[Request #${requestId}] Abandoned - newer request completed`);
+        return;
+      }
+      
+      console.log(`[Request #${requestId}] API response:`, {
+        searchTerm,
+        page,
+        append,
+        hasData: !!result.data,
+        dataLength: result.data?.length || 0,
+        hasMore: result.hasMore,
+        count: result.count
+      });
+      
+      // Handle different response formats
+      if (Array.isArray(result)) {
+        // Array response format
+        setHasMoreResults(result.length >= pageSize);
+        setSearchResults(prev => append ? [...prev, ...result] : result);
+      } else if (result.data && Array.isArray(result.data)) {
+        // Object with data array response format
+        setHasMoreResults(result.hasMore === true);
+        setSearchResults(prev => append ? [...prev, ...result.data] : result.data);
+      } else {
+        // Unknown format
+        console.error(`[Request #${requestId}] Unexpected API response format:`, result);
+        setSearchResults([]);
+        setHasMoreResults(false);
+      }
       
     } catch (error) {
-      console.error('Error fetching clients:', error);
-      toast.error("No se pudieron cargar los clientes");
+      // Only show errors for the most recent request
+      if (requestId === lastRequestIdRef.current) {
+        console.error(`[Request #${requestId}] Error fetching clients:`, error);
+        toast.error("No se pudieron cargar los clientes");
+        setSearchResults([]);
+        setHasMoreResults(false);
+      }
     } finally {
-      setIsSearching(false);
+      // Only update loading state for the most recent request
+      if (requestId === lastRequestIdRef.current) {
+        setIsSearching(false);
+      }
     }
-  }, [toast]);
+  }, [toast, pageSize]);
 
-  // Handler for search term changes
+  // Replace with debounced search
+  const debouncedFetchClients = useCallback(
+    debounce((term: string, page: number, append: boolean) => {
+      fetchClients(term, page, append);
+    }, 300),
+    [fetchClients]
+  );
+
+  // Handler for search term changes with debounce
   const handleSearchTermChange = useCallback((value: string) => {
     setSearchTerm(value);
     setCurrentPage(0);
-    setHasMoreResults(true);
-    fetchClients(value, 0, false);
-  }, [fetchClients]);
+    setIsDebouncing(true);
+    
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set a flag to indicate we're waiting for debounce
+    setIsDebouncing(true);
+    
+    // Use the debounced function
+    debouncedFetchClients(value, 0, false).then(() => {
+      setIsDebouncing(false);
+    });
+  }, [debouncedFetchClients]);
 
   // Handle scroll to load more results
   const handleScroll = useCallback(() => {
@@ -550,14 +641,17 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     };
   }, [comboboxOpen, handleScroll]);
 
-  // Initial fetch when combobox opens
+  // Initial fetch when combobox opens - don't use search term here
   useEffect(() => {
     if (comboboxOpen) {
       setCurrentPage(0);
       setHasMoreResults(true);
-      fetchClients(searchTerm, 0, false);
+      // Only fetch all clients if search term is empty
+      if (!searchTerm) {
+        fetchClients("", 0, false);
+      }
     }
-  }, [comboboxOpen, fetchClients, searchTerm]);
+  }, [comboboxOpen, fetchClients]);
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
@@ -760,10 +854,10 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                     ref={listRef}
                     className="max-h-[300px] overflow-y-auto" 
                   >
-                    {isSearching && searchResults.length === 0 ? (
+                    {(isSearching || isDebouncing) && searchResults.length === 0 ? (
                       <div className="flex items-center justify-center p-4">
                         <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        <span>Buscando clientes...</span>
+                        <span>{isDebouncing ? "Esperando para buscar..." : "Buscando clientes..."}</span>
                       </div>
                     ) : searchResults.length === 0 ? (
                       <div className="p-4">
@@ -808,15 +902,23 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                             className="p-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => handleClienteClick(cliente)}
                           >
-                            <div className="font-medium">{cliente.nombre}</div>
-                            {cliente.celular && <div className="text-sm">{cliente.celular}</div>}
-                            {cliente.correo && <div className="text-sm">{cliente.correo}</div>}
+                            <div className="font-medium">
+                              {searchTerm && searchTerm.length > 1
+                                ? highlightMatch(cliente.nombre, searchTerm)
+                                : cliente.nombre}
+                            </div>
+                            {cliente.celular && (
+                              <div className="text-sm">{cliente.celular}</div>
+                            )}
+                            {cliente.correo && (
+                              <div className="text-sm">{cliente.correo}</div>
+                            )}
                           </div>
                         ))}
-                        {isSearching && hasMoreResults && (
+                        {(isSearching || isDebouncing) && hasMoreResults && (
                           <div className="flex items-center justify-center p-2 text-sm text-gray-500">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            Cargando más resultados...
+                            {isDebouncing ? "Esperando para buscar..." : "Cargando más resultados..."}
                           </div>
                         )}
                       </>
