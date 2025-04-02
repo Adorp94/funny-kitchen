@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
           estado,
           moneda,
           total,
+          total_mxn,
           cliente:cliente_id (
             cliente_id,
             nombre,

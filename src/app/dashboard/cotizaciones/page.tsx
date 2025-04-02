@@ -42,6 +42,7 @@ interface Cotizacion {
   };
   moneda: string;
   total: number;
+  total_mxn?: number;
 }
 
 export default function CotizacionesPage() {
@@ -95,6 +96,17 @@ export default function CotizacionesPage() {
       const data = await response.json();
       console.log("Cotizaciones received:", data);
       
+      // Debug log to examine the first record in detail (if it exists)
+      if (data.cotizaciones && data.cotizaciones.length > 0) {
+        console.log("Sample cotización data:", {
+          first_record: data.cotizaciones[0],
+          has_total_mxn: data.cotizaciones[0].hasOwnProperty('total_mxn'),
+          total_mxn_value: data.cotizaciones[0].total_mxn,
+          moneda: data.cotizaciones[0].moneda,
+          total: data.cotizaciones[0].total
+        });
+      }
+      
       if (!data.cotizaciones || !Array.isArray(data.cotizaciones)) {
         const errorDetail = "Invalid data structure received from API";
         console.error(errorDetail, data);
@@ -102,15 +114,16 @@ export default function CotizacionesPage() {
         throw new Error(errorDetail);
       }
       
-      // Map the data to match our Cotizacion interface if needed
-      const formattedCotizaciones = data.cotizaciones.map((cot: any) => ({
+      // Map the data to match our Cotizacion interface
+      const formattedCotizaciones: Cotizacion[] = data.cotizaciones.map((cot: any) => ({
         cotizacion_id: cot.cotizacion_id,
         folio: cot.folio,
         fecha_creacion: cot.fecha_creacion,
         estado: cot.estado,
         cliente: cot.cliente,
         moneda: cot.moneda,
-        total: cot.total
+        total: cot.total,
+        total_mxn: cot.total_mxn
       }));
       
       setCotizaciones(formattedCotizaciones);
@@ -121,21 +134,26 @@ export default function CotizacionesPage() {
       const cotizacionesPendientes = formattedCotizaciones.filter(c => c.estado === 'pendiente').length;
       const cotizacionesAceptadas = formattedCotizaciones.filter(c => c.estado === 'aceptada').length;
       
-      // Calculate total amounts by currency
-      const montoTotalMXN = formattedCotizaciones
-        .filter(c => c.moneda === 'MXN')
-        .reduce((sum, c) => sum + c.total, 0);
-        
-      const montoTotalUSD = formattedCotizaciones
-        .filter(c => c.moneda === 'USD')
-        .reduce((sum, c) => sum + c.total, 0);
+      // Calculate total amount in MXN using total_mxn field when available
+      const montoTotalMXN = formattedCotizaciones.reduce((sum, c) => {
+        // For MXN currency quotes that don't have total_mxn field
+        if (c.moneda === 'MXN' && (c.total_mxn === null || c.total_mxn === undefined)) {
+          return sum + c.total;
+        }
+        // For quotes with total_mxn field (either USD or MXN)
+        else if (c.total_mxn !== null && c.total_mxn !== undefined) {
+          return sum + Number(c.total_mxn);
+        }
+        // Skip quotes without proper MXN value
+        return sum;
+      }, 0);
       
       setMetrics({
         totalCotizaciones,
         cotizacionesPendientes,
         cotizacionesAceptadas,
         montoTotalMXN,
-        montoTotalUSD
+        montoTotalUSD: 0 // We're not using this anymore
       });
     } catch (error) {
       console.error("Error fetching quotations:", error);
@@ -172,7 +190,7 @@ export default function CotizacionesPage() {
     
     // Sort the results
     results.sort((a, b) => {
-      let aValue, bValue;
+      let aValue: any, bValue: any;
       
       switch (sortBy.field) {
         case 'fecha_creacion':
@@ -188,8 +206,9 @@ export default function CotizacionesPage() {
           bValue = b.cliente.nombre.toLowerCase();
           break;
         default:
-          aValue = a[sortBy.field as keyof Cotizacion];
-          bValue = b[sortBy.field as keyof Cotizacion];
+          // Use a type assertion to access dynamic property
+          aValue = (a as any)[sortBy.field] || '';
+          bValue = (b as any)[sortBy.field] || '';
       }
       
       if (sortBy.direction === 'asc') {
@@ -306,7 +325,7 @@ export default function CotizacionesPage() {
       {errorDetails && renderErrorDetails()}
       
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Total Cotizaciones</CardDescription>
@@ -323,15 +342,8 @@ export default function CotizacionesPage() {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total MXN</CardDescription>
+            <CardDescription>Monto Total (MXN)</CardDescription>
             <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
-          </CardHeader>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total USD</CardDescription>
-            <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalUSD, 'USD')}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -448,6 +460,7 @@ export default function CotizacionesPage() {
                       </div>
                     </TableHead>
                     <TableHead className="whitespace-nowrap">Estado</TableHead>
+                    <TableHead className="whitespace-nowrap">Moneda</TableHead>
                     <TableHead 
                       className="cursor-pointer whitespace-nowrap"
                       onClick={() => handleSort('total')}
@@ -477,6 +490,11 @@ export default function CotizacionesPage() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {getStatusBadge(cotizacion.estado)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                          {cotizacion.moneda}
+                        </Badge>
                       </TableCell>
                       <TableCell className="font-medium whitespace-nowrap">
                         {formatCurrency(cotizacion.total, cotizacion.moneda)}

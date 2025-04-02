@@ -40,7 +40,13 @@ export function Header() {
   
   // Check if a given path is active
   const isActive = (path: string) => {
-    if (path === "/" && pathname !== "/") return false;
+    // Special case for dashboard paths
+    if (path === "/dashboard") {
+      // Only consider active if we're on the dashboard home page exactly
+      return pathname === "/dashboard";
+    }
+    
+    // For other paths, check if the current path starts with the given path
     return pathname === path || pathname.startsWith(path);
   };
 
