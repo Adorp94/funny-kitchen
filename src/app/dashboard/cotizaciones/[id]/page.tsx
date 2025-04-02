@@ -133,241 +133,275 @@ export default function CotizacionDetailPage() {
   }
   
   return (
-    <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard/cotizaciones">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+    <div className="py-6 px-4 sm:py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/cotizaciones" className="rounded-full bg-white shadow-sm border border-gray-100 p-2 hover:bg-gray-50 transition-colors">
+            <ArrowLeft className="h-4 w-4 text-gray-600" />
           </Link>
-          <h1 className="text-2xl font-bold">Cotización {cotizacion.folio || `#${cotizacion.cotizacion_id}`}</h1>
-          {getStatusBadge(cotizacion.estado)}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">{cotizacion.folio || `Cotización #${cotizacion.cotizacion_id}`}</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-gray-500">{formatDate(cotizacion.fecha_creacion || cotizacion.fecha_cotizacion)}</p>
+              <span className="text-gray-300">•</span>
+              {getStatusBadge(cotizacion.estado)}
+            </div>
+          </div>
         </div>
         
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <FileText className="mr-2 h-4 w-4" />
-            Cambiar Estado
-          </Button>
-        </div>
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-sm"
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          Cambiar Estado
+        </Button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Client information */}
-        <div className="bg-white rounded-lg border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Información del Cliente</h2>
-          
-          {cotizacion.cliente ? (
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">Nombre</p>
-                <p className="font-medium">{cotizacion.cliente.nombre}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Teléfono</p>
-                <p className="font-medium">{cotizacion.cliente.celular}</p>
-              </div>
-              
-              {cotizacion.cliente.correo && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-medium text-gray-900">Información del Cliente</h2>
+          </div>
+          <div className="p-6">
+            {cotizacion.cliente ? (
+              <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-500">Correo</p>
-                  <p className="font-medium">{cotizacion.cliente.correo}</p>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Nombre</p>
+                  <p className="font-medium text-gray-800">{cotizacion.cliente.nombre}</p>
                 </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-gray-500">No se encontró información del cliente</p>
-          )}
+                
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Teléfono</p>
+                  <p className="font-medium text-gray-800">{cotizacion.cliente.celular}</p>
+                </div>
+                
+                {cotizacion.cliente.correo && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Correo</p>
+                    <p className="font-medium text-gray-800">{cotizacion.cliente.correo}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-500">No se encontró información del cliente</p>
+            )}
+          </div>
         </div>
         
         {/* Cotizacion details */}
-        <div className="bg-white rounded-lg border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Detalles de la Cotización</h2>
-          
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-gray-500">Fecha</p>
-              <p className="font-medium">{formatDate(cotizacion.fecha_creacion || cotizacion.fecha_cotizacion)}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-500">Moneda</p>
-              <p className="font-medium">{cotizacion.moneda || 'MXN'}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-500">Tiempo de Entrega</p>
-              <p className="font-medium">{cotizacion.tiempo_estimado || 'No especificado'}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-500">Estado de Pago</p>
-              <p className="font-medium">{
-                cotizacion.estatus_pago === 'anticipo' 
-                  ? 'Con anticipo' 
-                  : cotizacion.estatus_pago === 'pagado' 
-                  ? 'Pagado' 
-                  : 'Pendiente'
-              }</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-medium text-gray-900">Detalles de la Cotización</h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Fecha</p>
+                <p className="font-medium text-gray-800">{formatDate(cotizacion.fecha_creacion || cotizacion.fecha_cotizacion)}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Moneda</p>
+                <p className="font-medium text-gray-800">{cotizacion.moneda || 'MXN'}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Tiempo de Entrega</p>
+                <p className="font-medium text-gray-800">{cotizacion.tiempo_estimado || 'No especificado'}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Estado de Pago</p>
+                <div className="font-medium text-gray-800">
+                  {cotizacion.estatus_pago === 'anticipo' ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                      Con anticipo
+                    </span>
+                  ) : cotizacion.estatus_pago === 'pagado' ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                      Pagado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                      Pendiente
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
         {/* Financial summary */}
-        <div className="bg-white rounded-lg border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Resumen Financiero</h2>
-          
-          <div className="space-y-4 mb-6">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(
-                  (cotizacion.subtotal || cotizacion.precio_total || 0) - 
-                  (cotizacion.monto_iva || cotizacion.iva || 0) - 
-                  (cotizacion.costo_envio || cotizacion.envio || 0), 
-                  cotizacion.moneda
-                )}
-              </span>
-            </div>
-            
-            {(cotizacion.descuento_global || cotizacion.descuento_total) > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-medium text-gray-900">Resumen Financiero</h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Descuento</span>
-                <span className="font-medium text-red-600">
-                  -{formatCurrency(cotizacion.descuento_global || cotizacion.descuento_total || 0, cotizacion.moneda)}
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium text-gray-800">
+                  {formatCurrency(
+                    (cotizacion.subtotal || cotizacion.precio_total || 0) - 
+                    (cotizacion.monto_iva || cotizacion.iva || 0) - 
+                    (cotizacion.costo_envio || cotizacion.envio || 0), 
+                    cotizacion.moneda
+                  )}
                 </span>
               </div>
-            )}
-            
-            {(cotizacion.monto_iva || cotizacion.iva) > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">IVA (16%)</span>
-                <span className="font-medium">
-                  {formatCurrency(cotizacion.monto_iva || cotizacion.iva || 0, cotizacion.moneda)}
-                </span>
-              </div>
-            )}
-            
-            {(cotizacion.costo_envio || cotizacion.envio) > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Envío</span>
-                <span className="font-medium">
-                  {formatCurrency(cotizacion.costo_envio || cotizacion.envio || 0, cotizacion.moneda)}
-                </span>
-              </div>
-            )}
-            
-            <Separator />
-            
-            <div className="flex justify-between items-center font-bold">
-              <span>Total</span>
-              <span className="text-emerald-600">
-                {formatCurrency(cotizacion.total || cotizacion.precio_total || 0, cotizacion.moneda)}
-              </span>
-            </div>
-            
-            {/* Show advance payment information if available */}
-            {cotizacion.pagos && cotizacion.pagos.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="font-medium text-gray-700 mb-2 flex items-center">
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    Anticipo Recibido
-                  </h3>
-                  <div className="bg-blue-50 p-3 rounded-md">
-                    <div className="flex justify-between text-sm">
-                      <span>Monto:</span>
-                      <span className="font-medium">{formatCurrency(cotizacion.pagos[0].monto, cotizacion.pagos[0].moneda)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Fecha:</span>
-                      <span className="font-medium">{formatDate(cotizacion.pagos[0].fecha_pago)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Método:</span>
-                      <span className="font-medium">{cotizacion.pagos[0].metodo_pago}</span>
-                    </div>
-                    {cotizacion.pagos[0].porcentaje && (
-                      <div className="flex justify-between text-sm">
-                        <span>Porcentaje:</span>
-                        <span className="font-medium">{cotizacion.pagos[0].porcentaje}%</span>
-                      </div>
-                    )}
-                  </div>
+              
+              {(cotizacion.descuento_global || cotizacion.descuento_total) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Descuento</span>
+                  <span className="font-medium text-red-600">
+                    -{formatCurrency(cotizacion.descuento_global || cotizacion.descuento_total || 0, cotizacion.moneda)}
+                  </span>
                 </div>
-              </>
-            )}
+              )}
+              
+              {(cotizacion.monto_iva || cotizacion.iva) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">IVA (16%)</span>
+                  <span className="font-medium text-gray-800">
+                    {formatCurrency(cotizacion.monto_iva || cotizacion.iva || 0, cotizacion.moneda)}
+                  </span>
+                </div>
+              )}
+              
+              {(cotizacion.costo_envio || cotizacion.envio) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Envío</span>
+                  <span className="font-medium text-gray-800">
+                    {formatCurrency(cotizacion.costo_envio || cotizacion.envio || 0, cotizacion.moneda)}
+                  </span>
+                </div>
+              )}
+              
+              <div className="border-t border-gray-100 my-2 pt-2"></div>
+              
+              <div className="flex justify-between items-center font-bold">
+                <span className="text-gray-900">Total</span>
+                <span className="text-emerald-600">
+                  {formatCurrency(cotizacion.total || cotizacion.precio_total || 0, cotizacion.moneda)}
+                </span>
+              </div>
+              
+              {/* Show advance payment information if available */}
+              {cotizacion.pagos && cotizacion.pagos.length > 0 && (
+                <>
+                  <div className="border-t border-gray-100 my-2 pt-2"></div>
+                  <div>
+                    <h3 className="font-medium text-gray-800 mb-3 flex items-center">
+                      <DollarSign className="h-4 w-4 mr-1 text-blue-600" />
+                      Anticipo Recibido
+                    </h3>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-blue-700 font-medium mb-1">Monto</p>
+                          <p className="font-medium text-blue-900">{formatCurrency(cotizacion.pagos[0].monto, cotizacion.pagos[0].moneda)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-blue-700 font-medium mb-1">Fecha</p>
+                          <p className="font-medium text-blue-900">{formatDate(cotizacion.pagos[0].fecha_pago)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-blue-700 font-medium mb-1">Método</p>
+                          <p className="font-medium text-blue-900 capitalize">{cotizacion.pagos[0].metodo_pago}</p>
+                        </div>
+                        {cotizacion.pagos[0].porcentaje && (
+                          <div>
+                            <p className="text-xs text-blue-700 font-medium mb-1">Porcentaje</p>
+                            <p className="font-medium text-blue-900">{cotizacion.pagos[0].porcentaje}%</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
       
       {/* Products section */}
-      <div className="bg-white rounded-lg border shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Productos</h2>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-medium text-gray-900">Productos</h2>
+        </div>
         
-        {cotizacion.productos && cotizacion.productos.length > 0 ? (
-          <ResponsiveTable>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cantidad
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Precio Unitario
-                  </th>
-                  {cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) && (
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descuento
+        <div className="p-6">
+          {cotizacion.productos && cotizacion.productos.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50 rounded-tl-lg">
+                      Producto
                     </th>
-                  )}
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Subtotal
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cotizacion.productos.map((producto: any) => (
-                  <tr key={producto.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {producto.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                      {producto.cantidad}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                      {formatCurrency(producto.precio_unitario || producto.precio, cotizacion.moneda)}
-                    </td>
+                    <th scope="col" className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
+                      Cantidad
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
+                      Precio
+                    </th>
                     {cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {producto.descuento ? `${producto.descuento}%` : '-'}
-                      </td>
+                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50">
+                        Descuento
+                      </th>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
-                      {formatCurrency(producto.precio_total || producto.subtotal, cotizacion.moneda)}
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 bg-gray-50 rounded-tr-lg">
+                      Subtotal
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {cotizacion.productos.map((producto: any, index: number) => (
+                    <tr key={producto.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <div className="truncate max-w-[150px] sm:max-w-none">{producto.nombre}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 text-center">
+                        {producto.cantidad}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 text-right whitespace-nowrap">
+                        {formatCurrency(producto.precio_unitario || 0, cotizacion.moneda)}
+                      </td>
+                      {cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) && (
+                        <td className="px-4 py-3 text-sm text-red-600 text-right whitespace-nowrap">
+                          {producto.descuento ? `${producto.descuento}%` : '-'}
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
+                        {formatCurrency(producto.precio_total || 0, cotizacion.moneda)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50">
+                    <td colSpan={cotizacion.productos.some((p: any) => p.descuento && p.descuento > 0) ? 4 : 3} className="px-4 py-3 text-sm font-medium text-gray-700 text-right">
+                      Total
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-emerald-600 text-right whitespace-nowrap">
+                      {formatCurrency(cotizacion.total || cotizacion.precio_total || 0, cotizacion.moneda)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </ResponsiveTable>
-        ) : (
-          <div className="bg-gray-50 p-4 rounded-md text-gray-500">
-            No hay productos asociados a esta cotización
-          </div>
-        )}
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 px-4">
+              <p className="text-gray-500">No hay productos registrados en esta cotización</p>
+            </div>
+          )}
+        </div>
       </div>
       
-      {/* Status change modal */}
       <CotizacionStatusModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

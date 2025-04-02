@@ -396,7 +396,7 @@ export function CotizacionStatusModal({
       <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
       <DialogContent className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col">
         <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="bg-gray-50 p-2 rounded-lg">
                 <FileText className="h-5 w-5 text-gray-600" />
@@ -410,7 +410,9 @@ export function CotizacionStatusModal({
                 </p>
               </div>
             </div>
-            {getStatusBadge(cotizacion.estado)}
+            <div className="ml-7 sm:ml-0 mt-1 sm:mt-0">
+              {getStatusBadge(cotizacion.estado)}
+            </div>
           </div>
         </DialogHeader>
 
