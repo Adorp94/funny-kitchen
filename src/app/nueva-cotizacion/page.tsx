@@ -97,8 +97,15 @@ function NuevaCotizacionClient() {
 
   // Use effect to update cliente state after render
   useEffect(() => {
-    if (clienteData) {
+    // If clienteData is null, reset the cliente state to ensure consistency
+    if (clienteData === null) {
+      setCliente(null);
+      // Also clear from sessionStorage to avoid persistence of old client data
+      sessionStorage.removeItem('cotizacion_cliente');
+    } else if (clienteData) {
       setCliente(clienteData);
+      // Store the updated client data in session storage
+      sessionStorage.setItem('cotizacion_cliente', JSON.stringify(clienteData));
     }
   }, [clienteData]);
   
@@ -184,9 +191,11 @@ function NuevaCotizacionClient() {
       const subtotalAfterDiscount = subtotal * (1 - globalDiscount / 100);
       const montoIva = hasIva ? subtotalAfterDiscount * 0.16 : 0;
       
-      // Prepare data for API call
+      // Prepare data for API call, including all client data
+      // This passes the client information to the API, which can create the client if needed
       const quotationData = {
         cliente: cliente,
+        create_client_if_needed: !cliente.cliente_id || cliente.cliente_id === 0,
         productos: productos.map(p => ({
           ...p,
           // Use the database producto_id if available
@@ -203,7 +212,7 @@ function NuevaCotizacionClient() {
         tipo_cambio: exchangeRate
       };
       
-      // Call API to save quotation
+      // Call API to save quotation (and client if needed)
       const response = await fetch('/api/cotizaciones', {
         method: 'POST',
         headers: {
@@ -216,6 +225,14 @@ function NuevaCotizacionClient() {
       
       if (!response.ok) {
         throw new Error(result.error || 'Error al guardar la cotización');
+      }
+      
+      // If a new client was created, update our state
+      if (result.cliente_creado) {
+        console.log("Client was created during quotation:", result.cliente_creado);
+        setClienteData(result.cliente_creado);
+        setCliente(result.cliente_creado);
+        sessionStorage.setItem('cotizacion_cliente', JSON.stringify(result.cliente_creado));
       }
       
       // Clear context data after successful save

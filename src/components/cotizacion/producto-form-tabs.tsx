@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Package, FileText, Search, AlertCircle, Save, Check, ChevronsUpDown, Banknote, Box, Layers, Hash, X, User, Loader2 } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
@@ -87,8 +87,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [isDebouncing, setIsDebouncing] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRequestIdRef = useRef<number>(0);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const pageSize = 20;
-  const listRef = useRef<HTMLDivElement>(null);
   
   // Initialize Supabase client
   const supabase = createClientComponentClient();
@@ -343,15 +347,48 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   };
 
-  // Search for products with pagination support
-  const handleSearch = async (searchTermValue: string, page = 0, append = false): Promise<void> => {
-    setIsSearching(true);
+  // Debounce function
+  function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    return (...args: Parameters<F>): Promise<ReturnType<F>> => {
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+      return new Promise(resolve => {
+        timeout = setTimeout(() => {
+          const result = func(...args);
+          resolve(result);
+        }, waitFor);
+      });
+    };
+  }
+
+  // Add debounced search function
+  const debouncedSearch = useCallback(
+    debounce((term: string, page: number, append: boolean) => {
+      handleSearch(term, page, append);
+    }, 300),
+    []
+  );
+
+  // Update the handleSearch function for better race condition handling
+  const handleSearch = async (searchTermValue: string, page: number, append: boolean = false) => {
+    // Create a unique ID for this request
+    const requestId = ++lastRequestIdRef.current;
     
     try {
-      console.log(`Searching products with term: "${searchTermValue}", page: ${page}`);
+      setIsSearching(true);
+      console.log(`[Request #${requestId}] Searching products with term: "${searchTermValue}", page: ${page}`);
       
       // Use direct fetch instead of the helper function while debugging
       const response = await fetch(`/api/productos?query=${encodeURIComponent(searchTermValue)}&page=${page}&pageSize=${pageSize}`);
+      
+      // If a newer request has started, abandon this one
+      if (requestId < lastRequestIdRef.current) {
+        console.log(`[Request #${requestId}] Abandoned - newer request in progress`);
+        return;
+      }
       
       if (!response.ok) {
         throw new Error('Failed to fetch products');
@@ -359,12 +396,18 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
       
       const result = await response.json();
       
+      // Check again if this is still the most recent request
+      if (requestId < lastRequestIdRef.current) {
+        console.log(`[Request #${requestId}] Abandoned - newer request completed`);
+        return;
+      }
+      
       // Process results
       const data = result.data || [];
       const hasMore = result.hasMore || false;
       const count = result.count || 0;
       
-      console.log(`Found ${data.length} results, total count: ${count}, hasMore: ${hasMore}`);
+      console.log(`[Request #${requestId}] Found ${data.length} results, total count: ${count}, hasMore: ${hasMore}`);
       
       if (data) {
         if (append) {
@@ -379,22 +422,49 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         setCurrentPage(page);
       }
     } catch (error) {
-      console.error("Error searching for products:", error);
-      toast.error("Error al buscar productos");
+      // Only show errors for the most recent request
+      if (requestId === lastRequestIdRef.current) {
+        console.error("[Request #${requestId}] Error searching for products:", error);
+        toast.error("Error al buscar productos");
+      }
     } finally {
-      setIsSearching(false);
+      // Only update loading state for the most recent request
+      if (requestId === lastRequestIdRef.current) {
+        setIsSearching(false);
+      }
     }
   };
 
+  // Handle search term changes with debounce
+  const handleSearchTermChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(0);
+    setIsDebouncing(true);
+    
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set a flag to indicate we're waiting for debounce
+    setIsDebouncing(true);
+    
+    // Use the debounced function
+    debouncedSearch(value, 0, false).then(() => {
+      setIsDebouncing(false);
+    });
+  }, [debouncedSearch]);
+
   // Handle scrolling to load more results - preserve scroll position
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget;
     
     // Check if we're close to the bottom
     if (
       element.scrollHeight - element.scrollTop <= element.clientHeight + 100 &&
       hasMoreResults &&
-      !isSearching
+      !isSearching &&
+      !isDebouncing
     ) {
       // Remember current scroll position and height
       const scrollTop = element.scrollTop;
@@ -415,7 +485,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
           }, 10);
         });
     }
-  };
+  }, [searchTerm, currentPage, hasMoreResults, isSearching, isDebouncing]);
   
   // Load initial product list when dropdown opens
   useEffect(() => {
@@ -432,14 +502,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
       
       // If the dropdown is open, perform the search
       if (comboboxOpen) {
-        const delayDebounceFn = setTimeout(() => {
-          handleSearch(searchTerm, 0, false);
-        }, 300);
-        
-        return () => clearTimeout(delayDebounceFn);
+        handleSearchTermChange(searchTerm);
       }
     }
-  }, [searchTerm, comboboxOpen]);
+  }, [searchTerm, comboboxOpen, handleSearchTermChange]);
 
   // Handle selection of an existing product
   const handleSelectProduct = (productoId: string) => {
@@ -827,9 +893,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <input
                         value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                        }}
+                        onChange={(e) => handleSearchTermChange(e.target.value)}
                         autoFocus
                         placeholder="Buscar por nombre o SKU..."
                         className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -842,10 +906,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                     ref={listRef}
                     onScroll={handleScroll}
                   >
-                    {isSearching ? (
+                    {(isSearching || isDebouncing) && searchResults.length === 0 ? (
                       <div className="py-6 text-center text-sm text-muted-foreground">
                         <div className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
-                        Buscando productos...
+                        {isDebouncing ? "Esperando para buscar..." : "Buscando productos..."}
                       </div>
                     ) : searchResults.length === 0 ? (
                       <div className="py-4 text-center">
@@ -884,9 +948,9 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                         </Button>
                       </div>
                     ) : (
-                      searchResults.map((producto) => (
+                      searchResults.map((producto, index) => (
                         <div
-                          key={producto.producto_id}
+                          key={`${producto.producto_id}-${index}`}
                           className="flex items-center px-3 py-2 cursor-pointer hover:bg-slate-100"
                           onClick={() => handleSelectProduct(producto.producto_id.toString())}
                         >
@@ -917,9 +981,10 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                       ))
                     )}
                     
-                    {hasMoreResults && !isSearching && (
+                    {(isSearching || isDebouncing) && hasMoreResults && (
                       <div className="py-2 text-center text-xs text-gray-500 border-t">
-                        Desplázate para cargar más
+                        <div className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
+                        {isDebouncing ? "Esperando para buscar..." : "Cargando más resultados..."}
                       </div>
                     )}
                   </div>

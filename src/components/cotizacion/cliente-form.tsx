@@ -239,7 +239,8 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       const hasNoErrors = Object.keys(validationErrors).length === 0;
       
       if (hasNoErrors) {
-        // Check that we have required fields based on the active tab
+        // Simply notify the parent with the current form data (saved or unsaved)
+        // DO NOT automatically save to database here
         if (activeTab === 'nuevo' && formData.nombre && formData.celular) {
           safeNotifyParent(formDataToCliente(formData));
         } else if (activeTab === 'existente' && formData.cliente_id) {
@@ -389,6 +390,96 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   };
 
   // Save new client to database
+  const handleSaveClient = async () => {
+    // Validate form first
+    const validationErrors = validateForm(formData);
+    setErrors(validationErrors);
+    
+    // Mark all fields as touched
+    setTouched({
+      nombre: true,
+      celular: true,
+      correo: true,
+      rfc: true
+    });
+    
+    if (Object.keys(validationErrors).length > 0) {
+      toast.error("Por favor corrige los errores antes de guardar");
+      return null;
+    }
+    
+    setIsSearching(true);
+    
+    try {
+      // Check if we're actually creating a new client or not
+      if (formData.cliente_id) {
+        console.log("Client already has ID, not creating a new one", formData.cliente_id);
+        setIsSearching(false);
+        return formDataToCliente(formData);
+      }
+      
+      // Create cliente object for API
+      const clienteToCreate = {
+        nombre: formData.nombre,
+        celular: formData.celular,
+        correo: formData.correo || null,
+        razon_social: formData.razon_social || null,
+        rfc: formData.rfc || null,
+        tipo_cliente: formData.tipo_cliente || null,
+        direccion_envio: formData.direccion_envio || null,
+        recibe: formData.recibe || null,
+        atencion: formData.atencion || null
+      };
+      
+      console.log("Creating new client:", clienteToCreate);
+      
+      // Insert the client using the API
+      const response = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(clienteToCreate),
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to create client');
+      }
+      
+      console.log("Create response:", responseData);
+      
+      if (responseData.success && responseData.cliente) {
+        // Update form data with the new client ID
+        const updatedFormData = {
+          ...formData,
+          cliente_id: responseData.cliente.cliente_id.toString()
+        };
+        
+        setFormData(updatedFormData);
+        setFormDataChanged(true);
+        
+        // Save to sessionStorage
+        sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedFormData));
+        
+        toast.success("Cliente creado exitosamente");
+        
+        // Return the created client
+        return formDataToCliente(updatedFormData);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error creating client:", error);
+      toast.error("Error al crear el cliente");
+      return null;
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Update existing client in database
   const handleUpdateClient = async () => {
     // Validate form first
     const validationErrors = validateForm(formData);
@@ -482,6 +573,109 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [activeTab]);
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    // If switching from "nuevo" tab and we have valid data, save the client first
+    if (activeTab === "nuevo" && value === "existente" && formData.nombre && formData.celular) {
+      const errors = validateForm(formData);
+      if (Object.keys(errors).length === 0 && !formData.cliente_id) {
+        // We're switching tabs with valid data but no client ID, so save first
+        toast.promise(handleSaveClient(), {
+          loading: "Guardando cliente...",
+          success: "Cliente guardado correctamente",
+          error: "Error al guardar el cliente"
+        });
+      }
+    }
+    
+    // If switching from "existente" to "nuevo", clear the form data for a fresh start
+    if (activeTab === "existente" && value === "nuevo") {
+      // Save the current client data to avoid losing it completely
+      if (formData.cliente_id) {
+        sessionStorage.setItem('cotizacion_lastExistingClient', JSON.stringify(formData));
+      }
+      
+      // Reset form to empty state
+      setFormData({
+        cliente_id: "",
+        nombre: "",
+        celular: "",
+        correo: "",
+        razon_social: "",
+        rfc: "",
+        tipo_cliente: "Normal",
+        direccion_envio: "",
+        recibe: "",
+        atencion: ""
+      });
+      
+      // Update sessionStorage
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify({
+        cliente_id: "",
+        nombre: "",
+        celular: "",
+        correo: "",
+        razon_social: "",
+        rfc: "",
+        tipo_cliente: "Normal",
+        direccion_envio: "",
+        recibe: "",
+        atencion: ""
+      }));
+      
+      // Reset errors and touched state
+      setErrors({});
+      setTouched({});
+      
+      // Mark as changed to trigger parent notification with null client
+      setFormDataChanged(true);
+      safeNotifyParent(null); // Explicitly notify parent that we have no client selected
+    }
+    
+    // When switching tabs, ensure the appropriate state is set
+    if (value === "nuevo") {
+      // If switching to nuevo, and we have data from a previous existente tab, clear it
+      if (formData.cliente_id) {
+        // Reset form and notify parent
+        setFormData({
+          cliente_id: "",
+          nombre: "",
+          celular: "",
+          correo: "",
+          razon_social: "",
+          rfc: "",
+          tipo_cliente: "Normal",
+          direccion_envio: "",
+          recibe: "",
+          atencion: ""
+        });
+        sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify({
+          cliente_id: "",
+          nombre: "",
+          celular: "",
+          correo: "",
+          razon_social: "",
+          rfc: "",
+          tipo_cliente: "Normal",
+          direccion_envio: "",
+          recibe: "",
+          atencion: ""
+        }));
+        setFormDataChanged(true);
+        safeNotifyParent(null);
+      }
+    }
+    
+    setActiveTab(value);
+  };
+
+  // Add function to auto-save client when unmounting if needed
+  useEffect(() => {
+    // We will not auto-save on unmounting anymore
+    // This will be handled by the parent component when creating the cotización
+    return () => {};
+  }, []);
 
   // Replace the existing fetchClients function with this improved version
   const fetchClients = useCallback(async (
@@ -655,7 +849,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
 
   return (
     <div className="bg-white rounded-lg shadow p-6 w-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="mb-4 grid grid-cols-2">
           <TabsTrigger value="nuevo">Nuevo</TabsTrigger>
           <TabsTrigger value="existente">Existente</TabsTrigger>
@@ -810,6 +1004,60 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                 icon={<User className="h-4 w-4" />}
               />
             </FormControl>
+            
+            {/* Action buttons for nuevo tab */}
+            <div className="md:col-span-2 mt-4 flex justify-center">
+              <Button 
+                onClick={() => {
+                  // Clear any previously selected client data when switching to existente tab
+                  // This prevents confusion between new clients and selected existing clients
+                  if (formData.cliente_id) {
+                    // If we already have a client ID, it means we're editing a selected existing client
+                    // Instead of saving, we'll clear the form and switch to existente tab
+                    const emptyFormData = {
+                      cliente_id: "",
+                      nombre: "",
+                      celular: "",
+                      correo: "",
+                      razon_social: "",
+                      rfc: "",
+                      tipo_cliente: "Normal",
+                      direccion_envio: "",
+                      recibe: "",
+                      atencion: ""
+                    };
+                    setFormData(emptyFormData);
+                    sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(emptyFormData));
+                    safeNotifyParent(null);
+                    setActiveTab("existente");
+                    return;
+                  }
+                  
+                  // If we have valid new client data but no ID, save it first
+                  if (formData.nombre && formData.celular) {
+                    const errors = validateForm(formData);
+                    if (Object.keys(errors).length === 0) {
+                      toast.promise(handleSaveClient(), {
+                        loading: "Guardando cliente...",
+                        success: "Cliente guardado correctamente",
+                        error: "Error al guardar el cliente"
+                      });
+                    } else {
+                      toast.error("Por favor corrige los errores antes de continuar");
+                      return;
+                    }
+                  }
+                  
+                  // Switch to existente tab to search
+                  setActiveTab("existente");
+                }}
+                variant="default"
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Ver Clientes Existentes
+              </Button>
+            </div>
           </div>
         </TabsContent>
         
@@ -863,35 +1111,9 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                       <div className="p-4">
                         <p className="text-center mb-2">No se encontraron clientes</p>
                         {searchTerm.trim() !== '' && (
-                          <Button 
-                            onClick={() => {
-                              // Create new client with the search term as name
-                              const newFormData = {
-                                cliente_id: "",
-                                nombre: searchTerm,
-                                celular: "",
-                                correo: "",
-                                razon_social: "",
-                                rfc: "",
-                                tipo_cliente: "Normal",
-                                direccion_envio: "",
-                                recibe: "",
-                                atencion: ""
-                              };
-                              
-                              setActiveTab("nuevo");
-                              setFormData(newFormData);
-                              setFormDataChanged(true);
-                              
-                              // Save to sessionStorage
-                              sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
-                            }}
-                            className="w-full mt-2"
-                            variant="outline"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Crear nuevo cliente con "{searchTerm}"
-                          </Button>
+                          <div className="text-center text-sm text-amber-600 mt-2 p-2 bg-amber-50 rounded-md border border-amber-200">
+                            <p>Para crear un nuevo cliente, ve a la pestaña <strong>Nuevo</strong> y completa los datos.</p>
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -1142,13 +1364,13 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
                   >
                     {isSearching ? (
                       <>
-                        <span className="animate-spin mr-2">⏳</span>
-                        Actualizando...
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <span>Actualizando...</span>
                       </>
                     ) : (
                       <>
                         <Save className="h-4 w-4 mr-2" />
-                        Actualizar Cliente
+                        <span>Actualizar Cliente</span>
                       </>
                     )}
                   </Button>
@@ -1159,35 +1381,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
             {!formData.cliente_id && searchResults.length === 0 && !isSearching && searchTerm.length > 0 && (
               <div className="border border-amber-300 bg-amber-50 p-4 rounded-md mt-4 text-sm">
                 <p className="font-medium text-amber-800 mb-2">No se encontraron clientes con ese nombre</p>
-                <p className="text-amber-700">Puedes crear un nuevo cliente en la pestaña "Nuevo".</p>
-                <Button 
-                  className="mt-3 bg-teal-500 hover:bg-teal-600 text-white" 
-                  size="sm"
-                  onClick={() => {
-                    // Create new client with the search term as name
-                    const newFormData = {
-                      cliente_id: "",
-                      nombre: searchTerm,
-                      celular: "",
-                      correo: "",
-                      razon_social: "",
-                      rfc: "",
-                      tipo_cliente: "Normal",
-                      direccion_envio: "",
-                      recibe: "",
-                      atencion: ""
-                    };
-                    
-                    setActiveTab("nuevo");
-                    setFormData(newFormData);
-                    setFormDataChanged(true);
-                    
-                    // Save to sessionStorage
-                    sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newFormData));
-                  }}
-                >
-                  Crear nuevo cliente
-                </Button>
+                <p className="text-amber-700">Para crear un nuevo cliente, utiliza la pestaña "Nuevo" y completa los datos necesarios.</p>
               </div>
             )}
           </div>

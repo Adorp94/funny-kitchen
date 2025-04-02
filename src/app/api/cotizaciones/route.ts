@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
     // Extract data from the request
     const { 
       cliente, 
+      create_client_if_needed,
       productos, 
       moneda, 
       subtotal, 
@@ -136,9 +137,84 @@ export async function POST(req: NextRequest) {
     console.log("===============================");
 
     // Validate required fields
-    if (!cliente || !cliente.cliente_id || !productos || productos.length === 0) {
+    if (!cliente || !productos || productos.length === 0) {
       return NextResponse.json(
         { error: 'Cliente y productos son requeridos' }, 
+        { status: 400 }
+      );
+    }
+
+    // Create or get client_id
+    let client_id = cliente.cliente_id;
+    let cliente_creado = null;
+    
+    if (create_client_if_needed && (!client_id || client_id === 0)) {
+      console.log("Creating new client:", cliente);
+      
+      try {
+        // First, get the maximum cliente_id to determine the next ID
+        const { data: maxIdData, error: maxIdError } = await supabase
+          .from('clientes')
+          .select('cliente_id')
+          .order('cliente_id', { ascending: false })
+          .limit(1)
+          .single();
+          
+        if (maxIdError && !maxIdError.message.includes('No rows found')) {
+          console.error(`Error getting max cliente_id:`, maxIdError);
+          return NextResponse.json(
+            { error: 'Error al crear el cliente: No se pudo obtener un ID válido' }, 
+            { status: 500 }
+          );
+        }
+        
+        // Calculate the next ID (if no clients exist yet, start with 1)
+        const nextId = maxIdData ? maxIdData.cliente_id + 1 : 1;
+        console.log(`Using next cliente_id: ${nextId} for new client`);
+        
+        // Insert client into database with explicit cliente_id
+        const { data: newClient, error: clientError } = await supabase
+          .from('clientes')
+          .insert({
+            cliente_id: nextId,
+            nombre: cliente.nombre.trim().toUpperCase(),
+            celular: cliente.celular,
+            correo: cliente.correo || null,
+            razon_social: cliente.razon_social || null,
+            rfc: cliente.rfc || null,
+            tipo_cliente: cliente.tipo_cliente || 'Normal',
+            direccion_envio: cliente.direccion_envio || null,
+            recibe: cliente.recibe || null,
+            atencion: cliente.atencion || null
+          })
+          .select()
+          .single();
+        
+        if (clientError) {
+          console.error("Error creating client:", clientError);
+          return NextResponse.json(
+            { error: `Error al crear el cliente: ${clientError.message}` }, 
+            { status: 500 }
+          );
+        }
+        
+        // Update client_id with the newly created ID
+        client_id = newClient.cliente_id;
+        cliente_creado = newClient;
+        console.log("Client created successfully with ID:", client_id);
+      } catch (clientError) {
+        console.error("Unexpected error creating client:", clientError);
+        return NextResponse.json(
+          { error: 'Error al crear el cliente' }, 
+          { status: 500 }
+        );
+      }
+    }
+    
+    // Validate client_id after potential creation
+    if (!client_id) {
+      return NextResponse.json(
+        { error: 'Cliente inválido' }, 
         { status: 400 }
       );
     }
@@ -191,7 +267,7 @@ export async function POST(req: NextRequest) {
     const { data: cotizacionData, error: cotizacionError } = await supabase
       .from('cotizaciones')
       .insert({
-        cliente_id: cliente.cliente_id,
+        cliente_id: client_id,
         moneda: moneda,
         subtotal: displaySubtotal,         // Amount in the display currency (USD or MXN)
         subtotal_mxn: subtotal_mxn,        // Always in MXN for reporting
@@ -517,11 +593,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return success with the quotation ID and folio
+    // Return information about the created quotation, including the client if it was created
     return NextResponse.json({
       success: true,
       cotizacion_id: cotizacionId,
-      folio: folio
+      folio: folio,
+      cliente_creado: cliente_creado
     });
     
   } catch (error) {
