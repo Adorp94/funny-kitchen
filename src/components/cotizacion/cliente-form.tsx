@@ -208,11 +208,15 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       newErrors.nombre = "El nombre debe tener al menos 3 caracteres";
     }
     
-    // Validate phone
+    // Validate phone (modified to accept numbers without + prefix)
     if (!data.celular) {
       newErrors.celular = "El teléfono es obligatorio";
-    } else if (!isValidPhoneNumber(data.celular)) {
-      newErrors.celular = "El formato de teléfono no es válido";
+    } else {
+      // For validation, we need to check both with and without + prefix
+      const phoneToValidate = data.celular.startsWith('+') ? data.celular : `+${data.celular}`;
+      if (!isValidPhoneNumber(phoneToValidate)) {
+        newErrors.celular = "El formato de teléfono no es válido";
+      }
     }
     
     // Validate email if provided
@@ -256,12 +260,18 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     }
   }, [formData, formDataChanged, activeTab, initialized]);
 
-  // Convert form data to Cliente object for parent component
+  // Helper to convert formData to Cliente
   const formDataToCliente = (data: ClienteFormData): ClienteType => {
+    // Remove + from phone number if present to match database format
+    let celular = data.celular;
+    if (celular && celular.startsWith('+')) {
+      celular = celular.substring(1);
+    }
+    
     return {
-      cliente_id: data.cliente_id ? parseInt(data.cliente_id) : 0,
+      cliente_id: Number(data.cliente_id),
       nombre: data.nombre,
-      celular: data.celular,
+      celular: celular,
       correo: data.correo || null,
       razon_social: data.razon_social || null,
       rfc: data.rfc || null,
@@ -270,6 +280,13 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       recibe: data.recibe || null,
       atencion: data.atencion || null
     };
+  };
+
+  // Helper to format phone number for PhoneInput component
+  const formatPhoneForInput = (phone: string): string => {
+    if (!phone) return '';
+    // Ensure phone has a + prefix for the component
+    return phone.startsWith('+') ? phone : `+${phone}`;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -301,10 +318,16 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   };
 
   const handlePhoneChange = (value: string | undefined) => {
+    // Remove + from phone number if present to match database format
+    let formattedValue = value || '';
+    if (formattedValue && formattedValue.startsWith('+')) {
+      formattedValue = formattedValue.substring(1);
+    }
+
     setFormData(prev => {
       const newData = {
         ...prev,
-        celular: value || ''
+        celular: formattedValue
       };
       
       // Mark field as touched
@@ -319,7 +342,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       // Save to sessionStorage
       const updatedData = {
         ...prev,
-        celular: value || ''
+        celular: formattedValue
       };
       sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedData));
       
@@ -365,10 +388,16 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
 
   // Handle selection of an existing client
   const handleClienteClick = (cliente: ClienteType) => {
+    // Remove + from phone number if present to match database format
+    let celular = cliente.celular || "";
+    if (celular && celular.startsWith('+')) {
+      celular = celular.substring(1);
+    }
+    
     const updatedFormData = {
       cliente_id: cliente.cliente_id.toString(),
       nombre: cliente.nombre || "",
-      celular: cliente.celular || "",
+      celular: celular,
       correo: cliente.correo || "",
       razon_social: cliente.razon_social || "",
       rfc: cliente.rfc || "",
@@ -1039,12 +1068,13 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
             <PhoneInput
               className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
               country="MX"
-              value={formData.celular}
+              value={formatPhoneForInput(formData.celular)}
               onChange={handlePhoneChange}
               onBlur={() => handleBlur('celular')}
-              placeholder="+52"
+              placeholder="5512345678"
               required
               disabled={!formData.cliente_id && !comboboxOpen}
+              international={false}
             />
           </div>
           {touched.celular && errors.celular && (
