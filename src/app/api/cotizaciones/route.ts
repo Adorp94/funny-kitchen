@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createBrowserClient } from '@supabase/ssr';
 import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
+import { getNextFolioNumber } from '@/app/actions/cotizacion-actions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -219,8 +220,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate a unique folio
-    const folio = `COT-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    // Generate a unique folio with consecutive numbering
+    const folio = await getNextFolioNumber();
     
     // Set expiration date (30 days from now)
     const fechaExpiracion = new Date();

@@ -321,4 +321,55 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
       error: error instanceof Error ? error.message : 'Error desconocido'
     };
   }
+}
+
+/**
+ * Gets the next consecutive folio number for a new cotizacion
+ * Format: COT-{YEAR}-{SEQUENTIAL_NUMBER}
+ */
+export async function getNextFolioNumber() {
+  const supabase = createServerSupabaseClient();
+  const currentYear = new Date().getFullYear();
+  
+  try {
+    // Get the latest quotation with a valid folio from the current year
+    const { data: latestCotizacion, error } = await supabase
+      .from('cotizaciones')
+      .select('folio')
+      .ilike('folio', `COT-${currentYear}-%`)
+      .order('cotizacion_id', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
+      console.error('Error getting latest cotizacion:', error);
+      // In case of error, create a random number as a fallback
+      return `COT-${currentYear}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    }
+    
+    if (!latestCotizacion || !latestCotizacion.folio) {
+      // If no cotizaciones exist for this year, start with 0001
+      return `COT-${currentYear}-0001`;
+    }
+    
+    // Extract the sequential number part from the folio (COT-YYYY-XXXX)
+    const folioRegex = new RegExp(`COT-${currentYear}-(\\d+)`);
+    const matches = latestCotizacion.folio.match(folioRegex);
+    
+    if (!matches || matches.length < 2) {
+      // If the regex didn't match, start with 0001
+      return `COT-${currentYear}-0001`;
+    }
+    
+    // Get the last sequential number and increment by 1
+    const lastNumber = parseInt(matches[1], 10);
+    const nextNumber = lastNumber + 1;
+    
+    // Format with leading zeros to maintain 4 digits (e.g., 0001, 0012, 0123)
+    return `COT-${currentYear}-${nextNumber.toString().padStart(4, '0')}`;
+  } catch (error) {
+    console.error('Error generating next folio number:', error);
+    // Fallback to a random number in case of error
+    return `COT-${currentYear}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  }
 } 

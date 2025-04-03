@@ -69,6 +69,10 @@ export default function CotizacionesPage() {
   
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   
+  // Add state for pagination after the other state declarations
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Show 10 items per page
+  
   const fetchCotizaciones = useCallback(async () => {
     try {
       setLoading(true);
@@ -179,8 +183,8 @@ export default function CotizacionesPage() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(cotizacion => 
-        cotizacion.folio.toLowerCase().includes(term) || 
-        cotizacion.cliente.nombre.toLowerCase().includes(term)
+        (cotizacion.folio?.toLowerCase().includes(term) || false) || 
+        (cotizacion.cliente?.nombre?.toLowerCase().includes(term) || false)
       );
     }
     
@@ -195,16 +199,16 @@ export default function CotizacionesPage() {
       
       switch (sortBy.field) {
         case 'fecha_creacion':
-          aValue = new Date(a.fecha_creacion).getTime();
-          bValue = new Date(b.fecha_creacion).getTime();
+          aValue = new Date(a.fecha_creacion || '').getTime();
+          bValue = new Date(b.fecha_creacion || '').getTime();
           break;
         case 'total':
-          aValue = a.total;
-          bValue = b.total;
+          aValue = a.total || 0;
+          bValue = b.total || 0;
           break;
         case 'cliente':
-          aValue = a.cliente.nombre.toLowerCase();
-          bValue = b.cliente.nombre.toLowerCase();
+          aValue = a.cliente?.nombre?.toLowerCase() || '';
+          bValue = b.cliente?.nombre?.toLowerCase() || '';
           break;
         default:
           // Use a type assertion to access dynamic property
@@ -220,6 +224,8 @@ export default function CotizacionesPage() {
     });
     
     setFilteredCotizaciones(results);
+    // Reset to first page when filters change
+    setCurrentPage(1);
   }, [searchTerm, filterEstado, cotizaciones, sortBy]);
   
   // Format date
@@ -306,6 +312,13 @@ export default function CotizacionesPage() {
     );
   };
   
+  // Add a function to get current page items after the formatCurrency function
+  const getCurrentPageItems = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredCotizaciones.slice(startIndex, endIndex);
+  };
+  
   return (
     <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
       {/* Header with title and actions */}
@@ -328,7 +341,7 @@ export default function CotizacionesPage() {
       {errorDetails && renderErrorDetails()}
       
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardDescription>Total Cotizaciones</CardDescription>
@@ -340,13 +353,6 @@ export default function CotizacionesPage() {
           <CardHeader className="pb-2">
             <CardDescription>Cotizaciones Pendientes</CardDescription>
             <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
-          </CardHeader>
-        </Card>
-        
-        <Card className="border border-gray-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription>Monto Total (MXN)</CardDescription>
-            <CardTitle className="text-2xl text-emerald-600">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -368,7 +374,7 @@ export default function CotizacionesPage() {
         <div className="flex gap-4">
           <div className="w-full sm:w-[180px]">
             <Select value={filterEstado} onValueChange={setFilterEstado}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-10 bg-white">
                 <div className="flex items-center">
                   <Filter className="mr-2 h-4 w-4 text-gray-500" />
                   <span className="truncate">
@@ -377,8 +383,8 @@ export default function CotizacionesPage() {
                   </span>
                 </div>
               </SelectTrigger>
-              <SelectContent className="min-w-[180px]">
-                <SelectItem value="todos">Todos los estados</SelectItem>
+              <SelectContent className="min-w-[180px] bg-white">
+                <SelectItem value="todos" className="bg-white hover:bg-gray-50">Todos los estados</SelectItem>
                 <SelectItem value="pendiente">Pendiente</SelectItem>
                 <SelectItem value="aprobada">Aprobada</SelectItem>
                 <SelectItem value="rechazada">Rechazada</SelectItem>
@@ -493,7 +499,7 @@ export default function CotizacionesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredCotizaciones.map((cotizacion) => (
+                {getCurrentPageItems().map((cotizacion) => (
                   <tr key={cotizacion.cotizacion_id} className="hover:bg-gray-50 transition-colors">
                     <td className="whitespace-nowrap px-6 py-4">
                       <button 
@@ -547,6 +553,41 @@ export default function CotizacionesPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {filteredCotizaciones.length > itemsPerPage && (
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Mostrando {Math.min(filteredCotizaciones.length, (currentPage - 1) * itemsPerPage + 1)} 
+                - {Math.min(filteredCotizaciones.length, currentPage * itemsPerPage)} 
+                de {filteredCotizaciones.length} cotizaciones
+              </div>
+              
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-3"
+                >
+                  Anterior
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => 
+                    Math.min(prev + 1, Math.ceil(filteredCotizaciones.length / itemsPerPage))
+                  )}
+                  disabled={currentPage >= Math.ceil(filteredCotizaciones.length / itemsPerPage)}
+                  className="h-8 px-3"
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
