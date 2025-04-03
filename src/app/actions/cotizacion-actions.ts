@@ -205,7 +205,7 @@ export async function getCotizacionDetails(cotizacionId: number) {
       .from('cotizacion_productos')
       .select(`
         *,
-        producto:producto_id(nombre)
+        producto:producto_id(nombre, tipo_producto)
       `)
       .eq('cotizacion_id', cotizacionId);
     
