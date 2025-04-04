@@ -53,10 +53,10 @@ export default function DashboardPage() {
         
         // For now, we'll just count the items
         // In a real app, you would have proper API endpoints for these metrics
-        const cotizacionesTotal = cotizacionesData.cotizaciones.length;
-        const cotizacionesPendientes = cotizacionesData.cotizaciones.filter(
+        const cotizacionesTotal = cotizacionesData?.cotizaciones?.length || 0;
+        const cotizacionesPendientes = cotizacionesData?.cotizaciones?.filter(
           (c: any) => c.estado === 'pendiente'
-        ).length;
+        )?.length || 0;
         
         // Set metrics data
         setMetrics({

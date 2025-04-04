@@ -41,3 +41,23 @@ export function formatDate(date: string | Date | null | undefined): string {
 export function generateCotizacionId(id: number): string {
   return `COT-${new Date().getFullYear()}-${String(id).padStart(4, '0')}`;
 }
+
+/**
+ * Generate a gradient background style for financial cards
+ * @param type The type of financial card (ingreso, egreso, balance, neutral)
+ * @param isHovered Whether the card is being hovered over
+ * @returns A CSS class string with the appropriate gradient
+ */
+export function getFinancialCardGradient(type: 'ingreso' | 'egreso' | 'balance-positive' | 'balance-negative' | 'neutral', isHovered: boolean = false): string {
+  const baseClasses = "transition-all duration-200 bg-gradient-to-br border";
+  
+  const gradients = {
+    'ingreso': `${baseClasses} from-white to-emerald-50 border-emerald-100 ${isHovered ? 'to-emerald-100 shadow-md' : 'shadow-sm'}`,
+    'egreso': `${baseClasses} from-white to-rose-50 border-rose-100 ${isHovered ? 'to-rose-100 shadow-md' : 'shadow-sm'}`,
+    'balance-positive': `${baseClasses} from-white to-blue-50 border-blue-100 ${isHovered ? 'to-blue-100 shadow-md' : 'shadow-sm'}`,
+    'balance-negative': `${baseClasses} from-white to-amber-50 border-amber-100 ${isHovered ? 'to-amber-100 shadow-md' : 'shadow-sm'}`,
+    'neutral': `${baseClasses} from-white to-indigo-50 border-indigo-100 ${isHovered ? 'to-indigo-100 shadow-md' : 'shadow-sm'}`,
+  };
+  
+  return gradients[type];
+}

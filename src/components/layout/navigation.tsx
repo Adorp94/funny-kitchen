@@ -3,34 +3,39 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus } from "lucide-react";
+import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus, DollarSign } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 
 const navigation = [
   {
     name: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
     name: "Cotizaciones",
-    href: "/cotizaciones",
+    href: "/dashboard/cotizaciones",
     icon: ClipboardList,
+  },
+  {
+    name: "Finanzas",
+    href: "/dashboard/finanzas",
+    icon: DollarSign,
   },
   // Productos and Clientes modules temporarily disabled
   // {
   //   name: "Productos",
-  //   href: "/productos",
+  //   href: "/dashboard/productos",
   //   icon: ChefHat,
   // },
   // {
   //   name: "Clientes",
-  //   href: "/clientes",
+  //   href: "/dashboard/clientes",
   //   icon: Users,
   // },
   {
     name: "Configuración",
-    href: "/configuracion",
+    href: "/dashboard/configuracion",
     icon: Settings,
   },
 ];
@@ -68,7 +73,7 @@ export function Navigation() {
       <div className="pt-2 border-t border-gray-200">
         <Tooltip content="Nueva cotización" side="right">
           <Link 
-            href="/nueva-cotizacion"
+            href="/dashboard/cotizaciones/nueva"
             className="inline-flex items-center justify-center w-full rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
           >
             <Plus className="h-4 w-4 lg:mr-2" />

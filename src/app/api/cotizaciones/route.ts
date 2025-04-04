@@ -54,17 +54,35 @@ export async function GET(request: NextRequest) {
       }
       
       // Format the response
-      const formattedProductos = productos.map(item => ({
-        id: item.producto.producto_id.toString(),
-        nombre: item.producto.nombre,
-        cantidad: item.cantidad,
-        precio: item.precio_unitario,
-        descuento: item.descuento_producto,
-        subtotal: item.subtotal,
-        sku: item.producto.sku,
-        descripcion: item.producto.descripcion,
-        colores: item.producto.colores?.split(',') || []
-      }));
+      const productosArray = Array.isArray(productos) ? productos : [];
+      const formattedProductos = productosArray.map(item => {
+        // Check if item and item.producto exist
+        if (!item || !item.producto) {
+          return {
+            id: "0",
+            nombre: "Producto no disponible",
+            cantidad: 0,
+            precio: 0,
+            descuento: 0,
+            subtotal: 0,
+            sku: "",
+            descripcion: "",
+            colores: []
+          };
+        }
+        
+        return {
+          id: item.producto.producto_id?.toString() || "0",
+          nombre: item.producto.nombre || "Sin nombre",
+          cantidad: item.cantidad || 0,
+          precio: item.precio_unitario || 0,
+          descuento: item.descuento_producto || 0,
+          subtotal: item.subtotal || 0,
+          sku: item.producto.sku || "",
+          descripcion: item.producto.descripcion || "",
+          colores: item.producto.colores?.split(',') || []
+        };
+      });
       
       return NextResponse.json({
         cotizacion: {
@@ -97,7 +115,34 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       
-      return NextResponse.json({ cotizaciones });
+      // Ensure cotizaciones is an array before returning
+      const cotizacionesArray = Array.isArray(cotizaciones) ? cotizaciones : [];
+      
+      // Add basic validation for each cotizacion to prevent null errors
+      const safeData = cotizacionesArray.map(cot => {
+        if (!cot) return null;
+        
+        return {
+          cotizacion_id: cot.cotizacion_id || 0,
+          folio: cot.folio || 'Sin folio',
+          fecha_creacion: cot.fecha_creacion || new Date().toISOString(),
+          estado: cot.estado || 'pendiente',
+          moneda: cot.moneda || 'MXN',
+          total: cot.total || 0,
+          total_mxn: cot.total_mxn || 0,
+          cliente: cot.cliente ? {
+            cliente_id: cot.cliente.cliente_id || 0,
+            nombre: cot.cliente.nombre || 'Cliente sin nombre',
+            celular: cot.cliente.celular || ''
+          } : {
+            cliente_id: 0,
+            nombre: 'Cliente no encontrado',
+            celular: ''
+          }
+        };
+      }).filter(Boolean); // Remove any null entries
+      
+      return NextResponse.json({ cotizaciones: safeData });
     }
   } catch (error) {
     console.error('Unexpected error:', error);

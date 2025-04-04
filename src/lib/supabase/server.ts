@@ -2,8 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from './types';
 
-export function createServerSupabaseClient() {
-  // Using regular function syntax instead of async
+// Create a Supabase client for use in server components and actions
+export function createClient() {
   const cookieStore = cookies();
   
   return createServerClient(
@@ -11,7 +11,7 @@ export function createServerSupabaseClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
+        get(name: string) {
           return cookieStore.get(name)?.value;
         },
         set(name, value, options) {
@@ -26,12 +26,26 @@ export function createServerSupabaseClient() {
 }
 
 /**
+ * Create a Supabase client specifically for API routes
+ * This is a wrapper around createClient to make it easier to use in API routes
+ */
+export function createServerSupabaseClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: cookies()
+    }
+  );
+}
+
+/**
  * Get the current user ID, with fallback options if authentication fails
  * Returns a valid user ID for database operations
  */
 export async function getCurrentUserId(fallbackUserId = 1): Promise<number> {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (session?.user?.id) {
