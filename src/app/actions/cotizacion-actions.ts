@@ -264,7 +264,7 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
       .from('pagos_anticipos')
       .select(`
         *,
-        cotizacion:cotizacion_id(
+        cotizacion_data:cotizacion_id(
           folio,
           cliente_id,
           moneda,
@@ -279,7 +279,7 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
     }
     
     // Enrich with client info
-    const clienteIds = [...new Set(pagos.map(pago => pago.cotizacion?.cliente_id))].filter(Boolean);
+    const clienteIds = [...new Set(pagos.map(pago => pago.cotizacion_data?.cliente_id))].filter(Boolean);
     
     // Get all clients in one query
     const { data: clientes, error: clientesError } = await supabase
@@ -300,7 +300,8 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
     // Attach client names to payments
     const pagosConClientes = pagos.map(pago => ({
       ...pago,
-      cliente_nombre: clienteMap[pago.cotizacion?.cliente_id] || 'Cliente desconocido'
+      cliente_nombre: clienteMap[pago.cotizacion_data?.cliente_id] || 'Cliente desconocido',
+      cotizacion: pago.cotizacion_data // Keep backward compatibility with existing code
     }));
     
     return {
