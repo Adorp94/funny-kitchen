@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Download } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
@@ -606,29 +606,141 @@ function EditCotizacionClient() {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   <span className="whitespace-nowrap">Anterior</span>
                 </Button>
-                <Button 
-                  onClick={() => {
-                    if (!isLoading) {
-                      setIsLoading(true);
-                      handleUpdateCotizacion().catch(() => setIsLoading(false));
-                    }
-                  }} 
-                  disabled={isLoading}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium flex items-center"
-                  size="md"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      <span className="whitespace-nowrap">Actualizando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      <span className="whitespace-nowrap">Actualizar Cotización</span>
-                    </>
-                  )}
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        setIsLoading(true);
+                        const response = await fetch(`/api/cotizaciones/${cotizacionId}/pdf`, {
+                          method: 'GET',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                        });
+                        
+                        if (!response.ok) {
+                          throw new Error('Error al obtener datos para el PDF');
+                        }
+                        
+                        const data = await response.json();
+                        
+                        if (!data.success || !data.cotizacion) {
+                          throw new Error('Error al obtener datos para el PDF');
+                        }
+
+                        // Instead of navigating, create an offscreen PDF element and download it
+                        const offscreenContainer = document.createElement('div');
+                        offscreenContainer.style.position = 'absolute';
+                        offscreenContainer.style.left = '-9999px';
+                        offscreenContainer.style.top = '-9999px';
+                        document.body.appendChild(offscreenContainer);
+                        
+                        // Create a temporary component with the PDF content
+                        const tempDiv = document.createElement('div');
+                        offscreenContainer.appendChild(tempDiv);
+                        
+                        // Manually render the PDF content
+                        const filename = `cotizacion-${data.cotizacion.folio || cotizacionId}-${new Date().toISOString().split('T')[0]}.pdf`;
+                        
+                        // Import necessary components and render in the temporary div
+                        import('react-dom/client').then(async (ReactDOM) => {
+                          const { PDFCotizacion } = await import('@/components/cotizacion/pdf-cotizacion');
+                          const { ProductosProvider } = await import('@/contexts/productos-context');
+                          const { PDFService } = await import('@/services/pdf-service');
+                          
+                          // Create root and render the PDF component
+                          const root = ReactDOM.createRoot(tempDiv);
+                          root.render(
+                            <ProductosProvider>
+                              <div style={{ 
+                                width: '215.9mm', 
+                                backgroundColor: 'white',
+                                padding: '20px'
+                              }}>
+                                <PDFCotizacion 
+                                  cliente={data.cotizacion.cliente}
+                                  folio={data.cotizacion.folio} 
+                                  cotizacion={data.cotizacion}
+                                />
+                              </div>
+                            </ProductosProvider>
+                          );
+                          
+                          // Wait for render to complete
+                          setTimeout(async () => {
+                            try {
+                              // Generate PDF from the rendered content
+                              await PDFService.generatePDFFromElement(tempDiv, {
+                                filename,
+                                format: 'letter',
+                                orientation: 'portrait',
+                                download: true
+                              });
+                            } catch (error) {
+                              console.error('Error generating PDF:', error);
+                              toast({
+                                title: "Error",
+                                description: "Error al generar el PDF. Intente nuevamente.",
+                                variant: "destructive",
+                              });
+                            } finally {
+                              // Clean up
+                              root.unmount();
+                              document.body.removeChild(offscreenContainer);
+                              setIsLoading(false);
+                            }
+                          }, 500);
+                        });
+                      } catch (error) {
+                        console.error('Error downloading PDF:', error);
+                        toast({
+                          title: "Error",
+                          description: "No se pudo descargar el PDF. Intente nuevamente.",
+                          variant: "destructive",
+                        });
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="border-emerald-500 text-emerald-500 hover:bg-emerald-50 px-4 h-10 text-sm font-medium flex items-center"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span className="whitespace-nowrap">Generando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span className="whitespace-nowrap">Descargar PDF</span>
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      if (!isLoading) {
+                        setIsLoading(true);
+                        handleUpdateCotizacion().catch(() => setIsLoading(false));
+                      }
+                    }} 
+                    disabled={isLoading}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium flex items-center"
+                    size="md"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span className="whitespace-nowrap">Actualizando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        <span className="whitespace-nowrap">Actualizar Cotización</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
