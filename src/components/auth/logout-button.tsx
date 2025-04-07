@@ -14,11 +14,10 @@ export default function LogoutButton({ variant = "default" }: { variant?: "defau
       setLoading(true);
       console.log("[Logout] Starting logout process...");
       
-      // Use Auth0's logout to handle everything
+      // Use Auth0's logout to handle everything - only logout from the application, not identity providers
       await logout({
         logoutParams: {
-          returnTo: window.location.origin,
-          federated: true // Add this to ensure complete logout
+          returnTo: window.location.origin
         }
       });
     } catch (error) {
