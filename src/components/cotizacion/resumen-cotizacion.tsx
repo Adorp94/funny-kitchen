@@ -73,12 +73,35 @@ export function ResumenCotizacion({
     const displayAmount = moneda === 'USD' && exchangeRate 
       ? amount / exchangeRate 
       : amount;
-    return `$${displayAmount.toFixed(2)} ${moneda}`;
+    
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: moneda,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(displayAmount);
+  };
+  
+  // Format number with commas for better readability
+  const formatNumber = (value: number): string => {
+    return new Intl.NumberFormat('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+  
+  // Format percentage value
+  const formatPercent = (value: number): string => {
+    return new Intl.NumberFormat('es-MX', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(value) + '%';
   };
 
   // Handle global discount change
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log(`ResumenCotizacion: handleGlobalDiscountChange called with value: ${value}`);
     
     // Allow empty string or valid numbers
     if (value === '' || !isNaN(parseFloat(value))) {
@@ -87,6 +110,8 @@ export function ResumenCotizacion({
       // Convert to number for the callback
       const numValue = value === '' ? 0 : parseFloat(value);
       const boundedValue = Math.min(Math.max(numValue, 0), 100);
+      
+      console.log(`ResumenCotizacion: Calling setGlobalDiscount with: ${boundedValue}`);
       setGlobalDiscount(boundedValue);
     }
   };
@@ -210,7 +235,7 @@ export function ResumenCotizacion({
                     <span className="whitespace-nowrap">{formatCurrency(producto.precio)}</span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                    {producto.descuento > 0 ? `${producto.descuento}%` : '-'}
+                    {producto.descuento > 0 ? formatPercent(producto.descuento) : '-'}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
                     <span className="whitespace-nowrap">{formatCurrency(producto.subtotal)}</span>

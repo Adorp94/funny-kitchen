@@ -5,78 +5,54 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
-    const id = searchParams.get('id');
-    const query = searchParams.get('query');
-    const page = parseInt(searchParams.get('page') || '0');
-    const pageSize = parseInt(searchParams.get('pageSize') || '20');
-    const from = page * pageSize;
+    const onlyIds = searchParams.get('onlyIds') === 'true';
     
-    console.log(`API request received for productos: id=${id}, query=${query}, page=${page}, pageSize=${pageSize}`);
-    
-    if (id) {
-      // Get a specific product
+    if (onlyIds) {
+      // For efficiency, only fetch product IDs
       const { data, error } = await supabase
         .from('productos')
-        .select('*')
-        .eq('producto_id', id)
-        .single();
-        
-      if (error) throw error;
+        .select('producto_id')
+        .order('producto_id', { ascending: true });
       
-      return NextResponse.json(data);
-    } else if (query) {
-      console.log(`Searching productos with query: "${query}"`);
+      if (error) {
+        console.error('Error fetching product IDs:', error);
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        );
+      }
       
-      // Search products
-      let searchQuery = supabase
-        .from('productos')
-        .select('*', { count: 'exact' });
-        
-      // Search across multiple fields: nombre, sku
-      searchQuery = searchQuery
-        .or(`nombre.ilike.%${query}%,sku.ilike.%${query}%`);
-      
-      // Apply pagination and order
-      const { data, error, count } = await searchQuery
-        .order('nombre')
-        .range(from, from + pageSize - 1)
-        .limit(pageSize);
-        
-      if (error) throw error;
-      
-      console.log(`Found ${data.length} results, total count: ${count}`);
-      
-      // Return results with pagination info
-      return NextResponse.json({
-        data,
-        count,
-        hasMore: data.length === pageSize
-      });
-    } else {
-      console.log(`Fetching all productos, page: ${page}, pageSize: ${pageSize}`);
-      
-      // Get all products (paginated)
-      const { data, error, count } = await supabase
-        .from('productos')
-        .select('*', { count: 'exact' })
-        .order('nombre')
-        .range(from, from + pageSize - 1)
-        .limit(pageSize);
-        
-      if (error) throw error;
-      
-      console.log(`Found ${data.length} results, total count: ${count}`);
-      
-      return NextResponse.json({
-        data,
-        count,
-        hasMore: data && data.length === pageSize
-      });
+      return NextResponse.json({ productos: data || [] });
     }
+    
+    // Handle full product listing and search
+    const query = searchParams.get('query') || '';
+    
+    // Get products with search if query provided
+    let productosQuery = supabase
+      .from('productos')
+      .select('*');
+    
+    if (query) {
+      productosQuery = productosQuery.or(`nombre.ilike.%${query}%,sku.ilike.%${query}%`);
+    }
+    
+    const { data, error } = await productosQuery.order('nombre');
+    
+    if (error) {
+      console.error('Error fetching products:', error);
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({ productos: data || [] });
+    
   } catch (error) {
-    console.error('Error fetching productos:', error);
+    console.error('Error in productos API:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch productos' },
+      { error: error instanceof Error ? error.message : 'Error desconocido' },
       { status: 500 }
     );
   }

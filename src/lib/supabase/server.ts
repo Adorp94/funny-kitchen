@@ -30,13 +30,50 @@ export function createClient() {
  * This is a wrapper around createClient to make it easier to use in API routes
  */
 export function createServerSupabaseClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: cookies()
-    }
-  );
+  try {
+    console.log("Creating server Supabase client");
+    const cookieStore = cookies();
+    
+    // Create client with appropriate cookie handling
+    return createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            try {
+              return cookieStore.get(name)?.value;
+            } catch (e) {
+              console.error(`Error getting cookie ${name}:`, e);
+              return undefined;
+            }
+          },
+          set(name: string, value: string, options: { path: string; maxAge?: number; domain?: string; sameSite?: 'lax' | 'strict' | 'none'; secure?: boolean }) {
+            try {
+              cookieStore.set({ name, value, ...options });
+            } catch (error) {
+              console.error(`Error setting cookie ${name}:`, error);
+            }
+          },
+          remove(name: string, options: { path: string; maxAge?: number; domain?: string; sameSite?: 'lax' | 'strict' | 'none'; secure?: boolean }) {
+            try {
+              cookieStore.set({ name, value: '', ...options });
+            } catch (error) {
+              console.error(`Error removing cookie ${name}:`, error);
+            }
+          },
+        },
+      }
+    );
+  } catch (error) {
+    console.error("Error creating supabase client:", error);
+    // Fallback to a minimal client as a last resort
+    return createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: {} }
+    );
+  }
 }
 
 /**

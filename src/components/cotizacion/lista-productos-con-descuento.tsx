@@ -44,15 +44,23 @@ export function ListaProductosConDescuento({
     return amount;
   };
 
-  // Format currency based on selected currency
+  // Format currency with proper currency symbol
   const formatCurrency = (amount: number): string => {
     const convertedAmount = convertAmount(amount);
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: moneda,
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(convertedAmount);
+  };
+
+  // Format percentage
+  const formatPercent = (value: number): string => {
+    return new Intl.NumberFormat('es-MX', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(value) + '%';
   };
 
   // Calculate price after discount for a product
@@ -156,7 +164,7 @@ export function ListaProductosConDescuento({
                   {formatCurrency(getSubtotalAfterDiscount(producto))}
                   {producto.descuento ? (
                     <div className="text-xs text-green-600">
-                      Descuento: {producto.descuento}%
+                      Descuento: {formatPercent(producto.descuento)}
                     </div>
                   ) : null}
                 </td>

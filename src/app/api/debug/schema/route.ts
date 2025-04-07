@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pkg from '../../../../package.json';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
@@ -19,7 +18,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: schemaError.message }, { status: 500 });
     }
     
-    // Fetch column information using a more direct query
+    // Create a stored procedure to get column information
+    await supabase.rpc('create_debug_function_if_not_exists');
+    
+    // Fetch column information using the procedure
     const { data: columnInfo, error: columnError } = await supabase.rpc(
       'debug_get_table_columns',
       { table_name: table }

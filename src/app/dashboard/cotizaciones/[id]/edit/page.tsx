@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,13 @@ interface ProductoFormData {
   [key: string]: any;
 }
 
+// Define the window extension for TypeScript
+declare global {
+  interface Window {
+    validProductIds?: Set<number>;
+  }
+}
+
 // Wrapper component to provide context
 export default function EditCotizacionPage() {
   return (
@@ -58,6 +65,7 @@ function EditCotizacionClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [cotizacionOriginal, setCotizacionOriginal] = useState<any>(null);
   const { convertMXNtoUSD, convertUSDtoMXN } = useExchangeRate();
+  const [error, setError] = useState<string | null>(null);
 
   // Get productos from context
   const {
@@ -85,6 +93,28 @@ function EditCotizacionClient() {
     async function fetchCotizacion() {
       setInitialLoading(true);
       try {
+        // Fetch valid product IDs and store them in window for validation
+        const fetchValidProductIds = async () => {
+          try {
+            const response = await fetch('/api/productos?onlyIds=true');
+            if (!response.ok) throw new Error('Failed to fetch valid product IDs');
+            const data = await response.json();
+            
+            // Create a Set with all valid product IDs for fast lookups
+            window.validProductIds = new Set(
+              data.productos.map((p: {producto_id: number}) => p.producto_id)
+            );
+            
+            console.log(`Loaded ${window.validProductIds.size} valid product IDs for validation`);
+          } catch (error) {
+            console.error('Error fetching valid product IDs:', error);
+            setError('Error al cargar IDs de productos válidos. La validación puede fallar.');
+          }
+        };
+
+        fetchValidProductIds();
+        
+        // Then fetch the cotizacion data
         const response = await fetch(`/api/cotizaciones?id=${cotizacionId}`);
         
         if (!response.ok) {
@@ -136,19 +166,23 @@ function EditCotizacionClient() {
         if (data.cotizacion.productos && Array.isArray(data.cotizacion.productos)) {
           clearProductos();
           
+          console.log("Products from API:", data.cotizacion.productos);
+          
           data.cotizacion.productos.forEach((producto: any) => {
+            console.log(`Adding product ${producto.nombre} with id ${producto.id} and producto_id ${producto.producto_id}`);
             addProducto({
               id: producto.id.toString(),
               nombre: producto.nombre,
-              precio: producto.precio,
+              precio: producto.precio_unitario || producto.precio || 0,
               cantidad: producto.cantidad,
               descuento: producto.descuento || 0,
-              subtotal: producto.subtotal,
+              subtotal: producto.subtotal || producto.precio_total || 0,
               sku: producto.sku || "",
               descripcion: producto.descripcion || "",
-              colores: Array.isArray(producto.colores) ? producto.colores : [],
+              colores: Array.isArray(producto.colores) ? producto.colores : 
+                      typeof producto.colores === 'string' ? producto.colores.split(',') : [],
               acabado: producto.acabado || "",
-              producto_id: producto.id
+              producto_id: producto.producto_id
             });
           });
         }
@@ -191,76 +225,58 @@ function EditCotizacionClient() {
 
   // Update cotizacion in database
   const handleUpdateCotizacion = async () => {
-    if (!cliente) {
-      toast.error("Por favor, ingresa la información del cliente");
-      return;
-    }
-    
-    if (productos.length === 0) {
-      toast.error("Por favor, agrega al menos un producto");
-      return;
-    }
-    
-    setIsLoading(true);
-
     try {
-      // Calculate IVA amount
-      const subtotalAfterDiscount = subtotal * (1 - globalDiscount / 100);
-      const montoIva = hasIva ? subtotalAfterDiscount * 0.16 : 0;
+      if (!cliente) {
+        toast.error("Por favor, ingresa la información del cliente");
+        return;
+      }
       
-      console.log("Preparing updated quotation data:");
-      console.log(`CotizacionId: ${cotizacionId}`);
-      console.log(`Cliente: ${JSON.stringify(cliente)}`);
-      console.log(`Currency: ${moneda}`);
-      console.log(`Shipping cost: ${shippingCost} ${moneda}`);
-      console.log(`Exchange rate: ${exchangeRate}`);
-      console.log(`Total: ${total}`);
-      console.log(`IVA: ${hasIva}, Monto IVA: ${montoIva}`);
-      
-      // Prepare data for API call
-      const quotationData = {
+      // Create a minimal request focusing on core data only
+      const cotizacionData = {
         cotizacion_id: parseInt(cotizacionId),
-        cliente: cliente,
-        productos: productos.map(p => ({
-          ...p,
-          producto_id: p.producto_id || 0
-        })),
+        cliente_id: cliente.cliente_id,
         moneda: moneda,
         subtotal: subtotal,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: montoIva,
+        monto_iva: hasIva ? subtotal * (1 - globalDiscount / 100) * 0.16 : 0,
         incluye_envio: shippingCost > 0,
         costo_envio: shippingCost,
         total: total,
         tipo_cambio: exchangeRate
       };
       
-      // Call API to update cotizacion
+      toast.loading("Actualizando cotización...", { id: "update-cotizacion" });
+      
+      // Make the API call
       const response = await fetch(`/api/cotizaciones/${cotizacionId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(quotationData),
+        body: JSON.stringify(cotizacionData),
+        credentials: 'include'
       });
       
-      const result = await response.json();
+      toast.dismiss("update-cotizacion");
       
-      console.log("API Response:", response.status, response.statusText);
-      console.log("Response body:", result);
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        throw new Error("Error al procesar la respuesta del servidor");
+      }
       
       if (!response.ok) {
-        throw new Error(result.error || 'Error al actualizar la cotización');
+        throw new Error(responseData?.error || 'Error al actualizar la cotización');
       }
       
       toast.success("Cotización actualizada correctamente");
-      
-      // Redirect to cotizaciones list
       router.push("/dashboard/cotizaciones");
       
     } catch (error) {
-      console.error("Error updating cotizacion:", error);
+      console.error("Error actualizando cotización:", error);
+      toast.dismiss("update-cotizacion");
       toast.error(error instanceof Error ? error.message : "Error al actualizar la cotización");
     } finally {
       setIsLoading(false);
@@ -566,7 +582,10 @@ function EditCotizacionClient() {
                     moneda={moneda}
                     subtotal={subtotal}
                     globalDiscount={globalDiscount}
-                    setGlobalDiscount={setGlobalDiscount}
+                    setGlobalDiscount={(value) => {
+                      console.log("Setting global discount to:", value);
+                      setGlobalDiscount(value);
+                    }}
                     hasIva={hasIva}
                     setHasIva={setHasIva}
                     shippingCost={shippingCost}
@@ -588,7 +607,12 @@ function EditCotizacionClient() {
                   <span className="whitespace-nowrap">Anterior</span>
                 </Button>
                 <Button 
-                  onClick={handleUpdateCotizacion} 
+                  onClick={() => {
+                    if (!isLoading) {
+                      setIsLoading(true);
+                      handleUpdateCotizacion().catch(() => setIsLoading(false));
+                    }
+                  }} 
                   disabled={isLoading}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium flex items-center"
                   size="md"

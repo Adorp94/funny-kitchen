@@ -113,6 +113,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     setProductos(prev => [...prev, productoConDescuento]);
   };
 
+  // Set global discount with logging
+  const handleSetGlobalDiscount = (value: number) => {
+    console.log(`ProductosContext: Setting globalDiscount to ${value}`);
+    setGlobalDiscount(value);
+  };
+
   // Remove a product by ID
   const removeProducto = (id: string) => {
     setProductos(prev => prev.filter(p => p.id !== id));
@@ -222,7 +228,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         clearProductos,
         subtotal: financialValues.subtotal,
         globalDiscount,
-        setGlobalDiscount,
+        setGlobalDiscount: handleSetGlobalDiscount,
         hasIva,
         setHasIva,
         shippingCost,
