@@ -38,9 +38,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       console.log("[Auth0] Configuration:", {
         domain,
         clientId,
-        redirect_uri: `${origin}/api/auth/callback`,
+        redirect_uri: origin,
         isMounted,
-        location: typeof window !== 'undefined' ? window.location.href : 'unknown'
+        location: typeof window !== 'undefined' ? window.location.href : 'unknown',
+        environment: process.env.NODE_ENV
       });
       
       // Add a global error handler to catch any uncaught errors
@@ -65,8 +66,9 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       <h2 className="text-xl font-bold mb-4">Auth0 Debug Information</h2>
       <p className="mb-2">Domain: {domain}</p>
       <p className="mb-2">Client ID: {clientId}</p>
-      <p className="mb-2">Redirect URI: {`${origin}/api/auth/callback`}</p>
+      <p className="mb-2">Redirect URI: {origin}</p>
       <p className="mb-2">Is Mounted: {String(isMounted)}</p>
+      <p className="mb-2">Environment: {process.env.NODE_ENV}</p>
       <hr className="my-4" />
       {error && (
         <div className="bg-red-50 p-4 text-red-700 rounded mt-4">
@@ -90,12 +92,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           domain={domain}
           clientId={clientId}
           authorizationParams={{
-            redirect_uri: `${origin}/api/auth/callback`,
+            redirect_uri: origin,
+            scope: "openid profile email"
           }}
           cacheLocation="localstorage"
-          useRefreshTokens={true}
-          useRefreshTokensFallback={true}
-          cookieDomain={typeof window !== 'undefined' ? window.location.hostname : undefined}
           onError={(error) => {
             console.error("[Auth0] Error:", error);
             setError(error.message || "An error occurred with authentication");

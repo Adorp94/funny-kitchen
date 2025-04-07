@@ -90,14 +90,9 @@ export default function Home() {
     try {
       setLoading(true);
       console.log("[Home] Starting direct login flow");
-      // Store in localStorage that we're coming from the login flow
-      localStorage.setItem('login_initiated', 'true');
-      // Use Auth0's loginWithRedirect method
+      
+      // Use Auth0's loginWithRedirect method with default settings
       loginWithRedirect({
-        authorizationParams: {
-          redirect_uri: `${window.location.origin}/api/auth/callback`,
-          screen_hint: 'login',
-        },
         appState: { returnTo: "/dashboard" }
       });
     } catch (err) {
@@ -112,15 +107,13 @@ export default function Home() {
     try {
       setLoading(true);
       console.log("[Home] Starting sign up flow");
-      // Store in localStorage that we're coming from the signup flow
-      localStorage.setItem('signup_initiated', 'true');
+      
       // Use Auth0's loginWithRedirect method with screen_hint set to signup
       loginWithRedirect({
+        appState: { returnTo: "/dashboard" },
         authorizationParams: {
-          redirect_uri: `${window.location.origin}/api/auth/callback`,
-          screen_hint: 'signup',
-        },
-        appState: { returnTo: "/dashboard" }
+          screen_hint: 'signup'  // This is crucial to show the signup screen
+        }
       });
     } catch (err) {
       console.error("[Home] Signup error:", err);
@@ -134,15 +127,13 @@ export default function Home() {
     try {
       setLoading(true);
       console.log("[Home] Starting Google login flow");
-      // Store in localStorage that we're coming from the login flow
-      localStorage.setItem('login_initiated', 'true');
+      
       // Use Auth0's loginWithRedirect method with Google connection
       loginWithRedirect({
+        appState: { returnTo: "/dashboard" },
         authorizationParams: {
-          redirect_uri: `${window.location.origin}/api/auth/callback`,
-          connection: 'google-oauth2',
-        },
-        appState: { returnTo: "/dashboard" }
+          connection: 'google-oauth2'
+        }
       });
     } catch (err) {
       console.error("[Home] Google login error:", err);

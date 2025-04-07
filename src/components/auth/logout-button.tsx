@@ -12,16 +12,21 @@ export default function LogoutButton({ variant = "default" }: { variant?: "defau
   const handleLogout = async () => {
     try {
       setLoading(true);
-      console.log("Starting logout process...");
+      console.log("[Logout] Starting logout process...");
       
+      // Use Auth0's logout to handle everything
       await logout({
         logoutParams: {
-          returnTo: window.location.origin
+          returnTo: window.location.origin,
+          federated: true // Add this to ensure complete logout
         }
       });
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("[Logout] Auth0 logout error:", error);
       setLoading(false);
+      
+      // Fallback to manual redirect if Auth0 logout fails
+      window.location.href = '/';
     }
   };
   
