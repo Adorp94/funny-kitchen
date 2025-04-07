@@ -7,16 +7,19 @@ export function middleware(request: NextRequest) {
   console.log(`[Middleware] Processing request for: ${request.nextUrl.pathname}`);
 
   // Define routes that should always be accessible without authentication
-  const publicRoutes = ['/', '/api/auth', '/test', '/login', '/privacy', '/terms', 
+  const publicRoutes = ['/', '/api', '/test', '/login', '/privacy', '/terms', 
                         '/callback', '/auth'];
   
-  // Check if this is an Auth0 callback route
-  const isAuth0Route = request.nextUrl.pathname.includes('/auth') || 
-                     request.nextUrl.pathname.includes('/callback') ||
-                     request.nextUrl.search.includes('code=');
-                     
-  if (isAuth0Route) {
-    console.log(`[Middleware] Auth0 callback route, allowing: ${request.nextUrl.pathname}`);
+  // Skip middleware for Auth0 routes and static files
+  const shouldSkip = 
+    request.nextUrl.pathname.includes('/_next') ||
+    request.nextUrl.pathname.includes('/api/auth') ||
+    request.nextUrl.pathname.includes('/callback') ||
+    request.nextUrl.search.includes('code=') ||
+    request.nextUrl.search.includes('error=');
+  
+  if (shouldSkip) {
+    console.log(`[Middleware] Skipping middleware for: ${request.nextUrl.pathname}`);
     return NextResponse.next();
   }
                      
@@ -31,14 +34,6 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname === route || 
     request.nextUrl.pathname.startsWith(`${route}/`)
   );
-
-  // Allow all API routes through without authentication checks
-  const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
-  
-  if (isApiRoute) {
-    console.log(`[Middleware] API route, letting pass through: ${request.nextUrl.pathname}`);
-    return NextResponse.next();
-  }
 
   // If user is not logged in and trying to access a protected route
   if (!isPublicRoute && !isLoggedIn) {
@@ -63,8 +58,7 @@ export const config = {
     /*
      * Match all request paths except for:
      * - Static files (_next/static, images, etc.)
-     * - Custom excluded paths (add any needed)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.ico$).*)',
   ],
 }; 

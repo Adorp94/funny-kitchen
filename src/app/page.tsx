@@ -14,6 +14,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [showHealth, setShowHealth] = useState(false);
   const [healthData, setHealthData] = useState<any>(null);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   const router = useRouter();
 
   // Add an error boundary
@@ -36,6 +37,23 @@ export default function Home() {
       setError(`Error initializing page: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, []);
+
+  // Add loading timeout to avoid infinite loading state
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (isLoading || checkingAuth) {
+      timer = setTimeout(() => {
+        console.log("[Home] Loading timeout reached after 10 seconds");
+        setLoadingTimeout(true);
+        setCheckingAuth(false);
+      }, 10000); // 10 seconds timeout
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoading, checkingAuth]);
 
   // Fetch health endpoint data
   useEffect(() => {
@@ -143,7 +161,7 @@ export default function Home() {
   };
 
   // Show loading indicator while checking authentication
-  if (isLoading || checkingAuth) {
+  if ((isLoading || checkingAuth) && !loadingTimeout) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center">
@@ -156,6 +174,55 @@ export default function Home() {
               <p>isAuthenticated: {String(isAuthenticated)}</p>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show timeout message if loading took too long
+  if (loadingTimeout) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-yellow-50 p-6 rounded-lg shadow-md max-w-lg w-full">
+          <h2 className="text-yellow-700 text-xl font-bold mb-4">Tiempo de espera agotado</h2>
+          <p className="text-yellow-600 mb-4">
+            La verificación de la sesión está tomando más tiempo del esperado. Puede que haya un problema con el servicio de autenticación.
+          </p>
+          <div className="space-y-4">
+            <Button 
+              className="w-full"
+              onClick={() => window.location.reload()}
+            >
+              Intentar de nuevo
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => {
+                localStorage.clear();
+                sessionStorage.clear();
+                // Clear cookies by setting them to expire
+                document.cookie.split(";").forEach(c => {
+                  document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+                window.location.href = '/';
+              }}
+            >
+              Reiniciar sesión
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowHealth(!showHealth)}
+            >
+              {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
+            </Button>
+            {showHealth && healthData && (
+              <div className="mt-4 p-4 bg-gray-100 rounded text-sm overflow-auto">
+                <pre>{JSON.stringify(healthData, null, 2)}</pre>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
