@@ -2,11 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { PDFCotizacion } from "@/components/cotizacion/pdf-cotizacion";
-import { Loader2, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PDFService } from "@/services/pdf-service";
-import { ProductosProvider } from "@/contexts/productos-context";
+import { Loader2 } from "lucide-react";
+import PDFWrapper from "@/components/cotizacion/pdf-wrapper";
 
 export default function PDFViewPage() {
   const params = useParams();
@@ -17,8 +14,6 @@ export default function PDFViewPage() {
   const [cotizacion, setCotizacion] = useState<any>(null);
   const [cliente, setCliente] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const pdfContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchCotizacion() {
@@ -49,35 +44,6 @@ export default function PDFViewPage() {
       fetchCotizacion();
     }
   }, [cotizacionId]);
-
-  // Auto-download when shouldDownload is true and data is loaded
-  useEffect(() => {
-    if (shouldDownload && !loading && !error && cotizacion && cliente && pdfContentRef.current) {
-      handleDownloadPDF();
-    }
-  }, [shouldDownload, loading, error, cotizacion, cliente]);
-
-  // Function to download the PDF
-  const handleDownloadPDF = async () => {
-    if (!pdfContentRef.current) return;
-    
-    try {
-      setDownloading(true);
-      const options = {
-        filename: `cotizacion-${cotizacion.folio || cotizacionId}-${new Date().toISOString().split('T')[0]}.pdf`,
-        format: 'letter',
-        orientation: 'portrait',
-        download: true // Force download
-      };
-      
-      await PDFService.generatePDFFromElement(pdfContentRef.current, options);
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
-      alert("No se pudo descargar el PDF. Intente nuevamente.");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -114,36 +80,61 @@ export default function PDFViewPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      {/* Download button above the PDF */}
       <div className="mb-6 flex justify-end">
-        <Button 
-          onClick={handleDownloadPDF}
-          disabled={downloading}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          {downloading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Descargando...
-            </>
-          ) : (
-            <>
-              <Download className="mr-2 h-4 w-4" />
-              Descargar PDF
-            </>
-          )}
-        </Button>
+        <PDFWrapper
+          cliente={cliente}
+          folio={cotizacion.folio}
+          cotizacion={cotizacion}
+          autoDownload={shouldDownload}
+        />
       </div>
       
-      {/* PDF Content */}
-      <div ref={pdfContentRef}>
-        <ProductosProvider>
-          <PDFCotizacion
-            cliente={cliente}
-            folio={cotizacion.folio}
-            cotizacion={cotizacion}
-          />
-        </ProductosProvider>
+      <div className="bg-white p-8 rounded-lg shadow border border-gray-200">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-semibold text-gray-800">Vista previa de la cotización</h1>
+          <p className="text-gray-600 mt-2">
+            Utilice el botón "Descargar PDF" para generar y descargar la cotización como un PDF.
+          </p>
+          <p className="text-gray-600">
+            El PDF generado incluirá texto seleccionable y enlaces funcionales.
+          </p>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center">
+          <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 w-full max-w-md">
+            <div className="text-center mb-4">
+              <h2 className="text-lg font-medium text-gray-800">Información de la cotización</h2>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Folio:</span>
+                <span className="font-medium">{cotizacion.folio}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Cliente:</span>
+                <span className="font-medium">{cliente.nombre}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Moneda:</span>
+                <span className="font-medium">{cotizacion.moneda}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total:</span>
+                <span className="font-medium">
+                  {new Intl.NumberFormat(cotizacion.moneda === 'MXN' ? 'es-MX' : 'en-US', { 
+                    style: 'currency', 
+                    currency: cotizacion.moneda || 'MXN' 
+                  }).format(cotizacion.total || 0)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Número de productos:</span>
+                <span className="font-medium">{cotizacion.productos?.length || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

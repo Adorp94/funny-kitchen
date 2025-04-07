@@ -612,12 +612,7 @@ function EditCotizacionClient() {
                     onClick={async () => {
                       try {
                         setIsLoading(true);
-                        const response = await fetch(`/api/cotizaciones/${cotizacionId}/pdf`, {
-                          method: 'GET',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                        });
+                        const response = await fetch(`/api/cotizaciones?id=${cotizacionId}`);
                         
                         if (!response.ok) {
                           throw new Error('Error al obtener datos para el PDF');
@@ -625,73 +620,41 @@ function EditCotizacionClient() {
                         
                         const data = await response.json();
                         
-                        if (!data.success || !data.cotizacion) {
+                        if (!data.cotizacion) {
                           throw new Error('Error al obtener datos para el PDF');
                         }
 
-                        // Instead of navigating, create an offscreen PDF element and download it
-                        const offscreenContainer = document.createElement('div');
-                        offscreenContainer.style.position = 'absolute';
-                        offscreenContainer.style.left = '-9999px';
-                        offscreenContainer.style.top = '-9999px';
-                        document.body.appendChild(offscreenContainer);
+                        // Dynamically import the PDF Wrapper component
+                        const { default: PDFWrapper } = await import('@/components/cotizacion/pdf-wrapper');
                         
-                        // Create a temporary component with the PDF content
-                        const tempDiv = document.createElement('div');
-                        offscreenContainer.appendChild(tempDiv);
+                        // Create a temporary container for the PDF renderer
+                        const tempContainer = document.createElement('div');
+                        tempContainer.style.position = 'absolute';
+                        tempContainer.style.left = '-9999px';
+                        document.body.appendChild(tempContainer);
                         
-                        // Manually render the PDF content
-                        const filename = `cotizacion-${data.cotizacion.folio || cotizacionId}-${new Date().toISOString().split('T')[0]}.pdf`;
+                        // Create a root for rendering the PDF wrapper
+                        const { createRoot } = await import('react-dom/client');
+                        const root = createRoot(tempContainer);
                         
-                        // Import necessary components and render in the temporary div
-                        import('react-dom/client').then(async (ReactDOM) => {
-                          const { PDFCotizacion } = await import('@/components/cotizacion/pdf-cotizacion');
-                          const { ProductosProvider } = await import('@/contexts/productos-context');
-                          const { PDFService } = await import('@/services/pdf-service');
-                          
-                          // Create root and render the PDF component
-                          const root = ReactDOM.createRoot(tempDiv);
-                          root.render(
-                            <ProductosProvider>
-                              <div style={{ 
-                                width: '215.9mm', 
-                                backgroundColor: 'white',
-                                padding: '20px'
-                              }}>
-                                <PDFCotizacion 
-                                  cliente={data.cotizacion.cliente}
-                                  folio={data.cotizacion.folio} 
-                                  cotizacion={data.cotizacion}
-                                />
-                              </div>
-                            </ProductosProvider>
-                          );
-                          
-                          // Wait for render to complete
-                          setTimeout(async () => {
-                            try {
-                              // Generate PDF from the rendered content
-                              await PDFService.generatePDFFromElement(tempDiv, {
-                                filename,
-                                format: 'letter',
-                                orientation: 'portrait',
-                                download: true
-                              });
-                            } catch (error) {
-                              console.error('Error generating PDF:', error);
-                              toast({
-                                title: "Error",
-                                description: "Error al generar el PDF. Intente nuevamente.",
-                                variant: "destructive",
-                              });
-                            } finally {
-                              // Clean up
-                              root.unmount();
-                              document.body.removeChild(offscreenContainer);
-                              setIsLoading(false);
-                            }
-                          }, 500);
-                        });
+                        // Render the PDF wrapper with autoDownload set to true
+                        root.render(
+                          <PDFWrapper
+                            cliente={data.cotizacion.cliente}
+                            folio={data.cotizacion.folio}
+                            cotizacion={data.cotizacion}
+                            autoDownload={true}
+                          />
+                        );
+                        
+                        // Clean up after a timeout to allow PDF generation to complete
+                        setTimeout(() => {
+                          if (tempContainer.parentNode) {
+                            root.unmount();
+                            document.body.removeChild(tempContainer);
+                          }
+                          setIsLoading(false);
+                        }, 3000);
                       } catch (error) {
                         console.error('Error downloading PDF:', error);
                         toast({

@@ -2,6 +2,9 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { pdf, PDFDownloadLink } from '@react-pdf/renderer';
+import ReactPDFDocument from '@/components/cotizacion/react-pdf-document';
+import React from 'react';
 
 export interface PDFGenerationOptions {
   filename?: string;
@@ -172,10 +175,59 @@ export const formatCurrencyForPDF = (amount: number, currency: 'MXN' | 'USD'): s
 };
 
 /**
+ * Generate proper PDF from React component using @react-pdf/renderer
+ * This creates a proper PDF with selectable text and working links
+ */
+export const generateReactPDF = async (
+  cliente: any,
+  folio: string | undefined,
+  cotizacion: any,
+  options: { download?: boolean, filename?: string } = {}
+): Promise<void> => {
+  try {
+    const mergedOptions = { 
+      download: true,
+      filename: `cotizacion-${folio || format(new Date(), 'dd-MM-yyyy')}.pdf`,
+      ...options
+    };
+    
+    // Generate PDF blob
+    const blob = await pdf(
+      <ReactPDFDocument 
+        cliente={cliente} 
+        folio={folio} 
+        cotizacion={cotizacion} 
+      />
+    ).toBlob();
+    
+    // Create URL and download
+    const url = URL.createObjectURL(blob);
+    
+    if (mergedOptions.download) {
+      // Create link and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = mergedOptions.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      // Open in new tab
+      window.open(url, '_blank');
+    }
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    throw new Error('Error generating PDF. Please try again.');
+  }
+};
+
+/**
  * Service for PDF generation
  */
 export const PDFService = {
   generatePDFFromElement,
   formatDateForPDF,
-  formatCurrencyForPDF
+  formatCurrencyForPDF,
+  generateReactPDF
 }; 
