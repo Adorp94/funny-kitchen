@@ -47,7 +47,7 @@ export default function Home() {
     // Use Auth0's loginWithRedirect method
     loginWithRedirect({
       authorizationParams: {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/api/auth/callback`,
         screen_hint: 'login',
       },
       appState: { returnTo: "/dashboard" }
@@ -63,7 +63,7 @@ export default function Home() {
     // Use Auth0's loginWithRedirect method with screen_hint set to signup
     loginWithRedirect({
       authorizationParams: {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/api/auth/callback`,
         screen_hint: 'signup',
       },
       appState: { returnTo: "/dashboard" }
@@ -79,7 +79,7 @@ export default function Home() {
     // Use Auth0's loginWithRedirect method with Google connection
     loginWithRedirect({
       authorizationParams: {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/api/auth/callback`,
         connection: 'google-oauth2',
       },
       appState: { returnTo: "/dashboard" }

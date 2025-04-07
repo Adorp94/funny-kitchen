@@ -61,7 +61,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           domain={domain}
           clientId={clientId}
           authorizationParams={{
-            redirect_uri: origin,
+            redirect_uri: `${origin}/api/auth/callback`,
           }}
           cacheLocation="localstorage"
           onError={(error) => {
