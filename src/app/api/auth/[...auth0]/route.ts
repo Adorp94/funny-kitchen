@@ -1,6 +1,9 @@
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const path = url.pathname;
+  const origin = url.origin;
+  
+  console.log("Auth0 API route called:", { path, origin });
   
   // Extract Auth0 configuration from environment variables
   const auth0Domain = process.env.AUTH0_DOMAIN || '';
@@ -20,6 +23,7 @@ export async function GET(request: Request) {
     loginUrl.searchParams.append('scope', 'openid profile email');
     loginUrl.searchParams.append('state', returnTo);
     
+    console.log("Redirecting to Auth0 login:", loginUrl.toString());
     return Response.redirect(loginUrl.toString());
   }
   
@@ -28,8 +32,11 @@ export async function GET(request: Request) {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state') || '/dashboard';
     
+    console.log("Auth0 callback received:", { code: !!code, state });
+    
     if (!code) {
-      return Response.redirect('/');
+      console.error("No code in callback");
+      return Response.redirect(new URL('/', origin).toString());
     }
     
     try {
@@ -48,26 +55,37 @@ export async function GET(request: Request) {
       });
       
       if (!tokenResponse.ok) {
-        throw new Error('Failed to exchange code for token');
+        const errorText = await tokenResponse.text();
+        console.error('Token exchange error:', tokenResponse.status, errorText);
+        throw new Error(`Failed to exchange code for token: ${errorText}`);
       }
       
       const tokenData = await tokenResponse.json();
+      console.log("Token received:", { 
+        access_token: !!tokenData.access_token,
+        id_token: !!tokenData.id_token,
+        token_type: tokenData.token_type
+      });
       
-      // Set the session cookie
-      const headers = new Headers();
-      headers.append('Set-Cookie', `appSession=${tokenData.access_token}; Path=/; HttpOnly; SameSite=Lax`);
+      // Set the session cookie with a long expiration (1 week)
+      const maxAge = 7 * 24 * 60 * 60; // 1 week in seconds
+      const cookieValue = `appSession=${tokenData.access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
       
-      // Redirect to the originally requested URL (stored in state)
+      // Create absolute URL for redirect
+      const redirectUrl = new URL(state.startsWith('/') ? state : `/${state}`, origin);
+      console.log("Redirecting after auth to:", redirectUrl.toString());
+      
+      // Return a response with both redirect and cookie
       return new Response(null, {
         status: 302,
         headers: {
-          Location: state,
-          ...Object.fromEntries(headers.entries())
+          'Location': redirectUrl.toString(),
+          'Set-Cookie': cookieValue
         }
       });
     } catch (error) {
       console.error('Auth callback error:', error);
-      return Response.redirect('/');
+      return Response.redirect(new URL('/', origin).toString());
     }
   }
   
@@ -78,14 +96,14 @@ export async function GET(request: Request) {
     logoutUrl.searchParams.append('returnTo', auth0PostLogoutRedirectUri);
     
     // Clear the session cookie
-    const headers = new Headers();
-    headers.append('Set-Cookie', 'appSession=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+    const clearCookie = 'appSession=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0';
     
+    console.log("Logging out, redirecting to:", logoutUrl.toString());
     return new Response(null, {
       status: 302,
       headers: {
-        Location: logoutUrl.toString(),
-        ...Object.fromEntries(headers.entries())
+        'Location': logoutUrl.toString(),
+        'Set-Cookie': clearCookie
       }
     });
   }
@@ -97,6 +115,7 @@ export async function GET(request: Request) {
     const token = sessionCookie?.split('=')[1];
     
     if (!token) {
+      console.log("No auth token found in cookies");
       return Response.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
@@ -108,10 +127,13 @@ export async function GET(request: Request) {
       });
       
       if (!userInfoResponse.ok) {
+        const errorText = await userInfoResponse.text();
+        console.error('User info error:', userInfoResponse.status, errorText);
         throw new Error('Failed to get user info');
       }
       
       const userInfo = await userInfoResponse.json();
+      console.log("User info retrieved:", { sub: userInfo.sub, email: userInfo.email });
       return Response.json(userInfo);
     } catch (error) {
       console.error('Error fetching user info:', error);

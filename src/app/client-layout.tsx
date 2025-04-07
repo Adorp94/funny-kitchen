@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect } from 'react';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Footer from '@/components/footer';
 import Header from '@/components/header';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 // Remove AuthGuard import since we're using middleware
 // import AuthGuard from "./auth-guard";
@@ -14,6 +15,7 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isSignInPage = pathname === '/';
   
   // Get Auth0 configuration from environment variables or hard-code for development
@@ -24,6 +26,20 @@ export default function ClientLayout({
   const redirectUri = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/auth/callback`
     : 'http://localhost:3000/api/auth/callback';
+    
+  // Define the redirect callback function with more robust handling
+  const onRedirectCallback = (appState: any) => {
+    console.log("Auth0 redirect callback triggered with app state:", appState);
+    
+    // Get the intended destination either from auth state or default to dashboard
+    const targetUrl = appState?.returnTo || '/dashboard';
+    
+    // Use window.location.href for a full page reload to ensure clean state
+    if (typeof window !== 'undefined') {
+      console.log("Redirecting to:", targetUrl);
+      window.location.href = targetUrl;
+    }
+  };
 
   return (
     <Auth0Provider
@@ -33,6 +49,8 @@ export default function ClientLayout({
         redirect_uri: redirectUri,
         scope: 'openid profile email'
       }}
+      onRedirectCallback={onRedirectCallback}
+      useRefreshTokens={true}
       cacheLocation="localstorage"
     >
       <div className="flex flex-col min-h-screen bg-gray-50">

@@ -14,9 +14,11 @@ const PUBLIC_ROUTES = [
 ];
 
 export async function middleware(req: NextRequest) {
-  // Skip auth check in development mode
+  console.log("[Middleware] Running on path:", req.nextUrl.pathname);
+  
+  // Skip auth check in development mode for easier debugging
   if (process.env.NODE_ENV === 'development') {
-    console.log("Development mode: Bypassing auth check");
+    console.log("[Middleware] Development mode: Bypassing auth check");
     return NextResponse.next();
   }
   
@@ -28,15 +30,18 @@ export async function middleware(req: NextRequest) {
       path.startsWith('/api/auth/') || 
       path.startsWith('/api/debug/') ||
       path.startsWith('/api/cotizaciones/')) {
+    console.log("[Middleware] Public path, skipping auth check:", path);
     return NextResponse.next();
   }
   
   // For other routes, check for authentication cookie
   // Auth0 sets appSession cookie
   const authCookie = req.cookies.get('appSession');
+  console.log("[Middleware] Auth cookie present:", !!authCookie);
   
   if (!authCookie) {
     // Redirect to login page if not authenticated
+    console.log("[Middleware] No auth cookie, redirecting to login");
     return NextResponse.redirect(new URL('/', req.url));
   }
   

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn, DollarSign } from "lucide-react";
@@ -29,8 +29,18 @@ const navigation = [
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, isLoading, loginWithRedirect } = useAuth0();
+  const { user, isLoading, loginWithRedirect, isAuthenticated } = useAuth0();
+  
+  // Add debug logging for authentication state
+  useEffect(() => {
+    console.log("[Header] Auth state:", { 
+      isAuthenticated, 
+      isLoading, 
+      user: user ? { email: user.email, name: user.name } : null 
+    });
+  }, [isAuthenticated, isLoading, user]);
   
   // Check if a given path is active
   const isActive = (path: string) => {
@@ -43,6 +53,22 @@ export default function Header() {
     // For other paths, check if the current path starts with the given path
     return pathname === path || pathname.startsWith(path);
   };
+
+  // If still loading auth state, show a minimal loading indicator
+  if (isLoading) {
+    return (
+      <header className="w-full bg-white border-b border-gray-100">
+        <div className="flex h-16 items-center justify-between max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
+          <div className="flex items-center">
+            <Link href="/dashboard" className="flex items-center">
+              <img src="/logo.png" alt="Funny Kitchen" className="h-10 object-contain" />
+            </Link>
+          </div>
+          <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="w-full bg-white border-b border-gray-100">
@@ -78,9 +104,7 @@ export default function Header() {
         
         {/* Right section with authentication */}
         <div className="flex items-center space-x-4">
-          {isLoading ? (
-            <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
-          ) : user ? (
+          {user ? (
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-gray-700 hidden sm:inline-block">
                 {user.name || user.email}
@@ -90,7 +114,12 @@ export default function Header() {
           ) : (
             <Button 
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => loginWithRedirect()}
+              onClick={() => loginWithRedirect({
+                authorizationParams: {
+                  redirect_uri: window.location.origin + '/api/auth/callback',
+                  returnTo: pathname
+                }
+              })}
             >
               <LogIn className="mr-2 h-4 w-4" />
               <span className="whitespace-nowrap">Iniciar Sesión</span>
@@ -135,11 +164,16 @@ export default function Header() {
             ))}
             
             {/* Mobile authentication */}
-            {!user && !isLoading && (
+            {!user && (
               <div className="px-3 py-3 mt-2">
                 <Button 
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => loginWithRedirect()}
+                  onClick={() => loginWithRedirect({
+                    authorizationParams: {
+                      redirect_uri: window.location.origin + '/api/auth/callback',
+                      returnTo: pathname
+                    }
+                  })}
                 >
                   <LogIn className="mr-2 h-4 w-4" />
                   <span className="whitespace-nowrap">Iniciar Sesión</span>

@@ -12,6 +12,7 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useAuth0 } from "@auth0/auth0-react";
 
 interface DashboardMetrics {
   cotizaciones: {
@@ -27,6 +28,7 @@ interface DashboardMetrics {
 }
 
 export default function DashboardPage() {
+  const { isAuthenticated, isLoading, user } = useAuth0();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -41,6 +43,31 @@ export default function DashboardPage() {
       total: 0
     }
   });
+
+  // Log authentication state for debugging
+  console.log("Dashboard auth state:", { isAuthenticated, isLoading, user });
+  
+  useEffect(() => {
+    // If not loading and not authenticated, redirect to login
+    if (!isLoading && !isAuthenticated) {
+      console.log("Not authenticated, redirecting to login");
+      router.push("/");
+    }
+  }, [isLoading, isAuthenticated, router]);
+  
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+  
+  // Render dashboard only if authenticated
+  if (!isAuthenticated) {
+    return null; // Don't render anything while redirecting
+  }
 
   useEffect(() => {
     const fetchMetrics = async () => {

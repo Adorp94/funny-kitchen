@@ -8,39 +8,67 @@ import Image from 'next/image';
 import { Loader2, Mail } from 'lucide-react';
 
 export default function Home() {
-  const { loginWithRedirect, isAuthenticated, isLoading } = useAuth0();
+  const { loginWithRedirect, isAuthenticated, isLoading, user } = useAuth0();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // If already authenticated, redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
+    // Log authentication state on component mount and when it changes
+    console.log("Home page auth state:", { isAuthenticated, isLoading, user });
+    
+    // This runs when auth state is ready
+    if (!isLoading) {
+      if (isAuthenticated) {
+        console.log("User is authenticated, redirecting to dashboard");
+        
+        // Use a direct URL change for a full page reload if routing doesn't work
+        window.location.href = '/dashboard';
+      } else {
+        console.log("User is not authenticated, showing login page");
+        setCheckingAuth(false);
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user]);
 
   // Handle email sign in
   const handleSignIn = async () => {
     setLoading(true);
-    await loginWithRedirect({
-      authorizationParams: {
-        screen_hint: 'login',
-      }
-    });
+    console.log("Starting email login flow");
+    try {
+      await loginWithRedirect({
+        authorizationParams: {
+          screen_hint: 'login',
+          redirect_uri: window.location.origin + '/api/auth/callback',
+          returnTo: '/dashboard' 
+        }
+      });
+    } catch (error) {
+      console.error("Error during login:", error);
+      setLoading(false);
+    }
   };
 
   // Handle Google sign in
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    await loginWithRedirect({
-      authorizationParams: {
-        connection: 'google-oauth2',
-      }
-    });
+    console.log("Starting Google login flow");
+    try {
+      await loginWithRedirect({
+        authorizationParams: {
+          connection: 'google-oauth2',
+          redirect_uri: window.location.origin + '/api/auth/callback',
+          returnTo: '/dashboard'
+        }
+      });
+    } catch (error) {
+      console.error("Error during Google login:", error);
+      setLoading(false);
+    }
   };
 
-  // Show loading indicator while Auth0 is loading or redirect is happening
-  if (isLoading || loading) {
+  // Show loading indicator while Auth0 is loading or checking auth state
+  if (isLoading || checkingAuth) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
