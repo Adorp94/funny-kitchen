@@ -93,6 +93,9 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             redirect_uri: `${origin}/api/auth/callback`,
           }}
           cacheLocation="localstorage"
+          useRefreshTokens={true}
+          useRefreshTokensFallback={true}
+          cookieDomain={typeof window !== 'undefined' ? window.location.hostname : undefined}
           onError={(error) => {
             console.error("[Auth0] Error:", error);
             setError(error.message || "An error occurred with authentication");

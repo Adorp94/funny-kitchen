@@ -14,6 +14,12 @@ const nextConfig = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
+  // Fix for "Dynamic server usage" errors in API routes
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/ssr', '@supabase/supabase-js']
+  },
+  // Force all API routes to be dynamic
+  output: 'standalone',
 };
 
 module.exports = nextConfig; 

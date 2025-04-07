@@ -12,21 +12,51 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showHealth, setShowHealth] = useState(false);
+  const [healthData, setHealthData] = useState<any>(null);
   const router = useRouter();
 
   // Add an error boundary
   useEffect(() => {
     try {
-      // Check if we're in the error state coming back from Auth0
-      const url = new URL(window.location.href);
-      const errorDescription = url.searchParams.get('error_description');
-      if (errorDescription) {
-        console.error('[Home] Auth0 returned error:', errorDescription);
-        setError(errorDescription);
+      console.log("[Home] Initializing with auth status:", { isLoading, isAuthenticated });
+      
+      // Check for URL parameters
+      if (typeof window !== 'undefined') {
+        // Check if we're in the error state coming back from Auth0
+        const url = new URL(window.location.href);
+        const errorDescription = url.searchParams.get('error_description');
+        if (errorDescription) {
+          console.error('[Home] Auth0 returned error:', errorDescription);
+          setError(errorDescription);
+        }
       }
     } catch (err) {
-      console.error('[Home] Error parsing URL:', err);
+      console.error('[Home] Error in initialization:', err);
+      setError(`Error initializing page: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }, []);
+
+  // Fetch health endpoint data
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          console.log("[Home] Health check data:", data);
+          setHealthData(data);
+        } else {
+          console.error("[Home] Health check failed:", response.status);
+          setHealthData({ status: 'error', message: `API returned ${response.status}` });
+        }
+      } catch (err) {
+        console.error("[Home] Health check error:", err);
+        setHealthData({ status: 'error', message: String(err) });
+      }
+    };
+    
+    checkHealth();
   }, []);
 
   useEffect(() => {
@@ -57,50 +87,68 @@ export default function Home() {
 
   // Handle email sign in - go directly to Auth0 login
   const handleSignIn = () => {
-    setLoading(true);
-    console.log("[Home] Starting direct login flow");
-    // Store in localStorage that we're coming from the login flow
-    localStorage.setItem('login_initiated', 'true');
-    // Use Auth0's loginWithRedirect method
-    loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: `${window.location.origin}/api/auth/callback`,
-        screen_hint: 'login',
-      },
-      appState: { returnTo: "/dashboard" }
-    });
+    try {
+      setLoading(true);
+      console.log("[Home] Starting direct login flow");
+      // Store in localStorage that we're coming from the login flow
+      localStorage.setItem('login_initiated', 'true');
+      // Use Auth0's loginWithRedirect method
+      loginWithRedirect({
+        authorizationParams: {
+          redirect_uri: `${window.location.origin}/api/auth/callback`,
+          screen_hint: 'login',
+        },
+        appState: { returnTo: "/dashboard" }
+      });
+    } catch (err) {
+      console.error("[Home] Login error:", err);
+      setError(`Login error: ${err instanceof Error ? err.message : String(err)}`);
+      setLoading(false);
+    }
   };
 
   // Handle sign up - go directly to Auth0 signup screen
   const handleSignUp = () => {
-    setLoading(true);
-    console.log("[Home] Starting sign up flow");
-    // Store in localStorage that we're coming from the signup flow
-    localStorage.setItem('signup_initiated', 'true');
-    // Use Auth0's loginWithRedirect method with screen_hint set to signup
-    loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: `${window.location.origin}/api/auth/callback`,
-        screen_hint: 'signup',
-      },
-      appState: { returnTo: "/dashboard" }
-    });
+    try {
+      setLoading(true);
+      console.log("[Home] Starting sign up flow");
+      // Store in localStorage that we're coming from the signup flow
+      localStorage.setItem('signup_initiated', 'true');
+      // Use Auth0's loginWithRedirect method with screen_hint set to signup
+      loginWithRedirect({
+        authorizationParams: {
+          redirect_uri: `${window.location.origin}/api/auth/callback`,
+          screen_hint: 'signup',
+        },
+        appState: { returnTo: "/dashboard" }
+      });
+    } catch (err) {
+      console.error("[Home] Signup error:", err);
+      setError(`Signup error: ${err instanceof Error ? err.message : String(err)}`);
+      setLoading(false);
+    }
   };
 
   // Handle Google sign in - go directly to Auth0 login with Google connection
   const handleGoogleSignIn = () => {
-    setLoading(true);
-    console.log("[Home] Starting Google login flow");
-    // Store in localStorage that we're coming from the login flow
-    localStorage.setItem('login_initiated', 'true');
-    // Use Auth0's loginWithRedirect method with Google connection
-    loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: `${window.location.origin}/api/auth/callback`,
-        connection: 'google-oauth2',
-      },
-      appState: { returnTo: "/dashboard" }
-    });
+    try {
+      setLoading(true);
+      console.log("[Home] Starting Google login flow");
+      // Store in localStorage that we're coming from the login flow
+      localStorage.setItem('login_initiated', 'true');
+      // Use Auth0's loginWithRedirect method with Google connection
+      loginWithRedirect({
+        authorizationParams: {
+          redirect_uri: `${window.location.origin}/api/auth/callback`,
+          connection: 'google-oauth2',
+        },
+        appState: { returnTo: "/dashboard" }
+      });
+    } catch (err) {
+      console.error("[Home] Google login error:", err);
+      setError(`Google login error: ${err instanceof Error ? err.message : String(err)}`);
+      setLoading(false);
+    }
   };
 
   // Show loading indicator while checking authentication
@@ -110,6 +158,13 @@ export default function Home() {
         <div className="flex flex-col items-center">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
           <p className="mt-4 text-gray-600">Verificando sesión...</p>
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mt-4 text-xs text-gray-500">
+              <p>isLoading: {String(isLoading)}</p>
+              <p>checkingAuth: {String(checkingAuth)}</p>
+              <p>isAuthenticated: {String(isAuthenticated)}</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -122,19 +177,50 @@ export default function Home() {
         <div className="bg-red-50 p-6 rounded-lg shadow-md max-w-lg w-full">
           <h2 className="text-red-700 text-xl font-bold mb-4">Error de autenticación</h2>
           <p className="text-red-600 mb-4">{error}</p>
-          <Button 
-            className="w-full"
-            onClick={() => window.location.href = '/'}
-          >
-            Intentar de nuevo
-          </Button>
+          <div className="space-y-4">
+            <Button 
+              className="w-full"
+              onClick={() => window.location.href = '/'}
+            >
+              Intentar de nuevo
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowHealth(!showHealth)}
+            >
+              {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
+            </Button>
+            {showHealth && healthData && (
+              <div className="mt-4 p-4 bg-gray-100 rounded text-sm overflow-auto">
+                <pre>{JSON.stringify(healthData, null, 2)}</pre>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
-
+  
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Health check button - only in development */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="absolute top-2 right-2">
+          <button 
+            onClick={() => setShowHealth(!showHealth)}
+            className="text-xs text-gray-500 underline"
+          >
+            {showHealth ? 'Hide Health' : 'Health Check'}
+          </button>
+          {showHealth && healthData && (
+            <div className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto w-64">
+              <pre>{JSON.stringify(healthData, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="flex-1 flex flex-col sm:flex-row">
         {/* Left side: Login */}
         <div className="w-full sm:w-1/2 flex flex-col justify-center items-center p-8">

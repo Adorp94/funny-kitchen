@@ -3,48 +3,44 @@ import type { NextRequest } from 'next/server';
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
-  // Log about the middleware being invoked
-  console.log('[Middleware] Processing request to:', request.nextUrl.pathname);
-  
-  // Define public routes
-  const publicRoutes = ['/', '/api/auth', '/api/graphql'];
-  
-  // Check if path is public
+  // Log the path being accessed for debugging
+  console.log(`[Middleware] Processing request for: ${request.nextUrl.pathname}`);
+
+  // Get the value of the appSession cookie
+  const sessionCookie = request.cookies.get('appSession');
+  const isLoggedIn = !!sessionCookie;
+
+  // Define routes that should always be accessible without authentication
+  const publicRoutes = ['/', '/api/auth', '/test', '/login', '/privacy', '/terms'];
   const isPublicRoute = publicRoutes.some(route => 
     request.nextUrl.pathname === route || 
     request.nextUrl.pathname.startsWith(`${route}/`)
   );
-  
-  // If path is public, skip authentication check
-  if (isPublicRoute) {
-    console.log('[Middleware] Public route, skipping auth check');
-    return NextResponse.next();
+
+  // Allow all API routes to be called without authentication (Auth0 will handle auth for protected endpoints)
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
+
+  // If the user is not logged in and tries to access a protected route, redirect to home
+  if (!isPublicRoute && !isApiRoute && !isLoggedIn) {
+    console.log(`[Middleware] Redirecting unauthenticated user from ${request.nextUrl.pathname} to /`);
+    return NextResponse.redirect(new URL('/', request.url));
   }
-  
-  // Check if user has auth cookie
-  const authCookie = request.cookies.get('appSession');
-  const hasAuthCookie = !!authCookie?.value;
-  
-  console.log('[Middleware] Auth check result:', { 
-    path: request.nextUrl.pathname,
-    hasAuthCookie
-  });
-  
-  // DEVELOPMENT MODE BYPASS - ENABLE THIS FOR EASIER LOCAL TESTING
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  if (isDevelopment) {
-    console.log('[Middleware] Development mode - bypassing auth checks');
-    return NextResponse.next();
-  }
-  
-  // If user has no auth cookie and trying to access protected route,
-  // redirect to login page
-  if (!hasAuthCookie) {
-    console.log('[Middleware] Unauthorized, redirecting to login');
-    const loginUrl = new URL('/', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-  
-  // If we reach here, user has auth cookie, proceed with the request
+
+  // Continue the request for public routes, API routes, or logged in users
   return NextResponse.next();
-} 
+}
+
+// See "Matching Paths" below to learn more
+export const config = {
+  // Apply this middleware to all routes except static files
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public directory
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)',
+  ],
+}; 
