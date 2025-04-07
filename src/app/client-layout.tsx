@@ -35,9 +35,13 @@ export default function ClientLayout({
       }}
       cacheLocation="localstorage"
     >
-      {!isSignInPage && <Header />}
-      <main className="flex flex-col flex-1">{children}</main>
-      <Footer />
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        {!isSignInPage && <Header />}
+        <main className={`flex-1 ${!isSignInPage ? 'pt-6 px-4 md:px-6 lg:px-8 max-w-[1440px] mx-auto w-full' : ''}`}>
+          {children}
+        </main>
+        {!isSignInPage && <Footer />}
+      </div>
     </Auth0Provider>
   );
 } 
