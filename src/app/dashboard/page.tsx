@@ -99,15 +99,47 @@ export default function DashboardPage() {
       
       const fetchDashboardData = async () => {
         try {
-          // Fetch dashboard metrics (simplified version for now)
+          // Fetch real metrics from the database
+          const [cotizacionesRes, ingresosRes, egresosRes] = await Promise.all([
+            fetch('/api/cotizaciones/count'),
+            fetch('/api/pagos/total'),
+            fetch('/api/egresos/total')
+          ]);
+          
+          let cotizacionesCount = 0;
+          let ingresosTotal = 0;
+          let egresosTotal = 0;
+          
+          if (cotizacionesRes.ok) {
+            const cotizacionesData = await cotizacionesRes.json();
+            cotizacionesCount = cotizacionesData.count || 0;
+          }
+          
+          if (ingresosRes.ok) {
+            const ingresosData = await ingresosRes.json();
+            ingresosTotal = ingresosData.total || 0;
+          }
+          
+          if (egresosRes.ok) {
+            const egresosData = await egresosRes.json();
+            egresosTotal = egresosData.total || 0;
+          }
+          
           setMetrics({
-            cotizaciones: 12,
-            ingresos: 45000,
-            egresos: 32000,
+            cotizaciones: cotizacionesCount,
+            ingresos: ingresosTotal,
+            egresos: egresosTotal,
           });
+          
           setLoading(false);
         } catch (error) {
           console.error("[Dashboard] Error fetching dashboard data:", error);
+          // If we can't fetch real data, at least show the dashboard with zeros
+          setMetrics({
+            cotizaciones: 0,
+            ingresos: 0,
+            egresos: 0,
+          });
           setLoading(false);
         }
       };
@@ -178,46 +210,6 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">${metrics.egresos.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Quick Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Cotizaciones</CardTitle>
-            <CardDescription>Gestiona tus cotizaciones</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <Button 
-              className="w-full" 
-              onClick={() => router.push('/dashboard/cotizaciones')}
-            >
-              Ver cotizaciones
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={() => router.push('/dashboard/cotizaciones/nueva')}
-            >
-              Nueva cotización
-            </Button>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Finanzas</CardTitle>
-            <CardDescription>Gestiona tus finanzas</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              className="w-full" 
-              onClick={() => router.push('/dashboard/finanzas')}
-            >
-              Ver finanzas
-            </Button>
           </CardContent>
         </Card>
       </div>
