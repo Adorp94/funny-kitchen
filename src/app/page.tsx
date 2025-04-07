@@ -14,60 +14,17 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Function to check authentication from various sources
+    // Simple authentication check
     const checkAuth = async () => {
       try {
-        // Prevent redirect loops by checking if we recently redirected
-        const lastRedirect = localStorage.getItem('last_redirect_time');
-        const now = Date.now();
-        const redirectThreshold = 2000; // 2 seconds
-        
-        if (lastRedirect && (now - parseInt(lastRedirect)) < redirectThreshold) {
-          console.log("[Home] Preventing redirect loop - too soon since last redirect");
-          setCheckingAuth(false);
-          return;
-        }
-        
-        // Check Auth0 SDK state
+        // If authenticated with Auth0, redirect to dashboard
         if (isAuthenticated) {
-          console.log("[Home] Auth0 SDK reports user is authenticated");
-          localStorage.setItem('app_auth_checked', 'true');
-          localStorage.setItem('last_redirect_time', now.toString());
+          console.log("[Home] User is authenticated, redirecting to dashboard");
           router.push('/dashboard');
           return;
         }
-
-        // Check for session cookie
-        const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('appSession='));
-        console.log("[Home] Session cookie present:", hasCookie);
         
-        if (hasCookie) {
-          // Verify cookie with API
-          try {
-            console.log("[Home] Verifying cookie validity with API...");
-            const response = await fetch('/api/auth/me', {
-              credentials: 'include',
-              cache: 'no-store'
-            });
-            
-            if (response.ok) {
-              console.log("[Home] API verified user is authenticated");
-              localStorage.setItem('app_auth_checked', 'true');
-              localStorage.setItem('last_redirect_time', now.toString());
-              router.push('/dashboard');
-              return;
-            } else {
-              console.log("[Home] API could not verify user, clearing stored auth state");
-              localStorage.removeItem('app_auth_checked');
-            }
-          } catch (error) {
-            console.error("[Home] Error verifying auth with API:", error);
-          }
-        }
-        
-        // If we reach here, user is not authenticated
-        console.log("[Home] User is not authenticated, showing login page");
-        localStorage.removeItem('app_auth_checked');
+        // Otherwise, show login page
         setCheckingAuth(false);
       } catch (error) {
         console.error("[Home] Error in auth check:", error);
@@ -77,7 +34,6 @@ export default function Home() {
 
     // Only run auth check if Auth0 has finished loading
     if (!isLoading) {
-      console.log("[Home] Auth0 has loaded, checking authentication...");
       checkAuth();
     }
   }, [isAuthenticated, isLoading, router]);

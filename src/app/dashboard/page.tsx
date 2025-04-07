@@ -35,62 +35,19 @@ export default function DashboardPage() {
   // Log authentication state for debugging
   console.log("[Dashboard] Auth state:", { isAuthenticated, isLoading, user });
 
-  // Run only once on component mount to check cookie and API auth
+  // Run only once on component mount to check authentication
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // If user is authenticated via Auth0 SDK, consider them authorized
-        if (isAuthenticated) {
-          console.log("[Dashboard] User authenticated via Auth0 SDK");
-          setIsAuthorized(true);
-          return;
-        }
-        
-        // Only check cookies if Auth0 reports not authenticated
-        const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('appSession='));
-        console.log("[Dashboard] Session cookie present:", hasCookie);
-        
-        // Try to get user data from the backend API if cookie exists
-        if (hasCookie) {
-          try {
-            console.log("[Dashboard] Cookie found, verifying with API...");
-            const response = await fetch('/api/auth/me', {
-              credentials: 'include',
-              cache: 'no-store'
-            });
-            
-            if (response.ok) {
-              const userData = await response.json();
-              console.log("[Dashboard] API verified user:", userData.email);
-              setIsAuthorized(true);
-            } else {
-              console.log("[Dashboard] API could not verify user, cookie may be invalid");
-              setIsAuthorized(false);
-            }
-          } catch (error) {
-            console.error("[Dashboard] Error verifying auth with API:", error);
-            // If API verification fails, but cookie exists, still allow access (graceful degradation)
-            setIsAuthorized(hasCookie);
-          }
-        } else {
-          console.log("[Dashboard] No session cookie found");
-          setIsAuthorized(false);
-        }
-      } catch (error) {
-        console.error("[Dashboard] Error checking auth:", error);
-        setIsAuthorized(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Only run if Auth0 has loaded
+    // Simple authentication check based only on Auth0
     if (!isLoading) {
-      checkAuth();
-    } else {
-      console.log("[Dashboard] Auth0 still loading, will check auth when ready");
+      if (isAuthenticated) {
+        console.log("[Dashboard] User is authenticated with Auth0, showing dashboard");
+        setIsAuthorized(true);
+      } else {
+        console.log("[Dashboard] User is not authenticated, redirecting to login");
+        router.push('/');
+      }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, router]);
   
   // Fetch dashboard data when authentication is confirmed
   useEffect(() => {
@@ -99,6 +56,8 @@ export default function DashboardPage() {
       
       const fetchDashboardData = async () => {
         try {
+          setLoading(true);
+          
           // Fetch real metrics from the database
           const [cotizacionesRes, ingresosRes, egresosRes] = await Promise.all([
             fetch('/api/cotizaciones/count'),
@@ -130,31 +89,22 @@ export default function DashboardPage() {
             ingresos: ingresosTotal,
             egresos: egresosTotal,
           });
-          
-          setLoading(false);
         } catch (error) {
           console.error("[Dashboard] Error fetching dashboard data:", error);
-          // If we can't fetch real data, at least show the dashboard with zeros
+          // If we can't fetch real data, reset to zeros
           setMetrics({
             cotizaciones: 0,
             ingresos: 0,
             egresos: 0,
           });
+        } finally {
           setLoading(false);
         }
       };
       
       fetchDashboardData();
-    } else if (!isLoading && !isAuthorized) {
-      // Add a delay before redirecting to prevent immediate redirect loops
-      console.log("[Dashboard] User not authorized, redirecting to login");
-      const timer = setTimeout(() => {
-        router.push('/');
-      }, 500);
-      
-      return () => clearTimeout(timer);
     }
-  }, [isAuthorized, isLoading, router]);
+  }, [isAuthorized]);
   
   // Show loading state
   if (isLoading || loading) {

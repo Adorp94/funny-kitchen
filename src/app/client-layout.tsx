@@ -12,6 +12,7 @@ interface ClientLayoutProps {
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
   const isSignIn = pathname === "/";
 
@@ -25,7 +26,23 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const origin = 
     typeof window !== 'undefined' && window.location.origin
       ? window.location.origin
-      : 'http://localhost:3001';
+      : 'http://localhost:3000';
+  
+  // Auth0 configuration
+  const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "dev-av1unzc74ll0psau.us.auth0.com";
+  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "y3zkQqmOiFGAV3OzU4bF5LIl631V6Jxb";
+  
+  // Log Auth0 configuration for debugging
+  useEffect(() => {
+    if (isMounted) {
+      console.log("[Auth0] Configuration:", {
+        domain,
+        clientId,
+        redirect_uri: origin,
+        isMounted
+      });
+    }
+  }, [domain, clientId, origin, isMounted]);
   
   // Don't render anything during SSR
   if (!isMounted) {
@@ -33,29 +50,30 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   }
 
   return (
-    <Auth0Provider
-      domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "dev-av1unzc74ll0psau.us.auth0.com"}
-      clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "y3zkQqmOiFGAV3OzU4bF5LIl631V6Jxb"}
-      authorizationParams={{
-        redirect_uri: origin,
-        audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE,
-      }}
-      cacheLocation="localstorage"
-      useRefreshTokens={true}
-      onRedirectCallback={(appState) => {
-        console.log("[Auth0] Redirect callback with appState:", appState);
-        // Store the last redirect time to prevent loops
-        localStorage.setItem('last_redirect_time', Date.now().toString());
-        
-        // Navigate to the intended route after login
-        if (appState?.returnTo) {
-          window.location.href = appState.returnTo;
-        }
-      }}
-    >
-      {!isSignIn && <Header />}
-      <main className="min-h-screen bg-gray-50">{children}</main>
-      {!isSignIn && <Footer />}
-    </Auth0Provider>
+    <>
+      {error ? (
+        <div className="bg-red-50 p-4 text-red-700 rounded m-4">
+          <h2 className="font-bold">Auth Error</h2>
+          <p>{error}</p>
+        </div>
+      ) : (
+        <Auth0Provider
+          domain={domain}
+          clientId={clientId}
+          authorizationParams={{
+            redirect_uri: origin,
+          }}
+          cacheLocation="localstorage"
+          onError={(error) => {
+            console.error("[Auth0] Error:", error);
+            setError(error.message || "An error occurred with authentication");
+          }}
+        >
+          {!isSignIn && <Header />}
+          <main className="min-h-screen bg-gray-50">{children}</main>
+          {!isSignIn && <Footer />}
+        </Auth0Provider>
+      )}
+    </>
   );
 } 
