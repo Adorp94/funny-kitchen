@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, ShoppingBag, Users, TrendingUp, ClipboardList, DollarSign } from "lucide-react";
+import { FileText, ShoppingBag, Users, TrendingUp, ClipboardList, DollarSign, Loader2 } from "lucide-react";
 import { 
   Card, 
   CardContent, 
@@ -15,157 +16,201 @@ import { Button } from "@/components/ui/button";
 import { useAuth0 } from "@auth0/auth0-react";
 
 interface DashboardMetrics {
-  cotizaciones: {
-    total: number;
-    pendientes: number;
-  };
-  clientes: {
-    total: number;
-  };
-  productos: {
-    total: number;
-  };
+  cotizaciones: number;
+  ingresos: number;
+  egresos: number;
 }
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading, user } = useAuth0();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
-    cotizaciones: {
-      total: 0,
-      pendientes: 0
-    },
-    clientes: {
-      total: 0
-    },
-    productos: {
-      total: 0
-    }
+    cotizaciones: 0,
+    ingresos: 0,
+    egresos: 0,
   });
 
   // Log authentication state for debugging
-  console.log("Dashboard auth state:", { isAuthenticated, isLoading, user });
-  
+  console.log("[Dashboard] Auth state:", { isAuthenticated, isLoading, user });
+
+  // Run only once on component mount to check cookie and API auth
   useEffect(() => {
-    // If not loading and not authenticated, redirect to login
-    if (!isLoading && !isAuthenticated) {
-      console.log("Not authenticated, redirecting to login");
-      router.push("/");
+    const checkAuth = async () => {
+      try {
+        // First check for the presence of appSession cookie
+        const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('appSession='));
+        console.log("[Dashboard] Session cookie present:", hasCookie);
+        
+        // Try to get user data from the backend API if cookie exists
+        if (hasCookie) {
+          try {
+            console.log("[Dashboard] Cookie found, verifying with API...");
+            const response = await fetch('/api/auth/me', {
+              credentials: 'include',
+              cache: 'no-store'
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              console.log("[Dashboard] API verified user:", userData.email);
+              setIsAuthorized(true);
+            } else {
+              console.log("[Dashboard] API could not verify user, cookie may be invalid");
+              setIsAuthorized(false);
+            }
+          } catch (error) {
+            console.error("[Dashboard] Error verifying auth with API:", error);
+            // If API verification fails, but cookie exists, still allow access (graceful degradation)
+            setIsAuthorized(hasCookie);
+          }
+        } else {
+          console.log("[Dashboard] No session cookie found");
+          setIsAuthorized(false);
+        }
+        
+        // If user is authenticated via Auth0 SDK, consider them authorized
+        if (isAuthenticated && !isLoading) {
+          console.log("[Dashboard] User authenticated via Auth0 SDK");
+          setIsAuthorized(true);
+        }
+      } catch (error) {
+        console.error("[Dashboard] Error checking auth:", error);
+        setIsAuthorized(false);
+      }
+    };
+
+    // Only run if Auth0 has loaded or we're in SSR
+    if (!isLoading) {
+      checkAuth();
+    } else {
+      console.log("[Dashboard] Auth0 still loading, will check auth when ready");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isAuthenticated, isLoading]);
+  
+  // Fetch dashboard data when authentication is confirmed
+  useEffect(() => {
+    if (isAuthorized) {
+      console.log("[Dashboard] User is authorized, fetching dashboard data");
+      
+      const fetchDashboardData = async () => {
+        try {
+          // Fetch dashboard metrics (simplified version for now)
+          setMetrics({
+            cotizaciones: 12,
+            ingresos: 45000,
+            egresos: 32000,
+          });
+          setLoading(false);
+        } catch (error) {
+          console.error("[Dashboard] Error fetching dashboard data:", error);
+          setLoading(false);
+        }
+      };
+      
+      fetchDashboardData();
+    } else if (!isLoading && !isAuthorized) {
+      // Redirect to login if Auth0 has finished loading and user is not authorized
+      console.log("[Dashboard] User not authorized, redirecting to login");
+      window.location.href = '/';
+    }
+  }, [isAuthorized, isLoading]);
   
   // Show loading state
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-900"></div>
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+          <p className="mt-4 text-gray-600">Cargando dashboard...</p>
+        </div>
       </div>
     );
   }
-  
-  // Render dashboard only if authenticated
-  if (!isAuthenticated) {
-    return null; // Don't render anything while redirecting
-  }
 
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch cotizaciones count
-        const cotizacionesResponse = await fetch("/api/cotizaciones");
-        const cotizacionesData = await cotizacionesResponse.json();
-        
-        // For now, we'll just count the items
-        // In a real app, you would have proper API endpoints for these metrics
-        const cotizacionesTotal = cotizacionesData?.cotizaciones?.length || 0;
-        const cotizacionesPendientes = cotizacionesData?.cotizaciones?.filter(
-          (c: any) => c.estado === 'pendiente'
-        )?.length || 0;
-        
-        // Set metrics data
-        setMetrics({
-          cotizaciones: {
-            total: cotizacionesTotal,
-            pendientes: cotizacionesPendientes
-          },
-          clientes: {
-            total: 0 // This would come from a real API
-          },
-          productos: {
-            total: 0 // This would come from a real API
-          }
-        });
-      } catch (error) {
-        console.error("Error fetching dashboard metrics:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchMetrics();
-  }, []);
+  // If not authorized and not loading, don't render anything (will redirect)
+  if (!isAuthorized) {
+    return null;
+  }
 
   const handleNavigate = (path: string) => {
     router.push(path);
   };
 
   return (
-    <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-2">Bienvenido al sistema de administración</p>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Cotizaciones</CardTitle>
+            <CardDescription>Total de cotizaciones</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{metrics.cotizaciones}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Ingresos</CardTitle>
+            <CardDescription>Total de ingresos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">${metrics.ingresos.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Egresos</CardTitle>
+            <CardDescription>Total de egresos</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">${metrics.egresos.toLocaleString()}</p>
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      
+      {/* Quick Action Buttons */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Cotizaciones</CardDescription>
-            <CardTitle className="text-2xl">{metrics.cotizaciones.total}</CardTitle>
+          <CardHeader>
+            <CardTitle>Cotizaciones</CardTitle>
+            <CardDescription>Gestiona tus cotizaciones</CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-sm text-gray-500">
-              {metrics.cotizaciones.pendientes} pendientes
-            </div>
+          <CardContent className="flex flex-col gap-4">
+            <Button 
+              className="w-full" 
+              onClick={() => router.push('/dashboard/cotizaciones')}
+            >
+              Ver cotizaciones
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => router.push('/dashboard/cotizaciones/nueva')}
+            >
+              Nueva cotización
+            </Button>
           </CardContent>
         </Card>
-
+        
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Clientes</CardDescription>
-            <CardTitle className="text-2xl">{metrics.clientes.total}</CardTitle>
+          <CardHeader>
+            <CardTitle>Finanzas</CardTitle>
+            <CardDescription>Gestiona tus finanzas</CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-sm text-gray-500">
-              Clientes registrados
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Productos</CardDescription>
-            <CardTitle className="text-2xl">{metrics.productos.total}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-sm text-gray-500">
-              Productos en catálogo
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Ventas</CardDescription>
-            <CardTitle className="text-2xl">$0.00</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-sm text-gray-500">
-              Este mes
-            </div>
+          <CardContent>
+            <Button 
+              className="w-full" 
+              onClick={() => router.push('/dashboard/finanzas')}
+            >
+              Ver finanzas
+            </Button>
           </CardContent>
         </Card>
       </div>

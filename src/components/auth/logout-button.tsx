@@ -2,17 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import { useAuth0 } from "@auth0/auth0-react";
 
-export default function LogoutButton({ variant = "default" }: { variant?: "default" | "destructive" | "outline" | "ghost" }) {
-  const { logout } = useAuth0();
-  
+export default function LogoutButton({ variant = "default" }: { variant?: "default" | "destructive" | "outline" | "ghost" }) {  
   const handleLogout = () => {
-    logout({ 
-      logoutParams: {
-        returnTo: window.location.origin
-      }
-    });
+    // Directly use the backend API for logout
+    window.location.href = '/api/auth/logout?returnTo=/';
   };
   
   return (

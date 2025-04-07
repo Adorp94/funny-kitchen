@@ -2,76 +2,97 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Loader2, Mail } from 'lucide-react';
 
 export default function Home() {
-  const { loginWithRedirect, isAuthenticated, isLoading, user } = useAuth0();
-  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth0();
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Log authentication state on component mount and when it changes
-    console.log("Home page auth state:", { isAuthenticated, isLoading, user });
-    
-    // This runs when auth state is ready
-    if (!isLoading) {
-      if (isAuthenticated) {
-        console.log("User is authenticated, redirecting to dashboard");
+    // Function to check authentication from various sources
+    const checkAuth = async () => {
+      try {
+        // Check Auth0 SDK state
+        if (isAuthenticated) {
+          console.log("[Home] Auth0 SDK reports user is authenticated");
+          localStorage.setItem('app_auth_checked', 'true');
+          window.location.href = '/dashboard';
+          return;
+        }
+
+        // Check for session cookie
+        const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('appSession='));
+        console.log("[Home] Session cookie present:", hasCookie);
         
-        // Use a direct URL change for a full page reload if routing doesn't work
-        window.location.href = '/dashboard';
-      } else {
-        console.log("User is not authenticated, showing login page");
+        if (hasCookie) {
+          // Verify cookie with API
+          try {
+            console.log("[Home] Verifying cookie validity with API...");
+            const response = await fetch('/api/auth/me', {
+              credentials: 'include',
+              cache: 'no-store'
+            });
+            
+            if (response.ok) {
+              console.log("[Home] API verified user is authenticated");
+              localStorage.setItem('app_auth_checked', 'true');
+              window.location.href = '/dashboard';
+              return;
+            } else {
+              console.log("[Home] API could not verify user, clearing stored auth state");
+              localStorage.removeItem('app_auth_checked');
+            }
+          } catch (error) {
+            console.error("[Home] Error verifying auth with API:", error);
+          }
+        }
+        
+        // If we reach here, user is not authenticated
+        console.log("[Home] User is not authenticated, showing login page");
+        localStorage.removeItem('app_auth_checked');
+        setCheckingAuth(false);
+      } catch (error) {
+        console.error("[Home] Error in auth check:", error);
         setCheckingAuth(false);
       }
-    }
-  }, [isAuthenticated, isLoading, user]);
+    };
 
-  // Handle email sign in
-  const handleSignIn = async () => {
-    setLoading(true);
-    console.log("Starting email login flow");
-    try {
-      await loginWithRedirect({
-        authorizationParams: {
-          screen_hint: 'login',
-          redirect_uri: window.location.origin + '/api/auth/callback',
-          returnTo: '/dashboard' 
-        }
-      });
-    } catch (error) {
-      console.error("Error during login:", error);
-      setLoading(false);
+    // Only run auth check if Auth0 has finished loading
+    if (!isLoading) {
+      console.log("[Home] Auth0 has loaded, checking authentication...");
+      checkAuth();
     }
+  }, [isAuthenticated, isLoading]);
+
+  // Handle email sign in - go directly to Auth0 login
+  const handleSignIn = () => {
+    setLoading(true);
+    console.log("[Home] Starting direct login flow");
+    // Store in localStorage that we're coming from the login flow
+    localStorage.setItem('login_initiated', 'true');
+    window.location.href = '/api/auth/login?returnTo=/dashboard';
   };
 
-  // Handle Google sign in
-  const handleGoogleSignIn = async () => {
+  // Handle Google sign in - go directly to Auth0 login with Google connection
+  const handleGoogleSignIn = () => {
     setLoading(true);
-    console.log("Starting Google login flow");
-    try {
-      await loginWithRedirect({
-        authorizationParams: {
-          connection: 'google-oauth2',
-          redirect_uri: window.location.origin + '/api/auth/callback',
-          returnTo: '/dashboard'
-        }
-      });
-    } catch (error) {
-      console.error("Error during Google login:", error);
-      setLoading(false);
-    }
+    console.log("[Home] Starting Google login flow");
+    // Store in localStorage that we're coming from the login flow
+    localStorage.setItem('login_initiated', 'true');
+    window.location.href = '/api/auth/login?connection=google-oauth2&returnTo=/dashboard';
   };
 
-  // Show loading indicator while Auth0 is loading or checking auth state
+  // Show loading indicator while checking authentication
   if (isLoading || checkingAuth) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+          <p className="mt-4 text-gray-600">Verificando sesión...</p>
+        </div>
       </div>
     );
   }
