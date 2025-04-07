@@ -200,14 +200,14 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           <div className="overflow-x-auto bg-white rounded-lg border border-gray-100">
             <table className="w-full border-collapse text-xs">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-5/12">Descripción</th>
-                  <th className="py-2 px-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Cant.</th>
-                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12">P. Unitario</th>
+                <tr className="bg-gray-50">
+                  <th className="py-2 px-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-5/12 border-b border-gray-200 pb-2.5">Descripción</th>
+                  <th className="py-2 px-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12 border-b border-gray-200 pb-2.5">Cant.</th>
+                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-2/12 border-b border-gray-200 pb-2.5">P. Unitario</th>
                   {productos.some(p => p.descuento && p.descuento > 0) && (
-                    <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12">Desc.</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12 border-b border-gray-200 pb-2.5">Desc.</th>
                   )}
-                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-3/12">Subtotal</th>
+                  <th className="py-2 px-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-3/12 border-b border-gray-200 pb-2.5">Subtotal</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -244,76 +244,77 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {/* Datos Bancarios - Order changed to come first */}
-          <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Datos bancarios</h2>
-            <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg leading-tight shadow-sm">
-              {moneda === 'MXN' ? (
-                <div className="space-y-1">
-                  <p className="font-medium">BBVA</p>
-                  <p>FUNNY KITCHEN S.A. DE C.V</p>
-                  <p>CUENTA: 012 244 0415</p>
-                  <p>CLABE: 012 320 00122440415 9</p>
-                  <p className="mt-1.5 font-medium">ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="font-medium">LEAD BANK</p>
-                  <p>PABLO ANAYA</p>
-                  <p>210319511130</p>
-                  <p>ABA 101019644</p>
-                </div>
-              )}
+        {/* Resumen - Full width */}
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1 text-right">Resumen</h2>
+          <div className="text-right text-xs leading-tight bg-gray-50 p-3 rounded-lg shadow-sm w-1/2 ml-auto">
+            <div className="flex justify-between py-0.5 text-gray-700">
+              <span>Subtotal:</span>
+              <span className="font-medium">{formatCurrency(subtotal)}</span>
             </div>
-          </div>
-          
-          {/* Totals */}
-          <div>
-            <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1 text-right">Resumen</h2>
-            <div className="text-right text-xs leading-tight bg-gray-50 p-3 rounded-lg shadow-sm">
+            
+            {totalProductDiscounts > 0 && (
               <div className="flex justify-between py-0.5 text-gray-700">
-                <span>Subtotal:</span>
-                <span className="font-medium">{formatCurrency(subtotal)}</span>
+                <span>Descuentos por producto:</span>
+                <span className="font-medium text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
               </div>
-              
-              {totalProductDiscounts > 0 && (
-                <div className="flex justify-between py-0.5 text-gray-700">
-                  <span>Descuentos por producto:</span>
-                  <span className="font-medium text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
-                </div>
-              )}
-              
-              {globalDiscount > 0 && (
-                <div className="flex justify-between py-0.5 text-gray-700">
-                  <span>Descuento global ({globalDiscount}%):</span>
-                  <span className="font-medium text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
-                </div>
-              )}
-              
-              {hasIva && (
-                <div className="flex justify-between py-0.5 text-gray-700">
-                  <span>IVA (16%):</span>
-                  <span className="font-medium">{formatCurrency(ivaAmount)}</span>
-                </div>
-              )}
-              
-              {hasShipping && shippingCost > 0 && (
-                <div className="flex justify-between py-0.5 text-gray-700">
-                  <span>Costo de envío:</span>
-                  <span className="font-medium">{formatCurrency(shippingCost)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between py-1 text-gray-900 border-t border-gray-200 mt-1">
-                <span className="font-medium">Total:</span>
-                <span className="font-bold text-base">{formatCurrency(total)}</span>
+            )}
+            
+            {globalDiscount > 0 && (
+              <div className="flex justify-between py-0.5 text-gray-700">
+                <span>Descuento global ({globalDiscount}%):</span>
+                <span className="font-medium text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
               </div>
+            )}
+            
+            {hasIva && (
+              <div className="flex justify-between py-0.5 text-gray-700">
+                <span>IVA (16%):</span>
+                <span className="font-medium">{formatCurrency(ivaAmount)}</span>
+              </div>
+            )}
+            
+            {hasShipping && shippingCost > 0 && (
+              <div className="flex justify-between py-0.5 text-gray-700">
+                <span>Costo de envío:</span>
+                <span className="font-medium">{formatCurrency(shippingCost)}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between py-1 text-gray-900 border-t border-gray-200 mt-1">
+              <span className="font-medium">Total:</span>
+              <span className="font-bold text-base">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
         
-        {/* Notas y Términos - Combined as requested */}
+        {/* Datos Bancarios - Full width, moved below Resumen */}
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Datos bancarios</h2>
+          <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg leading-tight shadow-sm">
+            {moneda === 'MXN' ? (
+              <div className="space-y-1">
+                <p className="font-medium">BBVA</p>
+                <p>FUNNY KITCHEN S.A. DE C.V</p>
+                <p>CUENTA: 012 244 0415</p>
+                <p>CLABE: 012 320 00122440415 9</p>
+                <p className="mt-1.5 font-medium">ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="font-medium">LEAD BANK</p>
+                <p>PABLO ANAYA</p>
+                <p>210319511130</p>
+                <p>ABA 101019644</p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Spacer to push content to bottom */}
+        <div className="flex-grow"></div>
+        
+        {/* Notas y Términos - Combined and positioned at bottom */}
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Notas y términos</h2>
           <div className="bg-gray-50 p-3 rounded-lg text-gray-700 text-xs leading-tight shadow-sm">
@@ -345,8 +346,8 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           </div>
         </div>
         
-        {/* Footer with flex-grow to push it to the bottom */}
-        <div className="border-t border-gray-200 pt-3 mt-auto text-xs flex-grow">
+        {/* Footer with signature */}
+        <div className="border-t border-gray-200 pt-3 mt-1 text-xs">
           <div className="text-xs text-gray-700 leading-tight">
             <p className="font-medium mb-1">ATENTAMENTE:</p>
             <div className="flex justify-between">
