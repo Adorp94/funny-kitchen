@@ -27,7 +27,8 @@ export async function middleware(req: NextRequest) {
     );
     
     if (isProtectedRoute && !session) {
-      const redirectUrl = new URL('/login', req.url);
+      // Redirect to the root path (/) instead of /login
+      const redirectUrl = new URL('/', req.url);
       return NextResponse.redirect(redirectUrl);
     }
     
