@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSession } from '@auth0/nextjs-auth0/edge';
 
 export async function middleware(req: NextRequest) {
   console.log("Middleware running on path:", req.nextUrl.pathname);
+  
+  // Skip auth check in development mode
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Development mode: Bypassing auth check");
+    return NextResponse.next();
+  }
   
   // Public paths that don't require authentication
   const publicPaths = [
@@ -30,22 +35,14 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
-  try {
-    // Try to get the user session
-    const res = NextResponse.next();
-    const session = await getSession(req, res);
-    
-    // If no session for protected route, redirect to login
-    if (!session?.user) {
-      console.log("No session, redirecting to login");
-      return NextResponse.redirect(new URL('/api/auth/login', req.url));
-    }
-    
-    return res;
-  } catch (error) {
-    console.error("Auth middleware error:", error);
-    
-    // On error, redirect to login
-    return NextResponse.redirect(new URL('/', req.url));
+  // Check for auth cookie
+  const authCookie = req.cookies.get('appSession');
+  
+  // If no auth cookie for protected route, redirect to login
+  if (!authCookie) {
+    console.log("No auth cookie, redirecting to login");
+    return NextResponse.redirect(new URL('/api/auth/login', req.url));
   }
+  
+  return NextResponse.next();
 } 
