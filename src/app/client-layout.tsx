@@ -18,10 +18,10 @@ export default function ClientLayout({
   // Determine if we're on the sign-in page (root path)
   const isSignInPage = pathname === "/";
   
-  // Define the correct redirect URI based on environment
+  // Define the callback URL using environment settings
   const redirectUri = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/auth/callback`
-    : 'http://localhost:3000/api/auth/callback';
+    : process.env.AUTH0_BASE_URL ? `${process.env.AUTH0_BASE_URL}/api/auth/callback` : 'http://localhost:3000/api/auth/callback';
 
   return (
     <Auth0Provider
@@ -29,8 +29,6 @@ export default function ClientLayout({
       clientId="y3zkQqmOiFGAV3OzU4bF5LIl631V6Jxb"
       authorizationParams={{
         redirect_uri: redirectUri,
-        // No explicit connection to allow user choice
-        screen_hint: 'signin',
         scope: 'openid profile email',
       }}
       useRefreshTokens={true}
