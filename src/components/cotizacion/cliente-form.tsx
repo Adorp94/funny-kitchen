@@ -57,6 +57,9 @@ interface FormErrors {
 interface ClienteFormProps {
   clienteId?: number;
   onClienteChange?: (cliente: ClienteType | null) => void;
+  initialCliente?: ClienteType | null;
+  defaultTab?: 'nuevo' | 'existente';
+  readOnly?: boolean;
 }
 
 // Add a debounce function
@@ -76,8 +79,14 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
   };
 }
 
-export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
-  const [activeTab, setActiveTab] = useState<string>("nuevo");
+export function ClienteForm({ 
+  clienteId, 
+  onClienteChange, 
+  initialCliente = null, 
+  defaultTab = 'nuevo',
+  readOnly = false
+}: ClienteFormProps) {
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [formDataChanged, setFormDataChanged] = useState<boolean>(false);
   const [initialized, setInitialized] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -95,17 +104,18 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   // Initialize Supabase client
   const supabase = createClientComponentClient();
 
+  // Initialize form data with default values
   const [formData, setFormData] = useState<ClienteFormData>({
-    cliente_id: "",
-    nombre: "",
-    celular: "",
-    correo: "",
-    razon_social: "",
-    rfc: "",
-    tipo_cliente: "Normal",
-    direccion_envio: "",
-    recibe: "",
-    atencion: ""
+    cliente_id: initialCliente?.cliente_id?.toString() || "",
+    nombre: initialCliente?.nombre || "",
+    celular: initialCliente?.celular || "",
+    correo: initialCliente?.correo || "",
+    razon_social: initialCliente?.razon_social || "",
+    rfc: initialCliente?.rfc || "",
+    tipo_cliente: initialCliente?.tipo_cliente || "Normal",
+    direccion_envio: initialCliente?.direccion_envio || "",
+    recibe: initialCliente?.recibe || "",
+    atencion: initialCliente?.atencion || ""
   });
 
   // Add state to track if search is active
@@ -113,9 +123,41 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRequestIdRef = useRef<number>(0);
 
+  // Apply initialCliente if provided on mount or when it changes
+  useEffect(() => {
+    if (initialCliente) {
+      setFormData({
+        cliente_id: initialCliente.cliente_id?.toString() || "",
+        nombre: initialCliente.nombre || "",
+        celular: initialCliente.celular || "",
+        correo: initialCliente.correo || "",
+        razon_social: initialCliente.razon_social || "",
+        rfc: initialCliente.rfc || "",
+        tipo_cliente: initialCliente.tipo_cliente || "Normal",
+        direccion_envio: initialCliente.direccion_envio || "",
+        recibe: initialCliente.recibe || "",
+        atencion: initialCliente.atencion || ""
+      });
+      
+      // Set active tab to "existente" if client ID is present
+      if (initialCliente.cliente_id) {
+        setActiveTab("existente");
+      }
+      
+      // Mark as initialized and trigger parent notification
+      setInitialized(true);
+      setFormDataChanged(true);
+    }
+  }, [initialCliente]);
+
   // Completely rewritten persistence logic
   useEffect(() => {
     const initializeForm = () => {
+      // If initialCliente was provided, we've already set the form data
+      if (initialCliente) {
+        return;
+      }
+      
       // Check if this is a page refresh or a navigation
       const isPageRefresh = !sessionStorage.getItem('navigationOccurred');
 
@@ -184,7 +226,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [initialCliente, initialized]);
 
   // Safe way to notify parent of changes to avoid issues during initialization
   const safeNotifyParent = (cliente: ClienteType | null) => {
@@ -1219,7 +1261,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
               <Button
                 type="button"
                 onClick={handleUpdateClient}
-                disabled={isSearching || !formData.nombre || !formData.celular || Object.keys(errors).length > 0}
+                disabled={isSearching || !formData.nombre || !formData.celular || Object.keys(errors).length > 0 || readOnly}
                 variant="default"
                 size="action"
                 className="w-full sm:w-auto"

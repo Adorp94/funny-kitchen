@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Receipt, DollarSign, Wallet } from 'lucide-react';
+import { CreditCard, Receipt, DollarSign, Wallet, FileEdit } from 'lucide-react';
 import { CotizacionStatusModal } from './cotizacion-status-modal';
 import { useToast } from '@/components/ui/use-toast';
 import { updateCotizacionStatus, getCotizacionDetails } from '@/app/actions/cotizacion-actions';
+import { useRouter } from 'next/navigation';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -44,6 +45,7 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
   const [detailedCotizacion, setDetailedCotizacion] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleOpenModal = async () => {
     setIsLoading(true);
@@ -140,8 +142,25 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
     }
   };
 
+  const handleEditCotizacion = () => {
+    router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}/edit`);
+  };
+
   return (
-    <>
+    <div className="flex gap-2">
+      {cotizacion.estado === 'pendiente' && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleEditCotizacion}
+          className="h-8 flex items-center space-x-1 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+          title="Editar cotización"
+        >
+          <FileEdit className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs">Editar</span>
+        </Button>
+      )}
+      
       <Button 
         variant="outline" 
         size="sm" 
@@ -166,7 +185,7 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
         cotizacion={detailedCotizacion}
         onStatusChange={handleStatusChange}
       />
-    </>
+    </div>
   );
 }
 
