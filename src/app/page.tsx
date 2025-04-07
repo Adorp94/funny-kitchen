@@ -2,24 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Loader2, Mail } from 'lucide-react';
 
 export default function Home() {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     // Function to check authentication from various sources
     const checkAuth = async () => {
       try {
+        // Prevent redirect loops by checking if we recently redirected
+        const lastRedirect = localStorage.getItem('last_redirect_time');
+        const now = Date.now();
+        const redirectThreshold = 2000; // 2 seconds
+        
+        if (lastRedirect && (now - parseInt(lastRedirect)) < redirectThreshold) {
+          console.log("[Home] Preventing redirect loop - too soon since last redirect");
+          setCheckingAuth(false);
+          return;
+        }
+        
         // Check Auth0 SDK state
         if (isAuthenticated) {
           console.log("[Home] Auth0 SDK reports user is authenticated");
           localStorage.setItem('app_auth_checked', 'true');
-          window.location.href = '/dashboard';
+          localStorage.setItem('last_redirect_time', now.toString());
+          router.push('/dashboard');
           return;
         }
 
@@ -39,7 +53,8 @@ export default function Home() {
             if (response.ok) {
               console.log("[Home] API verified user is authenticated");
               localStorage.setItem('app_auth_checked', 'true');
-              window.location.href = '/dashboard';
+              localStorage.setItem('last_redirect_time', now.toString());
+              router.push('/dashboard');
               return;
             } else {
               console.log("[Home] API could not verify user, clearing stored auth state");
@@ -65,7 +80,7 @@ export default function Home() {
       console.log("[Home] Auth0 has loaded, checking authentication...");
       checkAuth();
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, router]);
 
   // Handle email sign in - go directly to Auth0 login
   const handleSignIn = () => {
@@ -73,7 +88,14 @@ export default function Home() {
     console.log("[Home] Starting direct login flow");
     // Store in localStorage that we're coming from the login flow
     localStorage.setItem('login_initiated', 'true');
-    window.location.href = '/api/auth/login?returnTo=/dashboard';
+    // Use Auth0's loginWithRedirect method
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: window.location.origin,
+        screen_hint: 'login',
+      },
+      appState: { returnTo: "/dashboard" }
+    });
   };
 
   // Handle Google sign in - go directly to Auth0 login with Google connection
@@ -82,7 +104,14 @@ export default function Home() {
     console.log("[Home] Starting Google login flow");
     // Store in localStorage that we're coming from the login flow
     localStorage.setItem('login_initiated', 'true');
-    window.location.href = '/api/auth/login?connection=google-oauth2&returnTo=/dashboard';
+    // Use Auth0's loginWithRedirect method with Google connection
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: window.location.origin,
+        connection: 'google-oauth2',
+      },
+      appState: { returnTo: "/dashboard" }
+    });
   };
 
   // Show loading indicator while checking authentication

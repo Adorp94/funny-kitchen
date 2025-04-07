@@ -39,7 +39,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // First check for the presence of appSession cookie
+        // If user is authenticated via Auth0 SDK, consider them authorized
+        if (isAuthenticated) {
+          console.log("[Dashboard] User authenticated via Auth0 SDK");
+          setIsAuthorized(true);
+          return;
+        }
+        
+        // Only check cookies if Auth0 reports not authenticated
         const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('appSession='));
         console.log("[Dashboard] Session cookie present:", hasCookie);
         
@@ -69,19 +76,15 @@ export default function DashboardPage() {
           console.log("[Dashboard] No session cookie found");
           setIsAuthorized(false);
         }
-        
-        // If user is authenticated via Auth0 SDK, consider them authorized
-        if (isAuthenticated && !isLoading) {
-          console.log("[Dashboard] User authenticated via Auth0 SDK");
-          setIsAuthorized(true);
-        }
       } catch (error) {
         console.error("[Dashboard] Error checking auth:", error);
         setIsAuthorized(false);
+      } finally {
+        setLoading(false);
       }
     };
 
-    // Only run if Auth0 has loaded or we're in SSR
+    // Only run if Auth0 has loaded
     if (!isLoading) {
       checkAuth();
     } else {
@@ -111,11 +114,15 @@ export default function DashboardPage() {
       
       fetchDashboardData();
     } else if (!isLoading && !isAuthorized) {
-      // Redirect to login if Auth0 has finished loading and user is not authorized
+      // Add a delay before redirecting to prevent immediate redirect loops
       console.log("[Dashboard] User not authorized, redirecting to login");
-      window.location.href = '/';
+      const timer = setTimeout(() => {
+        router.push('/');
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isAuthorized, isLoading]);
+  }, [isAuthorized, isLoading, router]);
   
   // Show loading state
   if (isLoading || loading) {

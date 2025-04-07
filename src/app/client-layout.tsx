@@ -37,11 +37,21 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       domain={process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "dev-av1unzc74ll0psau.us.auth0.com"}
       clientId={process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "y3zkQqmOiFGAV3OzU4bF5LIl631V6Jxb"}
       authorizationParams={{
-        redirect_uri: `${origin}/api/auth/callback`,
+        redirect_uri: origin,
         audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE,
       }}
       cacheLocation="localstorage"
       useRefreshTokens={true}
+      onRedirectCallback={(appState) => {
+        console.log("[Auth0] Redirect callback with appState:", appState);
+        // Store the last redirect time to prevent loops
+        localStorage.setItem('last_redirect_time', Date.now().toString());
+        
+        // Navigate to the intended route after login
+        if (appState?.returnTo) {
+          window.location.href = appState.returnTo;
+        }
+      }}
     >
       {!isSignIn && <Header />}
       <main className="min-h-screen bg-gray-50">{children}</main>
