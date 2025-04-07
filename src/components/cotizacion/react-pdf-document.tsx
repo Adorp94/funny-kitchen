@@ -3,7 +3,7 @@ import { Document, Page, Text, View, StyleSheet, Font, Image, Link } from '@reac
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Register fonts (optional - you can add custom fonts if needed)
+// Register fonts
 Font.register({
   family: 'Roboto',
   fonts: [
@@ -17,19 +17,19 @@ Font.register({
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
-    padding: 30,
+    padding: 24,
     fontFamily: 'Roboto',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    paddingBottom: 10,
+    marginBottom: 12,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   logo: {
-    width: 120,
+    width: 110,
     height: 50,
     objectFit: 'contain',
   },
@@ -37,12 +37,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#1f2937',
   },
   headerText: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#4b5563',
     marginBottom: 2,
   },
@@ -57,19 +57,19 @@ const styles = StyleSheet.create({
     width: '48%',
   },
   columnTitle: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: 'bold',
     color: '#6b7280',
     textTransform: 'uppercase',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   clientInfo: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#4b5563',
     lineHeight: 1.4,
   },
   clientName: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 'medium',
     color: '#111827',
     marginBottom: 2,
@@ -78,101 +78,119 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   table: {
-    marginTop: 5,
-    marginBottom: 15,
+    marginTop: 4,
+    marginBottom: 10,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f9fafb',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    paddingVertical: 7,
-    paddingHorizontal: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
   },
   tableRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
-    paddingVertical: 7,
-    paddingHorizontal: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   tableCol1: {
-    width: '45%',
-    fontSize: 9,
+    width: '50%',
+    fontSize: 8,
   },
   tableCol2: {
     width: '10%',
     textAlign: 'center',
-    fontSize: 9,
+    fontSize: 8,
   },
   tableCol3: {
     width: '20%',
     textAlign: 'right',
-    fontSize: 9,
+    fontSize: 8,
   },
   tableCol4: {
-    width: '10%',
+    width: '5%',
     textAlign: 'right',
-    fontSize: 9,
+    fontSize: 8,
   },
   tableCol5: {
     width: '15%',
     textAlign: 'right',
-    fontSize: 9,
+    fontSize: 8,
   },
   tableHeaderText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
     color: '#6b7280',
   },
   tableRowText: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#374151',
   },
-  productDescription: {
-    fontSize: 8,
-    color: '#6b7280',
-    marginTop: 2,
+  threeColumnSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    flexGrow: 0,
   },
-  productSku: {
-    fontSize: 8,
-    color: '#9ca3af',
-    marginTop: 1,
+  threeColumnLeft: {
+    width: '31%',
   },
-  summaryContainer: {
-    width: '50%',
+  threeColumnCenter: {
+    width: '31%',
+  },
+  threeColumnRight: {
+    width: '31%',
+  },
+  summarySection: {
+    marginBottom: 10,
+    flexGrow: 0,
+  },
+  summaryRight: {
+    width: '35%',
     marginLeft: 'auto',
-    marginBottom: 15,
   },
-  summaryTitle: {
-    fontSize: 10,
+  twoColumnSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  twoColumnLeft: {
+    width: '48%',
+  },
+  twoColumnRight: {
+    width: '48%',
+  },
+  boxTitle: {
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#6b7280',
     textTransform: 'uppercase',
-    textAlign: 'right',
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  summaryBox: {
+  box: {
     backgroundColor: '#f9fafb',
     borderRadius: 4,
-    padding: 10,
+    padding: 8,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   summaryLabel: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#4b5563',
   },
   summaryValue: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'medium',
     color: '#374151',
   },
   summaryNegative: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'medium',
     color: '#dc2626',
   },
@@ -190,93 +208,68 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   summaryTotalValue: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#1f2937',
   },
-  bankInfoTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    marginBottom: 5,
-  },
-  bankInfoBox: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 4,
-    padding: 10,
-  },
   bankInfoText: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#4b5563',
     marginBottom: 2,
   },
   bankInfoHighlight: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'medium',
     color: '#1f2937',
     marginBottom: 2,
+  },
+  termsBox: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 10,
+  },
+  notesList: {
+    marginLeft: 4,
+  },
+  notesListItem: {
+    fontSize: 7,
+    color: '#4b5563',
+    marginBottom: 2,
+    lineHeight: 1.3,
+  },
+  termsText: {
+    fontSize: 7,
+    color: '#4b5563',
+    marginBottom: 2,
+    lineHeight: 1.3,
+  },
+  termsLink: {
+    fontSize: 7,
+    color: '#0891b2',
+    textDecoration: 'underline',
   },
   spacer: {
     flexGrow: 1,
   },
-  notesAndTerms: {
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  notesTermsBox: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 4,
-    padding: 10,
-  },
-  notesTermsGrid: {
-    flexDirection: 'row',
-  },
-  notesTermsColumn: {
-    width: '48%',
-  },
-  notesTermsTitle: {
-    fontSize: 9,
-    fontWeight: 'medium',
-    color: '#1f2937',
-    marginBottom: 5,
-  },
-  notesList: {
-    marginLeft: 10,
-  },
-  notesListItem: {
-    fontSize: 8,
-    color: '#4b5563',
-    marginBottom: 2,
-  },
-  termsText: {
-    fontSize: 8,
-    color: '#4b5563',
-    marginBottom: 3,
-  },
-  termsLink: {
-    fontSize: 8,
-    color: '#0891b2',
-    textDecoration: 'underline',
-  },
   footer: {
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 10,
-    marginTop: 5,
+    paddingTop: 6,
+    marginTop: 'auto',
   },
   footerTitle: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'medium',
     color: '#1f2937',
-    marginBottom: 5,
+    marginBottom: 3,
   },
   footerGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   footerText: {
-    fontSize: 8,
+    fontSize: 7,
     color: '#4b5563',
     marginBottom: 1,
   },
@@ -384,6 +377,10 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Subtotal after product discounts
   const subtotalAfterProductDiscounts = subtotal - totalProductDiscounts;
 
+  // Limit products to show maximum 8 (for single page fit)
+  const displayProductos = productos.slice(0, 8);
+  const hasMoreProducts = productos.length > 8;
+
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -406,21 +403,9 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
           <View style={styles.column}>
             <Text style={styles.columnTitle}>Cliente</Text>
             <Text style={styles.clientName}>{cliente.nombre}</Text>
-            {cliente.razon_social && (
-              <Text style={styles.clientInfo}>{cliente.razon_social}</Text>
-            )}
-            {cliente.rfc && (
-              <Text style={styles.clientInfo}>RFC: {cliente.rfc}</Text>
-            )}
             <Text style={styles.clientInfo}>{cliente.celular}</Text>
             {cliente.correo && (
               <Text style={styles.clientInfo}>{cliente.correo}</Text>
-            )}
-            {cliente.atencion && (
-              <Text style={styles.clientInfo}>Atención: {cliente.atencion}</Text>
-            )}
-            {cliente.direccion_envio && (
-              <Text style={styles.clientInfo}>{cliente.direccion_envio}</Text>
             )}
             {cliente.recibe && (
               <Text style={styles.clientInfo}>Recibe: {cliente.recibe}</Text>
@@ -457,22 +442,16 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                   <Text style={styles.tableHeaderText}>Desc.</Text>
                 </View>
               )}
-              <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '25%' }}>
+              <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
                 <Text style={styles.tableHeaderText}>Subtotal</Text>
               </View>
             </View>
             
-            {/* Table Rows */}
-            {productos.map((producto) => (
+            {/* Table Rows - Limited to fit single page */}
+            {displayProductos.map((producto) => (
               <View key={producto.id} style={styles.tableRow}>
                 <View style={styles.tableCol1}>
                   <Text style={styles.tableRowText}>{producto.nombre}</Text>
-                  {typeof producto.descripcion === 'string' && producto.descripcion && (
-                    <Text style={styles.productDescription}>{producto.descripcion}</Text>
-                  )}
-                  {typeof producto.sku === 'string' && producto.sku && (
-                    <Text style={styles.productSku}>SKU: {producto.sku}</Text>
-                  )}
                 </View>
                 <View style={styles.tableCol2}>
                   <Text style={styles.tableRowText}>{producto.cantidad}</Text>
@@ -487,7 +466,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                     </Text>
                   </View>
                 )}
-                <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '25%' }}>
+                <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
                   <Text style={styles.tableRowText}>
                     {producto.descuento && producto.descuento > 0 
                       ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100), moneda)
@@ -497,108 +476,120 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                 </View>
               </View>
             ))}
-          </View>
-        </View>
-        
-        {/* Resumen */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Resumen</Text>
-          <View style={styles.summaryBox}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal:</Text>
-              <Text style={styles.summaryValue}>{formatCurrency(subtotal, moneda)}</Text>
-            </View>
             
-            {totalProductDiscounts > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Descuentos por producto:</Text>
-                <Text style={styles.summaryNegative}>-{formatCurrency(totalProductDiscounts, moneda)}</Text>
-              </View>
-            )}
-            
-            {descuento_global > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Descuento global ({descuento_global}%):</Text>
-                <Text style={styles.summaryNegative}>-{formatCurrency((subtotalAfterProductDiscounts) * (descuento_global / 100), moneda)}</Text>
-              </View>
-            )}
-            
-            {iva && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>IVA (16%):</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(monto_iva, moneda)}</Text>
-              </View>
-            )}
-            
-            {incluye_envio && costo_envio > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Costo de envío:</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(costo_envio, moneda)}</Text>
-              </View>
-            )}
-            
-            <View style={styles.summaryTotal}>
-              <Text style={styles.summaryTotalLabel}>Total:</Text>
-              <Text style={styles.summaryTotalValue}>{formatCurrency(total, moneda)}</Text>
-            </View>
-          </View>
-        </View>
-        
-        {/* Datos Bancarios */}
-        <View style={styles.section}>
-          <Text style={styles.bankInfoTitle}>Datos bancarios</Text>
-          <View style={styles.bankInfoBox}>
-            {moneda === 'MXN' ? (
-              <>
-                <Text style={styles.bankInfoHighlight}>BBVA</Text>
-                <Text style={styles.bankInfoText}>FUNNY KITCHEN S.A. DE C.V</Text>
-                <Text style={styles.bankInfoText}>CUENTA: 012 244 0415</Text>
-                <Text style={styles.bankInfoText}>CLABE: 012 320 00122440415 9</Text>
-                <Text style={[styles.bankInfoHighlight, { marginTop: 5 }]}>ACEPTAMOS TODAS LAS TARJETAS DE CRÉDITO.</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.bankInfoHighlight}>LEAD BANK</Text>
-                <Text style={styles.bankInfoText}>PABLO ANAYA</Text>
-                <Text style={styles.bankInfoText}>210319511130</Text>
-                <Text style={styles.bankInfoText}>ABA 101019644</Text>
-              </>
-            )}
-          </View>
-        </View>
-        
-        {/* Spacer to push remaining content to bottom */}
-        <View style={styles.spacer} />
-        
-        {/* Notas y Términos */}
-        <View style={styles.notesAndTerms}>
-          <Text style={styles.columnTitle}>Notas y términos</Text>
-          <View style={styles.notesTermsBox}>
-            <View style={styles.notesTermsGrid}>
-              <View style={styles.notesTermsColumn}>
-                <Text style={styles.notesTermsTitle}>NOTAS:</Text>
-                <View style={styles.notesList}>
-                  <Text style={styles.notesListItem}>• Precios sujetos a cambio sin previo aviso.</Text>
-                  <Text style={styles.notesListItem}>• El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</Text>
-                  <Text style={styles.notesListItem}>• Fecha de la cotización: {fechaActual}</Text>
-                  <Text style={styles.notesListItem}>• Tiempo de Entrega estimado: 6 semanas después de la confirmación de pago.</Text>
+            {/* Show a message if there are more products */}
+            {hasMoreProducts && (
+              <View style={styles.tableRow}>
+                <View style={styles.tableCol1}>
+                  <Text style={[styles.tableRowText, { fontStyle: 'italic' }]}>
+                    Y {productos.length - 8} productos más...
+                  </Text>
                 </View>
+                <View style={styles.tableCol2}></View>
+                <View style={styles.tableCol3}></View>
+                {productos.some(p => p.descuento && p.descuento > 0) && (
+                  <View style={styles.tableCol4}></View>
+                )}
+                <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}></View>
+              </View>
+            )}
+          </View>
+        </View>
+        
+        {/* Summary on the right */}
+        <View style={styles.summarySection}>
+          <View style={styles.summaryRight}>
+            <Text style={styles.boxTitle}>Resumen</Text>
+            <View style={styles.box}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal:</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(subtotal, moneda)}</Text>
               </View>
               
-              <View style={styles.notesTermsColumn}>
-                <Text style={styles.notesTermsTitle}>TÉRMINOS Y CUIDADOS:</Text>
-                <Text style={styles.termsText}>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE.</Text>
-                <Text style={styles.termsText}>TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</Text>
-                <Text style={styles.termsText}>
-                  Términos completos: 
-                  <Link src="https://funnykitchen.mx/pages/terminos-y-condiciones" style={styles.termsLink}>
-                    {" funnykitchen.mx/terminos-y-condiciones"}
-                  </Link>
-                </Text>
+              {descuento_global > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Descuento global ({descuento_global}%):</Text>
+                  <Text style={styles.summaryNegative}>-{formatCurrency((subtotal) * (descuento_global / 100), moneda)}</Text>
+                </View>
+              )}
+              
+              {iva && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>IVA (16%):</Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(monto_iva, moneda)}</Text>
+                </View>
+              )}
+              
+              {incluye_envio && costo_envio > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Envío:</Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(costo_envio, moneda)}</Text>
+                </View>
+              )}
+              
+              <View style={styles.summaryTotal}>
+                <Text style={styles.summaryTotalLabel}>Total:</Text>
+                <Text style={styles.summaryTotalValue}>{formatCurrency(total, moneda)}</Text>
               </View>
             </View>
           </View>
         </View>
+        
+        {/* Datos Bancarios and Notas in two columns */}
+        <View style={styles.twoColumnSection}>
+          {/* Datos Bancarios */}
+          <View style={styles.twoColumnLeft}>
+            <Text style={styles.boxTitle}>Datos bancarios</Text>
+            <View style={styles.box}>
+              {moneda === 'MXN' ? (
+                <>
+                  <Text style={styles.bankInfoHighlight}>BBVA</Text>
+                  <Text style={styles.bankInfoText}>FUNNY KITCHEN S.A. DE C.V</Text>
+                  <Text style={styles.bankInfoText}>CUENTA: 012 244 0415</Text>
+                  <Text style={styles.bankInfoText}>CLABE: 012 320 00122440415 9</Text>
+                  <Text style={[styles.bankInfoHighlight, { marginTop: 3 }]}>ACEPTAMOS TARJETAS DE CRÉDITO</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.bankInfoHighlight}>LEAD BANK</Text>
+                  <Text style={styles.bankInfoText}>PABLO ANAYA</Text>
+                  <Text style={styles.bankInfoText}>210319511130</Text>
+                  <Text style={styles.bankInfoText}>ABA 101019644</Text>
+                </>
+              )}
+            </View>
+          </View>
+          
+          {/* Notas */}
+          <View style={styles.twoColumnRight}>
+            <Text style={styles.boxTitle}>Notas</Text>
+            <View style={styles.box}>
+              <View style={styles.notesList}>
+                <Text style={styles.notesListItem}>• Precios sujetos a cambio sin previo aviso.</Text>
+                <Text style={styles.notesListItem}>• Servicio pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</Text>
+                <Text style={styles.notesListItem}>• Tiempo de Entrega: 6 semanas después de confirmación.</Text>
+                <Text style={styles.notesListItem}>• Todas las piezas son artesanales y pueden variar.</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        
+        {/* Términos Y Cuidados */}
+        <View style={styles.section}>
+          <Text style={styles.columnTitle}>Términos y cuidados</Text>
+          <View style={styles.termsBox}>
+            <Text style={styles.termsText}>TODAS LAS PIEZAS SON A PRUEBA DE MICROONDAS Y LAVAVAJILLA. NO APILAR PIEZAS MOJADAS, PODRÍAN DAÑAR ESMALTE. TODAS LAS PIEZAS SON ARTESANALES, POR LO TANTO NO EXISTE NINGUNA PIEZA IDÉNTICA Y TODAS ELLAS PUEDEN TENER VARIACIÓN DE TAMAÑO, FORMA Y COLOR.</Text>
+            <Text style={styles.termsText}>
+              Términos completos: 
+              <Link src="https://funnykitchen.mx/pages/terminos-y-condiciones" style={styles.termsLink}>
+                {" funnykitchen.mx/terminos-y-condiciones"}
+              </Link>
+            </Text>
+          </View>
+        </View>
+        
+        {/* Spacer to push footer to bottom */}
+        <View style={styles.spacer} />
         
         {/* Footer */}
         <View style={styles.footer}>
