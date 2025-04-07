@@ -1,23 +1,22 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getSession } from '@auth0/nextjs-auth0';
 
 export async function middleware(req: NextRequest) {
   console.log("Middleware running on path:", req.nextUrl.pathname);
   
-  // Skip authentication check for API routes in development
-  if (process.env.NODE_ENV === 'development' && req.nextUrl.pathname.startsWith('/api/')) {
-    console.log("Development mode: Skipping authentication check for API route");
+  // Skip authentication check for API routes and public paths
+  if (req.nextUrl.pathname.startsWith('/api/') || 
+      req.nextUrl.pathname === '/' || 
+      req.nextUrl.pathname.startsWith('/login') ||
+      req.nextUrl.pathname.startsWith('/api/auth/')) {
+    console.log("Skipping auth check for public route:", req.nextUrl.pathname);
     return NextResponse.next();
   }
   
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
-  
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    // Check Auth0 session from cookies
+    const authCookie = req.cookies.get('appSession');
     
     // Check if user is authenticated for protected routes
     const protectedRoutes = ['/dashboard'];
@@ -26,15 +25,15 @@ export async function middleware(req: NextRequest) {
       req.nextUrl.pathname.startsWith(route)
     );
     
-    if (isProtectedRoute && !session) {
-      // Redirect to the root path (/) instead of /login
-      const redirectUrl = new URL('/', req.url);
+    if (isProtectedRoute && !authCookie) {
+      // Redirect to Auth0 login
+      const redirectUrl = new URL('/api/auth/login', req.url);
       return NextResponse.redirect(redirectUrl);
     }
     
-    return res;
+    return NextResponse.next();
   } catch (e) {
     console.error('Error in middleware:', e);
-    return res;
+    return NextResponse.next();
   }
 } 

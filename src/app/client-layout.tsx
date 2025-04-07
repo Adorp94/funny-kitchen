@@ -3,8 +3,10 @@
 import { Header } from "@/components/layout/header";
 import { Auth0Provider } from '@auth0/auth0-react';
 import { Toaster } from "react-hot-toast";
-import AuthGuard from "./auth-guard";
 import { usePathname } from "next/navigation";
+
+// Remove AuthGuard import since we're using middleware
+// import AuthGuard from "./auth-guard";
 
 export default function ClientLayout({
   children,
@@ -17,10 +19,9 @@ export default function ClientLayout({
   const isSignInPage = pathname === "/";
   
   // Define the correct redirect URI based on environment
-  // Use origin (/dashboard is automatically appended by Auth0)
   const redirectUri = typeof window !== 'undefined' 
-    ? window.location.origin
-    : 'http://localhost:3000';
+    ? `${window.location.origin}/api/auth/callback`
+    : 'http://localhost:3000/api/auth/callback';
 
   return (
     <Auth0Provider
@@ -35,16 +36,14 @@ export default function ClientLayout({
       useRefreshTokens={true}
       cacheLocation="localstorage"
     >
-      <AuthGuard>
-        {/* Only render header if not on sign-in page */}
-        {!isSignInPage && <Header />}
-        
-        <main className={isSignInPage ? "min-h-screen" : "pt-4 px-4 md:px-8 lg:px-12 max-w-[1440px] mx-auto"}>
-          {children}
-        </main>
-        
-        <Toaster position="bottom-right" />
-      </AuthGuard>
+      {/* Only render header if not on sign-in page */}
+      {!isSignInPage && <Header />}
+      
+      <main className={isSignInPage ? "min-h-screen" : "pt-4 px-4 md:px-8 lg:px-12 max-w-[1440px] mx-auto"}>
+        {children}
+      </main>
+      
+      <Toaster position="bottom-right" />
     </Auth0Provider>
   );
 } 
