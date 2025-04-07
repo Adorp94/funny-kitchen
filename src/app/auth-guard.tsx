@@ -5,7 +5,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useRouter, usePathname } from "next/navigation";
 
 // List of public routes that don't require authentication
-const publicRoutes = ["/", "/login", "/privacy", "/terms"];
+const publicRoutes = ["/", "/login", "/privacy", "/terms", "/test"];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth0();

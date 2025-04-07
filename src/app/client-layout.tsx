@@ -38,9 +38,19 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       console.log("[Auth0] Configuration:", {
         domain,
         clientId,
-        redirect_uri: origin,
-        isMounted
+        redirect_uri: `${origin}/api/auth/callback`,
+        isMounted,
+        location: typeof window !== 'undefined' ? window.location.href : 'unknown'
       });
+      
+      // Add a global error handler to catch any uncaught errors
+      if (typeof window !== 'undefined') {
+        window.onerror = function(message, source, lineno, colno, error) {
+          console.error("[Global Error]", { message, source, lineno, colno, error });
+          setError(`Error: ${message}`);
+          return false;
+        };
+      }
     }
   }, [domain, clientId, origin, isMounted]);
   
@@ -49,12 +59,31 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     return null;
   }
 
+  // Provide a fallback UI for debugging
+  const debugContent = (
+    <div className="p-6 bg-white rounded shadow m-4">
+      <h2 className="text-xl font-bold mb-4">Auth0 Debug Information</h2>
+      <p className="mb-2">Domain: {domain}</p>
+      <p className="mb-2">Client ID: {clientId}</p>
+      <p className="mb-2">Redirect URI: {`${origin}/api/auth/callback`}</p>
+      <p className="mb-2">Is Mounted: {String(isMounted)}</p>
+      <hr className="my-4" />
+      {error && (
+        <div className="bg-red-50 p-4 text-red-700 rounded mt-4">
+          <h3 className="font-bold">Auth Error</h3>
+          <p>{error}</p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       {error ? (
         <div className="bg-red-50 p-4 text-red-700 rounded m-4">
           <h2 className="font-bold">Auth Error</h2>
           <p>{error}</p>
+          {debugContent}
         </div>
       ) : (
         <Auth0Provider
@@ -69,6 +98,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
             setError(error.message || "An error occurred with authentication");
           }}
         >
+          <div id="auth0-debug" style={{ display: 'none' }}>{debugContent}</div>
           {!isSignIn && <Header />}
           <main className="min-h-screen bg-gray-50">{children}</main>
           {!isSignIn && <Footer />}

@@ -11,7 +11,23 @@ export default function Home() {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  // Add an error boundary
+  useEffect(() => {
+    try {
+      // Check if we're in the error state coming back from Auth0
+      const url = new URL(window.location.href);
+      const errorDescription = url.searchParams.get('error_description');
+      if (errorDescription) {
+        console.error('[Home] Auth0 returned error:', errorDescription);
+        setError(errorDescription);
+      }
+    } catch (err) {
+      console.error('[Home] Error parsing URL:', err);
+    }
+  }, []);
 
   useEffect(() => {
     // Simple authentication check
@@ -29,6 +45,7 @@ export default function Home() {
       } catch (error) {
         console.error("[Home] Error in auth check:", error);
         setCheckingAuth(false);
+        setError(`Authentication check error: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
 
@@ -93,6 +110,24 @@ export default function Home() {
         <div className="flex flex-col items-center">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
           <p className="mt-4 text-gray-600">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-50 p-6 rounded-lg shadow-md max-w-lg w-full">
+          <h2 className="text-red-700 text-xl font-bold mb-4">Error de autenticación</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button 
+            className="w-full"
+            onClick={() => window.location.href = '/'}
+          >
+            Intentar de nuevo
+          </Button>
         </div>
       </div>
     );
