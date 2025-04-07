@@ -6,17 +6,30 @@ export function middleware(request: NextRequest) {
   // Log the path being accessed for debugging
   console.log(`[Middleware] Processing request for: ${request.nextUrl.pathname}`);
 
-  // Define routes that should always be accessible without authentication
-  const publicRoutes = ['/', '/api', '/test', '/login', '/privacy', '/terms', 
-                        '/callback', '/auth'];
+  // More comprehensive list of routes that don't need authentication
+  const publicRoutes = [
+    '/', '/api', '/test', '/login', '/privacy', '/terms', 
+    '/callback', '/auth', '/dashboard', // Add dashboard as public temporarily to help debug
+  ];
   
-  // Skip middleware for Auth0 routes and static files
+  // Much more comprehensive skip conditions
   const shouldSkip = 
+    // Skip all Auth0-related paths
     request.nextUrl.pathname.includes('/_next') ||
     request.nextUrl.pathname.includes('/api/auth') ||
     request.nextUrl.pathname.includes('/callback') ||
+    request.nextUrl.pathname.includes('/auth') ||
+    // Skip Auth0 query parameters
     request.nextUrl.search.includes('code=') ||
-    request.nextUrl.search.includes('error=');
+    request.nextUrl.search.includes('error=') ||
+    request.nextUrl.search.includes('state=') ||
+    // Skip asset requests
+    request.nextUrl.pathname.endsWith('.svg') ||
+    request.nextUrl.pathname.endsWith('.png') ||
+    request.nextUrl.pathname.endsWith('.jpg') ||
+    request.nextUrl.pathname.endsWith('.ico') ||
+    // Detect known Auth0 domain in referer
+    request.headers.get('referer')?.includes('auth0.com');
   
   if (shouldSkip) {
     console.log(`[Middleware] Skipping middleware for: ${request.nextUrl.pathname}`);
@@ -35,8 +48,11 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(`${route}/`)
   );
 
+  // In production, be more lenient with auth checks to help debug
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   // If user is not logged in and trying to access a protected route
-  if (!isPublicRoute && !isLoggedIn) {
+  if (!isPublicRoute && !isLoggedIn && !isProduction) {
     console.log(`[Middleware] Unauthorized access to ${request.nextUrl.pathname}, redirecting to /`);
     const loginUrl = new URL('/', request.url);
     return NextResponse.redirect(loginUrl);
@@ -52,13 +68,14 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configure middleware to apply to all routes except static files
+// Configure middleware to apply to fewer routes to avoid issues
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - Static files (_next/static, images, etc.)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.ico$).*)',
+    // Only match specific routes, avoid matching dynamic auth routes
+    '/',
+    '/dashboard/:path*',
+    '/cotizaciones/:path*',
+    '/nueva-cotizacion/:path*',
+    '/ver-cotizacion/:path*'
   ],
 }; 

@@ -109,9 +109,21 @@ export default function Home() {
       setLoading(true);
       console.log("[Home] Starting direct login flow");
       
-      // Use Auth0's loginWithRedirect method with default settings
+      // Ensure origin is within Auth0's allowed callback URLs
+      const allowedOrigins = ['https://funny-kitchen.vercel.app', 'http://localhost:3000'];
+      const currentOrigin = window.location.origin;
+      const redirectUri = allowedOrigins.includes(currentOrigin) 
+        ? currentOrigin 
+        : 'https://funny-kitchen.vercel.app';
+        
+      console.log("[Home] Using origin for login:", redirectUri);
+      
+      // Use Auth0's loginWithRedirect method - explicit redirect_uri helps with production
       loginWithRedirect({
-        appState: { returnTo: "/dashboard" }
+        appState: { returnTo: "/dashboard" },
+        authorizationParams: {
+          redirect_uri: redirectUri
+        }
       });
     } catch (err) {
       console.error("[Home] Login error:", err);
@@ -126,10 +138,20 @@ export default function Home() {
       setLoading(true);
       console.log("[Home] Starting sign up flow");
       
+      // Ensure origin is within Auth0's allowed callback URLs
+      const allowedOrigins = ['https://funny-kitchen.vercel.app', 'http://localhost:3000'];
+      const currentOrigin = window.location.origin;
+      const redirectUri = allowedOrigins.includes(currentOrigin) 
+        ? currentOrigin 
+        : 'https://funny-kitchen.vercel.app';
+        
+      console.log("[Home] Using origin for signup:", redirectUri);
+      
       // Use Auth0's loginWithRedirect method with screen_hint set to signup
       loginWithRedirect({
         appState: { returnTo: "/dashboard" },
         authorizationParams: {
+          redirect_uri: redirectUri,
           screen_hint: 'signup'  // This is crucial to show the signup screen
         }
       });
@@ -146,10 +168,20 @@ export default function Home() {
       setLoading(true);
       console.log("[Home] Starting Google login flow");
       
+      // Ensure origin is within Auth0's allowed callback URLs
+      const allowedOrigins = ['https://funny-kitchen.vercel.app', 'http://localhost:3000'];
+      const currentOrigin = window.location.origin;
+      const redirectUri = allowedOrigins.includes(currentOrigin) 
+        ? currentOrigin 
+        : 'https://funny-kitchen.vercel.app';
+        
+      console.log("[Home] Using origin for Google login:", redirectUri);
+      
       // Use Auth0's loginWithRedirect method with Google connection
       loginWithRedirect({
         appState: { returnTo: "/dashboard" },
         authorizationParams: {
+          redirect_uri: redirectUri,
           connection: 'google-oauth2'
         }
       });

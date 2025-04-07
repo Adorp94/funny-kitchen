@@ -33,15 +33,19 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     return () => clearTimeout(timer);
   }, [pathname]);
 
-  // Get the origin for redirect_uri
-  const origin = 
-    typeof window !== 'undefined' && window.location.origin
-      ? window.location.origin
-      : 'http://localhost:3000';
-  
   // Auth0 configuration
   const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "dev-av1unzc74ll0psau.us.auth0.com";
   const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "y3zkQqmOiFGAV3OzU4bF5LIl631V6Jxb";
+  
+  // Get allowed origins from env or fallback to the default ones
+  const allowedOrigins = ['https://funny-kitchen.vercel.app', 'http://localhost:3000'];
+  
+  // Ensure origin is allowed - this addresses a common Auth0 production issue
+  // If the current origin isn't in allowed origins, default to the first one in production
+  const isAllowedOrigin = typeof window !== 'undefined' && allowedOrigins.includes(window.location.origin);
+  const finalOrigin = isAllowedOrigin 
+    ? window.location.origin 
+    : (process.env.NODE_ENV === 'production' ? allowedOrigins[0] : 'http://localhost:3000');
   
   // Log Auth0 configuration for debugging
   useEffect(() => {
@@ -49,11 +53,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       console.log("[Auth0] Configuration:", {
         domain,
         clientId,
-        redirect_uri: origin,
+        redirect_uri: finalOrigin,
         isMounted,
         location: typeof window !== 'undefined' ? window.location.href : 'unknown',
         environment: process.env.NODE_ENV,
-        timeout: initTimeout
+        timeout: initTimeout,
+        isAllowedOrigin,
+        finalOrigin
       });
       
       // Add a global error handler to catch any uncaught errors
@@ -65,7 +71,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         };
       }
     }
-  }, [domain, clientId, origin, isMounted, initTimeout]);
+  }, [domain, clientId, finalOrigin, isMounted, initTimeout, isAllowedOrigin]);
   
   // Don't render anything during SSR
   if (!isMounted) {
@@ -115,7 +121,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       <h2 className="text-xl font-bold mb-4">Auth0 Debug Information</h2>
       <p className="mb-2">Domain: {domain}</p>
       <p className="mb-2">Client ID: {clientId}</p>
-      <p className="mb-2">Redirect URI: {origin}</p>
+      <p className="mb-2">Redirect URI: {finalOrigin}</p>
       <p className="mb-2">Is Mounted: {String(isMounted)}</p>
       <p className="mb-2">Environment: {process.env.NODE_ENV}</p>
       <hr className="my-4" />
@@ -149,10 +155,20 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           domain={domain}
           clientId={clientId}
           authorizationParams={{
-            redirect_uri: origin,
+            redirect_uri: finalOrigin,
             scope: "openid profile email"
           }}
           cacheLocation="localstorage"
+          // Reduce token refresh to prevent stalled auth in production
+          useRefreshTokens={false} 
+          // Add missing callback handler
+          onRedirectCallback={(appState) => {
+            console.log("[Auth0] Redirect callback triggered, state:", 
+                       appState ? `returnTo: ${appState.returnTo}` : 'none');
+            if (appState && appState.returnTo) {
+              window.location.href = appState.returnTo;
+            }
+          }}
           onError={(error) => {
             console.error("[Auth0] Error:", error);
             setError(error.message || "An error occurred with authentication");
