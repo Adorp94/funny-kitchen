@@ -288,7 +288,12 @@ function NuevaCotizacionClient() {
       console.log(`formatCurrency - Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
     }
     
-    return `$${displayAmount.toFixed(2)} ${moneda}`;
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: moneda,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(displayAmount);
   };
 
   // Handle currency change

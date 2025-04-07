@@ -18,7 +18,12 @@ export function ListaProductos({
 }: ListaProductosProps) {
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)} ${moneda}`;
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: moneda,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
   // Calculate total

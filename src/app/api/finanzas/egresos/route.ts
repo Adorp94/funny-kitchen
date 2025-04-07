@@ -43,8 +43,7 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       return NextResponse.json({ 
         success: true, 
-        message: 'Egreso registrado correctamente',
-        data: result.data
+        message: 'Egreso registrado correctamente'
       });
     } else {
       return NextResponse.json({ 
