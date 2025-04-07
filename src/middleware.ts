@@ -1,47 +1,43 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// List of public routes that don't require authentication
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/terms',
+  '/privacy',
+  '/api/auth/login',
+  '/api/auth/callback',
+  '/api/auth/logout',
+  '/api/auth/me',
+];
+
 export async function middleware(req: NextRequest) {
-  console.log("Middleware running on path:", req.nextUrl.pathname);
-  
   // Skip auth check in development mode
   if (process.env.NODE_ENV === 'development') {
     console.log("Development mode: Bypassing auth check");
     return NextResponse.next();
   }
   
-  // Public paths that don't require authentication
-  const publicPaths = [
-    '/',
-    '/api/auth/login',
-    '/api/auth/callback',
-    '/api/auth/logout',
-    '/api/auth/me',
-    '/login',
-    '/terms',
-    '/privacy'
-  ];
+  const url = new URL(req.url);
+  const path = url.pathname;
   
-  // Check if the current path is public
-  const isPublicPath = publicPaths.some(path => 
-    req.nextUrl.pathname === path || 
-    req.nextUrl.pathname.startsWith('/api/debug') ||
-    req.nextUrl.pathname.startsWith('/api/cotizaciones')
-  );
-  
-  // Allow public paths without authentication
-  if (isPublicPath) {
-    console.log("Public path, skipping auth check:", req.nextUrl.pathname);
+  // Allow public routes
+  if (PUBLIC_ROUTES.includes(path) || 
+      path.startsWith('/api/auth/') || 
+      path.startsWith('/api/debug/') ||
+      path.startsWith('/api/cotizaciones/')) {
     return NextResponse.next();
   }
   
-  // Check for auth cookie
+  // For other routes, check for authentication cookie
+  // Auth0 sets appSession cookie
   const authCookie = req.cookies.get('appSession');
   
-  // If no auth cookie for protected route, redirect to login
   if (!authCookie) {
-    console.log("No auth cookie, redirecting to login");
-    return NextResponse.redirect(new URL('/api/auth/login', req.url));
+    // Redirect to login page if not authenticated
+    return NextResponse.redirect(new URL('/', req.url));
   }
   
   return NextResponse.next();

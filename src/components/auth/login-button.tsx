@@ -2,17 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
+import { useAuth0 } from "@auth0/auth0-react";
 
 export default function LoginButton() {
-  const handleLogin = () => {
-    // Redirect to Auth0 login with returnTo set to dashboard
-    window.location.href = '/api/auth/login?returnTo=/dashboard';
-  };
+  const { loginWithRedirect } = useAuth0();
   
   return (
     <Button 
       className="bg-emerald-600 hover:bg-emerald-700 text-white"
-      onClick={handleLogin}
+      onClick={() => loginWithRedirect()}
     >
       <LogIn className="mr-2 h-4 w-4" />
       <span className="whitespace-nowrap">Iniciar Sesión</span>
