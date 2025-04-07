@@ -8,10 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import 'react-phone-number-input/style.css';
-import PhoneInput from 'react-phone-number-input/input';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 import { toast } from "react-hot-toast";
-import { isValidPhoneNumber } from 'react-phone-number-input';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { searchClientes, insertCliente } from '@/lib/supabase';
 import { Cliente as ClienteType } from '@/lib/supabase';
@@ -208,15 +207,11 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       newErrors.nombre = "El nombre debe tener al menos 3 caracteres";
     }
     
-    // Validate phone (modified to accept numbers without + prefix)
+    // Validate phone - using just numeric length check since we're storing digits only
     if (!data.celular) {
       newErrors.celular = "El teléfono es obligatorio";
-    } else {
-      // For validation, we need to check both with and without + prefix
-      const phoneToValidate = data.celular.startsWith('+') ? data.celular : `+${data.celular}`;
-      if (!isValidPhoneNumber(phoneToValidate)) {
-        newErrors.celular = "El formato de teléfono no es válido";
-      }
+    } else if (data.celular.replace(/\D/g, '').length < 10) {
+      newErrors.celular = "El número de teléfono es demasiado corto";
     }
     
     // Validate email if provided
@@ -262,16 +257,10 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
 
   // Helper to convert formData to Cliente
   const formDataToCliente = (data: ClienteFormData): ClienteType => {
-    // Remove + from phone number if present to match database format
-    let celular = data.celular;
-    if (celular && celular.startsWith('+')) {
-      celular = celular.substring(1);
-    }
-    
     return {
-      cliente_id: Number(data.cliente_id),
+      cliente_id: parseInt(data.cliente_id) || 0,
       nombre: data.nombre,
-      celular: celular,
+      celular: data.celular,
       correo: data.correo || null,
       razon_social: data.razon_social || null,
       rfc: data.rfc || null,
@@ -282,11 +271,9 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     };
   };
 
-  // Helper to format phone number for PhoneInput component
+  // Format phone for react-phone-input-2
   const formatPhoneForInput = (phone: string): string => {
-    if (!phone) return '';
-    // Ensure phone has a + prefix for the component
-    return phone.startsWith('+') ? phone : `+${phone}`;
+    return phone || '';
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -317,17 +304,11 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
     });
   };
 
-  const handlePhoneChange = (value: string | undefined) => {
-    // Remove + from phone number if present to match database format
-    let formattedValue = value || '';
-    if (formattedValue && formattedValue.startsWith('+')) {
-      formattedValue = formattedValue.substring(1);
-    }
-
+  const handlePhoneChange = (value: string) => {
     setFormData(prev => {
       const newData = {
         ...prev,
-        celular: formattedValue
+        celular: value
       };
       
       // Mark field as touched
@@ -340,11 +321,7 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
       setFormDataChanged(true);
       
       // Save to sessionStorage
-      const updatedData = {
-        ...prev,
-        celular: formattedValue
-      };
-      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(updatedData));
+      sessionStorage.setItem('cotizacion_clienteForm', JSON.stringify(newData));
       
       return newData;
     });
@@ -388,16 +365,10 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
 
   // Handle selection of an existing client
   const handleClienteClick = (cliente: ClienteType) => {
-    // Remove + from phone number if present to match database format
-    let celular = cliente.celular || "";
-    if (celular && celular.startsWith('+')) {
-      celular = celular.substring(1);
-    }
-    
     const updatedFormData = {
       cliente_id: cliente.cliente_id.toString(),
       nombre: cliente.nombre || "",
-      celular: celular,
+      celular: cliente.celular || "",
       correo: cliente.correo || "",
       razon_social: cliente.razon_social || "",
       rfc: cliente.rfc || "",
@@ -1064,19 +1035,23 @@ export function ClienteForm({ clienteId, onClienteChange }: ClienteFormProps) {
         {/* Celular */}
         <FormControl>
           <FormLabel required>Celular</FormLabel>
-          <div className={`flex h-10 w-full rounded-md border ${touched.celular && errors.celular ? 'border-red-500' : 'border-input'} bg-background text-sm ring-offset-background`}>
-            <PhoneInput
-              className="flex-1 px-3 py-2 border-0 focus:outline-none focus:ring-0"
-              country="MX"
-              value={formatPhoneForInput(formData.celular)}
-              onChange={handlePhoneChange}
-              onBlur={() => handleBlur('celular')}
-              placeholder="5512345678"
-              required
-              disabled={!formData.cliente_id && !comboboxOpen}
-              international={false}
-            />
-          </div>
+          <PhoneInput
+            country={'mx'}
+            value={formData.celular}
+            onChange={handlePhoneChange}
+            onBlur={() => handleBlur('celular')}
+            inputProps={{
+              name: 'celular',
+              required: true,
+              disabled: !formData.cliente_id && activeTab !== 'nuevo',
+              placeholder: "Número de teléfono"
+            }}
+            containerClass={touched.celular && errors.celular ? 'error' : ''}
+            enableSearch={true}
+            disableSearchIcon={false}
+            preferredCountries={['mx', 'us', 'ca']}
+            searchPlaceholder="Buscar país..."
+          />
           {touched.celular && errors.celular && (
             <div className="text-red-500 text-xs mt-1 flex items-center">
               <AlertCircle className="h-3 w-3 mr-1" />

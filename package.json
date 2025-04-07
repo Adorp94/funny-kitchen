@@ -48,6 +48,7 @@
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.55.0",
     "react-hot-toast": "^2.4.1",
+    "react-phone-input-2": "^2.15.1",
     "react-phone-number-input": "^3.3.7",
     "react-responsive": "^9.0.2",
     "sonner": "^2.0.2",
