@@ -3,7 +3,8 @@
 import { Header } from "@/components/layout/header";
 import { Auth0Provider } from '@auth0/auth0-react';
 import { Toaster } from "react-hot-toast";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 // Remove AuthGuard import since we're using middleware
 // import AuthGuard from "./auth-guard";
@@ -14,14 +15,24 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   
   // Determine if we're on the sign-in page (root path)
   const isSignInPage = pathname === "/";
   
-  // Define the callback URL using environment settings
+  // Define the callback URL - we'll use the server-side route here
   const redirectUri = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/auth/callback`
     : process.env.AUTH0_BASE_URL ? `${process.env.AUTH0_BASE_URL}/api/auth/callback` : 'http://localhost:3000/api/auth/callback';
+  
+  // Handle Auth0 callback - for client-side use only
+  const onRedirectCallback = (appState: any) => {
+    if (appState?.returnTo) {
+      router.push(appState.returnTo);
+    } else {
+      router.push('/dashboard');
+    }
+  };
 
   return (
     <Auth0Provider
@@ -31,7 +42,7 @@ export default function ClientLayout({
         redirect_uri: redirectUri,
         scope: 'openid profile email',
       }}
-      useRefreshTokens={true}
+      onRedirectCallback={onRedirectCallback}
       cacheLocation="localstorage"
     >
       {/* Only render header if not on sign-in page */}

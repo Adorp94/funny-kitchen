@@ -14,13 +14,14 @@ export default function SignInPage() {
   // Function to redirect to Auth0 login
   const handleSignIn = async () => {
     setLoading(true);
-    window.location.href = '/api/auth/login';
+    window.location.href = '/api/auth/login?returnTo=/dashboard';
   };
   
   // Function to redirect to Google login specifically
   const handleGoogleSignIn = async () => {
     setLoading(true);
-    window.location.href = '/api/auth/login?connection=google-oauth2';
+    // The connection parameter might need to be passed differently depending on your Auth0 version
+    window.location.href = '/api/auth/login?connection=google-oauth2&returnTo=/dashboard';
   };
   
   return (
