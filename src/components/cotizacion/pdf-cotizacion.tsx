@@ -49,6 +49,7 @@ interface Cotizacion {
   total?: number;
   total_mxn?: number;
   tipo_cambio?: number;
+  tiempo_estimado?: number;
   productos?: Producto[];
 }
 
@@ -325,7 +326,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
                   <li>• Precios sujetos a cambio sin previo aviso.</li>
                   <li>• El servicio será pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</li>
                   <li>• Fecha de la cotización: {fechaActual}</li>
-                  <li>• Tiempo de Entrega estimado: 6 semanas después de la confirmación de pago.</li>
+                  <li>• Tiempo de Entrega estimado: {cotizacion?.tiempo_estimado || 6} semanas después de la confirmación de pago.</li>
                 </ul>
               </div>
               

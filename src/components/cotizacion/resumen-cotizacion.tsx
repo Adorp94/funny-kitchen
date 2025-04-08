@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Truck, Receipt, Percent, User } from 'lucide-react';
+import { DollarSign, Truck, Receipt, Percent, User, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
@@ -30,6 +30,8 @@ interface ResumenCotizacionProps {
   setShippingCost: (value: number) => void;
   total: number;
   moneda: 'MXN' | 'USD';
+  tiempoEstimado?: number;
+  setTiempoEstimado?: (weeks: number) => void;
 }
 
 export function ResumenCotizacion({
@@ -43,7 +45,9 @@ export function ResumenCotizacion({
   shippingCost,
   setShippingCost,
   total,
-  moneda
+  moneda,
+  tiempoEstimado = 6,
+  setTiempoEstimado
 }: ResumenCotizacionProps) {
   const { 
     exchangeRate, 
@@ -60,13 +64,15 @@ export function ResumenCotizacion({
   const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasShipping, setHasShipping] = useState<boolean>(false);
   const [shippingCostStr, setShippingCostStr] = useState<string>('0');
+  const [tiempoEstimadoStr, setTiempoEstimadoStr] = useState<string>(tiempoEstimado.toString());
 
   // Initialize form values from props
   useEffect(() => {
     setGlobalDiscountStr(globalDiscount.toString());
     setHasShipping(shippingCost > 0);
     setShippingCostStr(shippingCost.toString());
-  }, [globalDiscount, shippingCost]);
+    setTiempoEstimadoStr(tiempoEstimado.toString());
+  }, [globalDiscount, shippingCost, tiempoEstimado]);
 
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
@@ -145,6 +151,25 @@ export function ResumenCotizacion({
       // Store shipping cost in the selected currency
       // This ensures the value is interpreted correctly in the products context
       setShippingCost(boundedValue);
+    }
+  };
+
+  // Handle tiempo estimado change
+  const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty string or valid numbers
+    if (value === '' || !isNaN(parseInt(value))) {
+      setTiempoEstimadoStr(value);
+      
+      // Convert to number for the callback
+      const numValue = value === '' ? 6 : parseInt(value);
+      const boundedValue = Math.max(numValue, 1); // Minimum 1 week
+      
+      // Update parent component state if callback is provided
+      if (setTiempoEstimado) {
+        setTiempoEstimado(boundedValue);
+      }
     }
   };
 
@@ -365,6 +390,25 @@ export function ResumenCotizacion({
             </div>
           </div>
         )}
+        
+        {/* Tiempo de Entrega */}
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-600">Tiempo de entrega:</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={tiempoEstimadoStr}
+              onChange={handleTiempoEstimadoChange}
+              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="6"
+            />
+            <span className="text-gray-500">semanas</span>
+          </div>
+        </div>
         
         {/* Total */}
         <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">

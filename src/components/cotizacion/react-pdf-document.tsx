@@ -320,6 +320,7 @@ interface Cotizacion {
   total?: number;
   total_mxn?: number;
   tipo_cambio?: number;
+  tiempo_estimado?: number;
   productos?: Producto[];
 }
 
@@ -364,6 +365,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   const costo_envio = cotizacion?.costo_envio || 0;
   const total = cotizacion?.total || 0;
   const displayFolio = cotizacion?.folio || folio || '';
+  const tiempoEstimado = cotizacion?.tiempo_estimado || 6;
   
   // Calculate total product discounts
   const totalProductDiscounts = productos.reduce((sum, producto) => {
@@ -567,7 +569,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
               <View style={styles.notesList}>
                 <Text style={styles.notesListItem}>• Precios sujetos a cambio sin previo aviso.</Text>
                 <Text style={styles.notesListItem}>• Servicio pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</Text>
-                <Text style={styles.notesListItem}>• Tiempo de Entrega: 6 semanas después de confirmación.</Text>
+                <Text style={styles.notesListItem}>• Tiempo de Entrega: {tiempoEstimado} semanas después de confirmación.</Text>
                 <Text style={styles.notesListItem}>• Todas las piezas son artesanales y pueden variar.</Text>
               </View>
             </View>

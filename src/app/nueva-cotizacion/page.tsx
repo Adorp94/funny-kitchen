@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2 } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Cliente } from "@/lib/supabase";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
+import { PDFService } from "@/services/pdf-service";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -71,6 +72,11 @@ function NuevaCotizacionClient() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { convertMXNtoUSD, convertUSDtoMXN } = useExchangeRate();
+  const [globalDiscount, setGlobalDiscount] = useState(0);
+  const [hasIva, setHasIva] = useState(false);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [moneda, setMoneda] = useState<'MXN' | 'USD'>('MXN');
+  const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
 
   // Get productos from context
   const {
@@ -80,15 +86,7 @@ function NuevaCotizacionClient() {
     updateProductoDiscount: handleUpdateProductDiscount,
     clearProductos, 
     total,
-    moneda,
-    setMoneda,
     subtotal,
-    globalDiscount,
-    setGlobalDiscount,
-    hasIva,
-    setHasIva,
-    shippingCost,
-    setShippingCost,
     exchangeRate
   } = useProductos();
 
@@ -172,7 +170,7 @@ function NuevaCotizacionClient() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Update handleGenerateCotizacion to save quotation to database
+  // Handle generating the quotation
   const handleGenerateCotizacion = async () => {
     if (!cliente) {
       toast.error("Por favor, ingresa la información del cliente");
@@ -201,6 +199,7 @@ function NuevaCotizacionClient() {
       console.log(`Shipping cost: ${shippingCost} ${moneda}`);
       console.log(`Exchange rate: ${exchangeRate}`);
       console.log(`Total: ${total}`);
+      console.log(`Tiempo estimado: ${tiempoEstimado} semanas`);
       
       // Prepare data for API call, including all client data
       // This passes the client information to the API, which can create the client if needed
@@ -220,7 +219,8 @@ function NuevaCotizacionClient() {
         incluye_envio: shippingCost > 0,
         costo_envio: shippingCost,
         total: total,
-        tipo_cambio: exchangeRate
+        tipo_cambio: exchangeRate,
+        tiempo_estimado: tiempoEstimado
       };
       
       // Call API to save quotation (and client if needed)
@@ -246,24 +246,54 @@ function NuevaCotizacionClient() {
         sessionStorage.setItem('cotizacion_cliente', JSON.stringify(result.cliente_creado));
       }
       
+      // Create cotizacion object for PDF generation
+      const cotizacionForPDF = {
+        id: result.cotizacion_id,
+        folio: result.folio,
+        moneda: moneda,
+        subtotal: subtotal,
+        descuento_global: globalDiscount,
+        iva: hasIva,
+        monto_iva: montoIva,
+        incluye_envio: shippingCost > 0,
+        costo_envio: shippingCost,
+        total: total,
+        tipo_cambio: exchangeRate,
+        tiempo_estimado: tiempoEstimado,
+        productos: productos
+      };
+      
+      // Generate PDF directly
+      try {
+        await PDFService.generateReactPDF(
+          cliente,
+          result.folio,
+          cotizacionForPDF,
+          { download: true, filename: `cotizacion-${result.folio}.pdf` }
+        );
+        
+        toast.success(`Cotización ${result.folio} generada exitosamente`);
+      } catch (pdfError) {
+        console.error("Error generating PDF:", pdfError);
+        toast.error("La cotización fue guardada pero hubo un error al generar el PDF");
+      }
+      
       // Clear context data after successful save
       clearProductos();
       setGlobalDiscount(0);
       setHasIva(false);
       setShippingCost(0);
+      setTiempoEstimado(6);
       
-      // Save the quotation ID and folio in sessionStorage for the PDF view
-      sessionStorage.setItem('cotizacion_id', result.cotizacion_id);
-      sessionStorage.setItem('cotizacion_folio', result.folio);
+      // Navigate to the cotizaciones page
+      router.push('/dashboard/cotizaciones');
       
-      toast.success(`Cotización ${result.folio} generada exitosamente`);
-      
-      // Navigate to the PDF view
-      router.push('/ver-cotizacion');
     } catch (error) {
       console.error('Error generating quotation:', error);
       setIsLoading(false);
       toast.error(error instanceof Error ? error.message : "Error al generar la cotización");
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -622,6 +652,8 @@ function NuevaCotizacionClient() {
                     setShippingCost={setShippingCost}
                     total={total}
                     moneda={moneda}
+                    tiempoEstimado={tiempoEstimado}
+                    setTiempoEstimado={setTiempoEstimado}
                   />
                 </div>
               </div>
@@ -650,8 +682,8 @@ function NuevaCotizacionClient() {
                     </div>
                   ) : (
                     <div className="flex items-center justify-center">
-                      <Save className="h-4 w-4 mr-2" /> 
-                      <span>Generar Cotización</span>
+                      <FileText className="h-4 w-4 mr-2" /> 
+                      <span>Generar Cotización y PDF</span>
                     </div>
                   )}
                 </Button>

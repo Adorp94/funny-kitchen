@@ -171,7 +171,8 @@ export async function POST(req: NextRequest) {
       incluye_envio, 
       costo_envio, 
       total,
-      tipo_cambio
+      tipo_cambio,
+      tiempo_estimado
     } = data;
 
     console.log("==== QUOTATION DATA RECEIVED ====");
@@ -180,6 +181,7 @@ export async function POST(req: NextRequest) {
     console.log(`Shipping: ${costo_envio} ${moneda}`);
     console.log(`Total: ${total} ${moneda}`);
     console.log(`Exchange Rate: ${tipo_cambio}`);
+    console.log(`Tiempo estimado: ${tiempo_estimado || 6} semanas`);
     console.log("===============================");
 
     // Validate required fields
@@ -327,7 +329,8 @@ export async function POST(req: NextRequest) {
         total_mxn: total_mxn,              // Always in MXN for reporting
         folio: folio,
         fecha_expiracion: fechaExpiracion.toISOString(),
-        tipo_cambio: tipo_cambio || null
+        tipo_cambio: tipo_cambio || null,
+        tiempo_estimado: tiempo_estimado || 6
       })
       .select('cotizacion_id')
       .single();
