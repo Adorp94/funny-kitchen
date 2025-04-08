@@ -22,11 +22,13 @@ export async function GET(request: NextRequest) {
         );
       }
       
-      return NextResponse.json({ productos: data || [] });
+      return NextResponse.json({ data: data || [] });
     }
     
     // Handle full product listing and search
     const query = searchParams.get('query') || '';
+    const page = parseInt(searchParams.get('page') || '0');
+    const pageSize = parseInt(searchParams.get('pageSize') || '20');
     
     // Get products with search if query provided
     let productosQuery = supabase
@@ -37,7 +39,15 @@ export async function GET(request: NextRequest) {
       productosQuery = productosQuery.or(`nombre.ilike.%${query}%,sku.ilike.%${query}%`);
     }
     
-    const { data, error } = await productosQuery.order('nombre');
+    // Apply pagination
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    
+    productosQuery = productosQuery
+      .order('nombre')
+      .range(from, to);
+    
+    const { data, error } = await productosQuery;
     
     if (error) {
       console.error('Error fetching products:', error);
@@ -47,7 +57,22 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    return NextResponse.json({ productos: data || [] });
+    // Get total count for pagination
+    const { count, error: countError } = await supabase
+      .from('productos')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error counting products:', countError);
+    }
+    
+    const hasMore = count ? from + data.length < count : false;
+    
+    return NextResponse.json({ 
+      data: data || [],
+      count,
+      hasMore
+    });
     
   } catch (error) {
     console.error('Error in productos API:', error);
