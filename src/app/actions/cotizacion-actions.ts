@@ -333,6 +333,45 @@ export async function getNextFolioNumber() {
   const currentYear = new Date().getFullYear();
   
   try {
+    // First get the last cotizacion_id, which is the most reliable way to get the next number
+    const { data: latestCotizacion, error: idError } = await supabase
+      .from('cotizaciones')
+      .select('cotizacion_id, folio')
+      .order('cotizacion_id', { ascending: false })
+      .limit(1)
+      .single();
+      
+    console.log('Latest cotizacion found:', latestCotizacion);
+    
+    if (idError && idError.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
+      console.error('Error getting latest cotizacion ID:', idError);
+      // In case of error, use the regex method as fallback
+      return fallbackGenerateFolio(currentYear, supabase);
+    }
+    
+    if (!latestCotizacion) {
+      // If no cotizaciones exist at all, start with 0001
+      console.log('No cotizaciones found, starting with 0001');
+      return `COT-${currentYear}-0001`;
+    }
+    
+    // Use the cotizacion_id + 1 as the sequential number for the folio
+    const nextNumber = latestCotizacion.cotizacion_id + 1;
+    console.log(`Generating next folio based on cotizacion_id: ${latestCotizacion.cotizacion_id} → ${nextNumber}`);
+    
+    // Format with leading zeros to maintain 4 digits (e.g., 0001, 0012, 0123)
+    return `COT-${currentYear}-${nextNumber.toString().padStart(4, '0')}`;
+  } catch (error) {
+    console.error('Error generating next folio number:', error);
+    // Fallback to the regex method
+    return fallbackGenerateFolio(currentYear, supabase);
+  }
+}
+
+// Fallback function that uses the regex method in case the main approach fails
+async function fallbackGenerateFolio(currentYear, supabase) {
+  try {
+    console.log('Using fallback method to generate folio');
     // Get the latest quotation with a valid folio from the current year
     const { data: latestCotizacion, error } = await supabase
       .from('cotizaciones')
@@ -343,8 +382,8 @@ export async function getNextFolioNumber() {
       .single();
     
     if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
-      console.error('Error getting latest cotizacion:', error);
-      // In case of error, create a random number as a fallback
+      console.error('Error getting latest cotizacion in fallback:', error);
+      // In case of error, create a random number as a last resort
       return `COT-${currentYear}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     }
     
@@ -366,11 +405,11 @@ export async function getNextFolioNumber() {
     const lastNumber = parseInt(matches[1], 10);
     const nextNumber = lastNumber + 1;
     
-    // Format with leading zeros to maintain 4 digits (e.g., 0001, 0012, 0123)
+    // Format with leading zeros to maintain 4 digits
     return `COT-${currentYear}-${nextNumber.toString().padStart(4, '0')}`;
   } catch (error) {
-    console.error('Error generating next folio number:', error);
-    // Fallback to a random number in case of error
+    console.error('Error in fallback folio generation:', error);
+    // Last resort fallback
     return `COT-${currentYear}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
   }
 } 
