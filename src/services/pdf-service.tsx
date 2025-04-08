@@ -185,6 +185,9 @@ export const generateReactPDF = async (
   options: { download?: boolean, filename?: string } = {}
 ): Promise<void> => {
   try {
+    console.log("PDF Service - generateReactPDF received:", { cliente, folio, cotizacion });
+    console.log("PDF Service - tiempo_estimado:", cotizacion?.tiempo_estimado);
+    
     const mergedOptions = { 
       download: true,
       filename: `cotizacion-${folio || format(new Date(), 'dd-MM-yyyy')}.pdf`,

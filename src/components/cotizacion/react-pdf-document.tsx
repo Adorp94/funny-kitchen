@@ -354,6 +354,10 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Get today's date formatted
   const fechaActual = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es });
   
+  // Debug the incoming cotizacion data
+  console.log("ReactPDFDocument - Raw cotizacion:", cotizacion);
+  console.log("ReactPDFDocument - Raw tiempo_estimado value:", cotizacion?.tiempo_estimado);
+  
   // Use provided values or defaults
   const moneda = cotizacion?.moneda || 'MXN';
   const productos = cotizacion?.productos || [];
@@ -365,7 +369,18 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   const costo_envio = cotizacion?.costo_envio || 0;
   const total = cotizacion?.total || 0;
   const displayFolio = cotizacion?.folio || folio || '';
-  const tiempoEstimado = cotizacion?.tiempo_estimado || 6;
+  
+  // Force the tiempo_estimado to be a number (could be undefined, string, etc.)
+  let tiempoEstimado: number;
+  if (typeof cotizacion?.tiempo_estimado === 'number') {
+    tiempoEstimado = cotizacion.tiempo_estimado;
+  } else if (typeof cotizacion?.tiempo_estimado === 'string') {
+    tiempoEstimado = parseInt(cotizacion.tiempo_estimado, 10) || 6;
+  } else {
+    tiempoEstimado = 6; // Default value
+  }
+  
+  console.log("ReactPDFDocument - Using tiempo_estimado:", tiempoEstimado);
   
   // Calculate total product discounts
   const totalProductDiscounts = productos.reduce((sum, producto) => {

@@ -263,6 +263,9 @@ function NuevaCotizacionClient() {
         productos: productos
       };
       
+      console.log("Generating PDF with tiempo_estimado:", tiempoEstimado);
+      console.log("PDF data:", cotizacionForPDF);
+      
       // Generate PDF directly
       try {
         await PDFService.generateReactPDF(
