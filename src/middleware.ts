@@ -28,6 +28,13 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname.endsWith('.png') ||
     request.nextUrl.pathname.endsWith('.jpg') ||
     request.nextUrl.pathname.endsWith('.ico') ||
+    // Skip API calls for data fetching
+    request.nextUrl.pathname.includes('/api/productos') ||
+    request.nextUrl.pathname.includes('/api/clientes') ||
+    request.nextUrl.pathname.includes('/api/cotizaciones') ||
+    request.nextUrl.pathname.includes('/api/colores') ||
+    // IMPORTANT: All API routes should pass through for data fetching to work
+    request.nextUrl.pathname.startsWith('/api/') ||
     // Detect known Auth0 domain in referer
     request.headers.get('referer')?.includes('auth0.com');
   
@@ -71,7 +78,7 @@ export function middleware(request: NextRequest) {
 // Configure middleware to apply to fewer routes to avoid issues
 export const config = {
   matcher: [
-    // Only match specific routes, avoid matching dynamic auth routes
+    // Only match specific routes, avoid matching dynamic auth routes and API routes
     '/',
     '/dashboard/:path*',
     '/cotizaciones/:path*',
