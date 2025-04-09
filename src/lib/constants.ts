@@ -21,9 +21,9 @@ export const STORAGE_KEYS = {
 // Cotizacion status
 export const COTIZACION_STATUS = {
   PENDING: 'pendiente',
-  APPROVED: 'aprobada',
-  REJECTED: 'rechazada',
-  EXPIRED: 'expirada',
+  PRODUCTION: 'producción',
+  CANCELED: 'cancelada',
+  SHIPPED: 'enviada',
 } as const;
 
 // Currency options

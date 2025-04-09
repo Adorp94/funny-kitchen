@@ -209,9 +209,9 @@ export default function CotizacionesPage() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="Pendiente">Pendiente</SelectItem>
-                <SelectItem value="Aceptada">Aceptada</SelectItem>
-                <SelectItem value="Rechazada">Rechazada</SelectItem>
+                <SelectItem value="Producción">Producción</SelectItem>
                 <SelectItem value="Cancelada">Cancelada</SelectItem>
+                <SelectItem value="Enviada">Enviada</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -264,10 +264,12 @@ export default function CotizacionesPage() {
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             cotizacion.estatus === 'Pendiente'
                               ? 'bg-yellow-100 text-yellow-800'
-                              : cotizacion.estatus === 'Aceptada'
+                              : cotizacion.estatus === 'Producción'
                               ? 'bg-green-100 text-green-800'
-                              : cotizacion.estatus === 'Rechazada'
+                              : cotizacion.estatus === 'Cancelada'
                               ? 'bg-red-100 text-red-800'
+                              : cotizacion.estatus === 'Enviada'
+                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-gray-100 text-gray-800'
                           }`}
                         >

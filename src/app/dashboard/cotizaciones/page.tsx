@@ -280,12 +280,14 @@ export default function CotizacionesPage() {
     switch (estado?.toLowerCase()) {
       case 'pendiente':
         return <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-medium">Pendiente</Badge>;
-      case 'aprobada':
-        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Aprobada</Badge>;
+      case 'producción':
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Producción</Badge>;
       case 'rechazada':
         return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Rechazada</Badge>;
-      case 'cerrada':
-        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Cerrada</Badge>;
+      case 'cancelada':
+        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Cancelada</Badge>;
+      case 'enviada':
+        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Enviada</Badge>;
       case 'vencida':
         return <Badge className="bg-gray-50 text-gray-700 border-gray-200 font-medium">Vencida</Badge>;
       default:
@@ -386,10 +388,9 @@ export default function CotizacionesPage() {
               <SelectContent className="min-w-[180px] bg-white">
                 <SelectItem value="todos" className="bg-white hover:bg-gray-50">Todos los estados</SelectItem>
                 <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="aprobada">Aprobada</SelectItem>
-                <SelectItem value="rechazada">Rechazada</SelectItem>
-                <SelectItem value="cerrada">Cerrada</SelectItem>
-                <SelectItem value="vencida">Vencida</SelectItem>
+                <SelectItem value="producción">Producción</SelectItem>
+                <SelectItem value="cancelada">Cancelada</SelectItem>
+                <SelectItem value="enviada">Enviada</SelectItem>
               </SelectContent>
             </Select>
           </div>

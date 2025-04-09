@@ -32,7 +32,7 @@ export async function POST(
     console.log('API status change request:', { cotizacionId, newStatus, paymentData });
 
     // Validate the new status
-    const validStatus = ['pendiente', 'aprobada', 'rechazada', 'cerrada', 'vencida'];
+    const validStatus = ['pendiente', 'producción', 'cancelada', 'enviada'];
     if (!validStatus.includes(newStatus)) {
       return NextResponse.json(
         { error: 'Estado inválido' },
@@ -40,11 +40,11 @@ export async function POST(
       );
     }
 
-    // If new status is 'cerrada' or 'aprobada', payment data is required
-    if ((newStatus === 'cerrada' || newStatus === 'aprobada')) {
+    // If new status is 'producción', payment data is required
+    if (newStatus === 'producción') {
       if (!paymentData || typeof paymentData !== 'object') {
         return NextResponse.json(
-          { error: `Se requieren datos de pago para ${newStatus === 'cerrada' ? 'cerrar' : 'aprobar'} una cotización` },
+          { error: `Se requieren datos de pago para mandar a producción` },
           { status: 400 }
         );
       }

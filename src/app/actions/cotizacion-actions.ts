@@ -44,15 +44,13 @@ export async function updateCotizacionStatus(
     };
     
     // Add estatus_pago update if needed
-    if (['cerrada', 'aprobada'].includes(newStatus) && paymentData) {
+    if (newStatus === 'producción' && paymentData) {
       updateData.estatus_pago = 'anticipo';
     }
     
     // Update timestamp based on new status
-    if (newStatus === 'aprobada') {
+    if (newStatus === 'producción') {
       updateData.fecha_aprobacion = new Date().toISOString();
-    } else if (newStatus === 'cerrada') {
-      updateData.fecha_cierre = new Date().toISOString();
     }
     
     // 1. Update the cotizacion status
@@ -102,8 +100,8 @@ export async function updateCotizacionStatus(
       // Continue execution despite history recording failure
     }
     
-    // 3. If payment data is provided for 'cerrada' or 'aprobada' status, record the advance payment
-    if (['cerrada', 'aprobada'].includes(newStatus) && paymentData) {
+    // 3. If payment data is provided for 'producción' status, record the advance payment
+    if (newStatus === 'producción' && paymentData) {
       try {
         console.log('Recording payment for status:', newStatus, paymentData);
         const tipoCambio = existingCotizacion.tipo_cambio || 1;

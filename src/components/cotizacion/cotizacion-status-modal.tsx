@@ -113,7 +113,7 @@ export function CotizacionStatusModal({
 
   // Reset form when status changes
   useEffect(() => {
-    if (newStatus === 'aprobada' || newStatus === 'cerrada') {
+    if (newStatus === 'producción') {
       // If changing to a status requiring payment, switch to actions tab
       setActiveTab('acciones');
     }
@@ -157,8 +157,8 @@ export function CotizacionStatusModal({
       return;
     }
 
-    // For status changes to 'cerrada' or 'aprobada', we require payment data
-    const requiresPayment = ['cerrada', 'aprobada'].includes(newStatus);
+    // For status changes to 'producción', we require payment data
+    const requiresPayment = newStatus === 'producción';
     
     if (requiresPayment) {
       console.log('Payment data required. Validating form...', paymentData);
@@ -202,8 +202,7 @@ export function CotizacionStatusModal({
         if (success) {
           toast({
             title: "¡Éxito!",
-            description: `Cotización ${newStatus === 'aprobada' ? 'aprobada con anticipo' : 
-                         newStatus === 'cerrada' ? 'cerrada con pago' : 
+            description: `Cotización ${newStatus === 'producción' ? 'enviada a producción con anticipo' : 
                          'actualizada'} correctamente`,
             variant: "success"
           });
@@ -270,14 +269,12 @@ export function CotizacionStatusModal({
     switch (estado?.toLowerCase()) {
       case 'pendiente':
         return <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-medium">Pendiente</Badge>;
-      case 'aprobada':
-        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Aprobada</Badge>;
-      case 'rechazada':
-        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Rechazada</Badge>;
-      case 'cerrada':
-        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Cerrada</Badge>;
-      case 'vencida':
-        return <Badge className="bg-gray-50 text-gray-700 border-gray-200 font-medium">Vencida</Badge>;
+      case 'producción':
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Producción</Badge>;
+      case 'cancelada':
+        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Cancelada</Badge>;
+      case 'enviada':
+        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Enviada</Badge>;
       default:
         return <Badge className="bg-gray-50">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'No definido'}</Badge>;
     }
@@ -298,7 +295,7 @@ export function CotizacionStatusModal({
           <CreditCard className="h-5 w-5 text-blue-600" />
         </div>
         <h3 className="font-medium text-gray-900">
-          {newStatus === 'aprobada' ? 'Registro de Anticipo' : 'Registro de Anticipo para Cierre'}
+          Registro de Anticipo para Producción
         </h3>
       </div>
       
@@ -546,16 +543,14 @@ export function CotizacionStatusModal({
                   </SelectTrigger>
                   <SelectContent className="bg-white rounded-lg">
                     <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="aprobada">Aprobada (con anticipo)</SelectItem>
-                    <SelectItem value="rechazada">Rechazada</SelectItem>
-                    <SelectItem value="cerrada">Cerrada (con anticipo)</SelectItem>
-                    <SelectItem value="vencida">Vencida</SelectItem>
+                    <SelectItem value="producción">Mandar a producción</SelectItem>
+                    <SelectItem value="cancelada">Rechazada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Payment form for 'aprobada' and 'cerrada' statuses */}
-              {(newStatus === 'cerrada' || newStatus === 'aprobada') && renderPaymentForm()}
+              {/* Payment form for 'producción' status */}
+              {newStatus === 'producción' && renderPaymentForm()}
             </TabsContent>
           </Tabs>
         </div>
