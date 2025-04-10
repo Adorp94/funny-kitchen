@@ -172,7 +172,8 @@ export async function POST(req: NextRequest) {
       costo_envio, 
       total,
       tipo_cambio,
-      tiempo_estimado
+      tiempo_estimado,
+      tiempo_estimado_max
     } = data;
 
     console.log("==== QUOTATION DATA RECEIVED ====");
@@ -330,7 +331,8 @@ export async function POST(req: NextRequest) {
         folio: folio,
         fecha_expiracion: fechaExpiracion.toISOString(),
         tipo_cambio: tipo_cambio || null,
-        tiempo_estimado: tiempo_estimado || 6
+        tiempo_estimado: tiempo_estimado || 6,
+        tiempo_estimado_max: tiempo_estimado_max || 8
       })
       .select('cotizacion_id')
       .single();

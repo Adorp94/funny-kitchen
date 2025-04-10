@@ -321,6 +321,7 @@ interface Cotizacion {
   total_mxn?: number;
   tipo_cambio?: number;
   tiempo_estimado?: number;
+  tiempo_estimado_max?: number;
   productos?: Producto[];
 }
 
@@ -357,6 +358,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Debug the incoming cotizacion data
   console.log("ReactPDFDocument - Raw cotizacion:", cotizacion);
   console.log("ReactPDFDocument - Raw tiempo_estimado value:", cotizacion?.tiempo_estimado);
+  console.log("ReactPDFDocument - Raw tiempo_estimado_max value:", cotizacion?.tiempo_estimado_max);
   
   // Use provided values or defaults
   const moneda = cotizacion?.moneda || 'MXN';
@@ -380,7 +382,23 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
     tiempoEstimado = 6; // Default value
   }
   
+  // Handle tiempo_estimado_max
+  let tiempoEstimadoMax: number;
+  if (typeof cotizacion?.tiempo_estimado_max === 'number') {
+    tiempoEstimadoMax = cotizacion.tiempo_estimado_max;
+  } else if (typeof cotizacion?.tiempo_estimado_max === 'string') {
+    tiempoEstimadoMax = parseInt(cotizacion.tiempo_estimado_max, 10) || 8;
+  } else {
+    tiempoEstimadoMax = 8; // Default value
+  }
+  
+  // Ensure tiempoEstimadoMax is not less than tiempoEstimado
+  if (tiempoEstimadoMax < tiempoEstimado) {
+    tiempoEstimadoMax = tiempoEstimado;
+  }
+  
   console.log("ReactPDFDocument - Using tiempo_estimado:", tiempoEstimado);
+  console.log("ReactPDFDocument - Using tiempo_estimado_max:", tiempoEstimadoMax);
   
   // Calculate total product discounts
   const totalProductDiscounts = productos.reduce((sum, producto) => {
@@ -584,7 +602,9 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
               <View style={styles.notesList}>
                 <Text style={styles.notesListItem}>• Precios sujetos a cambio sin previo aviso.</Text>
                 <Text style={styles.notesListItem}>• Servicio pagado en {moneda === 'MXN' ? 'pesos mexicanos' : 'dólares americanos'}.</Text>
-                <Text style={styles.notesListItem}>• Tiempo de Entrega: {tiempoEstimado} semanas después de confirmación.</Text>
+                <Text style={styles.notesListItem}>• Tiempo de Entrega: {tiempoEstimado === tiempoEstimadoMax 
+                  ? `${tiempoEstimado} semanas` 
+                  : `${tiempoEstimado} a ${tiempoEstimadoMax} semanas`} después de confirmación.</Text>
                 <Text style={styles.notesListItem}>• Todas las piezas son artesanales y pueden variar.</Text>
               </View>
             </View>

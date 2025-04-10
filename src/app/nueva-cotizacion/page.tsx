@@ -77,6 +77,7 @@ function NuevaCotizacionClient() {
   const [shippingCost, setShippingCost] = useState(0);
   const [moneda, setMoneda] = useState<'MXN' | 'USD'>('MXN');
   const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
+  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number>(8);
 
   // Get productos from context
   const {
@@ -199,7 +200,7 @@ function NuevaCotizacionClient() {
       console.log(`Shipping cost: ${shippingCost} ${moneda}`);
       console.log(`Exchange rate: ${exchangeRate}`);
       console.log(`Total: ${total}`);
-      console.log(`Tiempo estimado: ${tiempoEstimado} semanas`);
+      console.log(`Tiempo estimado: ${tiempoEstimado} a ${tiempoEstimadoMax} semanas`);
       
       // Prepare data for API call, including all client data
       // This passes the client information to the API, which can create the client if needed
@@ -220,7 +221,8 @@ function NuevaCotizacionClient() {
         costo_envio: shippingCost,
         total: total,
         tipo_cambio: exchangeRate,
-        tiempo_estimado: tiempoEstimado
+        tiempo_estimado: tiempoEstimado,
+        tiempo_estimado_max: tiempoEstimadoMax
       };
       
       // Call API to save quotation (and client if needed)
@@ -260,10 +262,11 @@ function NuevaCotizacionClient() {
         total: total,
         tipo_cambio: exchangeRate,
         tiempo_estimado: tiempoEstimado,
+        tiempo_estimado_max: tiempoEstimadoMax,
         productos: productos
       };
       
-      console.log("Generating PDF with tiempo_estimado:", tiempoEstimado);
+      console.log("Generating PDF with tiempo_estimado:", tiempoEstimado, "to", tiempoEstimadoMax);
       console.log("PDF data:", cotizacionForPDF);
       
       // Generate PDF directly
@@ -287,6 +290,7 @@ function NuevaCotizacionClient() {
       setHasIva(false);
       setShippingCost(0);
       setTiempoEstimado(6);
+      setTiempoEstimadoMax(8);
       
       // Navigate to the cotizaciones page
       router.push('/dashboard/cotizaciones');
@@ -657,6 +661,8 @@ function NuevaCotizacionClient() {
                     moneda={moneda}
                     tiempoEstimado={tiempoEstimado}
                     setTiempoEstimado={setTiempoEstimado}
+                    tiempoEstimadoMax={tiempoEstimadoMax}
+                    setTiempoEstimadoMax={setTiempoEstimadoMax}
                   />
                 </div>
               </div>

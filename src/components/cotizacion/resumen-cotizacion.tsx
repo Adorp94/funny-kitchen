@@ -32,6 +32,8 @@ interface ResumenCotizacionProps {
   moneda: 'MXN' | 'USD';
   tiempoEstimado?: number;
   setTiempoEstimado?: (weeks: number) => void;
+  tiempoEstimadoMax?: number;
+  setTiempoEstimadoMax?: (weeks: number) => void;
 }
 
 export function ResumenCotizacion({
@@ -47,7 +49,9 @@ export function ResumenCotizacion({
   total,
   moneda,
   tiempoEstimado = 6,
-  setTiempoEstimado
+  setTiempoEstimado,
+  tiempoEstimadoMax = 8,
+  setTiempoEstimadoMax
 }: ResumenCotizacionProps) {
   const { 
     exchangeRate, 
@@ -65,6 +69,7 @@ export function ResumenCotizacion({
   const [hasShipping, setHasShipping] = useState<boolean>(false);
   const [shippingCostStr, setShippingCostStr] = useState<string>('0');
   const [tiempoEstimadoStr, setTiempoEstimadoStr] = useState<string>(tiempoEstimado.toString());
+  const [tiempoEstimadoMaxStr, setTiempoEstimadoMaxStr] = useState<string>(tiempoEstimadoMax.toString());
 
   // Initialize form values from props
   useEffect(() => {
@@ -72,7 +77,8 @@ export function ResumenCotizacion({
     setHasShipping(shippingCost > 0);
     setShippingCostStr(shippingCost.toString());
     setTiempoEstimadoStr(tiempoEstimado.toString());
-  }, [globalDiscount, shippingCost, tiempoEstimado]);
+    setTiempoEstimadoMaxStr(tiempoEstimadoMax.toString());
+  }, [globalDiscount, shippingCost, tiempoEstimado, tiempoEstimadoMax]);
 
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
@@ -169,6 +175,33 @@ export function ResumenCotizacion({
       // Update parent component state if callback is provided
       if (setTiempoEstimado) {
         setTiempoEstimado(boundedValue);
+      }
+      
+      // Ensure max value is not less than min value
+      const maxValue = parseInt(tiempoEstimadoMaxStr) || tiempoEstimadoMax;
+      if (boundedValue > maxValue && setTiempoEstimadoMax) {
+        setTiempoEstimadoMaxStr(boundedValue.toString());
+        setTiempoEstimadoMax(boundedValue);
+      }
+    }
+  };
+  
+  // Handle tiempo estimado max change
+  const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty string or valid numbers
+    if (value === '' || !isNaN(parseInt(value))) {
+      setTiempoEstimadoMaxStr(value);
+      
+      // Convert to number for the callback
+      const numValue = value === '' ? 8 : parseInt(value);
+      const minValue = parseInt(tiempoEstimadoStr) || tiempoEstimado;
+      const boundedValue = Math.max(numValue, minValue); // Ensure max is not less than min
+      
+      // Update parent component state if callback is provided
+      if (setTiempoEstimadoMax) {
+        setTiempoEstimadoMax(boundedValue);
       }
     }
   };
@@ -405,6 +438,15 @@ export function ResumenCotizacion({
               onChange={handleTiempoEstimadoChange}
               className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
               placeholder="6"
+            />
+            <span className="text-gray-500">a</span>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={tiempoEstimadoMaxStr}
+              onChange={handleTiempoEstimadoMaxChange}
+              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+              placeholder="8"
             />
             <span className="text-gray-500">semanas</span>
           </div>
