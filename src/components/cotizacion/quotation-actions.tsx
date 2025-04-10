@@ -59,7 +59,7 @@ export default function QuotationActions({
           // For mobile devices, trigger download
           const link = document.createElement('a');
           link.href = data.pdfUrl;
-          link.setAttribute('download', `cotizacion-${cotizacionId}.pdf`);
+          link.setAttribute('download', `${cotizacionId}.pdf`);
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);

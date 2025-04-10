@@ -160,7 +160,7 @@ export default function CotizacionesPage() {
         // For mobile devices, create an anchor element and trigger download
         const link = document.createElement('a');
         link.href = `/api/direct-pdf/${id}`;
-        link.setAttribute('download', `cotizacion-${id}.pdf`);
+        link.setAttribute('download', `${id}.pdf`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

@@ -191,7 +191,7 @@ export default function CotizacionDetailPage() {
         // For mobile devices, trigger download instead of opening in a new tab
         const link = document.createElement('a');
         link.href = cotizacion.pdf_url;
-        link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
+        link.setAttribute('download', `${cotizacion.cotizacion_id}.pdf`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -291,7 +291,7 @@ export default function CotizacionDetailPage() {
                 // For mobile devices, create an anchor element and trigger download
                 const link = document.createElement('a');
                 link.href = `/api/direct-pdf/${cotizacion.cotizacion_id}`;
-                link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
+                link.setAttribute('download', `${cotizacion.cotizacion_id}.pdf`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -344,7 +344,7 @@ export default function CotizacionDetailPage() {
                     // For mobile devices, trigger download
                     const link = document.createElement('a');
                     link.href = data.pdfUrl;
-                    link.setAttribute('download', `cotizacion-${cotizacion.cotizacion_id}.pdf`);
+                    link.setAttribute('download', `${cotizacion.cotizacion_id}.pdf`);
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);

@@ -87,7 +87,7 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ cliente, folio, cotizacion, aut
       // Create a temporary link to trigger download
       const link = document.createElement('a');
       link.href = url;
-      link.download = `cotizacion-${cotizacion.folio || folio || new Date().toISOString().split('T')[0]}.pdf`;
+      link.download = `${cotizacion.folio || folio || new Date().toISOString().split('T')[0]}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -140,7 +140,7 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ cliente, folio, cotizacion, aut
               cotizacion={cotizacion} 
             />
           }
-          fileName={`cotizacion-${cotizacion.folio || folio || new Date().toISOString().split('T')[0]}.pdf`}
+          fileName={`${cotizacion.folio || folio || new Date().toISOString().split('T')[0]}.pdf`}
           className="inline-block"
         >
           {({ loading, error }) => (

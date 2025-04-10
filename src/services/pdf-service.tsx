@@ -20,7 +20,7 @@ export interface PDFGenerationOptions {
 }
 
 const defaultOptions: PDFGenerationOptions = {
-  filename: `cotizacion-${format(new Date(), 'dd-MM-yyyy')}.pdf`,
+  filename: `${format(new Date(), 'dd-MM-yyyy')}.pdf`,
   format: 'letter',
   orientation: 'portrait',
   margin: {
@@ -190,7 +190,7 @@ export const generateReactPDF = async (
     
     const mergedOptions = { 
       download: true,
-      filename: `cotizacion-${folio || format(new Date(), 'dd-MM-yyyy')}.pdf`,
+      filename: `${folio || format(new Date(), 'dd-MM-yyyy')}.pdf`,
       ...options
     };
     
