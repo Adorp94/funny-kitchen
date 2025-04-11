@@ -88,11 +88,43 @@ function NuevaCotizacionClient() {
     clearProductos, 
     total,
     subtotal,
-    exchangeRate
+    exchangeRate,
+    setGlobalDiscount: setContextGlobalDiscount,
+    setHasIva: setContextHasIva,
+    setShippingCost: setContextShippingCost,
+    setMoneda: setContextMoneda
   } = useProductos();
 
   // Add formData state
   const [formData, setFormData] = useState<ProductoFormData>({ tipo: 'nuevo' });
+
+  // Synchronize local state with context state
+  useEffect(() => {
+    setContextGlobalDiscount(globalDiscount);
+  }, [globalDiscount, setContextGlobalDiscount]);
+
+  useEffect(() => {
+    setContextHasIva(hasIva);
+  }, [hasIva, setContextHasIva]);
+
+  useEffect(() => {
+    setContextShippingCost(shippingCost);
+  }, [shippingCost, setContextShippingCost]);
+
+  useEffect(() => {
+    setContextMoneda(moneda);
+  }, [moneda, setContextMoneda]);
+
+  // Debug logging for financial values
+  useEffect(() => {
+    console.log('Financial values updated:');
+    console.log(`Global Discount: ${globalDiscount}%`);
+    console.log(`Has IVA: ${hasIva}`);
+    console.log(`Shipping Cost: ${shippingCost} ${moneda}`);
+    console.log(`Subtotal: ${subtotal}`);
+    console.log(`Total: ${total}`);
+    console.log(`Exchange Rate: ${exchangeRate}`);
+  }, [globalDiscount, hasIva, shippingCost, subtotal, total, moneda, exchangeRate]);
 
   // Use effect to update cliente state after render
   useEffect(() => {
