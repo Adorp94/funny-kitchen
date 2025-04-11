@@ -154,13 +154,13 @@ export default function CotizacionesPage() {
     }
   };
   
-  const handleDownloadPdf = async (id: number) => {
+  const handleDownloadPdf = async (id: number, clientName: string) => {
     try {
       if (isMobileDevice()) {
         // For mobile devices, create an anchor element and trigger download
         const link = document.createElement('a');
         link.href = `/api/direct-pdf/${id}`;
-        link.setAttribute('download', `${id}.pdf`);
+        link.setAttribute('download', `${id}-${clientName.replace(/\s+/g, '-')}.pdf`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -289,7 +289,7 @@ export default function CotizacionesPage() {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => handleDownloadPdf(cotizacion.cotizacion_id)}
+                            onClick={() => handleDownloadPdf(cotizacion.cotizacion_id, cotizacion.cliente_nombre)}
                           >
                             <Download className="h-4 w-4" />
                             <span className="sr-only">Descargar</span>

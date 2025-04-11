@@ -190,7 +190,7 @@ export const generateReactPDF = async (
     
     const mergedOptions = { 
       download: true,
-      filename: `${folio || format(new Date(), 'dd-MM-yyyy')}.pdf`,
+      filename: `${folio || format(new Date(), 'dd-MM-yyyy')}-${cliente?.nombre?.replace(/\s+/g, '-') || 'Cliente'}.pdf`,
       ...options
     };
     

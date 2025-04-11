@@ -275,7 +275,7 @@ function NuevaCotizacionClient() {
           cliente,
           result.folio,
           cotizacionForPDF,
-          { download: true, filename: `${result.folio}.pdf` }
+          { download: true, filename: `${result.folio}-${cliente.nombre.replace(/\s+/g, '-')}.pdf` }
         );
         
         toast.success(`Cotización ${result.folio} generada exitosamente`);

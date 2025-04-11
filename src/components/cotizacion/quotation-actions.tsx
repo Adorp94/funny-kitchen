@@ -18,12 +18,14 @@ interface QuotationActionsProps {
   cotizacionId: number;
   hasExistingPdf: boolean;
   onPdfGenerated?: (pdfUrl: string) => void;
+  clientName?: string;
 }
 
 export default function QuotationActions({ 
   cotizacionId, 
   hasExistingPdf,
-  onPdfGenerated 
+  onPdfGenerated,
+  clientName = 'Cliente'
 }: QuotationActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const { toast } = useToast()
@@ -59,7 +61,7 @@ export default function QuotationActions({
           // For mobile devices, trigger download
           const link = document.createElement('a');
           link.href = data.pdfUrl;
-          link.setAttribute('download', `${cotizacionId}.pdf`);
+          link.setAttribute('download', `${cotizacionId}-${clientName.replace(/\s+/g, '-')}.pdf`);
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
