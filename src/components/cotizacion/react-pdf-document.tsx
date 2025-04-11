@@ -357,8 +357,10 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   
   // Debug the incoming cotizacion data
   console.log("ReactPDFDocument - Raw cotizacion:", cotizacion);
-  console.log("ReactPDFDocument - Raw tiempo_estimado value:", cotizacion?.tiempo_estimado);
-  console.log("ReactPDFDocument - Raw tiempo_estimado_max value:", cotizacion?.tiempo_estimado_max);
+  console.log("ReactPDFDocument - Currency:", cotizacion?.moneda);
+  console.log("ReactPDFDocument - Exchange rate:", cotizacion?.tipo_cambio);
+  console.log("ReactPDFDocument - Subtotal:", cotizacion?.subtotal);
+  console.log("ReactPDFDocument - Total:", cotizacion?.total);
   
   // Use provided values or defaults
   const moneda = cotizacion?.moneda || 'MXN';

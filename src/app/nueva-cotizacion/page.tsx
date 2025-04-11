@@ -285,17 +285,23 @@ function NuevaCotizacionClient() {
         id: result.cotizacion_id,
         folio: result.folio,
         moneda: moneda,
-        subtotal: subtotal,
+        subtotal: moneda === 'USD' && exchangeRate ? subtotal / exchangeRate : subtotal,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: montoIva,
+        monto_iva: moneda === 'USD' && exchangeRate ? montoIva / exchangeRate : montoIva,
         incluye_envio: shippingCost > 0,
         costo_envio: shippingCost,
-        total: total,
+        total: moneda === 'USD' && exchangeRate ? total / exchangeRate : total,
         tipo_cambio: exchangeRate,
         tiempo_estimado: tiempoEstimado,
         tiempo_estimado_max: tiempoEstimadoMax,
-        productos: productos
+        productos: moneda === 'USD' && exchangeRate 
+          ? productos.map(p => ({
+              ...p,
+              precio: p.precio / exchangeRate,
+              subtotal: p.subtotal / exchangeRate
+            }))
+          : productos
       };
       
       console.log("Generating PDF with tiempo_estimado:", tiempoEstimado, "to", tiempoEstimadoMax);
