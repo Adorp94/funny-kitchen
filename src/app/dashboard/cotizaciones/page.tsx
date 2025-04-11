@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -31,6 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { CotizacionActionsButton } from '@/components/cotizacion/cotizacion-actions-button';
+import { PDFService } from '@/services/pdf-service';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -439,10 +440,10 @@ export default function CotizacionesPage() {
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th onClick={() => handleSort('folio')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3">
+                  <th onClick={() => handleSort('folio')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 w-[110px] sm:w-[150px]">
                     <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Folio
                       {sortBy.field === 'folio' && (
@@ -452,7 +453,7 @@ export default function CotizacionesPage() {
                       )}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3">
+                  <th onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 w-[120px]">
                     <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fecha
                       {sortBy.field === 'fecha_creacion' && (
@@ -462,7 +463,7 @@ export default function CotizacionesPage() {
                       )}
                     </div>
                   </th>
-                  <th onClick={() => handleSort('cliente')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell">
+                  <th onClick={() => handleSort('cliente')} className="cursor-pointer text-left px-6 py-3 hidden lg:table-cell lg:w-[250px] xl:w-[300px]">
                     <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Cliente
                       {sortBy.field === 'cliente' && (
@@ -472,17 +473,17 @@ export default function CotizacionesPage() {
                       )}
                     </div>
                   </th>
-                  <th className="whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell">
+                  <th className="whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell w-[120px]">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
                     </div>
                   </th>
-                  <th className="whitespace-nowrap text-left px-6 py-3 hidden sm:table-cell">
+                  <th className="whitespace-nowrap text-left px-6 py-3 hidden sm:table-cell w-[100px]">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Moneda
                     </div>
                   </th>
-                  <th onClick={() => handleSort('total')} className="cursor-pointer whitespace-nowrap text-right px-6 py-3">
+                  <th onClick={() => handleSort('total')} className="cursor-pointer whitespace-nowrap text-right px-6 py-3 w-[120px]">
                     <div className="flex items-center justify-end text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
                       {sortBy.field === 'total' && (
@@ -492,7 +493,7 @@ export default function CotizacionesPage() {
                       )}
                     </div>
                   </th>
-                  <th className="whitespace-nowrap text-right px-6 py-3">
+                  <th className="whitespace-nowrap text-right px-6 py-3 w-[150px] sm:w-[180px]">
                     <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Acciones
                     </div>
@@ -502,7 +503,7 @@ export default function CotizacionesPage() {
               <tbody className="divide-y divide-gray-100">
                 {getCurrentPageItems().map((cotizacion) => (
                   <tr key={cotizacion.cotizacion_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="whitespace-nowrap px-6 py-4">
+                    <td className="px-6 py-3.5 whitespace-nowrap">
                       <button 
                         onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
                         className="font-medium text-emerald-600 hover:text-emerald-800"
@@ -516,24 +517,28 @@ export default function CotizacionesPage() {
                         {getStatusBadge(cotizacion.estado)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                    <td className="px-6 py-3.5 text-sm text-gray-700">
                       {formatDate(cotizacion.fecha_creacion)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 hidden lg:table-cell">
+                    <td className="px-6 py-3.5 hidden lg:table-cell align-top">
                       <div>
-                        <div className="font-medium truncate max-w-[180px] sm:max-w-none text-gray-800">{cotizacion.cliente.nombre}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-[180px] sm:max-w-none">{cotizacion.cliente.celular}</div>
+                        <div className="font-medium line-clamp-2 break-words max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.nombre}>
+                          {cotizacion.cliente.nombre}
+                        </div>
+                        <div className="text-sm text-gray-500 truncate max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.celular}>
+                          {cotizacion.cliente.celular || '—'}
+                        </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 hidden lg:table-cell">
+                    <td className="px-6 py-3.5 hidden lg:table-cell">
                       {getStatusBadge(cotizacion.estado)}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 hidden sm:table-cell">
+                    <td className="px-6 py-3.5 hidden sm:table-cell">
                       <Badge variant="outline" className="bg-gray-50 text-gray-700">
                         {cotizacion.moneda}
                       </Badge>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
+                    <td className="px-6 py-3.5 text-right">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-800">{formatCurrency(cotizacion.total, cotizacion.moneda)}</span>
                         <span className="sm:hidden text-xs text-gray-500 mt-1">
@@ -541,12 +546,50 @@ export default function CotizacionesPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
-                      <div className="flex justify-end">
+                    <td className="px-6 py-3.5 text-right">
+                      <div className="flex justify-end items-center gap-2">
                         <CotizacionActionsButton 
                           cotizacion={cotizacion}
                           onStatusChanged={fetchCotizaciones}
                         />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              // Fetch full cotizacion data first
+                              const response = await fetch(`/api/cotizaciones?id=${cotizacion.cotizacion_id}`);
+                              
+                              if (!response.ok) {
+                                throw new Error('Failed to fetch cotizacion data');
+                              }
+                              
+                              const data = await response.json();
+                              
+                              if (!data.cotizacion) {
+                                throw new Error('No cotizacion data found');
+                              }
+                              
+                              // Generate and download PDF
+                              await PDFService.generateReactPDF(
+                                data.cotizacion.cliente,
+                                data.cotizacion.folio,
+                                data.cotizacion,
+                                { 
+                                  download: true,
+                                  filename: `${data.cotizacion.folio}-${data.cotizacion.cliente.nombre.replace(/\s+/g, '-')}.pdf`
+                                }
+                              );
+                            } catch (error) {
+                              console.error('Error generating PDF:', error);
+                              toast.error('Error al generar el PDF. Por favor intente nuevamente.');
+                            }
+                          }}
+                          className="h-8 w-8 p-0 flex items-center justify-center border-gray-200 hover:bg-gray-50"
+                          title="Descargar PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>

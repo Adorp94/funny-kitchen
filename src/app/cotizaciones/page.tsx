@@ -29,7 +29,10 @@ import {
   FileText, 
   Download, 
   Plus,
-  Eye
+  Eye,
+  FileEdit,
+  DollarSign,
+  Pen
 } from "lucide-react";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 
@@ -172,6 +175,12 @@ export default function CotizacionesPage() {
       console.error(`Error downloading PDF for cotización ${id}:`, error);
     }
   };
+
+  const handlePaymentClick = (id: number) => {
+    // This function will need to be customized based on your app's payment flow
+    // For now, it will just navigate to the cotization detail page
+    router.push(`/cotizaciones/${id}?action=payment`);
+  };
   
   return (
     <main className="container mx-auto py-6 px-4 lg:px-6">
@@ -217,18 +226,18 @@ export default function CotizacionesPage() {
           </div>
         </div>
         
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-auto">
           <ResponsiveTable noBorder>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-20 whitespace-nowrap">ID</TableHead>
-                  <TableHead className="whitespace-nowrap">Cliente</TableHead>
+                  <TableHead className="w-14 whitespace-nowrap">ID</TableHead>
+                  <TableHead className="max-w-[180px] md:max-w-[250px]">Cliente</TableHead>
                   <TableHead className="whitespace-nowrap">Fecha</TableHead>
-                  <TableHead className="whitespace-nowrap">Vendedor</TableHead>
+                  <TableHead className="hidden md:table-cell">Vendedor</TableHead>
                   <TableHead className="text-right whitespace-nowrap">Total</TableHead>
                   <TableHead className="whitespace-nowrap">Estatus</TableHead>
-                  <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+                  <TableHead className="text-right whitespace-nowrap w-[170px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -253,9 +262,15 @@ export default function CotizacionesPage() {
                   getCurrentPageItems().map((cotizacion) => (
                     <TableRow key={cotizacion.cotizacion_id}>
                       <TableCell className="font-medium whitespace-nowrap">CT{cotizacion.cotizacion_id}</TableCell>
-                      <TableCell>{cotizacion.cliente_nombre}</TableCell>
+                      <TableCell className="max-w-[180px] md:max-w-[250px]">
+                        <div className="truncate" title={cotizacion.cliente_nombre}>
+                          {cotizacion.cliente_nombre}
+                        </div>
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDate(cotizacion.fecha_cotizacion)}</TableCell>
-                      <TableCell>{cotizacion.vendedor_nombre}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="truncate">{cotizacion.vendedor_nombre}</div>
+                      </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         {formatCurrency(cotizacion.precio_total, cotizacion.moneda)}
                       </TableCell>
@@ -276,23 +291,43 @@ export default function CotizacionesPage() {
                           {cotizacion.estatus}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="text-right">
+                        <div className="flex justify-end items-center gap-1.5">
                           <Button
                             variant="outline"
-                            size="icon"
+                            size="sm"
                             onClick={() => router.push(`/cotizaciones/${cotizacion.cotizacion_id}`)}
+                            title="Ver detalle"
+                            className="h-7 w-7 p-0 flex items-center justify-center"
                           >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">Ver</span>
+                            <Eye className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="outline"
-                            size="icon"
-                            onClick={() => handleDownloadPdf(cotizacion.cotizacion_id, cotizacion.cliente_nombre)}
+                            size="sm"
+                            onClick={() => router.push(`/cotizaciones/editar/${cotizacion.cotizacion_id}`)}
+                            title="Editar cotización"
+                            className="h-7 w-7 p-0 flex items-center justify-center text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
                           >
-                            <Download className="h-4 w-4" />
-                            <span className="sr-only">Descargar</span>
+                            <Pen className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePaymentClick(cotizacion.cotizacion_id)}
+                            title="Procesar pago"
+                            className="h-7 w-7 p-0 flex items-center justify-center text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+                          >
+                            <DollarSign className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadPdf(cotizacion.cotizacion_id, cotizacion.cliente_nombre)}
+                            title="Descargar PDF"
+                            className="h-7 w-7 p-0 flex items-center justify-center"
+                          >
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>

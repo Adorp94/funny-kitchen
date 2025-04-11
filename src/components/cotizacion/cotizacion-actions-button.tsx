@@ -153,11 +153,10 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
           variant="outline" 
           size="sm" 
           onClick={handleEditCotizacion}
-          className="h-8 flex items-center space-x-1 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+          className="h-8 w-8 p-0 flex items-center justify-center text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
           title="Editar cotización"
         >
           <FileEdit className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">Editar</span>
         </Button>
       )}
       
@@ -166,16 +165,13 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
         size="sm" 
         onClick={handleOpenModal}
         disabled={isLoading}
-        className="h-8 flex items-center space-x-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+        className="h-8 w-8 p-0 flex items-center justify-center text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
         title="Procesar pago / Cambiar estado"
       >
         {isLoading ? (
           <span className="h-4 w-4 animate-spin rounded-full border-b-2 border-emerald-600"></span>
         ) : (
-          <>
-            <DollarSign className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs">Pago</span>
-          </>
+          <DollarSign className="h-4 w-4" />
         )}
       </Button>
       
