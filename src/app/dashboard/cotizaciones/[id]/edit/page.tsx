@@ -177,8 +177,8 @@ function EditCotizacionClient() {
               nombre: producto.nombre,
               precio: producto.precio_unitario || producto.precio || 0,
               cantidad: producto.cantidad,
-              descuento: producto.descuento || 0,
-              subtotal: producto.subtotal || producto.precio_total || 0,
+              descuento: producto.descuento_producto ?? producto.descuento ?? 0,
+              subtotal: producto.subtotal ?? producto.precio_total ?? 0,
               sku: producto.sku || "",
               descripcion: producto.descripcion || "",
               colores: Array.isArray(producto.colores) ? producto.colores : 
