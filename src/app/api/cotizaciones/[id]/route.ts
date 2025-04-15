@@ -294,7 +294,7 @@ export async function PUT(
         }
       }
 
-      // 2. Insert new products
+      // 2. Insert new products (or update if already exists for cotizacion_id + producto_id)
       for (const producto of incomingNew) {
         const dbProducto = {
           cotizacion_id: cotizacionId,
@@ -307,16 +307,49 @@ export async function PUT(
           acabado: producto.acabado || '',
           descripcion: producto.descripcion || ''
         };
-        console.log("Inserting new cotizacion_producto with:", dbProducto);
-        const { error: insertProdError } = await supabase
+        // Check if a row with this cotizacion_id + producto_id already exists
+        const { data: existingRow, error: checkError } = await supabase
           .from('cotizacion_productos')
-          .insert(dbProducto);
-        if (insertProdError) {
-          console.error('Error inserting producto:', insertProdError);
-          return NextResponse.json({ 
-            error: 'Error al agregar producto',
-            details: insertProdError.message
+          .select('cotizacion_producto_id')
+          .eq('cotizacion_id', cotizacionId)
+          .eq('producto_id', producto.producto_id)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('Error checking for existing producto:', checkError);
+          return NextResponse.json({
+            error: 'Error al verificar producto existente',
+            details: checkError.message
           }, { status: 500 });
+        }
+
+        if (existingRow && existingRow.cotizacion_producto_id) {
+          // Update instead of insert
+          console.log(`Upserting (update) cotizacion_producto_id ${existingRow.cotizacion_producto_id} with:`, dbProducto);
+          const { error: updateProdError } = await supabase
+            .from('cotizacion_productos')
+            .update(dbProducto)
+            .eq('cotizacion_producto_id', existingRow.cotizacion_producto_id);
+          if (updateProdError) {
+            console.error('Error updating producto (upsert):', updateProdError);
+            return NextResponse.json({
+              error: 'Error al actualizar producto existente',
+              details: updateProdError.message
+            }, { status: 500 });
+          }
+        } else {
+          // Insert new
+          console.log("Inserting new cotizacion_producto with:", dbProducto);
+          const { error: insertProdError } = await supabase
+            .from('cotizacion_productos')
+            .insert(dbProducto);
+          if (insertProdError) {
+            console.error('Error inserting producto:', insertProdError);
+            return NextResponse.json({
+              error: 'Error al agregar producto',
+              details: insertProdError.message
+            }, { status: 500 });
+          }
         }
       }
 
