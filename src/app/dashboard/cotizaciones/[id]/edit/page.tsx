@@ -612,17 +612,20 @@ function EditCotizacionClient() {
                     onClick={async () => {
                       try {
                         setIsLoading(true);
+                        console.log("Starting PDF download for cotizacion ID:", cotizacionId);
                         const response = await fetch(`/api/cotizaciones?id=${cotizacionId}`);
                         
                         if (!response.ok) {
-                          throw new Error('Error al obtener datos para el PDF');
+                          throw new Error(`Error fetching data: ${response.status} ${response.statusText}`);
                         }
                         
                         const data = await response.json();
                         
                         if (!data.cotizacion) {
-                          throw new Error('Error al obtener datos para el PDF');
+                          throw new Error('No cotizacion data found in API response');
                         }
+
+                        console.log(`Successfully fetched cotizacion with ${data.cotizacion.productos?.length || 0} products`);
 
                         // Dynamically import the PDF Wrapper component
                         const { default: PDFWrapper } = await import('@/components/cotizacion/pdf-wrapper');
@@ -637,6 +640,7 @@ function EditCotizacionClient() {
                         const { createRoot } = await import('react-dom/client');
                         const root = createRoot(tempContainer);
                         
+                        console.log("Rendering PDF component with autoDownload=true");
                         // Render the PDF wrapper with autoDownload set to true
                         root.render(
                           <PDFWrapper
@@ -659,7 +663,9 @@ function EditCotizacionClient() {
                         console.error('Error downloading PDF:', error);
                         toast({
                           title: "Error",
-                          description: "No se pudo descargar el PDF. Intente nuevamente.",
+                          description: error instanceof Error 
+                            ? `No se pudo descargar el PDF: ${error.message}` 
+                            : "No se pudo descargar el PDF. Intente nuevamente.",
                           variant: "destructive",
                         });
                         setIsLoading(false);

@@ -72,6 +72,12 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ cliente, folio, cotizacion, aut
   const handleDirectDownload = async () => {
     try {
       setIsGenerating(true);
+      console.log("Starting PDF generation with", {
+        cliente: cliente?.nombre,
+        productos: cotizacion?.productos?.length || 0,
+        moneda: cotizacion?.moneda
+      });
+      
       // Generate PDF blob
       const blob = await pdf(
         <ReactPDFDocument 
@@ -80,6 +86,8 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ cliente, folio, cotizacion, aut
           cotizacion={cotizacion} 
         />
       ).toBlob();
+      
+      console.log("PDF blob generated successfully, size:", blob.size);
       
       // Create a URL for the blob
       const url = URL.createObjectURL(blob);
@@ -94,8 +102,16 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ cliente, folio, cotizacion, aut
       // Clean up
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      console.log("PDF download initiated successfully");
     } catch (error) {
       console.error('Error generating PDF:', error);
+      // Create a more detailed error message
+      const errorMessage = error instanceof Error 
+        ? `Error: ${error.message}` 
+        : 'Unknown error during PDF generation';
+      
+      // Alert the user with more details
+      alert(`Failed to generate PDF. ${errorMessage}\nPlease try again or contact support.`);
     } finally {
       setIsGenerating(false);
     }

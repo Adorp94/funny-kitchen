@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: 4,
   },
   tableCol1: {
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   tableRowText: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#374151',
   },
   threeColumnSection: {
@@ -414,9 +414,9 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Subtotal after product discounts
   const subtotalAfterProductDiscounts = subtotal - totalProductDiscounts;
 
-  // Limit products to show maximum 8 (for single page fit)
-  const displayProductos = productos.slice(0, 8);
-  const hasMoreProducts = productos.length > 8;
+  // Increase the product limit from 8 to 15
+  const displayProductos = productos.slice(0, 15);
+  const hasMoreProducts = productos.length > 15;
 
   return (
     <Document>
@@ -531,7 +531,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
               <View style={styles.tableRow}>
                 <View style={styles.tableCol1}>
                   <Text style={[styles.tableRowText, { fontStyle: 'italic' }]}>
-                    Y {productos.length - 8} productos más...
+                    Y {productos.length - 15} productos más...
                   </Text>
                 </View>
                 <View style={styles.tableCol2}></View>

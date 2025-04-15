@@ -418,7 +418,7 @@ export async function POST(req: NextRequest) {
     console.log("Existing product IDs in database:", Array.from(existingProductIds));
     
     // Map and filter products to handle both existing and new products
-    const validProductosToInsert = [];
+    let validProductosToInsert = [];
     const processedCustomProducts = new Set(); // Track processed custom products by name
 
     // First identify and create new products that need to be inserted
@@ -625,9 +625,81 @@ export async function POST(req: NextRequest) {
     console.log(`Inserting ${validProductosToInsert.length} valid products for quotation ${cotizacionId}`);
     console.log("Valid product IDs:", validProductosToInsert.map(p => p.producto_id));
 
+    // First, get the current maximum cotizacion_producto_id to avoid primary key conflicts
+    const { data: maxIdData, error: maxIdError } = await supabase
+      .from('cotizacion_productos')
+      .select('cotizacion_producto_id')
+      .order('cotizacion_producto_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (maxIdError) {
+      console.error('Error fetching max cotizacion_producto_id:', maxIdError);
+      // Continue anyway - we'll try using a high starting value if this fails
+    }
+    
+    // Start with max ID + 1, or 1 if no products exist, or 10000 if query failed
+    let nextProductoId = maxIdData?.cotizacion_producto_id 
+      ? Number(maxIdData.cotizacion_producto_id) + 1 
+      : (maxIdError ? 10000 : 1);
+    
+    console.log(`Starting cotizacion_producto_id: ${nextProductoId}`);
+    
+    // First, check if any of these products already exist for this quotation
+    // This prevents the duplicate key error
+    const { data: existingCotizacionProductos, error: existingProductsError } = await supabase
+      .from('cotizacion_productos')
+      .select('producto_id')
+      .eq('cotizacion_id', cotizacionId);
+    
+    if (existingProductsError) {
+      console.error('Error checking existing quotation products:', existingProductsError);
+      
+      // If there's an error, continue with the insert operation
+      // but log the potential issue
+    }
+    
+    // If there are existing products, filter them out from our insert
+    if (existingCotizacionProductos && existingCotizacionProductos.length > 0) {
+      const existingProductIdsInQuotation = new Set(existingCotizacionProductos.map(p => p.producto_id));
+      console.log("Existing product IDs in this quotation:", Array.from(existingProductIdsInQuotation));
+      
+      // Filter out products that already exist in this quotation
+      const filteredProductosToInsert = validProductosToInsert.filter(p => 
+        !existingProductIdsInQuotation.has(p.producto_id)
+      );
+      
+      console.log(`After filtering, inserting ${filteredProductosToInsert.length} new products`);
+      
+      // If we have no products left to insert after filtering, we can skip the insert operation
+      if (filteredProductosToInsert.length === 0) {
+        console.log("All products already exist in this quotation, skipping insert");
+        
+        // Return information about the created quotation
+        return NextResponse.json({
+          success: true,
+          cotizacion_id: cotizacionId,
+          folio: folio,
+          cliente_creado: cliente_creado
+        });
+      }
+      
+      // Update our array to only include new products
+      validProductosToInsert = filteredProductosToInsert;
+    }
+
+    // Now proceed with inserting only the products that don't already exist
+    // Add cotizacion_producto_id to each record
+    const productsWithIds = validProductosToInsert.map(producto => ({
+      ...producto,
+      cotizacion_producto_id: nextProductoId++
+    }));
+    
+    console.log(`Inserting ${productsWithIds.length} products with IDs starting from ${productsWithIds[0]?.cotizacion_producto_id || 'N/A'}`);
+    
     const { error: productosError } = await supabase
       .from('cotizacion_productos')
-      .insert(validProductosToInsert);
+      .insert(productsWithIds);
 
     if (productosError) {
       console.error('Error inserting quotation products:', productosError);
