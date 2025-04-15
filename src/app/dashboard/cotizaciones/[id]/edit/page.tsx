@@ -169,9 +169,11 @@ function EditCotizacionClient() {
           console.log("Products from API:", data.cotizacion.productos);
           
           data.cotizacion.productos.forEach((producto: any) => {
-            console.log(`Adding product ${producto.nombre} with id ${producto.id} and producto_id ${producto.producto_id}`);
+            // Use cotizacion_producto_id as id, producto_id as producto_id
             addProducto({
-              id: producto.id.toString(),
+              id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id.toString() : "new",
+              cotizacion_producto_id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id : null,
+              producto_id: producto.producto_id,
               nombre: producto.nombre,
               precio: producto.precio_unitario || producto.precio || 0,
               cantidad: producto.cantidad,
@@ -181,8 +183,7 @@ function EditCotizacionClient() {
               descripcion: producto.descripcion || "",
               colores: Array.isArray(producto.colores) ? producto.colores : 
                       typeof producto.colores === 'string' ? producto.colores.split(',') : [],
-              acabado: producto.acabado || "",
-              producto_id: producto.producto_id
+              acabado: producto.acabado || ""
             });
           });
         }
@@ -230,8 +231,44 @@ function EditCotizacionClient() {
         toast.error("Por favor, ingresa la información del cliente");
         return;
       }
-      
-      // Create a minimal request focusing on core data only
+
+      // Prepare productos array for backend
+      const productosPayload = productos.map((p) => {
+        // Use cotizacion_producto_id for existing products, "new" for new ones
+        if (p.cotizacion_producto_id) {
+          return {
+            id: p.cotizacion_producto_id.toString(),
+            cotizacion_producto_id: p.cotizacion_producto_id,
+            producto_id: p.producto_id,
+            nombre: p.nombre,
+            precio: p.precio,
+            cantidad: p.cantidad,
+            descuento: p.descuento || 0,
+            subtotal: p.subtotal,
+            sku: p.sku || "",
+            descripcion: p.descripcion || "",
+            colores: Array.isArray(p.colores) ? p.colores : [],
+            acabado: p.acabado || "",
+          };
+        } else if (p.producto_id) {
+          return {
+            id: "new",
+            producto_id: p.producto_id,
+            nombre: p.nombre,
+            precio: p.precio,
+            cantidad: p.cantidad,
+            descuento: p.descuento || 0,
+            subtotal: p.subtotal,
+            sku: p.sku || "",
+            descripcion: p.descripcion || "",
+            colores: Array.isArray(p.colores) ? p.colores : [],
+            acabado: p.acabado || "",
+          };
+        }
+        return null;
+      }).filter(Boolean);
+
+      // Create request including productos
       const cotizacionData = {
         cotizacion_id: parseInt(cotizacionId),
         cliente_id: cliente.cliente_id,
@@ -243,11 +280,12 @@ function EditCotizacionClient() {
         incluye_envio: shippingCost > 0,
         costo_envio: shippingCost,
         total: total,
-        tipo_cambio: exchangeRate
+        tipo_cambio: exchangeRate,
+        productos: productosPayload,
       };
-      
+
       toast.loading("Actualizando cotización...", { id: "update-cotizacion" });
-      
+
       // Make the API call
       const response = await fetch(`/api/cotizaciones/${cotizacionId}`, {
         method: 'PUT',
@@ -257,23 +295,23 @@ function EditCotizacionClient() {
         body: JSON.stringify(cotizacionData),
         credentials: 'include'
       });
-      
+
       toast.dismiss("update-cotizacion");
-      
+
       let responseData;
       try {
         responseData = await response.json();
       } catch (e) {
         throw new Error("Error al procesar la respuesta del servidor");
       }
-      
+
       if (!response.ok) {
         throw new Error(responseData?.error || 'Error al actualizar la cotización');
       }
-      
+
       toast.success("Cotización actualizada correctamente");
       router.push("/dashboard/cotizaciones");
-      
+
     } catch (error) {
       console.error("Error actualizando cotización:", error);
       toast.dismiss("update-cotizacion");
@@ -307,19 +345,24 @@ function EditCotizacionClient() {
 
   // Handle adding a product to the cart
   const handleAddProduct = (producto: Producto) => {
+    // Always add as a new line if id is "new" (new product)
+    if (producto.id === "new") {
+      addProducto({
+        ...producto,
+        subtotal: producto.precio * producto.cantidad
+      });
+      toast.success('Producto agregado al carrito');
+      return;
+    }
+
+    // For existing products, merge if id matches
     const existingProduct = productos.find(p => p.id === producto.id);
-    
     if (existingProduct) {
-      // If product exists, update its quantity
       const updatedProduct = {
         ...existingProduct,
         cantidad: existingProduct.cantidad + producto.cantidad,
+        subtotal: existingProduct.precio * (existingProduct.cantidad + producto.cantidad)
       };
-      
-      // Recalculate subtotal
-      updatedProduct.subtotal = updatedProduct.precio * updatedProduct.cantidad;
-      
-      // Clear and update the products list
       clearProductos();
       productos.forEach(p => {
         if (p.id === producto.id) {
@@ -328,10 +371,8 @@ function EditCotizacionClient() {
           addProducto(p);
         }
       });
-      
       toast.success(`Se actualizó la cantidad del producto a ${updatedProduct.cantidad}`);
     } else {
-      // If product doesn't exist, add it as new
       addProducto({
         ...producto,
         subtotal: producto.precio * producto.cantidad
@@ -497,10 +538,14 @@ function EditCotizacionClient() {
                 <div className="p-6">
                   <ProductoFormTabs onProductoChange={(producto: any) => {
                     if (producto) {
-                      // Format product data for addProducto
+                      // Always set producto_id for new products
+                      let productoIdValue = producto.producto_id;
+                      // If producto_id is not set, try to use id if it's numeric
+                      if (!productoIdValue && producto.id && /^\d+$/.test(producto.id)) {
+                        productoIdValue = Number(producto.id);
+                      }
                       const productoToAdd = {
-                        // Use 'new' for new products, real ID for existing ones
-                        id: producto.producto_id ? String(producto.producto_id) : 'new',
+                        id: "new",
                         nombre: producto.nombre || '',
                         cantidad: Number(producto.cantidad) || 1,
                         precio: producto.precio || 0,
@@ -514,11 +559,8 @@ function EditCotizacionClient() {
                             ? producto.colores.split(',') 
                             : [],
                         acabado: producto.acabado || '',
-                        // Add the original producto_id for database reference
-                        producto_id: producto.producto_id || null
+                        producto_id: productoIdValue || null
                       };
-                      
-                      // Add product to cart
                       handleAddProduct(productoToAdd);
                     }
                   }} />
@@ -717,4 +759,4 @@ function EditCotizacionClient() {
       </div>
     </div>
   );
-} 
+}

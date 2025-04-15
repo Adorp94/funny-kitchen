@@ -105,15 +105,22 @@ export async function GET(
     }
     
     // Format productos
-    const formattedProductos = productos.map(item => ({
-      id: item.cotizacion_producto_id.toString(),
-      nombre: item.productos?.nombre || 'Producto sin nombre',
-      cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      precio_total: item.subtotal,
-      descuento: item.descuento_producto,
-      tipo: item.productos?.tipo_producto
-    }));
+    const formattedProductos = (productos || []).map(item => {
+      // Supabase join can return an object, array, or undefined
+      let productoData: any = {};
+      if (item.productos && typeof item.productos === 'object' && !Array.isArray(item.productos)) {
+        productoData = item.productos;
+      }
+      return {
+        id: item.cotizacion_producto_id?.toString?.() || '',
+        nombre: productoData.nombre || 'Producto sin nombre',
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+        precio_total: item.subtotal,
+        descuento: item.descuento_producto,
+        tipo: productoData.tipo_producto
+      };
+    });
     
     // Get advance payments if any
     const { data: pagos, error: pagosError } = await supabase
@@ -192,8 +199,8 @@ export async function PUT(
     };
     
     // Only add fecha_actualizacion if it exists in the table (as per schema)
-    if ('fecha_actualizacion' in existingCotizacion) {
-      updateData.fecha_actualizacion = new Date().toISOString();
+    if (existingCotizacion && Object.prototype.hasOwnProperty.call(existingCotizacion, 'fecha_actualizacion')) {
+      (updateData as any).fecha_actualizacion = new Date().toISOString();
     }
     
     console.log("Update data:", updateData);
@@ -203,7 +210,7 @@ export async function PUT(
       .from('cotizaciones')
       .update(updateData)
       .eq('cotizacion_id', cotizacionId);
-    
+
     if (updateError) {
       console.error(`Error updating cotizacion ${cotizacionId}:`, updateError);
       return NextResponse.json({ 
@@ -211,14 +218,137 @@ export async function PUT(
         details: updateError.message
       }, { status: 500 });
     }
-    
-    console.log(`Successfully updated cotizacion ${cotizacionId} core data`);
-    
+
+    // --- PRODUCTOS SYNC LOGIC ---
+    // Expecting productos array in request body
+    console.log("Received productos array in PUT:", JSON.stringify(data.productos, null, 2));
+    if (Array.isArray(data.productos)) {
+      // Fetch current cotizacion_productos for this cotizacion
+      const { data: currentProductos, error: fetchProductosError } = await supabase
+        .from('cotizacion_productos')
+        .select('*')
+        .eq('cotizacion_id', cotizacionId);
+
+      if (fetchProductosError) {
+        console.error('Error fetching current cotizacion_productos:', fetchProductosError);
+        return NextResponse.json({ 
+          error: 'Error al obtener productos actuales de la cotización',
+          details: fetchProductosError.message
+        }, { status: 500 });
+      }
+
+      // Build maps for easier comparison
+      const currentMap = new Map();
+      (currentProductos || []).forEach(p => {
+        currentMap.set(p.cotizacion_producto_id.toString(), p);
+      });
+
+      // Separate incoming products into existing and new
+      const incomingExisting = [];
+      const incomingNew = [];
+      for (const producto of data.productos) {
+        if (producto.id && producto.id !== 'new' && currentMap.has(producto.id)) {
+          incomingExisting.push(producto);
+        } else {
+          incomingNew.push(producto);
+        }
+      }
+
+      // 1. Update existing products if changed
+      for (const producto of incomingExisting) {
+        const dbProducto = {
+          cotizacion_id: cotizacionId,
+          producto_id: producto.producto_id,
+          cantidad: producto.cantidad,
+          precio_unitario: producto.precio,
+          descuento_producto: producto.descuento || 0,
+          subtotal: producto.subtotal,
+          colores: Array.isArray(producto.colores) ? producto.colores.join(',') : (producto.colores || ''),
+          acabado: producto.acabado || '',
+          descripcion: producto.descripcion || ''
+        };
+        const current = currentMap.get(producto.id);
+        // Only update if something changed
+        const changed =
+          current.producto_id !== dbProducto.producto_id ||
+          current.cantidad !== dbProducto.cantidad ||
+          Number(current.precio_unitario) !== Number(dbProducto.precio_unitario) ||
+          Number(current.descuento_producto) !== Number(dbProducto.descuento_producto) ||
+          Number(current.subtotal) !== Number(dbProducto.subtotal) ||
+          (current.colores || '') !== dbProducto.colores ||
+          (current.acabado || '') !== dbProducto.acabado ||
+          (current.descripcion || '') !== dbProducto.descripcion;
+        if (changed) {
+          console.log(`Updating cotizacion_producto_id ${producto.id} with:`, dbProducto);
+          const { error: updateProdError } = await supabase
+            .from('cotizacion_productos')
+            .update(dbProducto)
+            .eq('cotizacion_producto_id', producto.id);
+          if (updateProdError) {
+            console.error('Error updating producto:', updateProdError);
+            return NextResponse.json({ 
+              error: 'Error al actualizar producto',
+              details: updateProdError.message
+            }, { status: 500 });
+          }
+        }
+      }
+
+      // 2. Insert new products
+      for (const producto of incomingNew) {
+        const dbProducto = {
+          cotizacion_id: cotizacionId,
+          producto_id: producto.producto_id,
+          cantidad: producto.cantidad,
+          precio_unitario: producto.precio,
+          descuento_producto: producto.descuento || 0,
+          subtotal: producto.subtotal,
+          colores: Array.isArray(producto.colores) ? producto.colores.join(',') : (producto.colores || ''),
+          acabado: producto.acabado || '',
+          descripcion: producto.descripcion || ''
+        };
+        console.log("Inserting new cotizacion_producto with:", dbProducto);
+        const { error: insertProdError } = await supabase
+          .from('cotizacion_productos')
+          .insert(dbProducto);
+        if (insertProdError) {
+          console.error('Error inserting producto:', insertProdError);
+          return NextResponse.json({ 
+            error: 'Error al agregar producto',
+            details: insertProdError.message
+          }, { status: 500 });
+        }
+      }
+
+      // 3. Delete products that are in DB but not in incoming payload
+      const incomingIds = new Set(incomingExisting.map(p => p.id));
+      const idsToDelete = (currentProductos || [])
+        .map(p => p.cotizacion_producto_id.toString())
+        .filter(id => !incomingIds.has(id));
+      if (idsToDelete.length > 0) {
+        console.log("IDs to delete from cotizacion_productos:", idsToDelete);
+        const { error: deleteError } = await supabase
+          .from('cotizacion_productos')
+          .delete()
+          .in('cotizacion_producto_id', idsToDelete);
+        if (deleteError) {
+          console.error('Error deleting removed productos:', deleteError);
+          return NextResponse.json({ 
+            error: 'Error al eliminar productos removidos',
+            details: deleteError.message
+          }, { status: 500 });
+        }
+      }
+    } else {
+      console.warn("No productos array received in PUT request.");
+    }
+
+    console.log(`Successfully updated cotizacion ${cotizacionId} and productos`);
     return NextResponse.json({ 
       success: true, 
-      message: 'Cotización actualizada correctamente'
+      message: 'Cotización y productos actualizados correctamente'
     });
-    
+
   } catch (error) {
     console.error('Unexpected error in cotizaciones API:', error);
     return NextResponse.json(
@@ -230,4 +360,4 @@ export async function PUT(
       { status: 500 }
     );
   }
-} 
+}
