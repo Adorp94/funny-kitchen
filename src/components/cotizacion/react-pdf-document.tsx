@@ -440,9 +440,21 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
           <View style={styles.column}>
             <Text style={styles.columnTitle}>Cliente</Text>
             <Text style={styles.clientName}>{cliente.nombre}</Text>
+            {cliente.razon_social && (
+              <Text style={styles.clientInfo}>{cliente.razon_social}</Text>
+            )}
+            {cliente.rfc && (
+              <Text style={styles.clientInfo}>RFC: {cliente.rfc}</Text>
+            )}
             <Text style={styles.clientInfo}>{cliente.celular}</Text>
             {cliente.correo && (
               <Text style={styles.clientInfo}>{cliente.correo}</Text>
+            )}
+            {cliente.atencion && (
+              <Text style={styles.clientInfo}>Atención: {cliente.atencion}</Text>
+            )}
+            {cliente.direccion_envio && (
+              <Text style={styles.clientInfo}>{cliente.direccion_envio}</Text>
             )}
             {cliente.recibe && (
               <Text style={styles.clientInfo}>Recibe: {cliente.recibe}</Text>
