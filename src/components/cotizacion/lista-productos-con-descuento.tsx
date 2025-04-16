@@ -11,6 +11,7 @@ import { ResponsiveTable } from '../ui/responsive-table';
 // Extended product interface with discount
 export interface ProductoConDescuento extends Producto {
   descuento?: number; // Discount percentage for this specific product
+  cotizacion_producto_id?: number | null;
 }
 
 interface ListaProductosConDescuentoProps {

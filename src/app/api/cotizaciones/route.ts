@@ -67,12 +67,14 @@ export async function GET(request: NextRequest) {
             subtotal: 0,
             sku: "",
             descripcion: "",
-            colores: []
+            colores: [],
+            cotizacion_producto_id: 0
           };
         }
         
         return {
           id: item.producto.producto_id?.toString() || "0",
+          cotizacion_producto_id: item.cotizacion_producto_id,
           nombre: item.producto.nombre || "Sin nombre",
           cantidad: item.cantidad || 0,
           precio: item.precio_unitario || 0,

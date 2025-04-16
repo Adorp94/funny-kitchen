@@ -113,6 +113,8 @@ export async function GET(
       }
       return {
         id: item.cotizacion_producto_id?.toString?.() || '',
+        cotizacion_producto_id: item.cotizacion_producto_id,
+        producto_id: item.producto_id,
         nombre: productoData.nombre || 'Producto sin nombre',
         cantidad: item.cantidad,
         precio_unitario: item.precio_unitario,

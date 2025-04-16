@@ -13,6 +13,12 @@ export interface Producto {
   precio: number;
   subtotal: number;
   producto_id?: number | null;
+  cotizacion_producto_id?: number | null;
+  descuento?: number;
+  sku?: string;
+  descripcion?: string;
+  colores?: string[];
+  acabado?: string;
 }
 
 interface ProductoFormErrors {
@@ -106,7 +112,13 @@ export function ProductoSimplificado({ onAddProduct }: ProductoFormProps) {
         cantidad: producto.cantidad,
         precio: producto.precio,
         subtotal: producto.cantidad * producto.precio,
-        producto_id: null // Explicitly set to null for new custom products
+        producto_id: null, // Explicitly set to null for new custom products
+        cotizacion_producto_id: null, // Explicitly set to null for new products
+        descuento: null, // Explicitly set to null for new products
+        sku: '',
+        descripcion: '',
+        colores: [],
+        acabado: ''
       };
       
       // Call onAddProduct callback

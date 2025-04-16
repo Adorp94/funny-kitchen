@@ -88,6 +88,11 @@ function EditCotizacionClient() {
     setProductos
   } = useProductos();
 
+  // Fix: Helper to generate a unique id for new products
+  function generateUniqueId() {
+    return `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
   // Fetch the cotizacion data on mount
   useEffect(() => {
     async function fetchCotizacion() {
@@ -162,6 +167,9 @@ function EditCotizacionClient() {
           setShippingCost(data.cotizacion.costo_envio);
         }
         
+        // Log the raw API response for productos
+        console.log('API productos:', data.cotizacion.productos);
+        
         // Load productos
         if (data.cotizacion.productos && Array.isArray(data.cotizacion.productos)) {
           clearProductos();
@@ -169,22 +177,41 @@ function EditCotizacionClient() {
           console.log("Products from API:", data.cotizacion.productos);
           
           data.cotizacion.productos.forEach((producto: any) => {
-            // Use cotizacion_producto_id as id, producto_id as producto_id
-            addProducto({
-              id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id.toString() : "new",
-              cotizacion_producto_id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id : null,
-              producto_id: producto.producto_id,
-              nombre: producto.nombre,
-              precio: producto.precio_unitario || producto.precio || 0,
-              cantidad: producto.cantidad,
-              descuento: producto.descuento_producto ?? producto.descuento ?? 0,
-              subtotal: producto.subtotal ?? producto.precio_total ?? 0,
-              sku: producto.sku || "",
-              descripcion: producto.descripcion || "",
-              colores: Array.isArray(producto.colores) ? producto.colores : 
-                      typeof producto.colores === 'string' ? producto.colores.split(',') : [],
-              acabado: producto.acabado || ""
-            });
+            // If the product has a cotizacion_producto_id, it's an existing product in the quote
+            if (producto.cotizacion_producto_id) {
+              addProducto({
+                id: producto.cotizacion_producto_id.toString(),
+                cotizacion_producto_id: producto.cotizacion_producto_id,
+                producto_id: producto.producto_id,
+                nombre: producto.nombre,
+                precio: producto.precio_unitario || producto.precio || 0,
+                cantidad: producto.cantidad,
+                descuento: producto.descuento_producto ?? producto.descuento ?? 0,
+                subtotal: producto.subtotal ?? producto.precio_total ?? 0,
+                sku: producto.sku || "",
+                descripcion: producto.descripcion || "",
+                colores: Array.isArray(producto.colores) ? producto.colores : 
+                        typeof producto.colores === 'string' ? producto.colores.split(',') : [],
+                acabado: producto.acabado || ""
+              });
+            } else {
+              // For new products (not yet in DB)
+              addProducto({
+                id: generateUniqueId(),
+                cotizacion_producto_id: null,
+                producto_id: producto.producto_id ?? producto.id ?? null,
+                nombre: producto.nombre,
+                precio: producto.precio_unitario || producto.precio || 0,
+                cantidad: producto.cantidad,
+                descuento: producto.descuento_producto ?? producto.descuento ?? 0,
+                subtotal: producto.subtotal ?? producto.precio_total ?? 0,
+                sku: producto.sku || "",
+                descripcion: producto.descripcion || "",
+                colores: Array.isArray(producto.colores) ? producto.colores : 
+                        typeof producto.colores === 'string' ? producto.colores.split(',') : [],
+                acabado: producto.acabado || ""
+              });
+            }
           });
         }
         
@@ -232,9 +259,11 @@ function EditCotizacionClient() {
         return;
       }
 
+      // DEBUG: Log productos before building payload
+      console.log('Productos in context before payload:', productos);
+
       // Prepare productos array for backend
       const productosPayload = productos.map((p) => {
-        // Use cotizacion_producto_id for existing products only
         if (p.cotizacion_producto_id) {
           return {
             id: p.cotizacion_producto_id.toString(),
@@ -251,9 +280,9 @@ function EditCotizacionClient() {
             acabado: p.acabado || "",
           };
         } else if (p.producto_id) {
-          // For new products, DO NOT include cotizacion_producto_id
           return {
-            id: "new",
+            id: p.id,
+            cotizacion_producto_id: null,
             producto_id: p.producto_id,
             nombre: p.nombre,
             precio: p.precio,
@@ -265,9 +294,15 @@ function EditCotizacionClient() {
             colores: Array.isArray(p.colores) ? p.colores : [],
             acabado: p.acabado || "",
           };
+        } else {
+          // Warn if a product is missing both IDs
+          console.warn('Product missing cotizacion_producto_id and producto_id:', p);
+          return null;
         }
-        return null;
       }).filter(Boolean);
+
+      // DEBUG: Log productosPayload before sending
+      console.log('productosPayload to send:', productosPayload);
 
       // Create request including productos
       const cotizacionData = {
@@ -346,40 +381,43 @@ function EditCotizacionClient() {
 
   // Handle adding a product to the cart
   const handleAddProduct = (producto: Producto) => {
-    // Always add as a new line if id is "new" (new product)
-    if (producto.id === "new") {
+    // Check if this product is already in context (by cotizacion_producto_id or producto_id)
+    const existing = productos.find(
+      p => (p.cotizacion_producto_id && p.cotizacion_producto_id === producto.cotizacion_producto_id) ||
+           (p.producto_id && p.producto_id === producto.producto_id)
+    );
+    if (existing) {
+      // Update the existing product (preserve cotizacion_producto_id and id)
       addProducto({
         ...producto,
-        subtotal: producto.precio * producto.cantidad
+        id: existing.id,
+        cotizacion_producto_id: existing.cotizacion_producto_id,
+        subtotal: producto.precio * producto.cantidad,
+        sku: producto.sku || '',
+        descripcion: producto.descripcion || '',
+        colores: Array.isArray(producto.colores) ? producto.colores : [],
+        acabado: producto.acabado || ''
       });
-      toast.success('Producto agregado al carrito');
+      toast.success('Producto actualizado en el carrito');
       return;
     }
+    // For truly new products
+    addProducto({
+      ...producto,
+      id: generateUniqueId(),
+      cotizacion_producto_id: null,
+      subtotal: producto.precio * producto.cantidad,
+      sku: producto.sku || '',
+      descripcion: producto.descripcion || '',
+      colores: Array.isArray(producto.colores) ? producto.colores : [],
+      acabado: producto.acabado || ''
+    });
+    toast.success('Producto agregado al carrito');
+  };
 
-    // For existing products, merge if id matches
-    const existingProduct = productos.find(p => p.id === producto.id);
-    if (existingProduct) {
-      const updatedProduct = {
-        ...existingProduct,
-        cantidad: existingProduct.cantidad + producto.cantidad,
-        subtotal: existingProduct.precio * (existingProduct.cantidad + producto.cantidad)
-      };
-      clearProductos();
-      productos.forEach(p => {
-        if (p.id === producto.id) {
-          addProducto(updatedProduct);
-        } else {
-          addProducto(p);
-        }
-      });
-      toast.success(`Se actualizó la cantidad del producto a ${updatedProduct.cantidad}`);
-    } else {
-      addProducto({
-        ...producto,
-        subtotal: producto.precio * producto.cantidad
-      });
-      toast.success('Producto agregado al carrito');
-    }
+  // Remove a product from the list
+  const handleRemoveProduct = (id: string) => {
+    removeProducto(id);
   };
 
   // Get CSS classes for step indicator
@@ -578,7 +616,7 @@ function EditCotizacionClient() {
                 <div className="p-6">
                   <ListaProductosConDescuento 
                     productos={productos} 
-                    onRemoveProduct={removeProducto}
+                    onRemoveProduct={handleRemoveProduct}
                     onUpdateProductDiscount={updateProductoDiscount}
                     moneda={moneda}
                   />
@@ -634,7 +672,6 @@ function EditCotizacionClient() {
                     shippingCost={shippingCost}
                     setShippingCost={setShippingCost}
                     total={total}
-                    isEditing={true}
                   />
                 </div>
               </div>
@@ -704,13 +741,9 @@ function EditCotizacionClient() {
                         }, 3000);
                       } catch (error) {
                         console.error('Error downloading PDF:', error);
-                        toast({
-                          title: "Error",
-                          description: error instanceof Error 
-                            ? `No se pudo descargar el PDF: ${error.message}` 
-                            : "No se pudo descargar el PDF. Intente nuevamente.",
-                          variant: "destructive",
-                        });
+                        toast.error(error instanceof Error 
+                          ? `No se pudo descargar el PDF: ${error.message}` 
+                          : "No se pudo descargar el PDF. Intente nuevamente.");
                         setIsLoading(false);
                       }
                     }}
