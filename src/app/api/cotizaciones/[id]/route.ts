@@ -361,22 +361,27 @@ export async function PUT(
       }
 
       // 3. Delete products that are in DB but not in incoming payload
-      const incomingIds = new Set(incomingExisting.map(p => p.id));
+      const incomingIds = new Set(incomingExisting.map(p => parseInt(p.id, 10)));
       const idsToDelete = (currentProductos || [])
-        .map(p => p.cotizacion_producto_id.toString())
-        .filter(id => !incomingIds.has(id));
+        .filter(p => !incomingIds.has(p.cotizacion_producto_id))
+        .map(p => p.cotizacion_producto_id);
       if (idsToDelete.length > 0) {
         console.log("IDs to delete from cotizacion_productos:", idsToDelete);
-        const { error: deleteError } = await supabase
+        const { data: deletedRows, error: deleteError } = await supabase
           .from('cotizacion_productos')
           .delete()
-          .in('cotizacion_producto_id', idsToDelete);
+          .eq('cotizacion_id', cotizacionId)
+          .in('cotizacion_producto_id', idsToDelete)
+          .select('cotizacion_producto_id');
         if (deleteError) {
           console.error('Error deleting removed productos:', deleteError);
           return NextResponse.json({ 
             error: 'Error al eliminar productos removidos',
             details: deleteError.message
           }, { status: 500 });
+        }
+        if (!deletedRows || deletedRows.length !== idsToDelete.length) {
+          console.warn(`Expected to delete ${idsToDelete.length} rows, but deleted ${deletedRows?.length}.`);
         }
       }
     } else {
