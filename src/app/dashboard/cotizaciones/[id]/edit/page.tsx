@@ -234,7 +234,7 @@ function EditCotizacionClient() {
 
       // Prepare productos array for backend
       const productosPayload = productos.map((p) => {
-        // Use cotizacion_producto_id for existing products, "new" for new ones
+        // Use cotizacion_producto_id for existing products only
         if (p.cotizacion_producto_id) {
           return {
             id: p.cotizacion_producto_id.toString(),
@@ -251,6 +251,7 @@ function EditCotizacionClient() {
             acabado: p.acabado || "",
           };
         } else if (p.producto_id) {
+          // For new products, DO NOT include cotizacion_producto_id
           return {
             id: "new",
             producto_id: p.producto_id,

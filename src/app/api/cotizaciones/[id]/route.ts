@@ -350,6 +350,11 @@ export async function PUT(
               details: insertProdError.message
             }, { status: 500 });
           }
+          // Defensive: Reset the sequence to the max value after insert
+          await supabase.rpc('setval', {
+            sequence_name: 'cotizacion_productos_cotizacion_producto_id_seq',
+            value: null // Let the DB set it to max automatically
+          });
         }
       }
 
