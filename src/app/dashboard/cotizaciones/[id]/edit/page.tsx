@@ -510,7 +510,7 @@ function EditCotizacionClient() {
         <div className="space-y-6">
           {/* Step 1: Cliente */}
           {activeStep === 1 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
               <div className="px-6 py-5 border-b border-gray-100">
                 <div className="flex items-center">
                   <User className="h-5 w-5 text-teal-600 mr-2" />
@@ -550,7 +550,7 @@ function EditCotizacionClient() {
           {/* Step 2: Productos */}
           {activeStep === 2 && (
             <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center">
@@ -606,7 +606,7 @@ function EditCotizacionClient() {
                 </div>
               </div>
               
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100">
                   <div className="flex items-center">
                     <Receipt className="h-5 w-5 text-teal-600 mr-2" />
@@ -649,7 +649,7 @@ function EditCotizacionClient() {
           {/* Step 3: Resumen y finalización */}
           {activeStep === 3 && (
             <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
                 <div className="px-6 py-5 border-b border-gray-100">
                   <div className="flex items-center">
                     <FileText className="h-5 w-5 text-teal-600 mr-2" />

@@ -140,7 +140,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
       {/* PDF Content */}
       <div 
         ref={pdfRef} 
-        className="bg-white p-6 sm:p-8 rounded-lg max-w-[215.9mm] mx-auto font-sans text-sm shadow-sm border border-gray-200 print:shadow-none print:border-0 print:p-4 print:max-w-full flex flex-col"
+        className="bg-white p-6 sm:p-8 rounded-lg max-w-[215.9mm] mx-auto font-sans text-sm shadow-xs border border-gray-200 print:shadow-none print:border-0 print:p-4 print:max-w-full flex flex-col"
         style={{ 
           minHeight: '279.4mm',
           /* Fix for Firefox's print handling */
@@ -150,7 +150,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
       >
         {/* Header */}
         <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-200">
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <img
               src="/logo.png"
               alt="Funny Kitchen Logo"
@@ -248,7 +248,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         {/* Resumen - Full width */}
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1 text-right">Resumen</h2>
-          <div className="text-right text-xs leading-tight bg-gray-50 p-3 rounded-lg shadow-sm w-1/2 ml-auto">
+          <div className="text-right text-xs leading-tight bg-gray-50 p-3 rounded-lg shadow-xs w-1/2 ml-auto">
             <div className="flex justify-between py-0.5 text-gray-700">
               <span>Subtotal:</span>
               <span className="font-medium">{formatCurrency(subtotal)}</span>
@@ -292,7 +292,7 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         {/* Datos Bancarios - Full width, moved below Resumen */}
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Datos bancarios</h2>
-          <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg leading-tight shadow-sm">
+          <div className="text-xs text-gray-700 bg-gray-50 p-3 rounded-lg leading-tight shadow-xs">
             {moneda === 'MXN' ? (
               <div className="space-y-1">
                 <p className="font-medium">BBVA</p>
@@ -313,12 +313,12 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
         </div>
         
         {/* Spacer to push content to bottom */}
-        <div className="flex-grow"></div>
+        <div className="grow"></div>
         
         {/* Notas y Términos - Combined and positioned at bottom */}
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase text-gray-500 mb-1">Notas y términos</h2>
-          <div className="bg-gray-50 p-3 rounded-lg text-gray-700 text-xs leading-tight shadow-sm">
+          <div className="bg-gray-50 p-3 rounded-lg text-gray-700 text-xs leading-tight shadow-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <p className="font-medium mb-1">NOTAS:</p>

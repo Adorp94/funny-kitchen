@@ -289,7 +289,7 @@ export function CotizacionStatusModal({
   };
 
   const renderPaymentForm = () => (
-    <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-sm space-y-4 sm:space-y-5">
+    <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-xs space-y-4 sm:space-y-5">
       <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
         <div className="bg-blue-50 p-2 rounded-lg">
           <CreditCard className="h-5 w-5 text-blue-600" />
@@ -387,7 +387,7 @@ export function CotizacionStatusModal({
       <DialogPrimitive.Content
         className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
       >
-        <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
+        <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-2">
               <div className="bg-gray-50 p-2 rounded-lg">
@@ -405,26 +405,26 @@ export function CotizacionStatusModal({
                 </div>
               </div>
             </div>
-            <DialogClose className="rounded-full h-7 w-7 p-0 flex items-center justify-center text-gray-400 hover:text-gray-500 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200">
+            <DialogClose className="rounded-full h-7 w-7 p-0 flex items-center justify-center text-gray-400 hover:text-gray-500 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-gray-200">
               <X className="h-4 w-4" />
               <span className="sr-only">Cerrar</span>
             </DialogClose>
           </div>
         </DialogHeader>
 
-        <div className="overflow-y-auto flex-grow" style={{ maxHeight: 'calc(92vh - 184px)' }}>
+        <div className="overflow-y-auto grow" style={{ maxHeight: 'calc(92vh - 184px)' }}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="p-4 sm:p-6">
             <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-4 sm:mb-5 w-full">
-              <TabsTrigger value="resumen" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <TabsTrigger value="resumen" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-xs">
                 Resumen
               </TabsTrigger>
-              <TabsTrigger value="acciones" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <TabsTrigger value="acciones" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-xs">
                 Cambiar Estado
               </TabsTrigger>
             </TabsList>
             
             <TabsContent value="resumen" className="space-y-4 sm:space-y-6 mt-0">
-              <div className="rounded-lg bg-white border border-gray-200 shadow-sm overflow-hidden">
+              <div className="rounded-lg bg-white border border-gray-200 shadow-xs overflow-hidden">
                 <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
                   <div className="p-4 sm:p-5">
                     <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
@@ -463,7 +463,7 @@ export function CotizacionStatusModal({
 
               {/* Products table */}
               {cotizacion.productos && cotizacion.productos.length > 0 && (
-                <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+                <div className="rounded-lg overflow-hidden border border-gray-200 shadow-xs">
                   <div className="p-4 bg-white border-b border-gray-100">
                     <h3 className="font-medium text-gray-900">Productos</h3>
                   </div>
@@ -532,7 +532,7 @@ export function CotizacionStatusModal({
             </TabsContent>
             
             <TabsContent value="acciones" className="space-y-4 sm:space-y-6 mt-0">
-              <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-sm">
+              <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-xs">
                 <h3 className="font-medium text-gray-900 mb-3">Cambiar estado de cotización</h3>
                 <Select 
                   value={newStatus} 
@@ -555,7 +555,7 @@ export function CotizacionStatusModal({
           </Tabs>
         </div>
 
-        <DialogFooter className="p-4 sm:p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center flex-shrink-0">
+        <DialogFooter className="p-4 sm:p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center shrink-0">
           <Button 
             variant="outline" 
             onClick={onClose} 

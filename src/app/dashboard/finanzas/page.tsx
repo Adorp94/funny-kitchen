@@ -207,7 +207,7 @@ export default function FinanzasPage() {
           {activeTab === "ingresos" ? (
             <Button 
               size="sm"
-              className="h-10 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+              className="h-10 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
               onClick={() => setIsIngresoModalOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -216,7 +216,7 @@ export default function FinanzasPage() {
           ) : (
             <Button 
               size="sm"
-              className="h-10 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white"
+              className="h-10 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white"
               onClick={() => setIsEgresoModalOpen(true)}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -318,13 +318,13 @@ export default function FinanzasPage() {
         <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200">
           <TabsTrigger 
             value="ingresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
+            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-xs data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
           >
             Ingresos
           </TabsTrigger>
           <TabsTrigger 
             value="egresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
+            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-xs data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
           >
             Egresos
           </TabsTrigger>

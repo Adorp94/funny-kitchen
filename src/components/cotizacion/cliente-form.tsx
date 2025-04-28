@@ -940,7 +940,7 @@ export function ClienteForm({
                 <input
                   type="text"
                   placeholder="Buscar cliente por nombre, teléfono o correo"
-                  className="flex-1 outline-none text-sm"
+                  className="flex-1 outline-hidden text-sm"
                   value={searchTerm}
                   onChange={(e) => handleSearchTermChange(e.target.value)}
                   onFocus={() => setComboboxOpen(true)}
@@ -950,7 +950,7 @@ export function ClienteForm({
               {comboboxOpen && (
                 <div 
                   ref={dropdownRef}
-                  className="absolute z-30 mt-1 w-full bg-white rounded-md shadow-lg max-h-80 overflow-auto focus:outline-none border border-gray-200"
+                  className="absolute z-30 mt-1 w-full bg-white rounded-md shadow-lg max-h-80 overflow-auto focus:outline-hidden border border-gray-200"
                 >
                   <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
                     <div className="flex items-center px-4 py-2">
@@ -958,14 +958,14 @@ export function ClienteForm({
                       <input
                         type="text"
                         placeholder="Buscar cliente por nombre, teléfono o correo"
-                        className="flex-1 outline-none text-sm py-1"
+                        className="flex-1 outline-hidden text-sm py-1"
                         value={searchTerm}
                         onChange={(e) => handleSearchTermChange(e.target.value)}
                         autoFocus
                       />
                       <button 
                         onClick={() => setComboboxOpen(false)}
-                        className="ml-2 text-gray-400 hover:text-gray-500 focus:outline-none"
+                        className="ml-2 text-gray-400 hover:text-gray-500 focus:outline-hidden"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -996,7 +996,7 @@ export function ClienteForm({
                             onClick={() => handleClienteClick(cliente)}
                           >
                             <div className="flex items-center">
-                              <User className="flex-shrink-0 h-5 w-5 text-gray-400 group-hover:text-emerald-500 mr-3" />
+                              <User className="shrink-0 h-5 w-5 text-gray-400 group-hover:text-emerald-500 mr-3" />
                               <div className="flex-1 truncate">
                                 <div className="flex">
                                   <span className="truncate font-medium text-gray-900">
@@ -1165,7 +1165,7 @@ export function ClienteForm({
             name="tipo_cliente"
             value={formData.tipo_cliente}
             onChange={handleInputChange}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!formData.cliente_id && !comboboxOpen}
           >
             <option value="Normal">Normal</option>

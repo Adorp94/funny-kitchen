@@ -333,7 +333,7 @@ export default function CotizacionesPage() {
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white mt-4 sm:mt-0 border-0 shadow-sm"
+          className="flex items-center bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white mt-4 sm:mt-0 border-0 shadow-xs"
         >
           <Plus className="mr-2 h-4 w-4" />
           <span className="whitespace-nowrap">Nueva Cotización</span>
@@ -345,14 +345,14 @@ export default function CotizacionesPage() {
       
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <Card className="border border-gray-100 shadow-sm">
+        <Card className="border border-gray-100 shadow-xs">
           <CardHeader className="pb-2">
             <CardDescription>Total Cotizaciones</CardDescription>
             <CardTitle className="text-2xl">{metrics.totalCotizaciones}</CardTitle>
           </CardHeader>
         </Card>
         
-        <Card className="border border-gray-100 shadow-sm">
+        <Card className="border border-gray-100 shadow-xs">
           <CardHeader className="pb-2">
             <CardDescription>Cotizaciones Pendientes</CardDescription>
             <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
@@ -399,14 +399,14 @@ export default function CotizacionesPage() {
       </div>
       
       {loading ? (
-        <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6 text-center">
+        <div className="bg-white border border-gray-100 shadow-xs rounded-xl p-6 text-center">
           <div className="flex justify-center my-6">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
           </div>
           <p className="text-gray-500">Cargando cotizaciones...</p>
         </div>
       ) : filteredCotizaciones.length === 0 ? (
-        <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6 text-center">
+        <div className="bg-white border border-gray-100 shadow-xs rounded-xl p-6 text-center">
           <div className="flex justify-center my-6">
             <div className="bg-gray-50 p-3 rounded-full">
               <FileText className="h-6 w-6 text-gray-400" />
@@ -433,7 +433,7 @@ export default function CotizacionesPage() {
           )}
         </div>
       ) : (
-        <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
+        <div className="bg-white border border-gray-100 shadow-xs rounded-xl overflow-hidden">
           <div className="p-4 px-6 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-medium text-gray-900">Lista de Cotizaciones</h2>
             <p className="text-sm text-gray-500">{filteredCotizaciones.length} cotizaciones</p>

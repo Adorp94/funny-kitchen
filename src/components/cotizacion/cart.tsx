@@ -49,7 +49,7 @@ export function Cart({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+      <div className="flex flex-col items-center justify-center py-8 text-gray-500 bg-white rounded-lg border border-gray-200 shadow-xs p-4">
         <ShoppingCart className="h-12 w-12 text-gray-300 mb-2" />
         <p className="text-sm">No hay productos agregados</p>
       </div>
@@ -57,7 +57,7 @@ export function Cart({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 shadow-xs overflow-hidden">
       <div className="flex items-center justify-between bg-gray-50 px-4 py-3 border-b border-gray-200">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center">
           <ShoppingCart className="h-4 w-4 mr-2" />
@@ -118,7 +118,7 @@ export function Cart({
                       type="number"
                       min="0"
                       max="100"
-                      className="w-12 text-right bg-transparent border-b border-gray-300 focus:border-primary focus:outline-none text-sm p-1"
+                      className="w-12 text-right bg-transparent border-b border-gray-300 focus:border-primary focus:outline-hidden text-sm p-1"
                       value={item.descuento * 100}
                       onChange={(e) => onUpdateDiscount(item.id, Number(e.target.value) / 100)}
                     />

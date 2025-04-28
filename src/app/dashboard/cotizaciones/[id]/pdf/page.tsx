@@ -89,7 +89,7 @@ export default function PDFViewPage() {
         />
       </div>
       
-      <div className="bg-white p-8 rounded-lg shadow border border-gray-200">
+      <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-gray-800">Vista previa de la cotización</h1>
           <p className="text-gray-600 mt-2">

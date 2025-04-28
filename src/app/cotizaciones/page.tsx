@@ -195,7 +195,7 @@ export default function CotizacionesPage() {
         </Link>
       </div>
       
-      <div className="bg-white rounded-lg border shadow-sm p-6">
+      <div className="bg-white rounded-lg border shadow-xs p-6">
         <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />

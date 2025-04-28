@@ -844,7 +844,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 w-full">
+    <div className="bg-white rounded-lg shadow-sm p-6 w-full">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid grid-cols-2 mb-6">
           <TabsTrigger value="existente">Existente</TabsTrigger>
@@ -896,7 +896,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                         onChange={(e) => handleSearchTermChange(e.target.value)}
                         autoFocus
                         placeholder="Buscar por nombre o SKU..."
-                        className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        className="w-full pl-8 py-2 border border-gray-200 rounded-md focus:outline-hidden focus:ring-2 focus:ring-teal-500"
                       />
                     </div>
                   </div>
@@ -966,12 +966,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                             </div>
                             <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-1">
                               {producto.capacidad && producto.unidad && (
-                                <span className="bg-gray-100 px-1 rounded">
+                                <span className="bg-gray-100 px-1 rounded-sm">
                                   {producto.capacidad} {producto.unidad}
                                 </span>
                               )}
                               {producto.precio !== null && (
-                                <span className="bg-gray-100 px-1 rounded">
+                                <span className="bg-gray-100 px-1 rounded-sm">
                                   ${producto.precio.toFixed(2)}
                                 </span>
                               )}
@@ -1036,7 +1036,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   value={formData.descripcion}
                   onChange={handleInputChange}
                   placeholder="Describe el producto"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                   readOnly={!formData.producto_id && !comboboxOpen}
                 />
               </FormControl>
@@ -1362,7 +1362,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                 value={formData.descripcion}
                 onChange={handleInputChange}
                 placeholder="Describe el producto"
-                className="flex h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                className="flex h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               />
             </FormControl>
             

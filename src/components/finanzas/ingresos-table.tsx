@@ -69,7 +69,7 @@ export function IngresosTable({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader className="bg-slate-50 border-b border-slate-200">

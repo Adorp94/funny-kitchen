@@ -45,7 +45,7 @@ export function Navigation() {
 
   return (
     <nav className="flex flex-col h-full space-y-2 py-2">
-      <div className="flex flex-col flex-grow space-y-1">
+      <div className="flex flex-col grow space-y-1">
         {navigation.map((item) => {
           const isActive = pathname === item.href || 
                           (item.href !== "/" && pathname.startsWith(item.href));

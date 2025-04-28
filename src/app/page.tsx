@@ -250,7 +250,7 @@ export default function Home() {
               {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
             </Button>
             {showHealth && healthData && (
-              <div className="mt-4 p-4 bg-gray-100 rounded text-sm overflow-auto">
+              <div className="mt-4 p-4 bg-gray-100 rounded-sm text-sm overflow-auto">
                 <pre>{JSON.stringify(healthData, null, 2)}</pre>
               </div>
             )}
@@ -282,7 +282,7 @@ export default function Home() {
               {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
             </Button>
             {showHealth && healthData && (
-              <div className="mt-4 p-4 bg-gray-100 rounded text-sm overflow-auto">
+              <div className="mt-4 p-4 bg-gray-100 rounded-sm text-sm overflow-auto">
                 <pre>{JSON.stringify(healthData, null, 2)}</pre>
               </div>
             )}
@@ -304,7 +304,7 @@ export default function Home() {
             {showHealth ? 'Hide Health' : 'Health Check'}
           </button>
           {showHealth && healthData && (
-            <div className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto w-64">
+            <div className="mt-2 p-2 bg-gray-100 rounded-sm text-xs overflow-auto w-64">
               <pre>{JSON.stringify(healthData, null, 2)}</pre>
             </div>
           )}
@@ -401,7 +401,7 @@ export default function Home() {
         </div>
 
         {/* Right side: Image */}
-        <div className="hidden sm:block sm:w-1/2 bg-gradient-to-r from-blue-500 to-indigo-600">
+        <div className="hidden sm:block sm:w-1/2 bg-linear-to-r from-blue-500 to-indigo-600">
           <div className="h-full flex items-center justify-center p-8">
             <div className="text-center text-white">
               <h1 className="text-4xl font-bold mb-4">

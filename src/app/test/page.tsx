@@ -33,7 +33,7 @@ export default function TestPage() {
         
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-2">Environment Information</h2>
-          <pre className="bg-gray-100 p-4 rounded overflow-auto">
+          <pre className="bg-gray-100 p-4 rounded-sm overflow-auto">
             {JSON.stringify(environment, null, 2)}
           </pre>
         </div>

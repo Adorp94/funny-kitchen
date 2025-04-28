@@ -370,7 +370,7 @@ export default function CotizacionDetailPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg border shadow-sm p-6">
+        <div className="bg-white rounded-lg border shadow-xs p-6">
           <h2 className="text-lg font-semibold mb-4">Información del Cliente</h2>
           
           {cliente ? (
@@ -397,7 +397,7 @@ export default function CotizacionDetailPage() {
           )}
         </div>
         
-        <div className="bg-white rounded-lg border shadow-sm p-6">
+        <div className="bg-white rounded-lg border shadow-xs p-6">
           <h2 className="text-lg font-semibold mb-4">Detalles de la Cotización</h2>
           
           <div className="space-y-3">
@@ -431,7 +431,7 @@ export default function CotizacionDetailPage() {
           </div>
         </div>
         
-        <div className="bg-white rounded-lg border shadow-sm p-6">
+        <div className="bg-white rounded-lg border shadow-xs p-6">
           <h2 className="text-lg font-semibold mb-4">Resumen</h2>
           
           <div className="space-y-4 mb-6">
@@ -481,7 +481,7 @@ export default function CotizacionDetailPage() {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg border shadow-sm p-6">
+      <div className="bg-white rounded-lg border shadow-xs p-6">
         <h2 className="text-lg font-semibold mb-4">Productos</h2>
         
         {cotizacion.productos && cotizacion.productos.length > 0 ? (

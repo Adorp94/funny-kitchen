@@ -103,7 +103,7 @@ export function ProductosTable({
                       type="number"
                       min="0"
                       max="100"
-                      className="w-12 sm:w-16 text-right bg-transparent border-b border-gray-300 focus:border-emerald-500 focus:outline-none"
+                      className="w-12 sm:w-16 text-right bg-transparent border-b border-gray-300 focus:border-emerald-500 focus:outline-hidden"
                       value={
                         editingDescount?.id === product.prodsxc_id
                           ? editingDescount.value * 100

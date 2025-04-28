@@ -68,7 +68,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   // Provide a fallback UI for debugging
   const debugContent = (
-    <div className="p-6 bg-white rounded shadow m-4">
+    <div className="p-6 bg-white rounded-sm shadow-sm m-4">
       <h2 className="text-xl font-bold mb-4">Auth0 Debug Information</h2>
       <p className="mb-2">Domain: {domain}</p>
       <p className="mb-2">Client ID: {clientId}</p>
@@ -77,7 +77,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       <p className="mb-2">Environment: {process.env.NODE_ENV}</p>
       <hr className="my-4" />
       {error && (
-        <div className="bg-red-50 p-4 text-red-700 rounded mt-4">
+        <div className="bg-red-50 p-4 text-red-700 rounded-sm mt-4">
           <h3 className="font-bold">Auth Error</h3>
           <p>{error}</p>
         </div>
@@ -88,13 +88,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <>
       {error ? (
-        <div className="bg-red-50 p-4 text-red-700 rounded m-4">
+        <div className="bg-red-50 p-4 text-red-700 rounded-sm m-4">
           <h2 className="font-bold">Auth Error</h2>
           <p>{error}</p>
           {debugContent}
           <div className="mt-4">
             <button
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600"
               onClick={() => window.location.href = '/'}
             >
               Volver al inicio

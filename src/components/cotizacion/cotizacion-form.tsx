@@ -69,7 +69,7 @@ export default function CotizacionForm({ cotizacionId }: CotizacionFormProps) {
   
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold mb-4">
           Cotización - {generateCotizacionId(nextId)}
         </h2>

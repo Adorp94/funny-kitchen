@@ -100,7 +100,7 @@ export function FloatingCart() {
                             max="100"
                             value={item.descuento}
                             onChange={(e) => updateDiscount(item.id, Number(e.target.value))}
-                            className="w-10 h-6 text-xs border border-gray-200 rounded px-1 text-center"
+                            className="w-10 h-6 text-xs border border-gray-200 rounded-sm px-1 text-center"
                             aria-label="Discount percentage"
                           />
                           <span className="text-xs text-gray-500 ml-1">%</span>
