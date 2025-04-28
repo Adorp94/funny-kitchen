@@ -515,8 +515,8 @@ export async function getAvailableCotizaciones(): Promise<{
         porcentaje_completado,
         cliente_id
       `)
-      .in('estado', ['enviada', 'producción'])
-      .in('estatus_pago', ['pendiente', 'parcial'])
+      // .in('estado', ['enviada', 'producción']) // DEBUG: show all cotizaciones
+      // .in('estatus_pago', ['pendiente', 'parcial']) // DEBUG: show all cotizaciones
       .order('fecha_creacion', { ascending: false });
     
     if (error) {

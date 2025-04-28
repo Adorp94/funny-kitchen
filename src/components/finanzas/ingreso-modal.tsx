@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
 import { getAvailableCotizaciones } from "@/app/actions/finanzas-actions";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 
 // Define the available payment methods
 const METODOS_PAGO = [
@@ -55,6 +56,8 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
   const [cotizaciones, setCotizaciones] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCotizacion, setSelectedCotizacion] = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState<string>("");
   
   const form = useForm<IngresoFormValues>({
     resolver: zodResolver(formSchema),
@@ -69,10 +72,15 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
     },
   });
 
-  // Load available cotizaciones when modal opens
+  // When modal opens, load cotizaciones and reset form and combobox state
   useEffect(() => {
     if (isOpen) {
       loadCotizaciones();
+      // reset search query and combobox open state
+      setQuery("");
+      setOpen(false);
+      // reset form to default values
+      form.reset();
     }
   }, [isOpen]);
 
@@ -93,20 +101,20 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
     }
   };
 
-  // Update selected cotizacion when cotizacion_id changes
+  // Watch cotizacion_id to update selected cotizacion and moneda
+  const watchedCotizacionId = form.watch("cotizacion_id");
   useEffect(() => {
-    const cotizacionId = form.watch("cotizacion_id");
-    if (cotizacionId) {
-      const cotizacion = cotizaciones.find(c => c.cotizacion_id === cotizacionId);
-      setSelectedCotizacion(cotizacion);
+    if (watchedCotizacionId) {
+      const cot = cotizaciones.find(c => c.cotizacion_id === watchedCotizacionId);
+      setSelectedCotizacion(cot);
       // Update moneda based on selected cotizacion
-      if (cotizacion && cotizacion.moneda) {
-        form.setValue("moneda", cotizacion.moneda);
+      if (cot && cot.moneda) {
+        form.setValue("moneda", cot.moneda);
       }
     } else {
       setSelectedCotizacion(null);
     }
-  }, [form.watch("cotizacion_id"), cotizaciones]);
+  }, [watchedCotizacionId, cotizaciones]);
 
   // Calculate the remaining amount for the selected cotizacion
   const getRemainingAmount = () => {
@@ -127,6 +135,14 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
     if (total === 0) return 0;
     return ((amount / total) * 100).toFixed(2);
   };
+
+  // filter cotizaciones by search query
+  const filteredCotizaciones = query
+    ? cotizaciones.filter((c) =>
+        c.folio.toLowerCase().includes(query.toLowerCase()) ||
+        c.cliente_nombre.toLowerCase().includes(query.toLowerCase())
+      )
+    : cotizaciones;
 
   const handleSubmit = async (values: IngresoFormValues) => {
     setIsSubmitting(true);
@@ -151,7 +167,7 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-6">
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold text-slate-800">
             Registrar Ingreso
@@ -164,39 +180,84 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
               <Label htmlFor="cotizacion_id" className="text-sm font-medium text-slate-700">
                 Cotización
               </Label>
-              
               {isLoading ? (
-                <div className="flex items-center space-x-2 h-10 px-3 py-2 border rounded-md bg-slate-50">
-                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                  <span className="text-sm text-slate-400">Cargando cotizaciones...</span>
+                <div className="flex items-center space-x-2 h-10 px-3 py-2 border rounded-md bg-muted">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Cargando cotizaciones...</span>
                 </div>
               ) : (
-                <Select 
-                  onValueChange={(value) => form.setValue("cotizacion_id", Number(value))}
-                  value={form.watch("cotizacion_id")?.toString()}
-                >
-                  <SelectTrigger className="bg-white border-slate-200 h-10">
-                    <SelectValue placeholder="Seleccionar cotización" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cotizaciones.length === 0 ? (
-                      <div className="p-2 text-sm text-slate-500">No hay cotizaciones disponibles</div>
-                    ) : (
-                      cotizaciones.map((cotizacion) => (
-                        <SelectItem 
-                          key={cotizacion.cotizacion_id} 
-                          value={cotizacion.cotizacion_id.toString()}
-                        >
-                          {cotizacion.folio} - {cotizacion.cliente_nombre}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <Popover open={open} onOpenChange={(isOpen) => {
+                  setOpen(isOpen);
+                  if (isOpen) setQuery("");
+                }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      id="cotizacion_id"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      aria-controls="cotizacion-list"
+                      aria-haspopup="listbox"
+                      className={cn(
+                        "w-full justify-between text-left",
+                        !selectedCotizacion && "text-muted-foreground"
+                      )}
+                    >
+                      {selectedCotizacion
+                        ? `${selectedCotizacion.folio} - ${selectedCotizacion.cliente_nombre}`
+                        : "Seleccionar cotización"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    side="bottom"
+                    sideOffset={4}
+                    className="w-[var(--radix-popover-trigger-width)] max-h-60 overflow-hidden z-50"
+                  >
+                    <Command className="overflow-hidden">
+                      <CommandInput
+                        autoFocus
+                        placeholder="Buscar cotización..."
+                        value={query}
+                        onValueChange={setQuery}
+                        className="px-2 py-1"
+                      />
+                      <CommandList
+                        id="cotizacion-list"
+                        role="listbox"
+                        className="max-h-52"
+                      >
+                        <CommandEmpty>No hay cotizaciones disponibles</CommandEmpty>
+                        {filteredCotizaciones.map((c) => (
+                          <CommandItem
+                            key={c.cotizacion_id}
+                            value={c.cotizacion_id.toString()}
+                            onSelect={(value) => {
+                              form.setValue("cotizacion_id", Number(value));
+                              setOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                watchedCotizacionId?.toString() ===
+                                  c.cotizacion_id.toString()
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            {c.folio} - {c.cliente_nombre}
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
-              
               {form.formState.errors.cotizacion_id && (
-                <p className="text-sm text-red-500">{form.formState.errors.cotizacion_id.message}</p>
+                <p className="text-sm text-red-500 mt-1">{form.formState.errors.cotizacion_id.message}</p>
               )}
               
               {selectedCotizacion && (
