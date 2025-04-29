@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+// Import the simple Supabase client instance
+import { supabase } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const onlyIds = searchParams.get('onlyIds') === 'true';
     
@@ -85,7 +85,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const body = await request.json();
     
     // First, get the next ID for the product
@@ -147,7 +146,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
   const body = await request.json();
   
   if (!body.producto_id) {
@@ -195,7 +193,6 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
   } catch (error) {
     console.error('Error deleting producto:', error);
     return NextResponse.json(

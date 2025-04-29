@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { ResumenCotizacion } from "@/components/cotizacion/resumen-cotizacion";
 import { useProductos, ProductosProvider } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
-import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
 import { PDFService } from "@/services/pdf-service";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -71,13 +71,14 @@ function NuevaCotizacionClient() {
   const [clienteData, setClienteData] = useState<Cliente | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { convertMXNtoUSD, convertUSDtoMXN } = useExchangeRate();
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [hasIva, setHasIva] = useState(false);
   const [shippingCost, setShippingCost] = useState(0);
   const [moneda, setMoneda] = useState<'MXN' | 'USD'>('MXN');
   const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
   const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number>(8);
+  // Add state for ClienteForm mode
+  const [clienteFormMode, setClienteFormMode] = useState<'search' | 'create'>('search');
 
   // Get productos from context
   const {
@@ -86,13 +87,14 @@ function NuevaCotizacionClient() {
     removeProducto,
     updateProductoDiscount: handleUpdateProductDiscount,
     clearProductos, 
-    total,
-    subtotal,
+    financials,
     exchangeRate,
     setGlobalDiscount: setContextGlobalDiscount,
     setHasIva: setContextHasIva,
     setShippingCost: setContextShippingCost,
-    setMoneda: setContextMoneda
+    setMoneda: setContextMoneda,
+    convertMXNtoUSD,
+    convertUSDtoMXN
   } = useProductos();
 
   // Add formData state
@@ -121,10 +123,10 @@ function NuevaCotizacionClient() {
     console.log(`Global Discount: ${globalDiscount}%`);
     console.log(`Has IVA: ${hasIva}`);
     console.log(`Shipping Cost: ${shippingCost} ${moneda}`);
-    console.log(`Subtotal: ${subtotal}`);
-    console.log(`Total: ${total}`);
+    console.log(`Display Subtotal: ${financials.displaySubtotal}`);
+    console.log(`Display Total: ${financials.displayTotal}`);
     console.log(`Exchange Rate: ${exchangeRate}`);
-  }, [globalDiscount, hasIva, shippingCost, subtotal, total, moneda, exchangeRate]);
+  }, [globalDiscount, hasIva, shippingCost, financials, moneda, exchangeRate]);
 
   // Use effect to update cliente state after render
   useEffect(() => {
@@ -219,8 +221,7 @@ function NuevaCotizacionClient() {
 
     try {
       // Calculate IVA amount
-      const subtotalAfterDiscount = subtotal * (1 - globalDiscount / 100);
-      const montoIva = hasIva ? subtotalAfterDiscount * 0.16 : 0;
+      const montoIva = hasIva ? financials.displaySubtotal * 0.16 : 0;
       
       // Handle shipping cost based on currency
       // If in USD, the shippingCost is already in USD, but our context works in MXN
@@ -231,7 +232,7 @@ function NuevaCotizacionClient() {
       console.log(`Currency: ${moneda}`);
       console.log(`Shipping cost: ${shippingCost} ${moneda}`);
       console.log(`Exchange rate: ${exchangeRate}`);
-      console.log(`Total: ${total}`);
+      console.log(`Total: ${financials.displayTotal}`);
       console.log(`Tiempo estimado: ${tiempoEstimado} a ${tiempoEstimadoMax} semanas`);
       
       // Prepare data for API call, including all client data
@@ -242,17 +243,33 @@ function NuevaCotizacionClient() {
         productos: productos.map(p => ({
           ...p,
           // Use the database producto_id if available
-          producto_id: p.producto_id || p.id
+          producto_id: p.producto_id || undefined,
+          // Use context's conversion function
+          precio_unitario: (moneda === 'USD' && exchangeRate) ? convertMXNtoUSD(p.precioMXN) : p.precioMXN,
+          subtotal: (moneda === 'USD' && exchangeRate) ? convertMXNtoUSD(p.subtotalMXN) : p.subtotalMXN,
+          // Also send MXN values
+          precio_unitario_mxn: p.precioMXN,
+          subtotal_mxn: p.subtotalMXN,
         })),
         moneda: moneda,
-        subtotal: subtotal,
+        // Send financials IN MXN only, plus moneda and rate
+        subtotal_mxn: financials.baseSubtotalMXN,
+        costo_envio_mxn: financials.shippingCostMXN,
+        total_mxn: financials.totalMXN,
+        // Remove display values to avoid API confusion
+        // subtotal: financials.displaySubtotal, 
+        // costo_envio: financials.displayShippingCost, 
+        // total: financials.displayTotal,
+        // Send MXN values for DB consistency
+        // subtotal_mxn: financials.baseSubtotalMXN, // Duplicated
+        // costo_envio_mxn: financials.shippingCostMXN, // Duplicated
+        // total_mxn: financials.totalMXN, // Duplicated
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: montoIva,
-        incluye_envio: shippingCost > 0,
-        costo_envio: shippingCost,
-        total: total,
-        tipo_cambio: exchangeRate,
+        monto_iva: financials.ivaAmountMXN, // Send IVA amount in MXN
+        incluye_envio: financials.shippingCostMXN > 0, // Determine based on MXN cost
+        // costo_envio: shippingCost, // Remove display value
+        tipo_cambio: exchangeRate, // Send the rate used
         tiempo_estimado: tiempoEstimado,
         tiempo_estimado_max: tiempoEstimadoMax
       };
@@ -285,23 +302,26 @@ function NuevaCotizacionClient() {
         id: result.cotizacion_id,
         folio: result.folio,
         moneda: moneda,
-        subtotal: moneda === 'USD' && exchangeRate ? subtotal / exchangeRate : subtotal,
+        // Use the financials directly, they are already in the correct display currency
+        subtotal: financials.displaySubtotal,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: moneda === 'USD' && exchangeRate ? montoIva / exchangeRate : montoIva,
-        incluye_envio: shippingCost > 0,
-        costo_envio: shippingCost,
-        total: moneda === 'USD' && exchangeRate ? total / exchangeRate : total,
+        monto_iva: financials.displayIvaAmount,
+        incluye_envio: financials.shippingCostMXN > 0, // Base decision on MXN value
+        costo_envio: financials.displayShippingCost, // Use display cost for PDF
+        total: financials.displayTotal,
         tipo_cambio: exchangeRate,
         tiempo_estimado: tiempoEstimado,
         tiempo_estimado_max: tiempoEstimadoMax,
-        productos: moneda === 'USD' && exchangeRate 
-          ? productos.map(p => ({
-              ...p,
-              precio: p.precio / exchangeRate,
-              subtotal: p.subtotal / exchangeRate
-            }))
-          : productos
+        // Map products for PDF - Ensure prices are in the display currency
+        productos: productos.map(p => ({
+          ...p,
+          // The 'precio' and 'subtotal' in the context state (ProductoEnContext)
+          // are already recalculated to the display currency by the context's effect
+          precio_unitario: p.precio, // Use the display price from context state
+          subtotal: p.subtotal,   // Use the display subtotal from context state
+          // No need for conversion here
+        }))
       };
       
       console.log("Generating PDF with tiempo_estimado:", tiempoEstimado, "to", tiempoEstimadoMax);
@@ -342,33 +362,19 @@ function NuevaCotizacionClient() {
     }
   };
   
-  // Get CSS classes for step indicator
-  const getStepClasses = (step: number) => {
-    if (step < activeStep) {
-      return "text-white bg-teal-500 ring-teal-500"; // completed
-    } else if (step === activeStep) {
-      return "text-teal-600 bg-white ring-teal-500"; // current
-    } else {
-      return "text-gray-400 bg-white ring-gray-200"; // upcoming
-    }
-  };
-  
   // Format currency with proper conversion
   const formatCurrency = (amount: number): string => {
-    let displayAmount = amount;
-    
-    // Convert to USD if needed
-    if (moneda === 'USD' && exchangeRate) {
-      displayAmount = amount / exchangeRate;
-      console.log(`formatCurrency - Converting ${amount} MXN → ${displayAmount.toFixed(2)} USD (rate: ${exchangeRate})`);
-    }
+    // The 'amount' passed here should already be in the correct display currency
+    // because it comes from financials.displayTotal, etc.
+    // The context handles the conversion based on the selected 'moneda'.
+    // We just need to format it using the correct currency code.
     
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
-      currency: moneda,
+      currency: moneda, // Use the context's moneda state
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(displayAmount);
+    }).format(amount); // Format the amount directly
   };
 
   // Handle currency change
@@ -379,359 +385,407 @@ function NuevaCotizacionClient() {
 
   // Handle adding a product to the cart
   const handleAddProduct = (producto: Producto) => {
-    const existingProduct = productos.find(p => p.id === producto.id);
+    console.log(`[NuevaCotizacionClient] handleAddProduct called with producto: ${JSON.stringify(producto)}`);
+
+    // Extract price from the incoming producto object
+    // This price IS ALREADY in the selected currency (moneda) because it comes from the form
+    const precioEnMonedaActual = producto.precio || 0;
+    console.log(`[NuevaCotizacionClient]   - Extracted precioEnMonedaActual: ${precioEnMonedaActual} (${moneda})`);
+
+    // Create a base product object without context-specific fields
+    const productoBase: Producto = {
+      ...producto,
+      // Ensure cantidad is a number
+      cantidad: Number(producto.cantidad) || 1,
+      // Use the extracted price
+      precio: precioEnMonedaActual,
+      // Initial subtotal calculation (will be refined in context)
+      subtotal: precioEnMonedaActual * (Number(producto.cantidad) || 1),
+      // Set default discount
+      descuento: producto.descuento || 0,
+      // Use producto_id if available
+      producto_id: producto.producto_id || null,
+      // Fill in other details if available
+      sku: producto.sku || "",
+      descripcion: producto.descripcion || "",
+      colores: Array.isArray(producto.colores) ? producto.colores : 
+              typeof producto.colores === 'string' ? producto.colores.split(',') : [],
+      acabado: producto.acabado || ""
+    };
+    console.log(`[NuevaCotizacionClient]   - Prepared productoBase: ${JSON.stringify(productoBase)}`);
+
+    // Call the context's addProducto, passing the base product and the price in the current currency
+    addProducto(productoBase, precioEnMonedaActual);
     
-    if (existingProduct) {
-      // If product exists, update its quantity
-      const updatedProduct = {
-        ...existingProduct,
-        cantidad: existingProduct.cantidad + producto.cantidad,
-      };
-      
-      // Recalculate subtotal
-      updatedProduct.subtotal = updatedProduct.precio * updatedProduct.cantidad;
-      
-      // Clear and update the products list
-      clearProductos();
-      productos.forEach(p => {
-        if (p.id === producto.id) {
-          addProducto(updatedProduct);
-        } else {
-          addProducto(p);
-        }
-      });
-      
-      toast.success(`Se actualizó la cantidad del producto a ${updatedProduct.cantidad}`);
-    } else {
-      // If product doesn't exist, add it as new
-      addProducto({
-        ...producto,
-        subtotal: producto.precio * producto.cantidad
-      });
-      toast.success('Producto agregado al carrito');
-    }
+    toast.success('Producto agregado al carrito');
+    
+    // Reset the form after adding
+    setFormData({ tipo: 'nuevo' });
   };
 
+  // Define handlers for ClienteForm, wrapped in useCallback
+  const handleClientSelect = useCallback((selected: Cliente | null, needsCreation?: boolean) => {
+    console.log("Cliente selected/created in form:", selected, "Needs creation:", needsCreation);
+    // Update clienteData which triggers the useEffect to update the confirmed 'cliente'
+    setClienteData(selected);
+    // We don't need to manage needsCreation here, API call handles it
+  }, []); // No dependencies needed as setClienteData is stable
+
+  const handleModeChange = useCallback((newMode: 'search' | 'create') => {
+    setClienteFormMode(newMode);
+  }, []); // No dependencies needed as setClienteFormMode is stable
+
+  // Memoize initialData for ClienteForm if derived from state
+  const clienteInitialData = useMemo(() => {
+    // Pass the current client data if available, otherwise empty object
+    return clienteData || {};
+  }, [clienteData]);
+
   return (
-    <div className="py-12 px-4 sm:px-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col items-center mb-12">
-          <h1 className="text-2xl font-medium text-gray-900 mb-10">Nueva Cotización</h1>
-          
-          {/* Step indicators */}
-          <div className="flex w-full max-w-md justify-between relative">
-            {/* Progress bar */}
-            <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-200">
-              <div 
-                className="absolute h-0.5 bg-teal-500 transition-all duration-500" 
-                style={{ width: `${(activeStep - 1) * 50}%` }}
-              ></div>
-            </div>
-            
-            {/* Step 1 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => setActiveStep(1)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(1)}
-                `}
-              >
-                1
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Cliente</span>
-            </div>
-            
-            {/* Step 2 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => cliente && setActiveStep(2)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(2)}
-                `}
-              >
-                2
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Productos</span>
-            </div>
-            
-            {/* Step 3 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => cliente && productos.length > 0 && setActiveStep(3)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(3)}
-                `}
-              >
-                3
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Finalizar</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Step content */}
-        <div className="space-y-6">
-          {/* Step 1: Cliente */}
-          {activeStep === 1 && (
-            <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 text-teal-600 mr-2" />
-                  <h2 className="text-lg font-medium text-gray-900">Información del Cliente</h2>
-                </div>
-              </div>
-              <div className="p-6">
-                <ClienteForm onClienteChange={setClienteData} />
-              </div>
-              <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.push('/')}
-                  className="text-gray-600 border-gray-300 px-4 h-10 text-sm font-medium"
-                  size="md"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={nextStep} 
-                  disabled={!cliente} 
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium"
-                  size="md"
-                >
-                  <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 2: Productos */}
-          {activeStep === 2 && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center">
-                      <Package className="h-5 w-5 text-emerald-600 mr-2" />
-                      <h2 className="text-lg font-medium text-gray-900">Agregar Productos</h2>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <ProductoFormTabs onProductoChange={(producto: any) => {
-                    if (producto) {
-                      // Format product data for addProducto
-                      const productoToAdd = {
-                        // Use 'new' for new products, real ID for existing ones
-                        id: producto.producto_id ? String(producto.producto_id) : 'new',
-                        nombre: producto.nombre || '',
-                        cantidad: Number(producto.cantidad) || 1,
-                        precio: producto.precio || 0,
-                        descuento: producto.descuento || 0,
-                        subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
-                        sku: producto.sku || '',
-                        descripcion: producto.descripcion || '',
-                        colores: Array.isArray(producto.colores) 
-                          ? producto.colores 
-                          : typeof producto.colores === 'string' 
-                            ? producto.colores.split(',') 
-                            : [],
-                        acabado: producto.acabado || '',
-                        // Add the original producto_id for database reference
-                        producto_id: producto.producto_id || null
-                      };
-                      
-                      // Check if this product already exists in the cart by ID
-                      const existingProductIndex = productos.findIndex(
-                        // For new products, check both id='new' and if the name matches
-                        p => (p.id === productoToAdd.id) || 
-                             (productoToAdd.id === 'new' && p.id === 'new' && p.nombre === productoToAdd.nombre)
-                      );
-                      
-                      if (existingProductIndex >= 0) {
-                        // If it exists, update the quantity and subtotal
-                        const updatedProductos = [...productos];
-                        const existingProduct = updatedProductos[existingProductIndex];
-                        
-                        // When the same product is added again, accumulate the quantity
-                        const newQuantity = existingProduct.cantidad + productoToAdd.cantidad;
-                        
-                        updatedProductos[existingProductIndex] = {
-                          ...existingProduct,
-                          cantidad: newQuantity,
-                          subtotal: productoToAdd.precio * newQuantity,
-                        };
-                        
-                        // Replace the entire array in context
-                        clearProductos();
-                        updatedProductos.forEach(p => addProducto(p));
-                        
-                        // Show a single notification about the update
-                        toast.success(`Se actualizó el producto "${productoToAdd.nombre}" (${newQuantity} unidades)`);
-                      } else {
-                        // If it's a new product, add it
-                        addProducto(productoToAdd);
-                        toast.success(`Se agregó "${productoToAdd.nombre}" a la cotización`);
-                      }
-                    }
-                  }} />
-                </div>
-              </div>
-              
-              {/* Client summary for this step */}
-              {cliente && (
-                <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-                  <div className="px-6 py-4 flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-gray-700">Cliente Seleccionado</h3>
-                    <Button 
-                      variant="ghost" 
-                      className="text-teal-600 h-8 px-2 py-0" 
-                      onClick={() => setActiveStep(1)}
+    <div className="flex flex-col flex-1 py-6 md:py-8 gap-y-4 md:gap-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between max-w-4xl mx-auto w-full px-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+          Nueva Cotización
+        </h1>
+      </div>
+
+      {/* Step Indicator using background tracks */} 
+      <div className="max-w-4xl mx-auto w-full px-4 mb-4 md:mb-6">
+        <nav aria-label="Progress">
+           {/* OL is relative to contain the absolute track lines */}
+          <ol role="list" className="relative flex justify-between items-start w-full">
+            {/* Background Track */}
+            <div className="absolute left-0 top-[15px] h-0.5 w-full bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
+            {/* Progress Track - Width based on activeStep */}
+            <div 
+              className="absolute left-0 top-[15px] h-0.5 bg-primary transition-all duration-300 ease-in-out"
+              style={{ width: `${((activeStep - 1) / 2) * 100}%` }} // 0/2=0%, 1/2=50%, 2/2=100%
+              aria-hidden="true"
+            ></div>
+
+            {[1, 2, 3].map((step, stepIdx) => (
+              // LI is relative z-10 to sit above tracks
+              <li key={step} className={`relative z-10 flex flex-col items-center`}>
+                {/* REMOVED internal line logic */}
+                 
+                {/* Completed Step Button/Icon/Text */}
+                {step < activeStep ? (
+                  <>
+                    <button
+                      onClick={() => setActiveStep(step)}
+                      // Use bg-primary directly, border might be visible below
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white"
                     >
-                      Cambiar
-                    </Button>
-                  </div>
-                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
-                    <div className="space-y-1">
-                      <p className="font-medium text-gray-900">{cliente.nombre}</p>
-                      <p className="text-sm text-gray-500">{cliente.celular}</p>
-                      {cliente.correo && <p className="text-sm text-gray-500">{cliente.correo}</p>}
-                    </div>
-                  </div>
+                       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                    <span className="mt-2 text-xs font-medium text-primary whitespace-nowrap">{['Cliente', 'Productos', 'Finalizar'][stepIdx]}</span>
+                  </>
+                ) : step === activeStep ? (
+                  /* Current Step Button/Icon/Text */
+                  <>
+                     <button
+                      onClick={() => setActiveStep(step)}
+                      // Ensure background covers the track line below
+                      className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary bg-background text-primary"
+                      aria-current="step"
+                    >
+                      <span className="text-xs font-semibold">{step}</span> 
+                    </button>
+                    <span className="mt-2 text-xs font-medium text-primary whitespace-nowrap">{['Cliente', 'Productos', 'Finalizar'][stepIdx]}</span>
+                  </>
+                ) : (
+                  /* Upcoming Step Button/Icon/Text */
+                  <>
+                     <button
+                       onClick={() => { /* ... click handler ... */ }}
+                       // Ensure background covers the track line below
+                       className="group flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 bg-background text-gray-400 hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-500 dark:hover:border-primary dark:hover:text-primary"
+                      disabled={(step === 2 && !cliente) || (step === 3 && (!cliente || productos.length === 0))}
+                    >
+                      <span className="text-xs font-semibold">{step}</span>
+                    </button>
+                    <span className="mt-2 text-xs font-medium text-muted-foreground whitespace-nowrap">{['Cliente', 'Productos', 'Finalizar'][stepIdx]}</span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        </nav>
+      </div>
+
+      {/* Container for Step Content */}
+      <div className="max-w-4xl mx-auto w-full">
+        <div>
+          {activeStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <User className="h-5 w-5 text-primary mr-2" />
+                  Información del Cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ClienteForm 
+                  onClientSelect={handleClientSelect} 
+                  initialData={clienteInitialData} // Use memoized data
+                  mode={clienteFormMode}
+                  onModeChange={handleModeChange}
+                />
+              </CardContent>
+               <div className="flex justify-between items-center px-6 py-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => router.push('/dashboard/cotizaciones')}
+                    disabled={isLoading}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={nextStep} 
+                    disabled={!cliente || isLoading} 
+                  >
+                    <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 </div>
-              )}
-              
-              {/* Listed products */}
-              {productos.length > 0 && (
-                <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-                  <div className="px-6 py-5 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Receipt className="h-5 w-5 text-emerald-600 mr-2" />
-                      <h2 className="text-lg font-medium text-gray-900">Productos Seleccionados</h2>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <ListaProductos 
-                      productos={productos}
-                      onRemoveProduct={(id) => removeProducto(id)}
-                      moneda={moneda}
-                    />
-                  </div>
+            </Card>
+          )}
+          
+          {activeStep === 2 && (
+             <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                     <CardTitle className="flex items-center">
+                        <Package className="h-5 w-5 text-primary mr-2" />
+                        Agregar Productos
+                      </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                     <ProductoFormTabs onProductoChange={(producto: any) => {
+                        if (producto) {
+                          const productoToAdd = {
+                            id: producto.producto_id ? String(producto.producto_id) : ('new-' + Date.now()), // Use timestamp for new IDs
+                            nombre: producto.nombre || '',
+                            cantidad: Number(producto.cantidad) || 1,
+                            precio: producto.precio_unitario || 0,
+                            descuento: producto.descuento || 0,
+                            subtotal: (producto.precio_unitario || 0) * (Number(producto.cantidad) || 1),
+                            sku: producto.sku || '',
+                            descripcion: producto.descripcion || '',
+                            colores: Array.isArray(producto.colores) 
+                              ? producto.colores 
+                              : typeof producto.colores === 'string' 
+                                ? producto.colores.split(',') 
+                                : [],
+                            acabado: producto.acabado || '',
+                            producto_id: producto.producto_id || null
+                          };
+                          
+                          // Simplified logic - find by matching producto_id if exists, otherwise by name if new
+                          const existingProductIndex = productos.findIndex(
+                             p => (productoToAdd.producto_id && p.producto_id === productoToAdd.producto_id) || 
+                                  (!productoToAdd.producto_id && p.nombre === productoToAdd.nombre)
+                          );
+                          
+                          if (existingProductIndex >= 0) {
+                            const updatedProductos = [...productos];
+                            const existingProduct = updatedProductos[existingProductIndex];
+                            
+                            const newQuantity = existingProduct.cantidad + productoToAdd.cantidad;
+                            const unitPrice = productoToAdd.precio; // Price from the form
+                            const discount = productoToAdd.descuento; // Discount from the form
+                            
+                            updatedProductos[existingProductIndex] = {
+                              ...existingProduct,
+                              cantidad: newQuantity,
+                              // Update price in case it changed in the form
+                              precio: unitPrice, // Update display price
+                              // Update discount in case it changed
+                              descuento: discount, 
+                              // Recalculate display subtotal for the updated product
+                              subtotal: unitPrice * newQuantity * (1 - (discount || 0) / 100),
+                              // We need precioMXN to be updated by the context's logic
+                            };
+                            
+                            // Let's remove the existing one and add the updated one with correct args
+                            removeProducto(existingProduct.id);
+                            // Call addProducto correctly for the updated item
+                            addProducto(
+                              updatedProductos[existingProductIndex],
+                              unitPrice // Pass the unit price in current currency
+                            );
+                            
+                            toast.success(`Se actualizó el producto "${productoToAdd.nombre}" (${newQuantity} unidades)`);
+                          } else {
+                            // Calculate subtotal considering discount
+                            const unitPrice = productoToAdd.precio; // Use the price from productoToAdd
+                            const subtotalWithDiscount = unitPrice * productoToAdd.cantidad * (1 - (productoToAdd.descuento || 0) / 100);
+                            
+                            // Call addProducto correctly with TWO arguments
+                            addProducto(
+                              {
+                                ...productoToAdd,
+                                subtotal: subtotalWithDiscount,
+                              },
+                              unitPrice // Pass the unit price in current currency
+                            );
+                            toast.success(`Se agregó "${productoToAdd.nombre}" a la cotización`);
+                          }
+                        }
+                      }} />
+                  </CardContent>
+                </Card>
+                
+                {cliente && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-base font-medium">
+                        Cliente Seleccionado
+                      </CardTitle>
+                      <Button 
+                        variant="link"
+                        className="h-auto p-0 text-primary" 
+                        onClick={() => setActiveStep(1)}
+                      >
+                        Cambiar
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1 text-sm">
+                        <p className="font-semibold text-foreground">{cliente.nombre}</p>
+                        <p className="text-muted-foreground">{cliente.celular}</p>
+                        {cliente.correo && <p className="text-muted-foreground">{cliente.correo}</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {productos.length > 0 && (
+                  <Card>
+                     <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Receipt className="h-5 w-5 text-primary mr-2" />
+                        Productos Seleccionados
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ListaProductos 
+                        productos={productos}
+                        onRemoveProduct={(id) => removeProducto(id)}
+                        moneda={moneda}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={prevStep}
+                    className="w-full sm:w-auto"
+                    disabled={isLoading}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" /> 
+                    <span>Regresar</span>
+                  </Button>
+                  <Button 
+                    onClick={nextStep} 
+                    disabled={productos.length === 0 || isLoading} 
+                    className="w-full sm:w-auto"
+                    variant="default"
+                  >
+                    <span>Continuar</span> 
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
                 </div>
-              )}
-              
-              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4 px-0 py-4">
-                <Button 
-                  variant="outline" 
-                  onClick={prevStep}
-                  className="w-full sm:w-auto"
-                  size="action"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" /> 
-                  <span>Regresar</span>
-                </Button>
-                <Button 
-                  onClick={nextStep} 
-                  disabled={productos.length === 0} 
-                  className="w-full sm:w-auto"
-                  variant="default"
-                  size="action"
-                >
-                  <span>Continuar</span> 
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
             </div>
           )}
           
-          {/* Step 3: Resumen */}
           {activeStep === 3 && (
             <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center">
-                      <FileText className="h-5 w-5 text-emerald-600 mr-2" />
-                      <h2 className="text-lg font-medium text-gray-900">Resumen de Cotización</h2>
-                    </div>
+              <Card>
+                <CardHeader>
+                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <CardTitle className="flex items-center">
+                      <FileText className="h-5 w-5 text-primary mr-2" />
+                      Resumen de Cotización
+                    </CardTitle>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">Moneda:</span>
-                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Moneda" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-gray-200">
-                          <SelectItem value="MXN">MXN</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <span className="text-sm text-muted-foreground">Moneda:</span>
+                        <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                          <SelectTrigger className="w-[100px] h-9">
+                            <SelectValue placeholder="Moneda" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="MXN">MXN</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                   <div>
+                      <h3 className="text-base font-medium text-foreground mb-3">Productos</h3>
+                      <ListaProductosConDescuento 
+                        productos={productos}
+                        onRemoveProduct={(id) => removeProducto(id)}
+                        onUpdateProductDiscount={handleUpdateProductDiscount}
+                        moneda={moneda}
+                      />
                     </div>
-                  </div>
-                </div>
-                <div className="p-6">
-                  {/* Add ListaProductosConDescuento to allow individual product discounts */}
-                  <div className="mb-6">
-                    <h3 className="text-base font-medium text-gray-700 mb-4">Productos con Descuento Individual</h3>
-                    <ListaProductosConDescuento 
-                      productos={productos}
-                      onRemoveProduct={(id) => removeProducto(id)}
-                      onUpdateProductDiscount={handleUpdateProductDiscount}
-                      moneda={moneda}
-                    />
-                  </div>
-                  
-                  <ResumenCotizacion 
-                    cliente={cliente}
-                    productos={productos}
-                    subtotal={subtotal}
-                    globalDiscount={globalDiscount}
-                    setGlobalDiscount={setGlobalDiscount}
-                    hasIva={hasIva}
-                    setHasIva={setHasIva}
-                    shippingCost={shippingCost}
-                    setShippingCost={setShippingCost}
-                    total={total}
-                    moneda={moneda}
-                    tiempoEstimado={tiempoEstimado}
-                    setTiempoEstimado={setTiempoEstimado}
-                    tiempoEstimadoMax={tiempoEstimadoMax}
-                    setTiempoEstimadoMax={setTiempoEstimadoMax}
-                  />
-                </div>
-              </div>
+                    
+                    <div>
+                       <h3 className="text-base font-medium text-foreground mb-3">Totales y Opciones</h3>
+                       <ResumenCotizacion 
+                         cliente={cliente}
+                         productos={productos}
+                         moneda={moneda}
+                         subtotal={financials.displaySubtotal}
+                         globalDiscount={globalDiscount}
+                         setGlobalDiscount={setGlobalDiscount}
+                         hasIva={hasIva}
+                         setHasIva={setHasIva}
+                         shippingCost={shippingCost}
+                         setShippingCost={setShippingCost}
+                         total={financials.displayTotal}
+                         tiempoEstimado={tiempoEstimado}
+                         setTiempoEstimado={setTiempoEstimado}
+                         tiempoEstimadoMax={tiempoEstimadoMax}
+                         setTiempoEstimadoMax={setTiempoEstimadoMax}
+                       />
+                    </div>
+                </CardContent>
+              </Card>
               
-              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4 px-0 py-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-between items-center gap-3 sm:gap-4">
                 <Button 
                   variant="outline" 
                   onClick={prevStep}
                   className="w-full sm:w-auto"
-                  size="action"
+                  disabled={isLoading}
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" /> 
                   <span>Regresar</span>
                 </Button>
                 <Button 
                   onClick={handleGenerateCotizacion}
-                  disabled={isLoading || productos.length === 0} 
+                  disabled={isLoading || productos.length === 0 || !cliente} // Also disable if no client
                   className="w-full sm:w-auto"
-                  variant="success"
-                  size="action"
+                  variant="default"
                 >
                   {isLoading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       <span>Generando...</span>
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex items-center justify-center">
+                    <>
                       <FileText className="h-4 w-4 mr-2" /> 
                       <span>Generar Cotización y PDF</span>
-                    </div>
+                    </>
                   )}
                 </Button>
               </div>

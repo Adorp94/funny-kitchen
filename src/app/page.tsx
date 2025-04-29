@@ -215,7 +215,7 @@ export default function Home() {
   if (loadingTimeout) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-yellow-50 p-6 rounded-lg shadow-md max-w-lg w-full">
+        <div className="bg-yellow-50 p-6 rounded-xs shadow-xs max-w-lg w-full">
           <h2 className="text-yellow-700 text-xl font-bold mb-4">Tiempo de espera agotado</h2>
           <p className="text-yellow-600 mb-4">
             La verificación de la sesión está tomando más tiempo del esperado. Puede que haya un problema con el servicio de autenticación.
@@ -250,7 +250,7 @@ export default function Home() {
               {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
             </Button>
             {showHealth && healthData && (
-              <div className="mt-4 p-4 bg-gray-100 rounded-sm text-sm overflow-auto">
+              <div className="mt-4 p-4 bg-gray-100 rounded-xs text-sm overflow-auto">
                 <pre>{JSON.stringify(healthData, null, 2)}</pre>
               </div>
             )}
@@ -264,7 +264,7 @@ export default function Home() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-red-50 p-6 rounded-lg shadow-md max-w-lg w-full">
+        <div className="bg-red-50 p-6 rounded-xs shadow-xs max-w-lg w-full">
           <h2 className="text-red-700 text-xl font-bold mb-4">Error de autenticación</h2>
           <p className="text-red-600 mb-4">{error}</p>
           <div className="space-y-4">
@@ -282,7 +282,7 @@ export default function Home() {
               {showHealth ? 'Ocultar diagnóstico' : 'Mostrar diagnóstico'}
             </Button>
             {showHealth && healthData && (
-              <div className="mt-4 p-4 bg-gray-100 rounded-sm text-sm overflow-auto">
+              <div className="mt-4 p-4 bg-gray-100 rounded-xs text-sm overflow-auto">
                 <pre>{JSON.stringify(healthData, null, 2)}</pre>
               </div>
             )}
@@ -304,7 +304,7 @@ export default function Home() {
             {showHealth ? 'Hide Health' : 'Health Check'}
           </button>
           {showHealth && healthData && (
-            <div className="mt-2 p-2 bg-gray-100 rounded-sm text-xs overflow-auto w-64">
+            <div className="mt-2 p-2 bg-gray-100 rounded-xs text-xs overflow-auto w-64">
               <pre>{JSON.stringify(healthData, null, 2)}</pre>
             </div>
           )}

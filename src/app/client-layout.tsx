@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import { Auth0Provider } from "@auth0/auth0-react";
 import Header from "@/components/header";
@@ -39,18 +38,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   // Log Auth0 configuration for debugging
   useEffect(() => {
     if (isMounted) {
-      console.log("[Auth0] Configuration:", {
-        domain,
-        clientId,
-        redirect_uri: finalOrigin,
-        isMounted,
-        location: typeof window !== 'undefined' ? window.location.href : 'unknown',
-        environment: process.env.NODE_ENV,
-        isAllowedOrigin,
-        finalOrigin
-      });
-      
-      // Add a global error handler to catch any uncaught errors
+       console.log("[Auth0] Configuration:", { domain, clientId, finalOrigin, isMounted, isAllowedOrigin });
+      // Restore window.onerror
       if (typeof window !== 'undefined') {
         window.onerror = function(message, source, lineno, colno, error) {
           console.error("[Global Error]", { message, source, lineno, colno, error });
@@ -68,7 +57,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   // Provide a fallback UI for debugging
   const debugContent = (
-    <div className="p-6 bg-white rounded-sm shadow-sm m-4">
+    <div className="p-6 bg-white rounded-xs shadow-xs m-4">
       <h2 className="text-xl font-bold mb-4">Auth0 Debug Information</h2>
       <p className="mb-2">Domain: {domain}</p>
       <p className="mb-2">Client ID: {clientId}</p>
@@ -77,7 +66,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       <p className="mb-2">Environment: {process.env.NODE_ENV}</p>
       <hr className="my-4" />
       {error && (
-        <div className="bg-red-50 p-4 text-red-700 rounded-sm mt-4">
+        <div className="bg-red-50 p-4 text-red-700 rounded-xs mt-4">
           <h3 className="font-bold">Auth Error</h3>
           <p>{error}</p>
         </div>
@@ -86,51 +75,43 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   );
 
   return (
-    <>
-      {error ? (
-        <div className="bg-red-50 p-4 text-red-700 rounded-sm m-4">
-          <h2 className="font-bold">Auth Error</h2>
-          <p>{error}</p>
-          {debugContent}
-          <div className="mt-4">
-            <button
-              className="px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600"
-              onClick={() => window.location.href = '/'}
-            >
-              Volver al inicio
-            </button>
-          </div>
-        </div>
-      ) : (
-        <Auth0Provider
-          domain={domain}
-          clientId={clientId}
-          authorizationParams={{
-            redirect_uri: finalOrigin,
-            scope: "openid profile email"
-          }}
-          cacheLocation="localstorage"
-          // Reduce token refresh to prevent stalled auth in production
-          useRefreshTokens={false} 
-          // Add missing callback handler
-          onRedirectCallback={(appState) => {
-            console.log("[Auth0] Redirect callback triggered, state:", 
-                       appState ? `returnTo: ${appState.returnTo}` : 'none');
-            if (appState && appState.returnTo) {
-              window.location.href = appState.returnTo;
-            }
-          }}
-          onError={(error) => {
-            console.error("[Auth0] Error:", error);
-            setError(error.message || "An error occurred with authentication");
-          }}
-        >
-          <div id="auth0-debug" style={{ display: 'none' }}>{debugContent}</div>
+    <Auth0Provider
+      domain={domain}
+      clientId={clientId}
+      authorizationParams={{
+        redirect_uri: finalOrigin,
+        scope: "openid profile email"
+      }}
+      cacheLocation="localstorage"
+      useRefreshTokens={false} 
+      onRedirectCallback={(appState) => {
+        console.log("[Auth0] Redirect callback triggered, state:", appState);
+        if (appState && appState.returnTo) {
+          window.location.href = appState.returnTo;
+        }
+      }}
+      onError={(error) => {
+        console.error("[Auth0] Error:", error);
+        setError(error.message || "An error occurred with authentication");
+      }}
+    >
+      {isMounted && !error ? (
+        <>
           {!isSignIn && <Header />}
-          <main className="min-h-screen bg-gray-50">{children}</main>
-          {!isSignIn && <Footer />}
-        </Auth0Provider>
+          <div className="w-full mx-auto px-6 sm:px-8 lg:px-10">
+            <div className="flex flex-col">
+              <main className="flex-1">
+                {children}
+              </main>
+              {!isSignIn && <Footer />}
+            </div>
+          </div>
+        </>
+      ) : error ? (
+        debugContent
+      ) : (
+        null
       )}
-    </>
+    </Auth0Provider>
   );
 } 

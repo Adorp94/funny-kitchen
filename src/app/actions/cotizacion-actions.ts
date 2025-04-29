@@ -1,8 +1,8 @@
 'use server';
 
-import { createServerSupabaseClient, getCurrentUserId } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase/server';
 
 interface AdvancePaymentData {
   monto: number;
@@ -17,13 +17,17 @@ export async function updateCotizacionStatus(
   paymentData?: AdvancePaymentData
 ) {
   console.log('Update cotizacion status called with:', { cotizacionId, newStatus, paymentData });
-  const supabase = createServerSupabaseClient();
   
+  // Fetch user ID first
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.error('Error fetching user or user not authenticated:', userError);
+    return { success: false, error: 'Usuario no autenticado.' };
+  }
+  const userId = user.id;
+  console.log('Using user ID for operation:', userId);
+
   try {
-    // Get user ID with fallback to system user if needed
-    const userId = await getCurrentUserId();
-    console.log('Using user ID for operation:', userId);
-    
     // First, get the cotizacion to understand its structure
     const { data: existingCotizacion, error: getError } = await supabase
       .from('cotizaciones')
@@ -181,8 +185,6 @@ export async function updateCotizacionStatus(
 }
 
 export async function getCotizacionDetails(cotizacionId: number) {
-  const supabase = createServerSupabaseClient();
-  
   try {
     // Get cotización details
     const { data: cotizacion, error: cotizacionError } = await supabase
@@ -251,8 +253,6 @@ export async function getCotizacionDetails(cotizacionId: number) {
 }
 
 export async function getAllAdvancePayments(page = 1, limit = 10) {
-  const supabase = createServerSupabaseClient();
-  
   try {
     // Calculate offset
     const offset = (page - 1) * limit;
@@ -289,8 +289,8 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
       throw new Error(`Error al obtener clientes: ${clientesError.message}`);
     }
     
-    // Create a lookup map for clients
-    const clienteMap = clientes.reduce((acc, cliente) => {
+    // Create a lookup map for clients with explicit type
+    const clienteMap = clientes.reduce((acc: { [key: number]: string }, cliente) => {
       acc[cliente.cliente_id] = cliente.nombre;
       return acc;
     }, {});
@@ -298,7 +298,8 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
     // Attach client names to payments
     const pagosConClientes = pagos.map(pago => ({
       ...pago,
-      cliente_nombre: clienteMap[pago.cotizacion_data?.cliente_id] || 'Cliente desconocido',
+      // Use type assertion for safety accessing clienteMap
+      cliente_nombre: clienteMap[pago.cotizacion_data?.cliente_id as number] || 'Cliente desconocido',
       cotizacion: pago.cotizacion_data // Keep backward compatibility with existing code
     }));
     
@@ -326,8 +327,7 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
  * Gets the next consecutive folio number for a new cotizacion
  * Format: COT-{YEAR}-{SEQUENTIAL_NUMBER}
  */
-export async function getNextFolioNumber() {
-  const supabase = createServerSupabaseClient();
+export async function getNextFolioNumber(): Promise<string> {
   const currentYear = new Date().getFullYear();
   
   try {
@@ -366,8 +366,8 @@ export async function getNextFolioNumber() {
   }
 }
 
-// Fallback function that uses the regex method in case the main approach fails
-async function fallbackGenerateFolio(currentYear, supabase) {
+// Fallback function with explicit types
+async function fallbackGenerateFolio(currentYear: number, supabase: SupabaseClient) {
   try {
     console.log('Using fallback method to generate folio');
     // Get the latest quotation with a valid folio from the current year

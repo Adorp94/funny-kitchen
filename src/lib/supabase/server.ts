@@ -1,120 +1,22 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { Database } from './types';
 
-// Create a Supabase client for use in server components and actions
-export function createClient() {
-  const cookieStore = cookies();
-  
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-        set(name, value, options) {
-          cookieStore.set({ name, value, ...options });
-        },
-        remove(name, options) {
-          cookieStore.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
+// Create a single instance of the Supabase client for server-side use (Route Handlers, Server Actions)
+// This uses the ANON KEY by default, suitable for public data access or RLS based on anon role.
+// If you need SERVICE_ROLE access, you would create another client instance using the service role key.
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Supabase URL and Anon Key must be defined in environment variables');
 }
 
-/**
- * Create a Supabase client specifically for API routes
- * This is a wrapper around createClient to make it easier to use in API routes
- */
-export function createServerSupabaseClient() {
-  try {
-    console.log("Creating server Supabase client");
-    const cookieStore = cookies();
-    
-    // Create client with appropriate cookie handling
-    return createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            try {
-              return cookieStore.get(name)?.value;
-            } catch (e) {
-              console.error(`Error getting cookie ${name}:`, e);
-              return undefined;
-            }
-          },
-          set(name: string, value: string, options: { path: string; maxAge?: number; domain?: string; sameSite?: 'lax' | 'strict' | 'none'; secure?: boolean }) {
-            try {
-              cookieStore.set({ name, value, ...options });
-            } catch (error) {
-              console.error(`Error setting cookie ${name}:`, error);
-            }
-          },
-          remove(name: string, options: { path: string; maxAge?: number; domain?: string; sameSite?: 'lax' | 'strict' | 'none'; secure?: boolean }) {
-            try {
-              cookieStore.set({ name, value: '', ...options });
-            } catch (error) {
-              console.error(`Error removing cookie ${name}:`, error);
-            }
-          },
-        },
-      }
-    );
-  } catch (error) {
-    console.error("Error creating supabase client:", error);
-    // Fallback to a minimal client as a last resort
-    return createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: {} }
-    );
-  }
-}
+// Export the single instance
+export const supabase = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey);
 
-/**
- * Get the current user ID, with fallback options if authentication fails
- * Returns a valid user ID for database operations
- */
-export async function getCurrentUserId(fallbackUserId = 1): Promise<number> {
-  try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session?.user?.id) {
-      // We need a numeric user ID for the database
-      // First try to get user metadata, which might have a numeric ID
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (userData?.user?.user_metadata?.id) {
-        const numericId = parseInt(userData.user.user_metadata.id);
-        if (!isNaN(numericId)) {
-          return numericId;
-        }
-      }
-      
-      // If no metadata ID, see if we can use the email to generate a consistent ID
-      // This is a workaround and not ideal for production
-      if (userData?.user?.email) {
-        // Generate a simple hash from the email for a more consistent ID
-        // This is just a placeholder approach - in production, store a proper mapping
-        const emailHash = userData.user.email
-          .split('')
-          .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          
-        return (emailHash % 1000) + 1; // Keep it reasonable size, avoid 0
-      }
-    }
-    
-    // Fallback: Return the default user ID
-    console.warn('No valid user information found, using fallback user ID:', fallbackUserId);
-    return fallbackUserId;
-  } catch (error) {
-    console.error('Error getting current user ID:', error);
-    return fallbackUserId;
-  }
-}
+// Remove the previous SSR-based client functions
+/*
+export function createClient() { ... }
+export function createRouteHandlerClient() { ... }
+*/

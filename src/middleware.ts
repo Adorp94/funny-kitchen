@@ -1,88 +1,64 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// This function can be marked `async` if using `await` inside
-export function middleware(request: NextRequest) {
-  // Log the path being accessed for debugging
-  console.log(`[Middleware] Processing request for: ${request.nextUrl.pathname}`);
+// Restore basic middleware structure focusing on Auth0 / Skip logic
+export async function middleware(request: NextRequest) {
+  console.log(`[Middleware - Auth0 Focus] Processing: ${request.nextUrl.pathname}`);
 
-  // More comprehensive list of routes that don't need authentication
-  const publicRoutes = [
-    '/', '/api', '/test', '/login', '/privacy', '/terms', 
-    '/callback', '/auth', '/dashboard', // Add dashboard as public temporarily to help debug
-  ];
-  
-  // Much more comprehensive skip conditions
-  const shouldSkip = 
-    // Skip all Auth0-related paths
-    request.nextUrl.pathname.includes('/_next') ||
-    request.nextUrl.pathname.includes('/api/auth') ||
-    request.nextUrl.pathname.includes('/callback') ||
-    request.nextUrl.pathname.includes('/auth') ||
-    // Skip Auth0 query parameters
-    request.nextUrl.search.includes('code=') ||
+  // ----- Skip Logic ----- 
+  const isAssetOrInternal = 
+    request.nextUrl.pathname.startsWith('/_next') ||
+    request.nextUrl.pathname.startsWith('/assets') || 
+    request.nextUrl.pathname.includes('/favicon.ico') ||
+    /\.(?:svg|png|jpg|jpeg|gif|webp)$/.test(request.nextUrl.pathname); // Match common asset extensions
+
+  const isAuth0PathOrRedirect = 
+    request.nextUrl.pathname.startsWith('/api/auth') || // Auth0 specific API
+    request.nextUrl.pathname.startsWith('/callback') || // Auth0 callback
+    request.nextUrl.search.includes('code=') || // Auth0 query params
     request.nextUrl.search.includes('error=') ||
     request.nextUrl.search.includes('state=') ||
-    // Skip asset requests
-    request.nextUrl.pathname.endsWith('.svg') ||
-    request.nextUrl.pathname.endsWith('.png') ||
-    request.nextUrl.pathname.endsWith('.jpg') ||
-    request.nextUrl.pathname.endsWith('.ico') ||
-    // Skip API calls for data fetching
-    request.nextUrl.pathname.includes('/api/productos') ||
-    request.nextUrl.pathname.includes('/api/clientes') ||
-    request.nextUrl.pathname.includes('/api/cotizaciones') ||
-    request.nextUrl.pathname.includes('/api/colores') ||
-    // IMPORTANT: All API routes should pass through for data fetching to work
-    request.nextUrl.pathname.startsWith('/api/') ||
-    // Detect known Auth0 domain in referer
-    request.headers.get('referer')?.includes('auth0.com');
-  
-  if (shouldSkip) {
-    console.log(`[Middleware] Skipping middleware for: ${request.nextUrl.pathname}`);
+    request.headers.get('referer')?.includes('auth0.com'); // Referer check
+
+  if (isAssetOrInternal || isAuth0PathOrRedirect) {
+    console.log(`[Middleware] Skipping Auth0 checks for asset/internal/Auth0 path: ${request.nextUrl.pathname}`);
     return NextResponse.next();
   }
-                     
-  // Check for authentication via the appSession cookie
+
+  // ----- Auth0 App Session Check ----- 
   const appSession = request.cookies.get('appSession');
-  const isLoggedIn = !!appSession?.value;
+  const isAuth0LoggedIn = !!appSession?.value;
+  console.log(`[Middleware] Auth0 Session Check: ${isAuth0LoggedIn ? 'Authenticated' : 'Not authenticated'}`);
 
-  console.log(`[Middleware] Auth check: ${isLoggedIn ? 'Authenticated' : 'Not authenticated'}`);
-  
-  // Check if the current route is public
-  const isPublicRoute = publicRoutes.some(route => 
-    request.nextUrl.pathname === route || 
-    request.nextUrl.pathname.startsWith(`${route}/`)
-  );
-
-  // In production, be more lenient with auth checks to help debug
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  // If user is not logged in and trying to access a protected route
-  if (!isPublicRoute && !isLoggedIn && !isProduction) {
-    console.log(`[Middleware] Unauthorized access to ${request.nextUrl.pathname}, redirecting to /`);
-    const loginUrl = new URL('/', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // If user is logged in and trying to access the home (login) page, redirect to dashboard
-  if (request.nextUrl.pathname === '/' && isLoggedIn) {
-    console.log(`[Middleware] Authenticated user at login page, redirecting to dashboard`);
+  // If accessing the login page (root) while already logged in via Auth0
+  if (request.nextUrl.pathname === '/' && isAuth0LoggedIn) {
+    console.log(`[Middleware] Auth0 user at login page, redirecting to dashboard`);
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // For all other cases, proceed with the request
+  // Define protected routes requiring Auth0 session
+  const protectedRoutes = [
+    '/dashboard', '/cotizaciones', '/nueva-cotizacion', '/ver-cotizacion'
+    // NOTE: API routes are NOT protected here by default. 
+    // Authorization for API routes should happen WITHIN the route handlers if needed,
+    // potentially checking the Auth0 session forwarded via headers or using Supabase API keys/RLS.
+  ];
+  const isProtectedRoute = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route));
+
+  // If trying to access a protected route without an Auth0 session (and not in production for easier debugging)
+  if (isProtectedRoute && !isAuth0LoggedIn && process.env.NODE_ENV !== 'production') {
+     console.log(`[Middleware] Auth0 unauthorized access to protected route ${request.nextUrl.pathname}, redirecting to /`);
+     return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // Allow the request to proceed
+  console.log(`[Middleware] Allowing request for: ${request.nextUrl.pathname}`);
   return NextResponse.next();
 }
 
-// Configure middleware to apply to fewer routes to avoid issues
+// Keep the broad matcher, relying on internal skip logic
 export const config = {
   matcher: [
-    // Only match specific routes, avoid matching dynamic auth routes and API routes
-    '/',
-    '/dashboard/:path*',
-    '/cotizaciones/:path*',
-    '/nueva-cotizacion/:path*',
-    '/ver-cotizacion/:path*'
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }; 

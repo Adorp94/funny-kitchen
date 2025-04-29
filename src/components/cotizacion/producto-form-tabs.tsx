@@ -794,51 +794,116 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
 
   // Modify handleAddToCart to not open search after adding product
   const handleAddToCart = () => {
-    // Validate form first
-    const validationErrors = validateForm(formData);
-    setErrors(validationErrors);
-    
-    // Mark all fields as touched
-    setTouched({
-      nombre: true,
-      precio: true,
-      capacidad: true,
-      cantidad: true
-    });
-    
-    if (Object.keys(validationErrors).length > 0) {
-      toast.error("Por favor corrige los errores antes de agregar al carrito");
-      return;
+    // Validate based on the active tab
+    const isNewProduct = activeTab === 'nuevo';
+
+    // Always require nombre and cantidad
+    const requiredFields: Array<keyof ProductoFormData> = ['nombre', 'cantidad'];
+    if (isNewProduct) {
+        // Only require precio for NEW products
+        requiredFields.push('precio');
     }
+
+    const currentErrors = validateForm(formData);
     
-    // If valid, notify parent with the quantity
-    const cantidad = parseInt(formData.cantidad) || 1;
-    
-    // Get the product data with the correct ID preserved
-    const producto = formDataToProducto(formData);
-    
-    // Make sure we're passing the original database ID for existing products
-    safeNotifyParent(producto, cantidad);
-    
+    // Check only required fields for the current mode
+    let hasRequiredErrors = false;
+    requiredFields.forEach(field => {
+        if (currentErrors[field as keyof FormErrors]) {
+            hasRequiredErrors = true;
+        }
+        // Mark required fields as touched to show errors immediately
+        setTouched(prev => ({ ...prev, [field]: true }));
+    });
+
+    // Specific check for price validity on new products AFTER general validation
+    if (isNewProduct && (!formData.precio || parseFloat(formData.precio) <= 0)) {
+        // Ensure an error message exists for price if it's invalid or missing
+        if (!currentErrors.precio) {
+            currentErrors.precio = "El precio debe ser un número positivo";
+        }
+        setTouched(prev => ({ ...prev, precio: true })); // Mark as touched
+        hasRequiredErrors = true;
+    }
+
+    if (hasRequiredErrors) {
+        toast.error("Por favor, completa los campos obligatorios correctamente.");
+        setErrors(currentErrors); // Update errors state to show messages
+        return;
+    }
+
+    // --- Robust Price Conversion --- 
+    // Attempt to parse price, handle potential NaN
+    let precioUnitarioValue: number | null = null;
+    if (formData.precio) {
+        const parsedPrice = parseFloat(formData.precio);
+        if (!isNaN(parsedPrice) && parsedPrice >= 0) { // Allow 0 price, but validation checks > 0 for new
+            precioUnitarioValue = parsedPrice;
+        } else {
+            // This case should ideally be caught by validation, but as a fallback:
+            console.error("Invalid price format encountered after validation:", formData.precio);
+            toast.error("Error interno: formato de precio inválido.");
+            return; // Prevent adding with invalid price
+        }
+    } else if (!isNewProduct) {
+        // If it's an existing product, price might not be present/required in this form
+        // We might need to fetch the price or handle it differently if updates are allowed
+        console.warn("Adding existing product without price from form. Price might be missing.");
+    } // If it's a new product, the validation above should have caught the missing price
+
+    // Ensure precioUnitarioValue is at least 0 if it's null but required (e.g., for context)
+    const finalPrecioUnitario = precioUnitarioValue ?? 0;
+
+    const productToSend: any = { // Use 'any' temporarily or define a specific type
+        producto_id: formData.producto_id ? parseInt(formData.producto_id) : null,
+        nombre: formData.nombre,
+        // Use finalPrecioUnitario which defaults null to 0, as context expects a number
+        precio_unitario: finalPrecioUnitario, 
+        cantidad: parseInt(formData.cantidad) || 1,
+        descuento: 0, // Assuming no discount field in this form?
+        sku: formData.sku,
+        tipo_ceramica: formData.tipo_ceramica,
+        capacidad: formData.capacidad ? parseInt(formData.capacidad) : null,
+        unidad: formData.unidad,
+        tipo_producto: formData.tipo_producto,
+        descripcion: formData.descripcion,
+        colores: formData.colores,
+        acabado: formData.acabado
+    };
+
+    // --- Corrected Logic --- 
+    // ONLY notify the parent component (NuevaCotizacionClient/EditCotizacionClient)
+    // It is the PARENT's responsibility to call the context's addProducto function.
+    // DO NOT call handleSaveProduct or handleUpdateProduct here.
+
+    console.log("Calling onProductoChange with:", productToSend);
+    if (onProductoChange) {
+        onProductoChange(productToSend);
+        toast.success("Producto listo para agregar a la cotización."); // More accurate toast
+    } else {
+        console.error("onProductoChange handler is not defined in ProductoFormTabs!");
+        toast.error("Error interno: No se pudo agregar el producto.");
+    }
+
     // Fully reset the form after adding to cart
     setFormData({
-      producto_id: "",
-      nombre: "",
-      tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
-      precio: "",
-      sku: "",
-      capacidad: "",
-      unidad: "ml",
-      tipo_producto: "Personalizado",
-      descripcion: "",
-      colores: "",
-      acabado: "",
-      cantidad: "1"
+        producto_id: "",
+        nombre: "",
+        tipo_ceramica: "CERÁMICA DE ALTA TEMPERATURA",
+        precio: "",
+        sku: "",
+        capacidad: "",
+        unidad: "ml",
+        tipo_producto: "Personalizado",
+        descripcion: "",
+        colores: "",
+        acabado: "",
+        cantidad: "1"
     });
-    
+
     // Clear touched state
     setTouched({});
-    
+
     // Clear the data from session storage
     sessionStorage.removeItem('cotizacion_productoForm');
   };

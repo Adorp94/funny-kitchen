@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Receipt, DollarSign, Wallet, FileEdit } from 'lucide-react';
 import { CotizacionStatusModal } from './cotizacion-status-modal';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from "sonner";
 import { updateCotizacionStatus, getCotizacionDetails } from '@/app/actions/cotizacion-actions';
 import { useRouter } from 'next/navigation';
 
@@ -44,7 +44,6 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailedCotizacion, setDetailedCotizacion] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
   const router = useRouter();
 
   const handleOpenModal = async () => {
@@ -57,16 +56,12 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
         setDetailedCotizacion(result.data);
         setIsModalOpen(true);
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "No se pudo cargar la información de la cotización",
+        toast("No se pudo cargar la información de la cotización", {
           variant: "destructive"
         });
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al cargar la cotización",
+      toast("Error al cargar la cotización", {
         variant: "destructive"
       });
     } finally {
@@ -110,18 +105,14 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged }: Cotizac
         return true;
       } else {
         console.error('CotizacionActionsButton: Error updating status:', result.error);
-        toast({
-          title: "Error",
-          description: result.error || "No se pudo actualizar el estado de la cotización",
+        toast("No se pudo actualizar el estado de la cotización", {
           variant: "destructive"
         });
         return false;
       }
     } catch (error) {
       console.error('CotizacionActionsButton: Unexpected error in handleStatusChange:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error desconocido",
+      toast("Error desconocido", {
         variant: "destructive"
       });
       return false;

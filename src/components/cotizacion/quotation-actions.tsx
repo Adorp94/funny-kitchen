@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/use-toast'
 import { Loader2, FileText, Download } from 'lucide-react'
+import { toast } from "sonner";
 
 // Add function to detect mobile devices
 const isMobileDevice = () => {
@@ -28,7 +28,6 @@ export default function QuotationActions({
   clientName = 'Cliente'
 }: QuotationActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false)
-  const { toast } = useToast()
 
   const handleGeneratePdf = async () => {
     try {
@@ -45,8 +44,7 @@ export default function QuotationActions({
       
       const data = await response.json()
       
-      toast({
-        title: "PDF Generado",
+      toast.success("PDF Generado", {
         description: "El PDF ha sido generado y guardado correctamente.",
       })
       
@@ -72,11 +70,7 @@ export default function QuotationActions({
       }
     } catch (error) {
       console.error('Error generating PDF:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Ocurrió un error al generar el PDF",
-        variant: "destructive",
-      })
+      toast.error(error instanceof Error ? error.message : "Ocurrió un error al generar el PDF")
     } finally {
       setIsGenerating(false)
     }

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '../ui/button'
 import { Loader2, FileText } from 'lucide-react'
 import { generateAndSaveQuotePDF } from '@/app/actions/generate-pdf'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from "sonner";
 
 interface GeneratePDFButtonProps {
   cotizacionId: number
@@ -54,15 +54,10 @@ export default function GeneratePDFButton({
   datos_bancarios
 }: GeneratePDFButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
 
   const handleGeneratePDF = async () => {
     if (productos.length === 0) {
-      toast({
-        title: 'Error',
-        description: 'No se puede generar la cotización sin productos',
-        variant: 'destructive',
-      })
+      toast.error('No se puede generar la cotización sin productos')
       return
     }
 
@@ -95,20 +90,13 @@ export default function GeneratePDFButton({
         // Open the PDF in a new window
         window.open(result.pdfUrl, '_blank')
         
-        toast({
-          title: 'PDF generado correctamente',
-          description: 'Se ha abierto el PDF en una nueva ventana',
-        })
+        toast.success('PDF generado correctamente')
       } else {
         throw new Error(result.error || 'Error al generar el PDF')
       }
     } catch (error) {
       console.error('Error generando PDF:', error)
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Ocurrió un error al generar el PDF',
-        variant: 'destructive',
-      })
+      toast.error((error as Error).message || 'Ocurrió un error al generar el PDF')
     } finally {
       setIsLoading(false)
     }

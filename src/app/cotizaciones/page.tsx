@@ -183,9 +183,9 @@ export default function CotizacionesPage() {
   };
   
   return (
-    <main className="container mx-auto py-6 px-4 lg:px-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Cotizaciones</h1>
+    <main className="mx-auto w-full max-w-6xl px-4 flex flex-col min-h-[calc(100vh-120px)]">
+      <div className="flex justify-between items-center mb-6 md:mb-12">
+        <h1 className="text-2xl md:text-4xl font-bold">Cotizaciones</h1>
         <Link 
           href="/nueva-cotizacion"
           className="inline-flex items-center justify-center rounded-md font-medium bg-teal-500 text-white hover:bg-teal-600 h-10 px-4 py-2 transition-colors"
@@ -195,8 +195,8 @@ export default function CotizacionesPage() {
         </Link>
       </div>
       
-      <div className="bg-white rounded-lg border shadow-xs p-6">
-        <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
+      <div className="bg-white rounded-lg border shadow-sm p-6 md:p-10">
+        <div className="flex flex-col md:flex-row justify-between mb-6 md:gap-10 gap-4">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input

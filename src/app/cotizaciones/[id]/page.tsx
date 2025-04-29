@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, ArrowLeft, Eye, Pen, Trash, FileText, Download } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useToast } from '@/components/ui/use-toast'
+import { toast } from "sonner";
 import { formatDate } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
 import { ResponsiveTable } from "@/components/ui/responsive-table";
@@ -49,7 +49,6 @@ const isMobileDevice = () => {
 export default function CotizacionDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { toast } = useToast()
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
   const [cliente, setCliente] = useState<{ nombre: string; celular: string; correo?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -142,11 +141,7 @@ export default function CotizacionDetailPage() {
       }
     } catch (error) {
       console.error('Error fetching cotizacion:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo cargar la cotización',
-        variant: 'destructive',
-      })
+      toast.error('No se pudo cargar la cotización')
     } finally {
       setIsLoading(false)
     }
@@ -167,19 +162,12 @@ export default function CotizacionDetailPage() {
       
       if (error) throw error
       
-      toast({
-        title: 'Cotización eliminada',
-        description: 'La cotización se ha eliminado correctamente',
-      })
+      toast.success('Cotización eliminada')
       
       router.push('/cotizaciones')
     } catch (error) {
       console.error('Error deleting cotizacion:', error)
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar la cotización',
-        variant: 'destructive',
-      })
+      toast.error('No se pudo eliminar la cotización')
     } finally {
       setIsDeleting(false)
     }
@@ -200,11 +188,7 @@ export default function CotizacionDetailPage() {
         window.open(cotizacion.pdf_url, '_blank');
       }
     } else {
-      toast({
-        title: 'PDF no disponible',
-        description: 'Esta cotización aún no tiene un PDF generado',
-        variant: 'destructive',
-      });
+      toast.error('Esta cotización aún no tiene un PDF generado')
     }
   }
   
@@ -234,15 +218,18 @@ export default function CotizacionDetailPage() {
   }
   
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
           <Link href="/cotizaciones">
             <Button variant="outline" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Cotización #{cotizacion.cotizacion_id}</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <FileText className="h-6 w-6 text-emerald-600" />
+            Cotización #{cotizacion.cotizacion_id}
+          </h1>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
             cotizacion.estatus.toLowerCase() === 'pendiente'
               ? 'bg-yellow-100 text-yellow-800'
@@ -310,10 +297,7 @@ export default function CotizacionDetailPage() {
             onClick={async () => {
               try {
                 // Show loading indicator
-                toast({
-                  title: "Generando PDF",
-                  description: "Por favor espere mientras se genera el PDF...",
-                });
+                toast.loading("Generando PDF")
                 
                 // Make the API call
                 const response = await fetch(`/api/cotizaciones/${cotizacion.cotizacion_id}/pdf`, {
@@ -333,10 +317,7 @@ export default function CotizacionDetailPage() {
                   pdf_url: data.pdfUrl
                 });
                 
-                toast({
-                  title: "PDF Generado",
-                  description: "El PDF ha sido generado y guardado correctamente.",
-                });
+                toast.success("PDF Generado")
                 
                 // Handle viewing/downloading the PDF based on device
                 if (data.pdfUrl) {
@@ -355,11 +336,7 @@ export default function CotizacionDetailPage() {
                 }
               } catch (error) {
                 console.error('Error generating PDF:', error);
-                toast({
-                  title: "Error",
-                  description: error instanceof Error ? error.message : "Ocurrió un error al generar el PDF",
-                  variant: "destructive",
-                });
+                toast.error(error instanceof Error ? error.message : "Ocurrió un error al generar el PDF")
               }
             }}
           >
@@ -370,7 +347,7 @@ export default function CotizacionDetailPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg border shadow-xs p-6">
+        <div className="bg-white rounded-lg border shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4">Información del Cliente</h2>
           
           {cliente ? (
@@ -397,7 +374,7 @@ export default function CotizacionDetailPage() {
           )}
         </div>
         
-        <div className="bg-white rounded-lg border shadow-xs p-6">
+        <div className="bg-white rounded-lg border shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4">Detalles de la Cotización</h2>
           
           <div className="space-y-3">
@@ -431,7 +408,7 @@ export default function CotizacionDetailPage() {
           </div>
         </div>
         
-        <div className="bg-white rounded-lg border shadow-xs p-6">
+        <div className="bg-white rounded-lg border shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4">Resumen</h2>
           
           <div className="space-y-4 mb-6">
@@ -481,7 +458,7 @@ export default function CotizacionDetailPage() {
         </div>
       </div>
       
-      <div className="bg-white rounded-lg border shadow-xs p-6">
+      <div className="bg-white rounded-lg border shadow-sm p-6 mt-8">
         <h2 className="text-lg font-semibold mb-4">Productos</h2>
         
         {cotizacion.productos && cotizacion.productos.length > 0 ? (
@@ -534,7 +511,7 @@ export default function CotizacionDetailPage() {
             </table>
           </ResponsiveTable>
         ) : (
-          <div className="bg-gray-50 p-4 rounded-md text-gray-500">
+          <div className="bg-gray-50 p-4 rounded-xs text-gray-500">
             No hay productos asociados a esta cotización
           </div>
         )}

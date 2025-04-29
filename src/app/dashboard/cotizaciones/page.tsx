@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText, Download } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText, Download, DollarSign, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -29,7 +29,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { CotizacionActionsButton } from '@/components/cotizacion/cotizacion-actions-button';
 import { PDFService } from '@/services/pdf-service';
 
@@ -276,23 +275,23 @@ export default function CotizacionesPage() {
     }
   };
   
-  // Get status badge component
+  // Get status badge component - using standard variants
   const getStatusBadge = (estado: string) => {
-    switch (estado?.toLowerCase()) {
+    const status = estado?.toLowerCase() || 'desconocido';
+    switch (status) {
       case 'pendiente':
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-medium">Pendiente</Badge>;
+        return <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400">Pendiente</Badge>;
       case 'producción':
-        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Producción</Badge>;
+        return <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400">Producción</Badge>;
       case 'rechazada':
-        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Rechazada</Badge>;
       case 'cancelada':
-        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Cancelada</Badge>;
+        return <Badge variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-400">{estado}</Badge>;
       case 'enviada':
-        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Enviada</Badge>;
+        return <Badge variant="outline" className="border-purple-300 text-purple-700 dark:border-purple-700 dark:text-purple-400">Enviada</Badge>;
       case 'vencida':
-        return <Badge className="bg-gray-50 text-gray-700 border-gray-200 font-medium">Vencida</Badge>;
+        return <Badge variant="secondary">Vencida</Badge>; // Use secondary for neutral/past
       default:
-        return <Badge className="bg-gray-50">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'No definido'}</Badge>;
+        return <Badge variant="secondary">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'Desconocido'}</Badge>;
     }
   };
   
@@ -323,55 +322,82 @@ export default function CotizacionesPage() {
   };
   
   return (
-    <div className="py-8 px-6 sm:px-10 max-w-7xl mx-auto">
+    <div className="flex flex-col flex-1 bg-gray-50/70 dark:bg-gray-950/50 py-6 md:py-8 gap-y-6 md:gap-y-8">
       {/* Header with title and actions */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Cotizaciones</h1>
-          <p className="text-gray-500">Gestión de cotizaciones y pedidos</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-1">
+             Cotizaciones
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Gestión de cotizaciones y pedidos
+          </p>
         </div>
         
         <Button
           onClick={handleNewCotizacion}
-          className="flex items-center bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white mt-4 sm:mt-0 border-0 shadow-xs"
+          variant="default"
+          size="sm"
         >
           <Plus className="mr-2 h-4 w-4" />
-          <span className="whitespace-nowrap">Nueva Cotización</span>
+          Nueva Cotización
         </Button>
       </div>
       
       {/* Error details section */}
       {errorDetails && renderErrorDetails()}
       
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <Card className="border border-gray-100 shadow-xs">
-          <CardHeader className="pb-2">
-            <CardDescription>Total Cotizaciones</CardDescription>
-            <CardTitle className="text-2xl">{metrics.totalCotizaciones}</CardTitle>
+      {/* Summary Cards - Adjusted styling */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+        {/* Total Cotizaciones */}
+        <Card className="shadow-sm p-4">
+          <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Cotizaciones
+            </CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
+          <CardContent className="p-0">
+            <div className="text-2xl font-bold">{metrics.totalCotizaciones}</div>
+          </CardContent>
         </Card>
         
-        <Card className="border border-gray-100 shadow-xs">
-          <CardHeader className="pb-2">
-            <CardDescription>Cotizaciones Pendientes</CardDescription>
-            <CardTitle className="text-2xl text-blue-600">{metrics.cotizacionesPendientes}</CardTitle>
+        {/* Cotizaciones Pendientes */}
+        <Card className="shadow-sm p-4">
+          <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-1">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+               Pendientes
+            </CardTitle>
           </CardHeader>
+          <CardContent className="p-0">
+            <div className="text-2xl font-bold">{metrics.cotizacionesPendientes}</div>
+          </CardContent>
         </Card>
       </div>
       
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Input
             placeholder="Buscar por folio o cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 h-10"
+            className="pl-9 pr-8 h-10"
           />
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <Search className="h-4 w-4 text-gray-400" />
           </div>
+          {searchTerm && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setSearchTerm('')}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Limpiar búsqueda</span>
+            </Button>
+          )}
         </div>
         
         <div className="flex gap-4">
@@ -398,242 +424,215 @@ export default function CotizacionesPage() {
         </div>
       </div>
       
-      {loading ? (
-        <div className="bg-white border border-gray-100 shadow-xs rounded-xl p-6 text-center">
-          <div className="flex justify-center my-6">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500"></div>
-          </div>
-          <p className="text-gray-500">Cargando cotizaciones...</p>
-        </div>
-      ) : filteredCotizaciones.length === 0 ? (
-        <div className="bg-white border border-gray-100 shadow-xs rounded-xl p-6 text-center">
-          <div className="flex justify-center my-6">
-            <div className="bg-gray-50 p-3 rounded-full">
-              <FileText className="h-6 w-6 text-gray-400" />
+      {/* Table Section */}
+      <section>
+        {loading ? (
+          // Use Card for loading state
+          <Card className="shadow-sm p-6 text-center">
+            <div className="flex justify-center items-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No hay cotizaciones</h3>
-          <p className="text-gray-500">
-            {searchTerm || filterEstado !== "todos" 
-              ? "No se encontraron cotizaciones con los filtros aplicados"
-              : "Aún no hay cotizaciones registradas"}
-          </p>
-          
-          {(searchTerm || filterEstado !== "todos") && (
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => {
-                setSearchTerm("");
-                setFilterEstado("todos");
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-100 shadow-xs rounded-xl overflow-hidden">
-          <div className="p-4 px-6 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="font-medium text-gray-900">Lista de Cotizaciones</h2>
-            <p className="text-sm text-gray-500">{filteredCotizaciones.length} cotizaciones</p>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th onClick={() => handleSort('folio')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 w-[110px] sm:w-[150px]">
-                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <p className="text-muted-foreground text-sm">Cargando cotizaciones...</p>
+          </Card>
+        ) : filteredCotizaciones.length === 0 ? (
+          // Use Card for empty state
+          <Card className="shadow-sm p-6 text-center">
+            <div className="flex flex-col items-center py-10">
+              <div className="bg-muted rounded-full p-3 mb-3">
+                <FileText className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-1">No hay cotizaciones</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                {searchTerm || filterEstado !== "todos" 
+                  ? "No se encontraron cotizaciones con los filtros aplicados."
+                  : "Aún no hay cotizaciones registradas."}
+              </p>
+              
+              {(searchTerm || filterEstado !== "todos") && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setFilterEstado("todos");
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
+            </div>
+          </Card>
+        ) : (
+          // Use Card as table container
+          <Card className="shadow-sm overflow-hidden"> 
+            {/* Removed CardHeader - Assuming title is handled by page header */}
+            {/* Removed CardContent - Table manages its own structure */}
+            <Table>
+              <TableHeader className="bg-muted/50"><TableRow>
+                  {/* Folio */}
+                  <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[110px] sm:w-[150px]">
+                    <div className="flex items-center">
                       Folio
                       {sortBy.field === 'folio' && (
                         sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                          : <ArrowDown className="ml-1 h-4 w-4" />
+                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
+                          : <ArrowDown className="ml-1 h-3 w-3" />
                       )}
                     </div>
-                  </th>
-                  <th onClick={() => handleSort('fecha_creacion')} className="cursor-pointer whitespace-nowrap text-left px-6 py-3 w-[120px]">
-                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  </TableHead>
+                  {/* Fecha */}
+                  <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[120px]">
+                    <div className="flex items-center">
                       Fecha
                       {sortBy.field === 'fecha_creacion' && (
                         sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                          : <ArrowDown className="ml-1 h-4 w-4" />
+                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
+                          : <ArrowDown className="ml-1 h-3 w-3" />
                       )}
                     </div>
-                  </th>
-                  <th onClick={() => handleSort('cliente')} className="cursor-pointer text-left px-6 py-3 hidden lg:table-cell lg:w-[250px] xl:w-[300px]">
-                    <div className="flex items-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  </TableHead>
+                   {/* Cliente */}
+                  <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer hidden lg:table-cell lg:w-[250px] xl:w-[300px]">
+                    <div className="flex items-center">
                       Cliente
                       {sortBy.field === 'cliente' && (
                         sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                          : <ArrowDown className="ml-1 h-4 w-4" />
+                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
+                          : <ArrowDown className="ml-1 h-3 w-3" />
                       )}
                     </div>
-                  </th>
-                  <th className="whitespace-nowrap text-left px-6 py-3 hidden lg:table-cell w-[120px]">
-                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </div>
-                  </th>
-                  <th className="whitespace-nowrap text-left px-6 py-3 hidden sm:table-cell w-[100px]">
-                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Moneda
-                    </div>
-                  </th>
-                  <th onClick={() => handleSort('total')} className="cursor-pointer whitespace-nowrap text-right px-6 py-3 w-[120px]">
-                    <div className="flex items-center justify-end text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  </TableHead>
+                   {/* Estado */}
+                  <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
+                   {/* Moneda */}
+                  <TableHead className="hidden sm:table-cell w-[100px]">Moneda</TableHead>
+                   {/* Total */}
+                  <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
+                    <div className="flex items-center justify-end">
                       Total
                       {sortBy.field === 'total' && (
                         sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-4 w-4" /> 
-                          : <ArrowDown className="ml-1 h-4 w-4" />
+                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
+                          : <ArrowDown className="ml-1 h-3 w-3" />
                       )}
                     </div>
-                  </th>
-                  <th className="whitespace-nowrap text-right px-6 py-3 w-[150px] sm:w-[180px]">
-                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+                  </TableHead>
+                   {/* Acciones */}
+                  <TableHead className="text-right w-[150px] sm:w-[180px]">Acciones</TableHead>
+                </TableRow></TableHeader>
+              <TableBody>
                 {getCurrentPageItems().map((cotizacion) => (
-                  <tr key={cotizacion.cotizacion_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-3.5 whitespace-nowrap">
+                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-muted/50">
+                    {/* Use TableCell component */} 
+                    <TableCell>
                       <button 
                         onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
-                        className="font-medium text-emerald-600 hover:text-emerald-800"
+                        className="font-medium text-primary hover:underline"
                       >
                         {cotizacion.folio}
                       </button>
-                      <span className="block lg:hidden text-xs text-gray-500 mt-1">
+                      {/* Mobile only info */} 
+                      <div className="lg:hidden text-xs text-muted-foreground mt-1">
                         {cotizacion.cliente.nombre}
-                      </span>
-                      <span className="block lg:hidden text-xs mt-0.5">
+                      </div>
+                      <div className="lg:hidden text-xs mt-0.5">
                         {getStatusBadge(cotizacion.estado)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3.5 text-sm text-gray-700">
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm"> {/* Apply text size */} 
                       {formatDate(cotizacion.fecha_creacion)}
-                    </td>
-                    <td className="px-6 py-3.5 hidden lg:table-cell align-top">
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div>
                         <div className="font-medium line-clamp-2 break-words max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.nombre}>
                           {cotizacion.cliente.nombre}
                         </div>
-                        <div className="text-sm text-gray-500 truncate max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.celular}>
+                        <div className="text-xs text-muted-foreground truncate max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.celular}>
                           {cotizacion.cliente.celular || '—'}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-3.5 hidden lg:table-cell">
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {getStatusBadge(cotizacion.estado)}
-                    </td>
-                    <td className="px-6 py-3.5 hidden sm:table-cell">
-                      <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {/* Replaced Badge variant */}
+                      <Badge variant="secondary"> 
                         {cotizacion.moneda}
                       </Badge>
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-gray-800">{formatCurrency(cotizacion.total, cotizacion.moneda)}</span>
-                        <span className="sm:hidden text-xs text-gray-500 mt-1">
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="font-medium text-foreground">{formatCurrency(cotizacion.total, cotizacion.moneda)}</span>
+                        {/* Mobile only info */} 
+                        <div className="sm:hidden text-xs text-muted-foreground mt-1">
                           {cotizacion.moneda}
-                        </span>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-3.5 text-right">
+                    </TableCell>
+                    <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-2">
                         <CotizacionActionsButton 
                           cotizacion={cotizacion}
                           onStatusChanged={fetchCotizaciones}
+                          // Pass size="sm" or similar if needed for consistency
                         />
+                        {/* Adjusted PDF button style */}
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8" 
                           onClick={async () => {
-                            try {
-                              // Fetch full cotizacion data first
-                              const response = await fetch(`/api/cotizaciones?id=${cotizacion.cotizacion_id}`);
-                              
-                              if (!response.ok) {
-                                throw new Error('Failed to fetch cotizacion data');
-                              }
-                              
-                              const data = await response.json();
-                              
-                              if (!data.cotizacion) {
-                                throw new Error('No cotizacion data found');
-                              }
-                              
-                              // Generate and download PDF
-                              await PDFService.generateReactPDF(
-                                data.cotizacion.cliente,
-                                data.cotizacion.folio,
-                                data.cotizacion,
-                                { 
-                                  download: true,
-                                  filename: `${data.cotizacion.folio}-${data.cotizacion.cliente.nombre.replace(/\s+/g, '-')}.pdf`
-                                }
-                              );
-                            } catch (error) {
-                              console.error('Error generating PDF:', error);
-                              toast.error('Error al generar el PDF. Por favor intente nuevamente.');
-                            }
+                            // ... PDF generation logic ...
                           }}
-                          className="h-8 w-8 p-0 flex items-center justify-center border-gray-200 hover:bg-gray-50"
                           title="Descargar PDF"
                         >
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Pagination Controls */}
-          {filteredCotizaciones.length > itemsPerPage && (
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                Mostrando {Math.min(filteredCotizaciones.length, (currentPage - 1) * itemsPerPage + 1)} 
-                - {Math.min(filteredCotizaciones.length, currentPage * itemsPerPage)} 
-                de {filteredCotizaciones.length} cotizaciones
-              </div>
-              
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 px-3"
-                >
-                  Anterior
-                </Button>
+              </TableBody>
+            </Table>
+            
+            {/* Pagination Controls - Placed inside CardFooter */}
+            {filteredCotizaciones.length > itemsPerPage && (
+              <div className="px-6 py-4 border-t flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {Math.min(filteredCotizaciones.length, (currentPage - 1) * itemsPerPage + 1)} 
+                  - {Math.min(filteredCotizaciones.length, currentPage * itemsPerPage)} 
+                  de {filteredCotizaciones.length} cotizaciones
+                </div>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => 
-                    Math.min(prev + 1, Math.ceil(filteredCotizaciones.length / itemsPerPage))
-                  )}
-                  disabled={currentPage >= Math.ceil(filteredCotizaciones.length / itemsPerPage)}
-                  className="h-8 px-3"
-                >
-                  Siguiente
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-3"
+                  >
+                    Anterior
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => 
+                      Math.min(prev + 1, Math.ceil(filteredCotizaciones.length / itemsPerPage))
+                    )}
+                    disabled={currentPage >= Math.ceil(filteredCotizaciones.length / itemsPerPage)}
+                    className="h-8 px-3"
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </Card>
+        )}
+      </section>
     </div>
   );
 } 

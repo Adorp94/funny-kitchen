@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+// Import the simple Supabase client instance
+import { supabase } from '@/lib/supabase/server';
+
+// Force dynamic execution for Route Handler
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
-    const query = searchParams.get('query');
+    const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '0');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
     const from = page * pageSize;
     
-    console.log(`API request received: id=${id}, query=${query}, page=${page}, pageSize=${pageSize}`);
+    console.log(`API request received: id=${id}, search=${search}, page=${page}, pageSize=${pageSize}`);
     
     if (id) {
       // Get a specific client
@@ -24,17 +27,17 @@ export async function GET(request: NextRequest) {
       if (error) throw error;
       
       return NextResponse.json(data);
-    } else if (query) {
-      console.log(`Searching clients with query: "${query}"`);
+    } else if (search) {
+      console.log(`Searching clients with search term: "${search}"`);
       
       // Search clients
       let searchQuery = supabase
         .from('clientes')
         .select('*', { count: 'exact' });
         
-      // Search across multiple fields: nombre, celular, correo
+      // Search across multiple fields: nombre, celular, correo, rfc
       searchQuery = searchQuery
-        .or(`nombre.ilike.%${query}%,celular.ilike.%${query}%,correo.ilike.%${query}%`);
+        .or(`nombre.ilike.%${search}%,celular.ilike.%${search}%,correo.ilike.%${search}%,rfc.ilike.%${search}%`);
       
       // Apply pagination and order
       const { data, error, count } = await searchQuery
@@ -46,14 +49,20 @@ export async function GET(request: NextRequest) {
       
       console.log(`Found ${data.length} results, total count: ${count}`);
       
-      // Return results with pagination info
-      return NextResponse.json({
-        data,
+      // Prepare the response object
+      const responseObject = {
+        clientes: data,
         count,
         hasMore: data.length === pageSize
-      });
+      };
+      
+      // Log the object just before returning
+      console.log('API returning object:', JSON.stringify(responseObject));
+      
+      // Return results with pagination info
+      return NextResponse.json(responseObject);
     } else {
-      console.log(`Fetching all clients, page: ${page}, pageSize: ${pageSize}`);
+      console.log(`Fetching all clients (no search term), page: ${page}, pageSize: ${pageSize}`);
       
       // Get all clients (paginated)
       const { data, error, count } = await supabase
@@ -84,7 +93,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const body = await request.json();
     
     const { data, error } = await supabase
@@ -120,7 +128,6 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const body = await request.json();
     
     if (!body.cliente_id) {

@@ -185,8 +185,8 @@ export default function FinanzasPage() {
   };
 
   return (
-    <div className="container mx-auto px-8 py-10 max-w-7xl">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-10">
+    <div className="mx-auto w-full max-w-6xl px-4 flex flex-col min-h-[calc(100vh-120px)]">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-10 md:mb-12">
         <div>
           <h1 className="text-4xl font-bold tracking-tight text-slate-900">Finanzas</h1>
           <p className="mt-2 text-base text-slate-500 max-w-xl">
@@ -227,7 +227,7 @@ export default function FinanzasPage() {
       </div>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10 mb-10 md:mb-12">
         {/* Ingresos MXN Card */}
         <Card className={getFinancialCardGradient('ingreso')}>
           <CardHeader className="pb-2">
@@ -318,13 +318,13 @@ export default function FinanzasPage() {
         <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200">
           <TabsTrigger 
             value="ingresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-xs data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
+            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
           >
             Ingresos
           </TabsTrigger>
           <TabsTrigger 
             value="egresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-xs data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
+            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
           >
             Egresos
           </TabsTrigger>

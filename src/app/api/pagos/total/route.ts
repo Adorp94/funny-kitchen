@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabase } from '@/lib/supabase/server';
+import { NextRequest } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
-    
     // Get the sum of all payments in MXN (converted amount)
     const { data, error } = await supabase
       .from('pagos')

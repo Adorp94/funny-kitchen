@@ -5,7 +5,6 @@ import { Trash2, Percent } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Producto } from './producto-simplificado';
-import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { ResponsiveTable } from '../ui/responsive-table';
 
 // Extended product interface with discount
@@ -29,31 +28,26 @@ export function ListaProductosConDescuento({
   moneda = 'MXN',
   editMode = true
 }: ListaProductosConDescuentoProps) {
-  const { exchangeRate, loading, error, convertMXNtoUSD } = useExchangeRate();
-
   // Explicitly log currency and exchange rate
   useEffect(() => {
     console.log('Current currency in ListaProductos:', moneda);
-    console.log('Exchange rate in ListaProductos:', exchangeRate);
-  }, [moneda, exchangeRate]);
-
-  // Convert amount based on selected currency
-  const convertAmount = (amount: number): number => {
-    if (moneda === 'USD' && exchangeRate) {
-      return convertMXNtoUSD(amount);
-    }
-    return amount;
-  };
+  }, [moneda]);
 
   // Format currency with proper currency symbol
   const formatCurrency = (amount: number): string => {
-    const convertedAmount = convertAmount(amount);
+    // The amount received should already be in the correct display currency
+    // We just need to format it.
+    // Handle potential null/undefined/NaN values gracefully.
+    if (isNaN(amount) || amount === null || amount === undefined) {
+        return "---"; // Or indicate an error/loading state
+    }
+
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: moneda,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(convertedAmount);
+    }).format(amount);
   };
 
   // Format percentage
@@ -67,7 +61,7 @@ export function ListaProductosConDescuento({
   // Calculate price after discount for a product
   const getPriceAfterDiscount = (producto: ProductoConDescuento): number => {
     const discount = producto.descuento || 0;
-    const originalPrice = producto.precio;
+    const originalPrice = producto.precio; // This is already the display price
     const discountedPrice = originalPrice * (1 - discount / 100);
     return discountedPrice;
   };
@@ -162,7 +156,7 @@ export function ListaProductosConDescuento({
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
-                  {formatCurrency(getSubtotalAfterDiscount(producto))}
+                  {formatCurrency(producto.subtotal)}
                   {producto.descuento ? (
                     <div className="text-xs text-green-600">
                       Descuento: {formatPercent(producto.descuento)}
@@ -191,7 +185,7 @@ export function ListaProductosConDescuento({
                 Total:
               </td>
               <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                {formatCurrency(totalAfterDiscounts)}
+                {formatCurrency(productos.reduce((sum, p) => sum + (p.subtotal || 0), 0))}
               </td>
               {editMode && <td></td>}
             </tr>

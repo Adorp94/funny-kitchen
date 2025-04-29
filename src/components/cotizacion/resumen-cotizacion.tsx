@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { DollarSign, Truck, Receipt, Percent, User, Clock } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { ResponsiveTable } from '../ui/responsive-table';
 
 interface Cliente {
@@ -53,45 +52,30 @@ export function ResumenCotizacion({
   tiempoEstimadoMax = 8,
   setTiempoEstimadoMax
 }: ResumenCotizacionProps) {
-  const { 
-    exchangeRate, 
-    baseRate,
-    loading, 
-    error, 
-    convertMXNtoUSD, 
-    convertUSDtoMXN,
-    formatExchangeRateInfo,
-    lastUpdated
-  } = useExchangeRate();
-
   // State for the form - using string values for inputs
   const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasShipping, setHasShipping] = useState<boolean>(false);
   const [shippingCostStr, setShippingCostStr] = useState<string>('0');
-  const [tiempoEstimadoStr, setTiempoEstimadoStr] = useState<string>(tiempoEstimado.toString());
-  const [tiempoEstimadoMaxStr, setTiempoEstimadoMaxStr] = useState<string>(tiempoEstimadoMax.toString());
 
   // Initialize form values from props
   useEffect(() => {
     setGlobalDiscountStr(globalDiscount.toString());
     setHasShipping(shippingCost > 0);
     setShippingCostStr(shippingCost.toString());
-    setTiempoEstimadoStr(tiempoEstimado.toString());
-    setTiempoEstimadoMaxStr(tiempoEstimadoMax.toString());
-  }, [globalDiscount, shippingCost, tiempoEstimado, tiempoEstimadoMax]);
+  }, [globalDiscount, shippingCost]);
 
   // Format currency based on selected currency
   const formatCurrency = (amount: number): string => {
-    const displayAmount = moneda === 'USD' && exchangeRate 
-      ? amount / exchangeRate 
-      : amount;
+    if (isNaN(amount) || amount === null || amount === undefined) {
+        return "---"; // Or indicate error/loading state
+    }
     
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
       currency: moneda,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(displayAmount);
+    }).format(amount);
   };
   
   // Format number with commas for better readability
@@ -163,46 +147,43 @@ export function ResumenCotizacion({
   // Handle tiempo estimado change
   const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    // Parse directly from input value
+    const numValue = value === '' ? 0 : parseInt(value);
     
-    // Allow empty string or valid numbers
-    if (value === '' || !isNaN(parseInt(value))) {
-      setTiempoEstimadoStr(value);
-      
-      // Convert to number for the callback
-      const numValue = value === '' ? 6 : parseInt(value);
-      const boundedValue = Math.max(numValue, 1); // Minimum 1 week
-      
-      // Update parent component state if callback is provided
-      if (setTiempoEstimado) {
-        setTiempoEstimado(boundedValue);
-      }
-      
-      // Ensure max value is not less than min value
-      const maxValue = parseInt(tiempoEstimadoMaxStr) || tiempoEstimadoMax;
-      if (boundedValue > maxValue && setTiempoEstimadoMax) {
-        setTiempoEstimadoMaxStr(boundedValue.toString());
-        setTiempoEstimadoMax(boundedValue);
-      }
+    // Ignore non-numeric input
+    if (isNaN(numValue)) return;
+
+    // Ensure min >= 1
+    const newMinValue = Math.max(numValue, 1);
+    
+    // Update parent component state if callback is provided
+    if (setTiempoEstimado) {
+      setTiempoEstimado(newMinValue);
+    }
+    
+    // Ensure max value is not less than new min value
+    // Use the current max prop directly for comparison
+    if (newMinValue > tiempoEstimadoMax && setTiempoEstimadoMax) {
+      // Update parent's max state if needed
+      setTiempoEstimadoMax(newMinValue);
     }
   };
   
   // Handle tiempo estimado max change
   const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    // Parse directly from input value
+    const numValue = value === '' ? 0 : parseInt(value);
     
-    // Allow empty string or valid numbers
-    if (value === '' || !isNaN(parseInt(value))) {
-      setTiempoEstimadoMaxStr(value);
-      
-      // Convert to number for the callback
-      const numValue = value === '' ? 8 : parseInt(value);
-      const minValue = parseInt(tiempoEstimadoStr) || tiempoEstimado;
-      const boundedValue = Math.max(numValue, minValue); // Ensure max is not less than min
-      
-      // Update parent component state if callback is provided
-      if (setTiempoEstimadoMax) {
-        setTiempoEstimadoMax(boundedValue);
-      }
+    // Ignore non-numeric input
+    if (isNaN(numValue)) return;
+
+    // Ensure max >= current min prop
+    const newMaxValue = Math.max(numValue, tiempoEstimado);
+    
+    // Update parent component state if callback is provided
+    if (setTiempoEstimadoMax) {
+      setTiempoEstimadoMax(newMaxValue);
     }
   };
 
@@ -309,28 +290,8 @@ export function ResumenCotizacion({
       <div className="bg-gray-50 rounded-lg p-4 md:p-6 space-y-5">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-base font-medium text-gray-700">Resumen</h3>
-          {exchangeRate ? (
-            <div className="text-xs space-y-1">
-              <div className="text-gray-600 font-medium">
-                {formatExchangeRateInfo()}
-              </div>
-              <div className="text-gray-400">
-                {lastUpdated && 
-                  `Última actualización: ${formatBanxicoDate(lastUpdated)}`
-                }
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="text-xs text-gray-500">
-              Cargando tipo de cambio...
-            </div>
-          ) : error ? (
-            <div className="text-xs text-red-500">
-              Error: {error}
-            </div>
-          ) : null}
         </div>
-        
+
         {/* Subtotal */}
         <div className="flex items-center justify-between py-2">
           <span className="text-sm font-medium text-gray-600">Subtotal:</span>
@@ -434,7 +395,7 @@ export function ResumenCotizacion({
             <Input
               type="text"
               inputMode="numeric"
-              value={tiempoEstimadoStr}
+              value={tiempoEstimado}
               onChange={handleTiempoEstimadoChange}
               className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
               placeholder="6"
@@ -443,7 +404,7 @@ export function ResumenCotizacion({
             <Input
               type="text"
               inputMode="numeric"
-              value={tiempoEstimadoMaxStr}
+              value={tiempoEstimadoMax}
               onChange={handleTiempoEstimadoMaxChange}
               className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
               placeholder="8"

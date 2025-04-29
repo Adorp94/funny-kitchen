@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { supabase } from '@/lib/supabase/server';
+import { NextRequest } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
-    
     const { count, error } = await supabase
       .from('cotizaciones')
       .select('*', { count: 'exact', head: true });

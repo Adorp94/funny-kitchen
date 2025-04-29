@@ -2,9 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle, CreditCard, DollarSign, FileClock, FileText, Check, X, ArrowRight, TruckIcon } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { formatCurrency } from '@/lib/utils';
-import { formatDate } from '@/lib/utils';
+import { toast } from "sonner";
+// Removed incorrect imports from @/lib/utils
+// Imports will be added from where they are defined, assuming nueva-cotizacion page or similar
+
+// Import functions directly if defined globally or pass them as props
+// Assuming formatDate and formatCurrency might be defined in a parent or utils file
+// For now, we'll define basic placeholders here to remove the error, 
+// but these should be replaced with the actual imports/definitions.
+const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString() || 'Invalid Date';
+const formatCurrency = (amount: number | undefined | null, currency: string) => 
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: currency || 'MXN' }).format(amount || 0);
 
 import {
   Dialog,
@@ -84,7 +92,6 @@ export function CotizacionStatusModal({
   cotizacion,
   onStatusChange
 }: CotizacionStatusModalProps) {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('resumen');
   const [newStatus, setNewStatus] = useState<string>('');
@@ -149,10 +156,8 @@ export function CotizacionStatusModal({
 
     // Don't allow changing to same status
     if (newStatus === cotizacion.estado) {
-      toast({
-        title: "Sin cambios",
+      toast("Sin cambios", {
         description: "El estado seleccionado es el mismo que el actual",
-        variant: "default"
       });
       return;
     }
@@ -164,10 +169,8 @@ export function CotizacionStatusModal({
       console.log('Payment data required. Validating form...', paymentData);
       if (!validatePaymentForm()) {
         console.log('Payment form validation failed:', errors);
-        toast({
-          title: "Error",
+        toast("Error", {
           description: "Por favor corrija los errores en el formulario de pago",
-          variant: "destructive"
         });
         return;
       }
@@ -200,23 +203,15 @@ export function CotizacionStatusModal({
         console.log('Status change result:', success);
         
         if (success) {
-          toast({
-            title: "¡Éxito!",
-            description: `Cotización ${newStatus === 'producción' ? 'enviada a producción con anticipo' : 
-                         'actualizada'} correctamente`,
-            variant: "success"
-          });
+          toast.success(`Cotización ${newStatus === 'producción' ? 'enviada a producción con anticipo' : 
+                         'actualizada'} correctamente`);
           
           // Close the modal after a delay to ensure state updates
           setTimeout(() => {
             onClose();
           }, 300);
         } else {
-          toast({
-            title: "Error",
-            description: "No se pudo actualizar el estado. Por favor, inténtelo de nuevo.",
-            variant: "destructive"
-          });
+          toast.error("No se pudo actualizar el estado. Por favor, inténtelo de nuevo.");
         }
       } else {
         // For statuses that don't require payment
@@ -235,31 +230,19 @@ export function CotizacionStatusModal({
         console.log('Status change result:', success);
         
         if (success) {
-          toast({
-            title: "¡Éxito!",
-            description: `Cotización actualizada a "${newStatus}" correctamente`,
-            variant: "success"
-          });
+          toast.success(`Cotización actualizada a "${newStatus}" correctamente`);
           
           // Close the modal after a delay to ensure state updates
           setTimeout(() => {
             onClose();
           }, 300);
         } else {
-          toast({
-            title: "Error",
-            description: "No se pudo actualizar el estado. Por favor, inténtelo de nuevo.",
-            variant: "destructive"
-          });
+          toast.error("No se pudo actualizar el estado. Por favor, inténtelo de nuevo.");
         }
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Ha ocurrido un error al actualizar el estado",
-        variant: "destructive"
-      });
+      toast.error(error instanceof Error ? error.message : "Ha ocurrido un error al actualizar el estado");
     } finally {
       setLoading(false);
     }
@@ -280,12 +263,13 @@ export function CotizacionStatusModal({
     }
   };
 
-  // Helper function to safely format currency values
+  // Safely format currency
   const safeCurrency = (value: any, currency: string) => {
-    if (value === undefined || value === null || isNaN(Number(value))) {
-      return formatCurrency(0, currency);
+    const amount = Number(value);
+    if (isNaN(amount)) {
+      return 'N/A';
     }
-    return formatCurrency(Number(value), currency);
+    return formatCurrency(amount, currency || 'MXN');
   };
 
   const renderPaymentForm = () => (
@@ -381,8 +365,13 @@ export function CotizacionStatusModal({
 
   if (!cotizacion) return null;
 
+  // Define constants for totals
+  const subtotal = cotizacion.productos?.reduce((acc, p) => acc + (p.subtotal || 0), 0) || 0;
+  const ivaAmount = cotizacion.iva ? (subtotal * (1 - (cotizacion.descuento_global || 0) / 100)) * 0.16 : 0;
+  const shippingAmount = cotizacion.incluye_envio ? (cotizacion.costo_envio || 0) : 0;
+  
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"

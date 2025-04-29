@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { createBrowserClient } from '@supabase/ssr';
+import { supabase } from '@/lib/supabase/server';
 import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
 import { getNextFolioNumber } from '@/app/actions/cotizacion-actions';
 
@@ -8,10 +7,12 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
-    const supabase = createServerSupabaseClient();
+    
+    console.log(`[API /cotizaciones GET] Received request for ID: ${id}`); // Log ID
     
     if (id) {
       // Get a specific quote with its products and client
+      console.log(`[API /cotizaciones GET id=${id}] Fetching main cotizacion details...`);
       const { data: cotizacion, error: cotizacionError } = await supabase
         .from('cotizaciones')
         .select(`
@@ -22,14 +23,18 @@ export async function GET(request: NextRequest) {
         .single();
         
       if (cotizacionError) {
-        console.error('Error fetching quotation:', cotizacionError);
+        // Log the specific error before returning
+        console.error(`[API /cotizaciones GET id=${id}] Error fetching main cotizacion:`, cotizacionError);
         return NextResponse.json(
           { error: 'Error al obtener la cotización' }, 
           { status: 500 }
         );
       }
       
+      console.log(`[API /cotizaciones GET id=${id}] Fetched main cotizacion:`, cotizacion);
+
       if (!cotizacion) {
+         console.warn(`[API /cotizaciones GET id=${id}] Cotizacion not found.`);
         return NextResponse.json(
           { error: 'Cotización no encontrada' }, 
           { status: 404 }
@@ -37,6 +42,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Get the quotation products
+      console.log(`[API /cotizaciones GET id=${id}] Fetching associated products...`);
       const { data: productos, error: productosError } = await supabase
         .from('cotizacion_productos')
         .select(`
@@ -46,18 +52,25 @@ export async function GET(request: NextRequest) {
         .eq('cotizacion_id', id);
       
       if (productosError) {
-        console.error('Error fetching quotation products:', productosError);
+         // Log the specific error before returning
+        console.error(`[API /cotizaciones GET id=${id}] Error fetching cotizacion products:`, productosError);
         return NextResponse.json(
           { error: 'Error al obtener los productos de la cotización' }, 
           { status: 500 }
         );
       }
       
+      console.log(`[API /cotizaciones GET id=${id}] Fetched associated products data:`, productos);
+
       // Format the response
       const productosArray = Array.isArray(productos) ? productos : [];
-      const formattedProductos = productosArray.map(item => {
+      console.log(`[API /cotizaciones GET id=${id}] Processing ${productosArray.length} product items...`);
+      
+      const formattedProductos = productosArray.map((item, index) => {
+        console.log(`[API /cotizaciones GET id=${id}] Mapping item ${index}:`, item);
         // Check if item and item.producto exist
         if (!item || !item.producto) {
+           console.warn(`[API /cotizaciones GET id=${id}] Item ${index} is missing or item.producto is null/undefined.`);
           return {
             id: "0",
             nombre: "Producto no disponible",
@@ -71,6 +84,9 @@ export async function GET(request: NextRequest) {
             cotizacion_producto_id: 0
           };
         }
+        
+        // Log the structure of item.producto before accessing its properties
+        console.log(`[API /cotizaciones GET id=${id}] Item ${index} has producto:`, item.producto);
         
         return {
           id: item.producto.producto_id?.toString() || "0",
@@ -86,12 +102,14 @@ export async function GET(request: NextRequest) {
         };
       });
       
-      return NextResponse.json({
+      const responsePayload = {
         cotizacion: {
           ...cotizacion,
           productos: formattedProductos
         }
-      });
+      };
+      console.log(`[API /cotizaciones GET id=${id}] Returning final payload.`);
+      return NextResponse.json(responsePayload);
     } else {
       // Get all cotizaciones with cliente info
       const { data: cotizaciones, error } = await supabase
@@ -157,7 +175,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
     const data = await req.json();
     
     // Extract data from the request
@@ -166,31 +183,37 @@ export async function POST(req: NextRequest) {
       create_client_if_needed,
       productos, 
       moneda, 
-      subtotal, 
+      // Remove display values, add MXN base values
+      // subtotal, 
+      subtotal_mxn, 
       descuento_global, 
       iva, 
-      monto_iva, 
-      incluye_envio, 
-      costo_envio, 
-      total,
+      // monto_iva, // Calculate this later
+      // incluye_envio, // Determine this later
+      // costo_envio, 
+      costo_envio_mxn,
+      // total,
+      total_mxn,
       tipo_cambio,
       tiempo_estimado,
       tiempo_estimado_max
     } = data;
 
-    console.log("==== QUOTATION DATA RECEIVED ====");
+    console.log("==== QUOTATION DATA RECEIVED (MXN Basis) ====");
     console.log(`Currency: ${moneda}`);
-    console.log(`Subtotal: ${subtotal} ${moneda}`);
-    console.log(`Shipping: ${costo_envio} ${moneda}`);
-    console.log(`Total: ${total} ${moneda}`);
+    console.log(`Subtotal MXN: ${subtotal_mxn}`);
+    console.log(`Shipping MXN: ${costo_envio_mxn}`);
+    console.log(`Total MXN: ${total_mxn}`);
     console.log(`Exchange Rate: ${tipo_cambio}`);
-    console.log(`Tiempo estimado: ${tiempo_estimado || 6} semanas`);
+    console.log(`Has IVA: ${iva}`);
+    console.log(`Global Discount: ${descuento_global}%`);
     console.log("===============================");
 
     // Validate required fields
-    if (!cliente || !productos || productos.length === 0) {
+    if (!cliente || !productos || productos.length === 0 || typeof subtotal_mxn === 'undefined' || typeof costo_envio_mxn === 'undefined' || typeof total_mxn === 'undefined') {
+      console.error('Validation Error: Missing required fields', { cliente: !!cliente, productos: productos?.length, subtotal_mxn, costo_envio_mxn, total_mxn });
       return NextResponse.json(
-        { error: 'Cliente y productos son requeridos' }, 
+        { error: 'Cliente, productos y valores MXN son requeridos' }, 
         { status: 400 }
       );
     }
@@ -277,452 +300,247 @@ export async function POST(req: NextRequest) {
     const fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
 
-    // In our application architecture:
-    // 1. All monetary values in the context are stored in MXN
-    // 2. The UI displays them in USD if moneda is USD (by dividing by exchange rate)
-    // 3. We store both the display currency values and MXN equivalents
-    
-    // Calculate display values based on the selected currency
-    let displaySubtotal = subtotal;
-    let displayShippingCost = costo_envio || 0;
-    let displayTotal = total;
-    
-    // MXN values are already in the right currency
-    let subtotal_mxn = subtotal;
-    let costo_envio_mxn = costo_envio || 0;
-    let total_mxn = total;
-    
-    // If currency is USD, convert display values for storage
-    if (moneda === 'USD' && tipo_cambio) {
-      // Convert from MXN to USD for display currency values
-      displaySubtotal = subtotal / tipo_cambio;
-      displayShippingCost = costo_envio / tipo_cambio;
-      displayTotal = total / tipo_cambio;
-      
-      console.log(`Converting from MXN to USD for display: Rate ${tipo_cambio}`);
-      console.log(`Subtotal MXN: ${subtotal} → USD: ${displaySubtotal.toFixed(2)}`);
-      console.log(`Total MXN: ${total} → USD: ${displayTotal.toFixed(2)}`);
+    // --- Calculate Display Values & IVA for DB --- 
+    // Reintroduce separate variables for DB display values
+    let db_subtotal: number;
+    let db_costo_envio: number;
+    let db_total: number;
+    let db_monto_iva: number;
+    const incluye_envio_db = costo_envio_mxn > 0;
+
+    // Use the original MXN values received from the request
+    const original_subtotal_mxn = subtotal_mxn;
+    const original_costo_envio_mxn = costo_envio_mxn;
+    const original_total_mxn = total_mxn;
+
+    if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
+      // Convert original MXN to USD for display columns
+      db_subtotal = original_subtotal_mxn / tipo_cambio;
+      db_costo_envio = original_costo_envio_mxn / tipo_cambio;
+      db_total = original_total_mxn / tipo_cambio;
+      console.log(`Converting from MXN to USD for DB display columns: Rate ${tipo_cambio}`);
+    } else {
+      // Use original MXN values directly for display columns if currency is MXN
+      db_subtotal = original_subtotal_mxn;
+      db_costo_envio = original_costo_envio_mxn;
+      db_total = original_total_mxn;
     }
-    
-    console.log("==== COTIZACION DATA TO SAVE ====");
+
+    // Calculate IVA amount based on subtotal AFTER global discount (using original MXN)
+    const subtotalAfterDiscountMXN = original_subtotal_mxn * (1 - (descuento_global || 0) / 100);
+    const ivaAmountMXN = iva ? subtotalAfterDiscountMXN * 0.16 : 0;
+
+    // Convert IVA amount to display currency if needed
+    if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
+      db_monto_iva = ivaAmountMXN / tipo_cambio;
+    } else {
+      db_monto_iva = ivaAmountMXN;
+    }
+
+    console.log("==== COTIZACION DATA TO SAVE (Calculated) ====");
     console.log(`Currency: ${moneda}`);
-    console.log(`Subtotal (${moneda}): ${displaySubtotal.toFixed(2)}`);
-    console.log(`Subtotal_MXN: ${subtotal_mxn.toFixed(2)}`);
-    console.log(`Shipping (${moneda}): ${displayShippingCost.toFixed(2)}`);
-    console.log(`Shipping_MXN: ${costo_envio_mxn.toFixed(2)}`);
-    console.log(`Total (${moneda}): ${displayTotal.toFixed(2)}`);
-    console.log(`Total_MXN: ${total_mxn.toFixed(2)}`);
+    console.log(`DB Subtotal (${moneda}): ${db_subtotal.toFixed(2)}`);
+    console.log(`DB Shipping (${moneda}): ${db_costo_envio.toFixed(2)}`);
+    console.log(`DB IVA (${moneda}): ${db_monto_iva.toFixed(2)}`);
+    console.log(`DB Total (${moneda}): ${db_total.toFixed(2)}`);
+    console.log(`Base Subtotal_MXN: ${original_subtotal_mxn.toFixed(2)}`);
+    console.log(`Base Shipping_MXN: ${original_costo_envio_mxn.toFixed(2)}`);
+    console.log(`Base Total_MXN: ${original_total_mxn.toFixed(2)}`);
+    console.log(`Includes Shipping: ${incluye_envio_db}`);
     console.log("===============================");
 
-    // 1. Insert the quotation
+    // --- Database Transaction --- 
+    // Refactor: Remove RPC call and use direct inserts
+
+    // 1. Insert into Cotizaciones Table
     const { data: cotizacionData, error: cotizacionError } = await supabase
       .from('cotizaciones')
       .insert({
         cliente_id: client_id,
+        folio: folio, // Generated folio
         moneda: moneda,
-        subtotal: displaySubtotal,         // Amount in the display currency (USD or MXN)
-        subtotal_mxn: subtotal_mxn,        // Always in MXN for reporting
+        // Insert calculated display values
+        subtotal: db_subtotal,
+        costo_envio: db_costo_envio,
+        total: db_total,
+        monto_iva: db_monto_iva, // Use calculated IVA
+        // Insert base MXN values (use original values)
+        subtotal_mxn: original_subtotal_mxn,
+        costo_envio_mxn: original_costo_envio_mxn,
+        total_mxn: original_total_mxn,
+        // Other fields
         descuento_global: descuento_global || 0,
         iva: iva || false,
-        monto_iva: monto_iva || 0,
-        incluye_envio: incluye_envio || false,
-        costo_envio: displayShippingCost,  // Amount in the display currency (USD or MXN)
-        costo_envio_mxn: costo_envio_mxn,  // Always in MXN for reporting
-        total: displayTotal,               // Amount in the display currency (USD or MXN)
-        total_mxn: total_mxn,              // Always in MXN for reporting
-        folio: folio,
-        fecha_expiracion: fechaExpiracion.toISOString(),
-        tipo_cambio: tipo_cambio || null,
+        incluye_envio: incluye_envio_db, // Use calculated boolean
+        tipo_cambio: tipo_cambio,
         tiempo_estimado: tiempo_estimado || 6,
-        tiempo_estimado_max: tiempo_estimado_max || 8
+        tiempo_estimado_max: tiempo_estimado_max || 8,
+        estado: 'pendiente',
+        fecha_expiracion: fechaExpiracion.toISOString()
       })
-      .select('cotizacion_id')
-      .single();
+      .select('cotizacion_id') // Select the ID of the newly inserted row
+      .single(); // Expect only one row
 
     if (cotizacionError) {
-      console.error('Error inserting quotation:', cotizacionError);
+      console.error('Error inserting cotizacion:', cotizacionError);
       return NextResponse.json(
-        { error: 'Error al guardar la cotización' }, 
+        { error: `Error al guardar la cotización: ${cotizacionError.message}` },
         { status: 500 }
       );
     }
 
     const cotizacionId = cotizacionData.cotizacion_id;
+    console.log("Cotizacion inserted successfully with ID:", cotizacionId);
 
-    // 2. First, validate which productos exist in the database
-    console.log("===== PRODUCT DATA RECEIVED FROM CLIENT =====");
-    productos.forEach((p, i) => {
-      console.log(`Product ${i+1}:`, {
-        id: p.id,
-        producto_id: p.producto_id,
-        nombre: p.nombre,
-        precio: p.precio
-      });
-    });
-    console.log("===========================================");
-    
+    // 2. Prepare and Insert Products into Cotizacion_Productos Table
+    // (Adapting existing product validation logic)
+
     const productoIds = productos
-      .map(p => {
-        // Skip products that are clearly new/custom
-        if (p.id === 'new' || 
-            p.producto_id === null || 
-            (typeof p.id === 'string' && p.id.startsWith('custom-'))) {
-          return null;
+      .map((p: any) => {
+        const idValue = p.producto_id ?? p.id;
+        if (idValue && !String(idValue).startsWith('new-')) {
+            const numId = Number(idValue);
+            return !isNaN(numId) ? numId : null;
         }
-        
-        // First check if producto_id is available
-        if (p.producto_id) {
-          // Ensure it's a valid integer ID (not a timestamp)
-          const id = Number(p.producto_id);
-          if (!isNaN(id) && id > 0 && id < 1000000000) {
-            return id;
-          }
-        } 
-        
-        // Fall back to id if producto_id is not available and it's a valid numeric ID
-        if (p.id && typeof p.id !== 'object') {
-          const id = Number(p.id);
-          if (!isNaN(id) && id > 0 && id < 1000000000) {
-            return id;
-          }
-        }
-        
         return null;
       })
-      .filter(id => id !== null && !isNaN(id));
-    
-    console.log("Product IDs to verify:", productoIds);
+      .filter((id: number | null): id is number => id !== null);
 
-    // Check which products exist in the database
-    const { data: existingProducts, error: productsCheckError } = await supabase
+    console.log("Product IDs from frontend to verify:", productoIds);
+
+    const { data: existingDbProducts, error: productsCheckError } = await supabase
       .from('productos')
       .select('producto_id')
-      .in('producto_id', productoIds.length > 0 ? productoIds : [0]); // Prevent empty IN clause
-    
+      .in('producto_id', productoIds.length > 0 ? productoIds : [0]);
+
     if (productsCheckError) {
       console.error("Error checking existing products:", productsCheckError);
-      
-      // If there's an error, delete the quotation
-      await supabase
-        .from('cotizaciones')
-        .delete()
-        .eq('cotizacion_id', cotizacionId);
-        
-      return NextResponse.json(
-        { error: `Error al verificar productos: ${productsCheckError.message}` }, 
-        { status: 500 }
-      );
-    }
-    
-    // Create a set of existing product IDs for easy lookup
-    const existingProductIds = new Set(existingProducts?.map(p => p.producto_id) || []);
-    
-    console.log("Existing product IDs in database:", Array.from(existingProductIds));
-    
-    // Map and filter products to handle both existing and new products
-    let validProductosToInsert = [];
-    const processedCustomProducts = new Set(); // Track processed custom products by name
-
-    // First identify and create new products that need to be inserted
-    for (let i = 0; i < productos.length; i++) {
-      const producto = productos[i];
-      try {
-        // Check if this is a new product that needs to be inserted
-        const isCustomProduct = 
-          // Our intended marker for new products
-          producto.id === 'new' || 
-          // If producto_id is explicitly null, it's a new product
-          producto.producto_id === null ||
-          // If id is a string that looks like a timestamp (large number or starts with 'custom-')
-          (typeof producto.id === 'string' && 
-            ((producto.id.startsWith('custom-')) || 
-              (!isNaN(Number(producto.id)) && Number(producto.id) > 1000000000))) ||
-          // If id is a number that's too large to be a valid database ID (likely a timestamp)
-          (typeof producto.id === 'number' && producto.id > 1000000000);
-
-        if (isCustomProduct) {
-          // Skip if we've already processed a custom product with this name
-          if (processedCustomProducts.has(producto.nombre)) {
-            console.log(`Skipping duplicate custom product with name: ${producto.nombre}`);
-            continue;
-          }
-          
-          // Check if this product already exists in the database by name
-          const { data: existingProductByName, error: nameCheckError } = await supabase
-            .from('productos')
-            .select('producto_id')
-            .ilike('nombre', producto.nombre)
-            .limit(1);
-            
-          if (nameCheckError) {
-            console.error("Error checking if product exists by name:", nameCheckError);
-          }
-          
-          // If the product already exists, use that ID instead of creating a new one
-          if (existingProductByName && existingProductByName.length > 0) {
-            console.log(`Found existing product with name "${producto.nombre}", using ID: ${existingProductByName[0].producto_id}`);
-            
-            // Add product to the list using the existing producto_id
-            const precio_unitario_mxn = Number(producto.precio) || 0;
-            const producto_subtotal_mxn = Number(producto.subtotal) || 0;
-            
-            // For display currency fields, convert if needed
-            let displayPrecio = precio_unitario_mxn;
-            let displaySubtotal = producto_subtotal_mxn;
-            
-            // Convert to display currency if moneda is USD
-            if (moneda === 'USD' && tipo_cambio) {
-              displayPrecio = precio_unitario_mxn / tipo_cambio;
-              displaySubtotal = producto_subtotal_mxn / tipo_cambio;
-            }
-            
-            validProductosToInsert.push({
-              cotizacion_id: cotizacionId,
-              producto_id: existingProductByName[0].producto_id,
-              cantidad: Number(producto.cantidad) || 1,
-              precio_unitario: displayPrecio,
-              precio_unitario_mxn: precio_unitario_mxn,
-              descuento_producto: Number(producto.descuento) || 0,
-              subtotal: displaySubtotal,
-              subtotal_mxn: producto_subtotal_mxn
-            });
-            
-            // Add to processed set to avoid duplicates
-            processedCustomProducts.add(producto.nombre);
-            continue;
-          }
-          
-          console.log(`Custom product at index ${i} detected, will insert it:`, producto.nombre);
-          
-          // Add to processed set
-          processedCustomProducts.add(producto.nombre);
-          
-          // First, get the maximum producto_id to determine the next ID
-          const { data: maxIdData, error: maxIdError } = await supabase
-            .from('productos')
-            .select('producto_id')
-            .order('producto_id', { ascending: false })
-            .limit(1)
-            .single();
-            
-          if (maxIdError && !maxIdError.message.includes('No rows found')) {
-            console.error(`Error getting max producto_id:`, maxIdError);
-            continue; // Skip this product if we can't get the max ID
-          }
-          
-          // Calculate the next ID (if no products exist yet, start with 1)
-          const nextId = maxIdData ? maxIdData.producto_id + 1 : 1;
-          console.log(`Using next producto_id: ${nextId} for new product`);
-          
-          // Insert the new product into productos table with the specific ID
-          const { data: newProduct, error: newProductError } = await supabase
-            .from('productos')
-            .insert({
-              producto_id: nextId,
-              nombre: producto.nombre,
-              precio: Number(producto.precio) || 0,
-              tipo_producto: 'Personalizado'
-            })
-            .select('producto_id')
-            .single();
-            
-          if (newProductError) {
-            console.error(`Error inserting custom product at index ${i}:`, newProductError);
-            continue; // Skip this product if insert failed
-          }
-          
-          console.log(`Successfully inserted custom product, got ID: ${newProduct.producto_id}`);
-          
-          // Add product to the list using the newly generated producto_id
-          const precio_unitario_mxn = Number(producto.precio) || 0;
-          const producto_subtotal_mxn = Number(producto.subtotal) || 0;
-          
-          // For display currency fields, convert if needed
-          let displayPrecio = precio_unitario_mxn;
-          let displaySubtotal = producto_subtotal_mxn;
-          
-          // Convert to display currency if moneda is USD
-          if (moneda === 'USD' && tipo_cambio) {
-            displayPrecio = precio_unitario_mxn / tipo_cambio;
-            displaySubtotal = producto_subtotal_mxn / tipo_cambio;
-          }
-          
-          validProductosToInsert.push({
-            cotizacion_id: cotizacionId,
-            producto_id: newProduct.producto_id,
-            cantidad: Number(producto.cantidad) || 1,
-            precio_unitario: displayPrecio,
-            precio_unitario_mxn: precio_unitario_mxn,
-            descuento_producto: Number(producto.descuento) || 0,
-            subtotal: displaySubtotal,
-            subtotal_mxn: producto_subtotal_mxn
-          });
-        } else {
-          // Handle existing products with valid database IDs
-          // Use producto_id from the request if available, otherwise use the id field
-          const productoId = producto.producto_id || producto.id;
-          
-          // Skip products that don't have a valid ID
-          if (!productoId) {
-            console.error(`Product at index ${i} has no ID. Skipping.`);
-            continue;
-          }
-          
-          // Ensure the product ID is a number for the database
-          const numericProductId = Number(productoId);
-          
-          // Skip if the product ID is not in our validated set of existing products
-          if (!existingProductIds.has(numericProductId)) {
-            console.error(`Product ID ${numericProductId} does not exist in the database. Skipping.`);
-            continue;
-          }
-          
-          // All product prices and subtotals in context are in MXN
-          // Store them in MXN for the _mxn fields
-          const precio_unitario_mxn = Number(producto.precio) || 0;
-          const producto_subtotal_mxn = Number(producto.subtotal) || 0;
-          
-          // For display currency fields, convert if needed
-          let displayPrecio = precio_unitario_mxn;
-          let displaySubtotal = producto_subtotal_mxn;
-          
-          // Convert to display currency if moneda is USD
-          if (moneda === 'USD' && tipo_cambio) {
-            displayPrecio = precio_unitario_mxn / tipo_cambio;
-            displaySubtotal = producto_subtotal_mxn / tipo_cambio;
-          }
-          
-          validProductosToInsert.push({
-            cotizacion_id: cotizacionId,
-            producto_id: numericProductId,
-            cantidad: Number(producto.cantidad) || 1,
-            precio_unitario: displayPrecio,
-            precio_unitario_mxn: precio_unitario_mxn,
-            descuento_producto: Number(producto.descuento) || 0,
-            subtotal: displaySubtotal,
-            subtotal_mxn: producto_subtotal_mxn
-          });
-        }
-      } catch (error) {
-        console.error(`Error processing product at index ${i}:`, error);
-      }
+      // Rollback: Delete the just inserted cotizacion
+      await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+      return NextResponse.json({ error: 'Error al verificar productos existentes' }, { status: 500 });
     }
 
-    // Check if we have any valid products left
-    if (validProductosToInsert.length === 0) {
-      console.error("No valid products to insert!");
-      
-      // Delete the quotation since we can't add any products
-      await supabase
-        .from('cotizaciones')
-        .delete()
-        .eq('cotizacion_id', cotizacionId);
-        
-      return NextResponse.json(
-        { error: "No se pudo guardar la cotización: Ninguno de los productos existe en la base de datos" }, 
-        { status: 400 }
-      );
-    }
+    const existingProductIds = new Set(existingDbProducts?.map(p => p.producto_id) || []);
+    console.log("Existing product IDs found in DB:", Array.from(existingProductIds));
 
-    console.log(`Inserting ${validProductosToInsert.length} valid products for quotation ${cotizacionId}`);
-    console.log("Valid product IDs:", validProductosToInsert.map(p => p.producto_id));
-
-    // First, get the current maximum cotizacion_producto_id to avoid primary key conflicts
+    // --- Fetch Max cotizacion_producto_id to generate new IDs --- 
     const { data: maxIdData, error: maxIdError } = await supabase
       .from('cotizacion_productos')
       .select('cotizacion_producto_id')
       .order('cotizacion_producto_id', { ascending: false })
       .limit(1)
-      .maybeSingle();
-    
+      .maybeSingle(); // Use maybeSingle to handle case where table is empty
+
     if (maxIdError) {
-      console.error('Error fetching max cotizacion_producto_id:', maxIdError);
-      // Continue anyway - we'll try using a high starting value if this fails
+      console.error("Error fetching max cotizacion_producto_id:", maxIdError);
+       // Rollback: Delete the just inserted cotizacion
+      await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+      return NextResponse.json({ error: 'Error al preparar IDs de productos para cotización' }, { status: 500 });
     }
-    
-    // Start with max ID + 1, or 1 if no products exist, or 10000 if query failed
-    let nextProductoId = maxIdData?.cotizacion_producto_id 
-      ? Number(maxIdData.cotizacion_producto_id) + 1 
-      : (maxIdError ? 10000 : 1);
-    
-    console.log(`Starting cotizacion_producto_id: ${nextProductoId}`);
-    
-    // First, check if any of these products already exist for this quotation
-    // This prevents the duplicate key error
-    const { data: existingCotizacionProductos, error: existingProductsError } = await supabase
-      .from('cotizacion_productos')
-      .select('producto_id')
-      .eq('cotizacion_id', cotizacionId);
-    
-    if (existingProductsError) {
-      console.error('Error checking existing quotation products:', existingProductsError);
-      
-      // If there's an error, continue with the insert operation
-      // but log the potential issue
-    }
-    
-    // If there are existing products, filter them out from our insert
-    if (existingCotizacionProductos && existingCotizacionProductos.length > 0) {
-      const existingProductIdsInQuotation = new Set(existingCotizacionProductos.map(p => p.producto_id));
-      console.log("Existing product IDs in this quotation:", Array.from(existingProductIdsInQuotation));
-      
-      // Filter out products that already exist in this quotation
-      const filteredProductosToInsert = validProductosToInsert.filter(p => 
-        !existingProductIdsInQuotation.has(p.producto_id)
-      );
-      
-      console.log(`After filtering, inserting ${filteredProductosToInsert.length} new products`);
-      
-      // If we have no products left to insert after filtering, we can skip the insert operation
-      if (filteredProductosToInsert.length === 0) {
-        console.log("All products already exist in this quotation, skipping insert");
-        
-        // Return information about the created quotation
-        return NextResponse.json({
-          success: true,
+
+    let nextId = (maxIdData?.cotizacion_producto_id || 0) + 1;
+    console.log(`Starting next cotizacion_producto_id from: ${nextId}`);
+    // --- End Fetch Max ID ---
+
+    const productosToInsert = productos
+      .map((p: any) => {
+        const frontendId = p.producto_id ?? p.id;
+        const dbProductoId = Number(frontendId);
+
+        // Ensure product exists in DB before adding
+        if (isNaN(dbProductoId) || !existingProductIds.has(dbProductoId)) {
+            console.warn(`Skipping product - ID not found in DB or invalid: ${frontendId}`);
+            return null;
+        }
+
+        // Use the MXN values sent from the frontend for the product
+        const prod_original_precio_mxn = p.precio_unitario_mxn;
+        const prod_original_subtotal_mxn = p.subtotal_mxn;
+
+        // Calculate display price/subtotal for this product
+        let prod_db_precio: number;
+        let prod_db_subtotal: number;
+        if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
+            prod_db_precio = prod_original_precio_mxn / tipo_cambio;
+            prod_db_subtotal = prod_original_subtotal_mxn / tipo_cambio;
+        } else {
+            prod_db_precio = prod_original_precio_mxn;
+            prod_db_subtotal = prod_original_subtotal_mxn;
+        }
+
+        // Assign the generated ID
+        const currentId = nextId++;
+
+        return {
+          cotizacion_producto_id: currentId, // Assign explicit ID
           cotizacion_id: cotizacionId,
-          folio: folio,
-          cliente_creado: cliente_creado
-        });
-      }
-      
-      // Update our array to only include new products
-      validProductosToInsert = filteredProductosToInsert;
+          producto_id: dbProductoId,
+          cantidad: p.cantidad,
+          // Calculated display values for DB
+          precio_unitario: prod_db_precio,
+          subtotal: prod_db_subtotal,
+          // Base MXN values for DB (use original from frontend)
+          precio_unitario_mxn: prod_original_precio_mxn, 
+          subtotal_mxn: prod_original_subtotal_mxn,
+          // Other fields
+          descuento_producto: p.descuento || 0,
+          descripcion: p.descripcion,
+          colores: Array.isArray(p.colores) ? p.colores.join(',') : p.colores,
+          acabado: p.acabado
+        };
+      })
+      .filter((p: any): p is object => p !== null); // Filter out nulls
+
+    if (productosToInsert.length === 0) {
+      console.warn("No valid products found to insert after validation.");
+      // Rollback: Delete the just inserted cotizacion if no products are valid
+      await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+      return NextResponse.json({ error: 'Ningún producto válido para agregar a la cotización.' }, { status: 400 });
     }
 
-    // Now proceed with inserting only the products that don't already exist
-    // Add cotizacion_producto_id to each record
-    const productsWithIds = validProductosToInsert.map(producto => ({
-      ...producto,
-      cotizacion_producto_id: nextProductoId++
-    }));
-    
-    console.log(`Inserting ${productsWithIds.length} products with IDs starting from ${productsWithIds[0]?.cotizacion_producto_id || 'N/A'}`);
-    
-    const { error: productosError } = await supabase
-      .from('cotizacion_productos')
-      .insert(productsWithIds);
+    console.log(`Attempting to insert ${productosToInsert.length} products into cotizacion_productos`);
 
-    if (productosError) {
-      console.error('Error inserting quotation products:', productosError);
-      
-      // If there's an error with products, delete the quotation
-      await supabase
-        .from('cotizaciones')
-        .delete()
-        .eq('cotizacion_id', cotizacionId);
-        
+    const { error: productosInsertError } = await supabase
+        .from('cotizacion_productos')
+        .insert(productosToInsert);
+
+    if (productosInsertError) {
+        console.error('Error inserting products into cotizacion_productos:', productosInsertError);
+        // Rollback: Delete the just inserted cotizacion
+        await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+        return NextResponse.json({ error: `Error al guardar productos: ${productosInsertError.message}` }, { status: 500 });
+    }
+
+    console.log("Products inserted successfully for cotizacion ID:", cotizacionId);
+    
+    // --- End Database Transaction --- 
+    
+    /* Remove RPC call result extraction
+    const { data: cotizacionResult, error: cotizacionError } = await supabase.rpc('crear_cotizacion_con_productos', { ... });
+
+    if (cotizacionError) {
+      console.error('Error calling Supabase function crear_cotizacion_con_productos:', cotizacionError);
       return NextResponse.json(
-        { error: `Error al guardar los productos de la cotización: ${productosError.message}` }, 
+        { error: `Error al guardar en base de datos: ${cotizacionError.message}` },
         { status: 500 }
       );
     }
 
+    // Extract results from the function call
+    const { nueva_cotizacion_id, nuevo_folio } = cotizacionResult;
+    */
+
+    // Use the ID and folio obtained from the direct insert
+    const nueva_cotizacion_id = cotizacionId;
+    const nuevo_folio = folio; 
+
+    console.log("Cotizacion created successfully (direct insert):", { nueva_cotizacion_id, nuevo_folio });
+
     // Return information about the created quotation, including the client if it was created
     return NextResponse.json({
       success: true,
-      cotizacion_id: cotizacionId,
-      folio: folio,
+      cotizacion_id: nueva_cotizacion_id,
+      folio: nuevo_folio,
       cliente_creado: cliente_creado
     });
     
@@ -736,7 +554,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
   const searchParams = request.nextUrl.searchParams;
   const id = searchParams.get('id');
   

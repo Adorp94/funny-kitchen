@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, FileText, DollarSign } from "lucide-react";
 import Link from "next/link";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,6 @@ interface PaymentFormData {
 export default function CotizacionDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   
   const [cotizacion, setCotizacion] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,9 +49,7 @@ export default function CotizacionDetailPage() {
       }
     } catch (error) {
       console.error("Error fetching cotizacion:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la cotización",
+      toast("No se pudo cargar la cotización", {
         variant: "destructive",
       });
     } finally {
@@ -73,17 +70,13 @@ export default function CotizacionDetailPage() {
         fetchCotizacion();
         return true;
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "No se pudo actualizar el estado",
+        toast(result.error || "No se pudo actualizar el estado", {
           variant: "destructive",
         });
         return false;
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al actualizar el estado",
+      toast(error instanceof Error ? error.message : "Error al actualizar el estado", {
         variant: "destructive",
       });
       return false;
@@ -136,7 +129,7 @@ export default function CotizacionDetailPage() {
     <div className="py-6 px-4 sm:py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/cotizaciones" className="rounded-full bg-white shadow-xs border border-gray-100 p-2 hover:bg-gray-50 transition-colors shrink-0">
+          <Link href="/dashboard/cotizaciones" className="rounded-full bg-white shadow-sm border border-gray-100 p-2 hover:bg-gray-50 transition-colors shrink-0">
             <ArrowLeft className="h-4 w-4 text-gray-600" />
           </Link>
           <div className="min-w-0">
@@ -151,7 +144,7 @@ export default function CotizacionDetailPage() {
         
         <Button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-xs w-full sm:w-auto"
+          className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-sm w-full sm:w-auto"
         >
           <FileText className="mr-2 h-4 w-4" />
           Cambiar Estado
@@ -160,7 +153,7 @@ export default function CotizacionDetailPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Client information */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-linear-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-medium text-gray-900">Información del Cliente</h2>
           </div>
@@ -191,7 +184,7 @@ export default function CotizacionDetailPage() {
         </div>
         
         {/* Cotizacion details */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-linear-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-medium text-gray-900">Detalles de la Cotización</h2>
           </div>
@@ -235,7 +228,7 @@ export default function CotizacionDetailPage() {
         </div>
         
         {/* Financial summary */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-linear-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-medium text-gray-900">Resumen Financiero</h2>
           </div>
@@ -298,7 +291,7 @@ export default function CotizacionDetailPage() {
                       <DollarSign className="h-4 w-4 mr-1 text-blue-600" />
                       Anticipo Recibido
                     </h3>
-                    <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="bg-blue-50 p-4 rounded-full">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-xs text-blue-700 font-medium mb-1">Monto</p>
@@ -329,7 +322,7 @@ export default function CotizacionDetailPage() {
       </div>
       
       {/* Products section */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden mb-6 sm:mb-8">
+      <div className="bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden mb-6 sm:mb-8">
         <div className="bg-linear-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <h2 className="text-base sm:text-lg font-medium text-gray-900">Productos</h2>
         </div>
@@ -392,7 +385,7 @@ export default function CotizacionDetailPage() {
       
       {/* Payment history */}
       {cotizacion.pagos && cotizacion.pagos.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden">
           <div className="bg-linear-to-r from-gray-50 to-white px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
             <h2 className="text-base sm:text-lg font-medium text-gray-900">Historial de Pagos</h2>
           </div>
