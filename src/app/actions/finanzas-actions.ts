@@ -46,50 +46,107 @@ interface PaginationResult {
   itemsPerPage: number;
 }
 
-// Server action to get financial metrics
-export async function getFinancialMetrics(): Promise<{ success: boolean; data?: FinancialMetrics; error?: string }> {
+// Updated server action to get financial metrics with filters
+export async function getFinancialMetrics(
+  month?: number, // Can be 0 for "Todos"
+  year?: number   // Can be 0 for "Todos"
+): Promise<{ success: boolean; data?: FinancialMetrics; error?: string }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
-    
-    // Get total ingresos in MXN
-    const { data: ingresosMXN, error: errorIngresosMXN } = await supabase
+    // Base queries
+    let ingresosMXNQuery = supabase
       .from('cotizacion_pagos_view')
       .select('monto_mxn')
       .eq('moneda', 'MXN');
-    
-    // Get total ingresos in USD
-    const { data: ingresosUSD, error: errorIngresosUSD } = await supabase
+      
+    let ingresosUSDQuery = supabase
       .from('cotizacion_pagos_view')
       .select('monto')
       .eq('moneda', 'USD');
-    
-    // Get total egresos in MXN
-    const { data: egresosMXN, error: errorEgresosMXN } = await supabase
+      
+    let egresosMXNQuery = supabase
       .from('egresos')
       .select('monto_mxn')
       .eq('moneda', 'MXN');
-    
-    // Get total egresos in USD
-    const { data: egresosUSD, error: errorEgresosUSD } = await supabase
+      
+    let egresosUSDQuery = supabase
       .from('egresos')
       .select('monto')
       .eq('moneda', 'USD');
-    
-    // Get count of paid cotizaciones
-    const { count: cotizacionesPagadas, error: errorCotizaciones } = await supabase
+      
+    // Assuming cotizaciones should be filtered by fecha_pago_inicial or similar
+    // *** Adjust 'fecha_pago_inicial' if the relevant date column is different ***
+    let cotizacionesQuery = supabase
       .from('cotizaciones')
       .select('*', { count: 'exact', head: true })
       .eq('estatus_pago', 'pagado');
+
+    // Apply filters if year is provided and not 0
+    if (year) {
+      const yearStartIngresos = `${year}-01-01T00:00:00Z`;
+      const yearEndIngresos = `${year}-12-31T23:59:59Z`;
+      const yearStartEgresos = `${year}-01-01`;
+      const yearEndEgresos = `${year}-12-31`;
+
+      ingresosMXNQuery = ingresosMXNQuery.filter('fecha_pago', 'gte', yearStartIngresos).filter('fecha_pago', 'lte', yearEndIngresos);
+      ingresosUSDQuery = ingresosUSDQuery.filter('fecha_pago', 'gte', yearStartIngresos).filter('fecha_pago', 'lte', yearEndIngresos);
+      egresosMXNQuery = egresosMXNQuery.filter('fecha', 'gte', yearStartEgresos).filter('fecha', 'lte', yearEndEgresos);
+      egresosUSDQuery = egresosUSDQuery.filter('fecha', 'gte', yearStartEgresos).filter('fecha', 'lte', yearEndEgresos);
+      // Filter cotizaciones count - adjust date column if needed
+      cotizacionesQuery = cotizacionesQuery.filter('fecha_pago_inicial', 'gte', yearStartIngresos).filter('fecha_pago_inicial', 'lte', yearEndIngresos);
+
+      // Apply month filter if month and year are provided and not 0
+      if (month) {
+        const monthStartIngresos = new Date(year, month - 1, 1).toISOString();
+        const monthEndIngresos = new Date(year, month, 1).toISOString(); // Use less than start of next month
+        const monthStartEgresos = `${year}-${String(month).padStart(2, '0')}-01`;
+        const nextMonthEgresos = month === 12 ? 1 : month + 1;
+        const nextYearEgresos = month === 12 ? year + 1 : year;
+        const monthEndEgresos = `${nextYearEgresos}-${String(nextMonthEgresos).padStart(2, '0')}-01`;
+
+        ingresosMXNQuery = ingresosMXNQuery.filter('fecha_pago', 'gte', monthStartIngresos).filter('fecha_pago', 'lt', monthEndIngresos);
+        ingresosUSDQuery = ingresosUSDQuery.filter('fecha_pago', 'gte', monthStartIngresos).filter('fecha_pago', 'lt', monthEndIngresos);
+        egresosMXNQuery = egresosMXNQuery.filter('fecha', 'gte', monthStartEgresos).filter('fecha', 'lt', monthEndEgresos);
+        egresosUSDQuery = egresosUSDQuery.filter('fecha', 'gte', monthStartEgresos).filter('fecha', 'lt', monthEndEgresos);
+         // Filter cotizaciones count - adjust date column if needed
+        cotizacionesQuery = cotizacionesQuery.filter('fecha_pago_inicial', 'gte', monthStartIngresos).filter('fecha_pago_inicial', 'lt', monthEndIngresos);
+      }
+    }
+
+    // Execute all queries in parallel
+    const [ 
+      { data: ingresosMXN, error: errorIngresosMXN },
+      { data: ingresosUSD, error: errorIngresosUSD },
+      { data: egresosMXN, error: errorEgresosMXN },
+      { data: egresosUSD, error: errorEgresosUSD },
+      { count: cotizacionesPagadas, error: errorCotizaciones } 
+    ] = await Promise.all([
+      ingresosMXNQuery,
+      ingresosUSDQuery,
+      egresosMXNQuery,
+      egresosUSDQuery,
+      cotizacionesQuery
+    ]);
     
-    // Log any errors but continue with available data
-    if (errorIngresosMXN) console.error('Error fetching MXN ingresos:', errorIngresosMXN);
-    if (errorIngresosUSD) console.error('Error fetching USD ingresos:', errorIngresosUSD);
-    if (errorEgresosMXN) console.error('Error fetching MXN egresos:', errorEgresosMXN);
-    if (errorEgresosUSD) console.error('Error fetching USD egresos:', errorEgresosUSD);
-    if (errorCotizaciones) console.error('Error fetching paid cotizaciones:', errorCotizaciones);
+    // Log any errors 
+    if (errorIngresosMXN) console.error('Error fetching filtered MXN ingresos:', errorIngresosMXN);
+    if (errorIngresosUSD) console.error('Error fetching filtered USD ingresos:', errorIngresosUSD);
+    if (errorEgresosMXN) console.error('Error fetching filtered MXN egresos:', errorEgresosMXN);
+    if (errorEgresosUSD) console.error('Error fetching filtered USD egresos:', errorEgresosUSD);
+    if (errorCotizaciones) console.error('Error fetching filtered paid cotizaciones:', errorCotizaciones);
+
+    // Check for critical errors - return failure if any query failed
+    if (errorIngresosMXN || errorIngresosUSD || errorEgresosMXN || errorEgresosUSD || errorCotizaciones) {
+        const errors = [
+            errorIngresosMXN?.message,
+            errorIngresosUSD?.message,
+            errorEgresosMXN?.message,
+            errorEgresosUSD?.message,
+            errorCotizaciones?.message
+        ].filter(Boolean).join('; ');
+        return { success: false, error: `Failed to fetch some metrics: ${errors}` };
+    }
     
-    // Calculate totals, safely handling null/undefined data
+    // Calculate totals (same logic as before, now on potentially filtered data)
     const ingresosMXNTotal = Array.isArray(ingresosMXN) 
       ? ingresosMXN.reduce((acc, curr) => acc + Number(curr?.monto_mxn || 0), 0) 
       : 0;
@@ -106,7 +163,6 @@ export async function getFinancialMetrics(): Promise<{ success: boolean; data?: 
       ? egresosUSD.reduce((acc, curr) => acc + Number(curr?.monto || 0), 0) 
       : 0;
     
-    // Calculate balance
     const balanceMXN = ingresosMXNTotal - egresosMXNTotal;
     const balanceUSD = ingresosUSDTotal - egresosUSDTotal;
     
@@ -121,14 +177,9 @@ export async function getFinancialMetrics(): Promise<{ success: boolean; data?: 
     };
   } catch (error) {
     console.error('Error getting financial metrics:', error);
+    // Return success: false on general catch error
     return { 
-      success: true, // Return success true with empty data to avoid breaking UI
-      data: {
-        ingresos: { mxn: 0, usd: 0 },
-        egresos: { mxn: 0, usd: 0 },
-        balance: { mxn: 0, usd: 0 },
-        cotizacionesPagadas: 0
-      },
+      success: false, 
       error: error instanceof Error ? error.message : 'Failed to fetch financial metrics'
     };
   }

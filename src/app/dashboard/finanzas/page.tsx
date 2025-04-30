@@ -124,28 +124,27 @@ export default function FinanzasPage() {
 
   // Fetch initial data based on default filters
   useEffect(() => {
-    fetchMetrics(); // Metrics aren't filtered yet
-    // Pass 0 if selectedMonth/Year is 0, otherwise pass the number
+    // Pass filters to fetchMetrics
+    fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
     fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined);
     fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined);
-    // Depend on selectedMonth/Year state
-  }, [selectedMonth, selectedYear]); 
+  }, [selectedMonth, selectedYear]); // Re-fetch when filters change
 
   // --- Fetching Functions ---
-  const fetchMetrics = async () => {
-    // Consider adding filters if metrics should reflect selection
+  // Updated fetchMetrics to accept filters
+  const fetchMetrics = async (month: number | undefined, year: number | undefined) => {
     try {
-      const result = await getFinancialMetrics();
+      // Pass filters to the server action
+      const result = await getFinancialMetrics(month, year); 
       if (result.success && result.data) {
         setMetrics(result.data);
       } else {
          console.warn("Failed to fetch metrics or no data:", result.error);
-         // Optionally reset metrics state here
+         // Reset metrics state on failure
          setMetrics({ ingresos: { mxn: 0, usd: 0 }, egresos: { mxn: 0, usd: 0 }, balance: { mxn: 0, usd: 0 }, cotizacionesPagadas: 0 });
       }
     } catch (error) {
       console.error("Error fetching metrics:", error);
-      // Reset metrics on error
       setMetrics({ ingresos: { mxn: 0, usd: 0 }, egresos: { mxn: 0, usd: 0 }, balance: { mxn: 0, usd: 0 }, cotizacionesPagadas: 0 });
     }
   };
@@ -216,8 +215,8 @@ export default function FinanzasPage() {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        fetchMetrics(), 
-        // Pass state values (can be 0)
+        // Pass filters to fetchMetrics
+        fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
         fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined),
         fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined)
       ]);
@@ -231,9 +230,8 @@ export default function FinanzasPage() {
     try {
       const result = await createIngreso(data);
       if (result.success) {
-        // Refetch metrics and the first page of current filtered view
-        fetchMetrics(); 
-        // Pass state values (can be 0)
+        // Pass filters to fetchMetrics
+        fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
         fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined); 
         return true;
       }
@@ -248,9 +246,8 @@ export default function FinanzasPage() {
     try {
       const result = await createEgreso(data);
       if (result.success) {
-        // Refetch metrics and the first page of current filtered view
-        fetchMetrics();
-        // Pass state values (can be 0)
+        // Pass filters to fetchMetrics
+        fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
         fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined); 
         return true;
       }
