@@ -7,3 +7,6 @@ export function cn(...inputs: ClassValue[]) {
 
 // Re-export currency utils
 export { formatCurrency, parseAmount, calculateSubtotal, calculateTotalWithIVA, convertToDollars } from './utils/currency';
+
+// Re-export date utils
+export { formatDate } from './utils/date';
