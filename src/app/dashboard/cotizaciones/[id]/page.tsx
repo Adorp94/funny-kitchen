@@ -75,23 +75,24 @@ export default function CotizacionDetailPage() {
     newStatus: string, 
     paymentData?: PaymentFormData
   ) => {
+    if (!cotizacion) {
+      toast.error("Error: Datos de cotización no disponibles.");
+      return false;
+    }
+
     try {
       const result = await updateCotizacionStatus(cotizacionId, newStatus, paymentData);
       
       if (result.success) {
-        // Refresh the data
-        fetchCotizacion();
+        await fetchCotizacion();
         return true;
       } else {
-        toast(result.error || "No se pudo actualizar el estado", {
-          variant: "destructive",
-        });
+        toast.error(result.error || "No se pudo actualizar el estado. Intenta de nuevo.");
         return false;
       }
     } catch (error) {
-      toast(error instanceof Error ? error.message : "Error al actualizar el estado", {
-        variant: "destructive",
-      });
+      console.error("Error calling updateCotizacionStatus:", error);
+      toast.error(error instanceof Error ? error.message : "Error inesperado al actualizar el estado.");
       return false;
     }
   };
@@ -322,12 +323,14 @@ export default function CotizacionDetailPage() {
          )}
       </div>
 
-      <CotizacionStatusModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        cotizacion={cotizacion}
-        onStatusChange={handleStatusChange}
-      />
+      {cotizacion && (
+        <CotizacionStatusModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          cotizacion={cotizacion}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   );
 } 
