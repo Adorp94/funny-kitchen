@@ -99,13 +99,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         <>
           {!isSignIn && <Header />}
           <div className="w-full mx-auto px-6 sm:px-8 lg:px-10">
-            <div className="flex flex-col">
+            <div className="flex flex-col min-h-[calc(100vh-theme(space.16)-theme(space.16))] ">
               <main className="flex-1">
                 {children}
               </main>
-              {!isSignIn && <Footer />}
             </div>
           </div>
+          {!isSignIn && <Footer />}
         </>
       ) : error ? (
         debugContent
