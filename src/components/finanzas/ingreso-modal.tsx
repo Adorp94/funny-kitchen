@@ -28,6 +28,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { getAvailableCotizaciones } from "@/app/actions/finanzas-actions";
 import { IngresoForm } from "./ingreso-form";
 import { cn, formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 
 // Form validation schema
 const formSchema = z.object({
@@ -120,11 +121,13 @@ export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoR
       const dataToSubmit = { ...values, moneda };
       const success = await onSubmit(dataToSubmit);
       if (success) {
+        toast.success("Ingreso registrado exitosamente.");
         form.reset();
         onClose();
       }
     } catch (error) {
       console.error("Error submitting payment:", error);
+      toast.error("Error al registrar el ingreso. Intenta de nuevo.");
     } finally {
       setIsSubmitting(false);
     }

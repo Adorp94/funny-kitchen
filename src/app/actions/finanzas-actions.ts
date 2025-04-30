@@ -23,8 +23,7 @@ interface IngresoData {
   metodo_pago: string;
   fecha_pago: string;
   porcentaje: number;
-  notas?: string;
-  comprobante_url?: string;
+  // notes and comprobante_url are removed / already optional
 }
 
 interface EgresoData {
@@ -162,29 +161,28 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
     const currentPage = Math.min(page, totalPages);
     const offset = (currentPage - 1) * pageSize;
     
-    // Get paginated ingresos
+    // Get paginated ingresos - Corrected select string
+    const selectString = `
+      anticipo_id,
+      cotizacion_id,
+      folio,
+      cliente_id,
+      moneda,
+      monto,
+      monto_mxn,
+      metodo_pago,
+      fecha_pago,
+      porcentaje,
+      precio_total
+    `;
     const { data, error } = await supabase
       .from('cotizacion_pagos_view')
-      .select(`
-        anticipo_id, 
-        cotizacion_id, 
-        folio, 
-        cliente_id,
-        moneda, 
-        monto, 
-        monto_mxn, 
-        metodo_pago, 
-        fecha_pago, 
-        porcentaje, 
-        notas, 
-        comprobante_url,
-        precio_total
-      `)
+      .select(selectString)
       .order('fecha_pago', { ascending: false })
       .range(offset, offset + pageSize - 1);
-    
+
     if (error) {
-      console.error('Error fetching ingresos:', error);
+       console.error('Error fetching ingresos:', error);
       // Return empty data with pagination
       return {
         success: true,
@@ -199,7 +197,6 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
       };
     }
     
-    // Ensure data is an array
     const ingresos = Array.isArray(data) ? data : [];
     
     // Get client names only if we have ingresos with cliente_id
@@ -230,12 +227,22 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
     
     // Map ingresos with client names
     const formattedIngresos = ingresos.map(ingreso => ({
-      ...ingreso,
+      // Explicitly map only needed fields to match IngresoData type
+      anticipo_id: ingreso.anticipo_id,
+      cotizacion_id: ingreso.cotizacion_id,
+      folio: ingreso.folio,
+      // cliente_id: ingreso.cliente_id, // Don't need to return cliente_id itself
       cliente_nombre: ingreso.cliente_id != null ? 
         (clientesMap[ingreso.cliente_id] || 'Cliente desconocido') : 
-        'Cliente no especificado'
+        'Cliente no especificado',
+      moneda: ingreso.moneda,
+      monto: ingreso.monto,
+      monto_mxn: ingreso.monto_mxn,
+      metodo_pago: ingreso.metodo_pago,
+      fecha_pago: ingreso.fecha_pago,
+      porcentaje: ingreso.porcentaje,
     }));
-    
+
     return {
       success: true,
       data: formattedIngresos,

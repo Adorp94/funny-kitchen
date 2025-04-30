@@ -143,6 +143,7 @@ export default function FinanzasPage() {
   };
 
   const refreshData = async () => {
+    console.log('[FinanzasPage] Refresh Button Clicked - Calling refreshData...');
     setIsRefreshing(true);
     try {
       await Promise.all([
