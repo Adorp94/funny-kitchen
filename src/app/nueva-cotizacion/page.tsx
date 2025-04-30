@@ -375,36 +375,45 @@ function NuevaCotizacionClient() {
     const steps = ['Cliente', 'Productos', 'Finalizar'];
     return (
       <nav aria-label="Progress">
-        <ol role="list" className="flex items-center">
+        <ol role="list" className="flex items-center space-x-8 sm:space-x-16">
           {steps.map((name, stepIdx) => {
             const stepNumber = stepIdx + 1;
             const isCompleted = stepNumber < currentStep;
             const isCurrent = stepNumber === currentStep;
+            const canNavigate = stepNumber < currentStep ||
+                                (stepNumber === 2 && cliente) ||
+                                (stepNumber === 3 && cliente && productos.length > 0);
+
             return (
-              <li key={name} className={`relative ${stepIdx !== steps.length - 1 ? 'pr-12 sm:pr-24' : ''}`}>
-                <div className="absolute inset-0 top-1/2 -translate-y-1/2" aria-hidden="true">
-                  <div className={`h-0.5 w-full ${isCompleted ? 'bg-primary' : 'bg-muted'}`}></div>
-                </div>
+              <li key={name} className={`relative flex-1 ${stepIdx === steps.length - 1 ? 'flex-grow-0' : ''}`}>
+                {stepIdx < steps.length - 1 ? (
+                  <div className="absolute left-4 top-4 -ml-px h-0.5 w-full bg-muted" aria-hidden="true" />
+                ) : null}
+                {isCompleted && stepIdx < steps.length - 1 ? (
+                  <div
+                    className="absolute left-4 top-4 -ml-px h-0.5 w-full bg-primary"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 <button
                   onClick={() => {
-                    if (stepNumber < currentStep || 
-                        (stepNumber === 2 && cliente) || 
-                        (stepNumber === 3 && cliente && productos.length > 0)) {
+                    if (canNavigate) {
                       setActiveStep(stepNumber);
                     }
                   }}
-                  className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${
-                    isCompleted 
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                      : isCurrent 
-                      ? 'border-2 border-primary bg-background text-primary' 
-                      : 'border-2 border-muted bg-background text-muted-foreground hover:border-muted-foreground' 
-                  }`}
+                  disabled={!canNavigate}
+                  className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium z-10 ${
+                    isCompleted
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : isCurrent
+                      ? 'border-2 border-primary bg-background text-primary'
+                      : 'border-2 border-muted bg-background text-muted-foreground hover:border-muted-foreground'
+                  } ${!canNavigate && !isCurrent ? 'cursor-not-allowed opacity-50' : ''}`}
                   aria-current={isCurrent ? 'step' : undefined}
                 >
                   {isCompleted ? <Check className="h-5 w-5" /> : stepNumber}
                 </button>
-                <span className="absolute top-full mt-2 text-xs font-medium text-muted-foreground whitespace-nowrap">{name}</span>
+                <span className="absolute top-full mt-2 text-xs text-center w-full font-medium text-muted-foreground whitespace-nowrap">{name}</span>
               </li>
             );
           })}
@@ -415,15 +424,17 @@ function NuevaCotizacionClient() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Nueva Cotización
-        </h1>
+      {/* Page Header - Wrapped for centering */}
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Nueva Cotización
+          </h1>
+        </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex justify-center pb-10">
+      {/* Step Indicator - Increase padding below */}
+      <div className="flex justify-center pb-12"> 
          <StepIndicator currentStep={activeStep} />
       </div>
 
