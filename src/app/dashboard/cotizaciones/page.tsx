@@ -53,6 +53,7 @@ interface Cotizacion {
 export default function CotizacionesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [filteredCotizaciones, setFilteredCotizaciones] = useState<Cotizacion[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -253,16 +254,11 @@ export default function CotizacionesPage() {
   };
   
   const handleViewCotizacion = (id: number) => {
-    // Store ID in session storage and navigate to view page
-    sessionStorage.setItem('cotizacion_id', id.toString());
-    router.push('/ver-cotizacion');
+    router.push(`/dashboard/cotizaciones/${id}`);
   };
   
   const handleNewCotizacion = () => {
-    // Clear any existing session storage data and navigate to new quote page
-    sessionStorage.removeItem('cotizacion_id');
-    sessionStorage.removeItem('cotizacion_cliente');
-    sessionStorage.removeItem('cotizacion_productos');
+    setIsNavigating(true);
     router.push('/nueva-cotizacion');
   };
   
@@ -334,13 +330,59 @@ export default function CotizacionesPage() {
     return filteredCotizaciones.slice(startIndex, endIndex);
   };
   
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+  
+  const renderPagination = () => {
+    return (
+      <CardFooter className="flex items-center justify-between border-t px-6 py-3">
+        <div className="text-xs text-muted-foreground">
+          Página {currentPage} de {totalPages}
+        </div>
+        <div className="flex space-x-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+            disabled={currentPage === 1}
+            className="h-7 px-2.5"
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+            disabled={currentPage >= totalPages}
+            className="h-7 px-2.5"
+          >
+            Siguiente
+          </Button>
+        </div>
+      </CardFooter>
+    );
+  };
+  
+  // Skeleton Loader Component
+  const TableSkeletonLoader = () => {
+    return (
+      <TableRow>
+        <TableCell colSpan={6} className="h-24 text-center">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+        </TableCell>
+      </TableRow>
+    );
+  };
+  
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Header with title and actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-             Cotizaciones
+            <FileText className="mr-2 h-5 w-5 text-emerald-600"/>
+            Cotizaciones
           </h1>
           <p className="text-sm text-muted-foreground">
             Administra cotizaciones y pedidos.
@@ -350,8 +392,13 @@ export default function CotizacionesPage() {
         <Button
           onClick={handleNewCotizacion}
           size="sm"
+          disabled={isNavigating || loading}
         >
-          <Plus className="mr-2 h-4 w-4" />
+          {isNavigating ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="mr-2 h-4 w-4" />
+          )}
           Nueva Cotización
         </Button>
       </div>
@@ -460,11 +507,7 @@ export default function CotizacionesPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-                  </TableCell>
-                </TableRow>
+                <TableSkeletonLoader />
               ) : getCurrentPageItems().length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
@@ -473,19 +516,9 @@ export default function CotizacionesPage() {
                 </TableRow>
               ) : (
                 getCurrentPageItems().map((cotizacion) => (
-                  <TableRow key={cotizacion.cotizacion_id}>
-                    <TableCell>
-                      <Button 
-                        variant="link"
-                        className="font-medium p-0 h-auto"
-                        onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
-                      >
-                        {cotizacion.folio}
-                      </Button>
-                      {/* Mobile Client Name */}
-                       <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
-                        {cotizacion.cliente.nombre}
-                      </div>
+                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-slate-50">
+                    <TableCell className="py-2.5 px-3 font-medium text-emerald-600 cursor-pointer hover:underline whitespace-nowrap" onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}>
+                      {cotizacion.folio || 'N/A'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDate(cotizacion.fecha_creacion)}</TableCell>
                     <TableCell className="hidden md:table-cell">
@@ -501,7 +534,6 @@ export default function CotizacionesPage() {
                       <CotizacionActionsButton 
                         cotizacion={cotizacion}
                         onStatusChanged={fetchCotizacionesData}
-                        // Use size="sm" for consistency
                         buttonSize="sm" 
                       />
                     </TableCell>
@@ -511,34 +543,7 @@ export default function CotizacionesPage() {
             </TableBody>
           </Table>
         </CardContent>
-        {/* Pagination - Moved inside Card but uses totalPages calculated above */}
-        {totalPages > 1 && (
-          <CardFooter className="flex items-center justify-between border-t px-6 py-3">
-            <div className="text-xs text-muted-foreground">
-              Página {currentPage} de {totalPages}
-            </div>
-            <div className="flex space-x-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="h-7 px-2.5" // Smaller pagination buttons
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage >= totalPages}
-                className="h-7 px-2.5" // Smaller pagination buttons
-              >
-                Siguiente
-              </Button>
-            </div>
-          </CardFooter>
-        )}
+        {totalPages > 1 && renderPagination()}
       </Card>
     </div>
   );
