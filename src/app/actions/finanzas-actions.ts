@@ -138,8 +138,8 @@ export async function getFinancialMetrics(): Promise<{ success: boolean; data?: 
 export async function getAllIngresos(
   page = 1, 
   pageSize = 10, 
-  month?: number, 
-  year?: number
+  month?: number, // Can be 0 for "Todos"
+  year?: number   // Can be 0 for "Todos"
 ): Promise<{ 
   success: boolean; 
   data?: IngresoData[]; 
@@ -151,21 +151,17 @@ export async function getAllIngresos(
       .from('cotizacion_pagos_view')
       .select('*', { count: 'exact', head: true });
 
-    // Apply filters if provided
-    if (year) {
+    // Apply filters only if year is provided and not 0 ("Todos")
+    if (year) { 
       query = query.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
       query = query.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
-    }
-    if (month && year) {
-       // Adjust month filter to work correctly with Supabase date functions
-       // Supabase/Postgres MONTH is 1-12
-       const startDate = new Date(year, month - 1, 1).toISOString();
-       const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString(); // Last day of the month
-       query = query.filter('fecha_pago', 'gte', startDate);
-       query = query.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString()); // Use less than the start of the next month
-       // Alternative using EXTRACT - requires function call or RPC
-       // query = query.filter('EXTRACT(MONTH FROM fecha_pago)', 'eq', month);
-       // query = query.filter('EXTRACT(YEAR FROM fecha_pago)', 'eq', year);
+      
+      // Apply month filter only if month and year are provided and not 0 ("Todos")
+      if (month) { 
+         const startDate = new Date(year, month - 1, 1).toISOString();
+         query = query.filter('fecha_pago', 'gte', startDate);
+         query = query.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString());
+      }
     }
 
     // Get total count for pagination WITH filters applied
@@ -173,7 +169,6 @@ export async function getAllIngresos(
     
     if (countError) {
       console.error('Error counting filtered ingresos:', countError);
-      // Return success: false on count error
       return {
         success: false, 
         error: `Failed to count ingresos: ${countError.message}`
@@ -183,10 +178,10 @@ export async function getAllIngresos(
     // Calculate pagination values
     const totalItems = count || 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.max(1, Math.min(page, totalPages)); // Ensure page is at least 1
+    const currentPage = Math.max(1, Math.min(page, totalPages));
     const offset = (currentPage - 1) * pageSize;
     
-    // Build the data query with filters
+    // Build the data query 
     let dataQuery = supabase
       .from('cotizacion_pagos_view')
       .select(`
@@ -203,19 +198,17 @@ export async function getAllIngresos(
         precio_total
       `);
 
-    // Apply filters to data query
-    if (year) {
+    // Apply filters to data query only if year is provided and not 0 ("Todos")
+    if (year) { 
       dataQuery = dataQuery.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
       dataQuery = dataQuery.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
-    }
-    if (month && year) {
-       const startDate = new Date(year, month - 1, 1).toISOString();
-       const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString(); // Last day of the month
-       dataQuery = dataQuery.filter('fecha_pago', 'gte', startDate);
-       dataQuery = dataQuery.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString()); // Use less than the start of the next month
-       // Alternative using EXTRACT - requires function call or RPC
-       // dataQuery = dataQuery.filter('EXTRACT(MONTH FROM fecha_pago)', 'eq', month);
-       // dataQuery = dataQuery.filter('EXTRACT(YEAR FROM fecha_pago)', 'eq', year);
+      
+      // Apply month filter only if month and year are provided and not 0 ("Todos")
+      if (month) { 
+         const startDate = new Date(year, month - 1, 1).toISOString();
+         dataQuery = dataQuery.filter('fecha_pago', 'gte', startDate);
+         dataQuery = dataQuery.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString());
+      }
     }
 
     // Apply ordering and pagination
@@ -228,7 +221,6 @@ export async function getAllIngresos(
 
     if (error) {
        console.error('Error fetching filtered ingresos:', error);
-      // Return success: false on data fetch error
       return {
         success: false,
         error: `Failed to fetch ingresos: ${error.message}`
@@ -237,7 +229,7 @@ export async function getAllIngresos(
     
     const ingresos = Array.isArray(data) ? data : [];
     
-    // Get client names (remains the same)
+    // Get client names
     const clienteIds = ingresos
       .map(ingreso => ingreso?.cliente_id)
       .filter(id => id != null) as number[];
@@ -252,7 +244,6 @@ export async function getAllIngresos(
       
       if (clientesError) {
         console.error('Error fetching cliente names:', clientesError);
-        // Log but don't fail the whole request
       } else if (Array.isArray(clientes)) {
         clientesMap = clientes.reduce((acc, cliente) => {
           if (cliente && cliente.cliente_id != null) {
@@ -263,7 +254,6 @@ export async function getAllIngresos(
       }
     }
     
-    // Map ingresos with client names (remains the same)
     const formattedIngresos = ingresos.map(ingreso => ({
       anticipo_id: ingreso.anticipo_id,
       cotizacion_id: ingreso.cotizacion_id,
@@ -302,8 +292,8 @@ export async function getAllIngresos(
 export async function getAllEgresos(
   page = 1, 
   pageSize = 10, 
-  month?: number, 
-  year?: number
+  month?: number, // Can be 0 for "Todos"
+  year?: number   // Can be 0 for "Todos"
 ): Promise<{ 
   success: boolean; 
   data?: EgresoData[]; 
@@ -315,23 +305,20 @@ export async function getAllEgresos(
       .from('egresos')
       .select('*', { count: 'exact', head: true });
 
-    // Apply filters to count query
-    if (year) {
+    // Apply filters to count query only if year is provided and not 0 ("Todos")
+    if (year) { 
       countQuery = countQuery.filter('fecha', 'gte', `${year}-01-01`);
       countQuery = countQuery.filter('fecha', 'lte', `${year}-12-31`);
-    }
-    if (month && year) {
-      // Supabase/Postgres MONTH is 1-12
-      // Use date range for month filtering
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const nextMonth = month === 12 ? 1 : month + 1;
-      const nextYear = month === 12 ? year + 1 : year;
-      const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
-      countQuery = countQuery.filter('fecha', 'gte', startDate);
-      countQuery = countQuery.filter('fecha', 'lt', endDate); // Less than start of next month
-       // Alternative using EXTRACT - requires function call or RPC
-       // countQuery = countQuery.filter('EXTRACT(MONTH FROM fecha)', 'eq', month);
-       // countQuery = countQuery.filter('EXTRACT(YEAR FROM fecha)', 'eq', year);
+
+      // Apply month filter only if month and year are provided and not 0 ("Todos")
+      if (month) { 
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+        countQuery = countQuery.filter('fecha', 'gte', startDate);
+        countQuery = countQuery.filter('fecha', 'lt', endDate); 
+      }
     }
 
     // Get total count for pagination WITH filters applied
@@ -339,7 +326,6 @@ export async function getAllEgresos(
     
     if (countError) {
       console.error('Error counting filtered egresos:', countError);
-       // Return success: false on count error
       return {
         success: false, 
         error: `Failed to count egresos: ${countError.message}`
@@ -349,10 +335,10 @@ export async function getAllEgresos(
     // Calculate pagination values
     const totalItems = count || 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.max(1, Math.min(page, totalPages)); // Ensure page is at least 1
+    const currentPage = Math.max(1, Math.min(page, totalPages));
     const offset = (currentPage - 1) * pageSize;
     
-    // Build the data query with filters
+    // Build the data query
     let dataQuery = supabase
       .from('egresos')
       .select(`
@@ -366,21 +352,20 @@ export async function getAllEgresos(
         metodo_pago
       `);
 
-    // Apply filters to data query
-    if (year) {
+    // Apply filters to data query only if year is provided and not 0 ("Todos")
+    if (year) { 
       dataQuery = dataQuery.filter('fecha', 'gte', `${year}-01-01`);
       dataQuery = dataQuery.filter('fecha', 'lte', `${year}-12-31`);
-    }
-    if (month && year) {
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const nextMonth = month === 12 ? 1 : month + 1;
-      const nextYear = month === 12 ? year + 1 : year;
-      const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
-      dataQuery = dataQuery.filter('fecha', 'gte', startDate);
-      dataQuery = dataQuery.filter('fecha', 'lt', endDate);
-       // Alternative using EXTRACT - requires function call or RPC
-       // dataQuery = dataQuery.filter('EXTRACT(MONTH FROM fecha)', 'eq', month);
-       // dataQuery = dataQuery.filter('EXTRACT(YEAR FROM fecha)', 'eq', year);
+
+      // Apply month filter only if month and year are provided and not 0 ("Todos")
+      if (month) { 
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+        dataQuery = dataQuery.filter('fecha', 'gte', startDate);
+        dataQuery = dataQuery.filter('fecha', 'lt', endDate);
+      }
     }
 
     // Apply ordering and pagination
@@ -393,14 +378,12 @@ export async function getAllEgresos(
     
     if (error) {
       console.error('Error fetching filtered egresos:', error);
-      // Return success: false on data fetch error
       return {
         success: false,
         error: `Failed to fetch egresos: ${error.message}`
       };
     }
     
-    // Ensure data is an array
     const egresos = Array.isArray(data) ? data : [];
     
     return {

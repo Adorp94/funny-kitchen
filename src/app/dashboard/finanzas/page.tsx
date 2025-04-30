@@ -79,8 +79,12 @@ interface PaginationResult {
 
 // --- Helper data ---
 const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 5 }, (_, i) => currentYear - i); // Last 5 years
+const years = [
+  { value: 0, label: "Todos" }, // Added "Todos" option for year
+  ...Array.from({ length: 5 }, (_, i) => ({ value: currentYear - i, label: (currentYear - i).toString() })) // Last 5 years
+];
 const months = [
+  { value: 0, label: "Todos" }, // Added "Todos" option for month
   { value: 1, label: "Enero" }, { value: 2, label: "Febrero" }, { value: 3, label: "Marzo" },
   { value: 4, label: "Abril" }, { value: 5, label: "Mayo" }, { value: 6, label: "Junio" },
   { value: 7, label: "Julio" }, { value: 8, label: "Agosto" }, { value: 9, label: "Septiembre" },
@@ -120,14 +124,16 @@ export default function FinanzasPage() {
 
   // Fetch initial data based on default filters
   useEffect(() => {
-    fetchMetrics(); // Metrics might not be filtered yet, adjust if needed
-    fetchIngresos(1, selectedMonth, selectedYear);
-    fetchEgresos(1, selectedMonth, selectedYear);
-  }, [selectedMonth, selectedYear]); // Re-fetch when filters change
+    fetchMetrics(); // Metrics aren't filtered yet
+    // Pass 0 if selectedMonth/Year is 0, otherwise pass the number
+    fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined);
+    fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined);
+    // Depend on selectedMonth/Year state
+  }, [selectedMonth, selectedYear]); 
 
   // --- Fetching Functions ---
   const fetchMetrics = async () => {
-    // Consider adding month/year filtering to getFinancialMetrics if needed
+    // Consider adding filters if metrics should reflect selection
     try {
       const result = await getFinancialMetrics();
       if (result.success && result.data) {
@@ -144,11 +150,11 @@ export default function FinanzasPage() {
     }
   };
 
-  // Updated fetchIngresos to include filters
-  const fetchIngresos = async (page: number, month: number, year: number) => {
+  // Updated fetchIngresos to handle month/year being potentially 0
+  const fetchIngresos = async (page: number, month: number | undefined, year: number | undefined) => {
     setLoadingIngresos(true);
     try {
-      // Pass filters to the server action (will be implemented next)
+      // Pass 0 or undefined directly (backend will handle)
       const result = await getAllIngresos(page, 10, month, year); 
       if (result.success && result.data) {
         setIngresos(result.data);
@@ -158,28 +164,27 @@ export default function FinanzasPage() {
             totalPages: result.pagination.totalPages
           });
         } else {
-           // Reset pagination if not provided
            setIngresosPagination({ page: 1, totalPages: 1 });
         }
       } else {
         console.warn("Failed to fetch ingresos or no data for filter:", result.error);
-        setIngresos([]); // Clear data on failure or no data
-        setIngresosPagination({ page: 1, totalPages: 1 }); // Reset pagination
+        setIngresos([]); 
+        setIngresosPagination({ page: 1, totalPages: 1 }); 
       }
     } catch (error) {
       console.error("Error fetching ingresos:", error);
-      setIngresos([]); // Clear data on error
-      setIngresosPagination({ page: 1, totalPages: 1 }); // Reset pagination
+      setIngresos([]); 
+      setIngresosPagination({ page: 1, totalPages: 1 }); 
     } finally {
       setLoadingIngresos(false);
     }
   };
 
-  // Updated fetchEgresos to include filters
-  const fetchEgresos = async (page: number, month: number, year: number) => {
+  // Updated fetchEgresos to handle month/year being potentially 0
+  const fetchEgresos = async (page: number, month: number | undefined, year: number | undefined) => {
     setLoadingEgresos(true);
     try {
-      // Pass filters to the server action (will be implemented next)
+      // Pass 0 or undefined directly (backend will handle)
       const result = await getAllEgresos(page, 10, month, year); 
       if (result.success && result.data) {
         setEgresos(result.data);
@@ -189,18 +194,17 @@ export default function FinanzasPage() {
             totalPages: result.pagination.totalPages
           });
         } else {
-           // Reset pagination if not provided
            setEgresosPagination({ page: 1, totalPages: 1 });
         }
       } else {
         console.warn("Failed to fetch egresos or no data for filter:", result.error);
-        setEgresos([]); // Clear data on failure or no data
-        setEgresosPagination({ page: 1, totalPages: 1 }); // Reset pagination
+        setEgresos([]); 
+        setEgresosPagination({ page: 1, totalPages: 1 }); 
       }
     } catch (error) {
       console.error("Error fetching egresos:", error);
-      setEgresos([]); // Clear data on error
-      setEgresosPagination({ page: 1, totalPages: 1 }); // Reset pagination
+      setEgresos([]); 
+      setEgresosPagination({ page: 1, totalPages: 1 }); 
     } finally {
       setLoadingEgresos(false);
     }
@@ -212,23 +216,25 @@ export default function FinanzasPage() {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        fetchMetrics(), // Re-fetch metrics (consider filtering?)
-        fetchIngresos(1, selectedMonth, selectedYear), // Fetch first page with filters
-        fetchEgresos(1, selectedMonth, selectedYear)  // Fetch first page with filters
+        fetchMetrics(), 
+        // Pass state values (can be 0)
+        fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined),
+        fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined)
       ]);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // --- Submit Handlers (Refetch with filters after submit) ---
+  // --- Submit Handlers (Refetch with current filters after submit) ---
   const handleIngresoSubmit = async (data: any) => {
     try {
       const result = await createIngreso(data);
       if (result.success) {
         // Refetch metrics and the first page of current filtered view
         fetchMetrics(); 
-        fetchIngresos(1, selectedMonth, selectedYear); 
+        // Pass state values (can be 0)
+        fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined); 
         return true;
       }
       return false;
@@ -244,7 +250,8 @@ export default function FinanzasPage() {
       if (result.success) {
         // Refetch metrics and the first page of current filtered view
         fetchMetrics();
-        fetchEgresos(1, selectedMonth, selectedYear); 
+        // Pass state values (can be 0)
+        fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined); 
         return true;
       }
       return false;
@@ -256,28 +263,26 @@ export default function FinanzasPage() {
 
   // --- Pagination Handlers (Use current filters) ---
   const handleIngresoPageChange = (page: number) => {
-    fetchIngresos(page, selectedMonth, selectedYear);
+    // Pass state values (can be 0)
+    fetchIngresos(page, selectedMonth || undefined, selectedYear || undefined);
   };
 
   const handleEgresoPageChange = (page: number) => {
-    fetchEgresos(page, selectedMonth, selectedYear);
+    // Pass state values (can be 0)
+    fetchEgresos(page, selectedMonth || undefined, selectedYear || undefined);
   };
 
   // --- Filter Change Handlers ---
   const handleYearChange = (value: string) => {
-    const year = parseInt(value, 10);
-    setSelectedYear(year);
-    // Fetch page 1 of the new filter combination
-    fetchIngresos(1, selectedMonth, year);
-    fetchEgresos(1, selectedMonth, year);
+    const year = parseInt(value, 10); // value will be "0" for "Todos"
+    setSelectedYear(year); 
+    // No need to re-fetch here, useEffect handles it
   };
 
   const handleMonthChange = (value: string) => {
-    const month = parseInt(value, 10);
-    setSelectedMonth(month);
-     // Fetch page 1 of the new filter combination
-    fetchIngresos(1, month, selectedYear);
-    fetchEgresos(1, month, selectedYear);
+    const month = parseInt(value, 10); // value will be "0" for "Todos"
+    setSelectedMonth(month); 
+    // No need to re-fetch here, useEffect handles it
   };
 
   return (
@@ -313,6 +318,7 @@ export default function FinanzasPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
            {/* Filters */}
            <div className="flex flex-col sm:flex-row items-center gap-3">
+             {/* Month Select - uses value 0 for Todos */}
              <Select value={selectedMonth.toString()} onValueChange={handleMonthChange}>
                <SelectTrigger className="w-full sm:w-[180px]">
                  <SelectValue placeholder="Seleccionar Mes" />
@@ -325,14 +331,15 @@ export default function FinanzasPage() {
                  ))}
                </SelectContent>
              </Select>
+             {/* Year Select - uses value 0 for Todos */}
              <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
                <SelectTrigger className="w-full sm:w-[120px]">
                  <SelectValue placeholder="Seleccionar Año" />
                </SelectTrigger>
                <SelectContent>
                  {years.map((year) => (
-                   <SelectItem key={year} value={year.toString()}>
-                     {year}
+                   <SelectItem key={year.value} value={year.value.toString()}>
+                     {year.label}
                    </SelectItem>
                  ))}
                </SelectContent>
