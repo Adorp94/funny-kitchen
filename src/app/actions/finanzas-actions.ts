@@ -307,9 +307,7 @@ export async function getAllEgresos(page = 1, pageSize = 10): Promise<{
         monto, 
         monto_mxn, 
         moneda, 
-        metodo_pago, 
-        comprobante_url, 
-        notas
+        metodo_pago 
       `)
       .order('fecha', { ascending: false })
       .range(offset, offset + pageSize - 1);

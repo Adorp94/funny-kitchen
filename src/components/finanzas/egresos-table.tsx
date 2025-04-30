@@ -65,7 +65,12 @@ export function EgresosTable({
       "equipo": "Equipo/Maquinaria",
       "marketing": "Marketing",
       "impuestos": "Impuestos",
-      "gastos_varios": "Gastos Varios"
+      "gastos_varios": "Gastos Varios",
+      "Caja chica": "Caja Chica",
+      "Devoluciones": "Devoluciones",
+      "Envíos": "Envíos",
+      "Instalación y mantenimiento": "Instalación y Mantenimiento",
+      "Pago a proveedores": "Pago a Proveedores",
     };
     return categoriasMap[categoria] || categoria;
   };
@@ -80,7 +85,12 @@ export function EgresosTable({
       "equipo": "bg-indigo-100 text-indigo-800 border-indigo-200",
       "marketing": "bg-orange-100 text-orange-800 border-orange-200",
       "impuestos": "bg-red-100 text-red-800 border-red-200",
-      "gastos_varios": "bg-gray-100 text-gray-800 border-gray-200"
+      "gastos_varios": "bg-gray-100 text-gray-800 border-gray-200",
+      "Caja chica": "bg-pink-100 text-pink-800 border-pink-200",
+      "Devoluciones": "bg-teal-100 text-teal-800 border-teal-200",
+      "Envíos": "bg-cyan-100 text-cyan-800 border-cyan-200",
+      "Instalación y mantenimiento": "bg-lime-100 text-lime-800 border-lime-200",
+      "Pago a proveedores": "bg-sky-100 text-sky-800 border-sky-200",
     };
     return styleMap[categoria] || "bg-gray-100 text-gray-800 border-gray-200";
   };
