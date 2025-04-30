@@ -176,7 +176,7 @@ export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoR
             Selecciona la cotización y registra los detalles del pago recibido.
           </DrawerDescription>
         </DrawerHeader>
-        <div className="px-4 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4">
           <IngresoForm {...formProps} id="ingreso-form-mobile" onSubmit={form.handleSubmit(handleFormSubmit)} />
         </div>
         <DrawerFooter className="pt-4">

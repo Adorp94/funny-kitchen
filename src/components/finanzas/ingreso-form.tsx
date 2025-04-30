@@ -138,57 +138,60 @@ export function IngresoForm({
         )}
       </div>
 
-      {/* Monto Input */}
-      <div className="space-y-2">
-        <Label htmlFor="monto" className="text-sm">Monto *</Label>
-        <div className="relative">
-          <Input
-            id="monto"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            {...form.register("monto")}
-            className={cn(
-                "pl-10",
-                form.formState.errors.monto && "border-red-500"
-              )}
-          />
-          <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">
-            {selectedCotizacion?.moneda || "MXN"}
-          </span>
+      {/* Grid container for Monto and Metodo Pago */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Monto Input */}
+        <div className="space-y-2">
+          <Label htmlFor="monto" className="text-sm">Monto *</Label>
+          <div className="relative">
+            <Input
+              id="monto"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              {...form.register("monto")}
+              className={cn(
+                  "pl-7 text-right",
+                  form.formState.errors.monto && "border-red-500"
+                )}
+            />
+            <span className="absolute inset-y-0 left-2 flex items-center text-sm text-muted-foreground pointer-events-none">
+              $
+            </span>
+          </div>
+          {selectedCotizacion && (
+              <p className="text-xs text-muted-foreground">
+                Pendiente: {formatCurrency(getRemainingAmount(), selectedCotizacion.moneda)}
+                {Number(form.watch("monto")) > 0 && ` (${calculatePercentage()}%)`}
+              </p>
+          )}
+          {form.formState.errors.monto && (
+            <p className="text-xs text-red-600">{form.formState.errors.monto.message}</p>
+          )}
         </div>
-        {selectedCotizacion && (
-            <p className="text-xs text-muted-foreground">
-              Pendiente: {formatCurrency(getRemainingAmount(), selectedCotizacion.moneda)}
-              {Number(form.watch("monto")) > 0 && ` (${calculatePercentage()}%)`}
-            </p>
-        )}
-        {form.formState.errors.monto && (
-          <p className="text-xs text-red-600">{form.formState.errors.monto.message}</p>
-        )}
-      </div>
 
-      {/* Metodo Pago Select */}
-      <div className="space-y-2">
-        <Label htmlFor="metodo_pago" className="text-sm">Método de pago *</Label>
-        <Select 
-            onValueChange={(value) => form.setValue("metodo_pago", value)}
-            defaultValue={form.getValues("metodo_pago")}
-        >
-          <SelectTrigger id="metodo_pago" className="w-full">
-            <SelectValue placeholder="Seleccionar método" />
-          </SelectTrigger>
-          <SelectContent>
-            {METODOS_PAGO.map((metodo) => (
-              <SelectItem key={metodo.value} value={metodo.value}>
-                {metodo.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-          {form.formState.errors.metodo_pago && (
-          <p className="text-xs text-red-600">{form.formState.errors.metodo_pago.message}</p>
-        )}
+        {/* Metodo Pago Select */}
+        <div className="space-y-2">
+          <Label htmlFor="metodo_pago" className="text-sm">Método de pago *</Label>
+          <Select 
+              onValueChange={(value) => form.setValue("metodo_pago", value)}
+              defaultValue={form.getValues("metodo_pago")}
+          >
+            <SelectTrigger id="metodo_pago" className="w-full">
+              <SelectValue placeholder="Seleccionar método" />
+            </SelectTrigger>
+            <SelectContent>
+              {METODOS_PAGO.map((metodo) => (
+                <SelectItem key={metodo.value} value={metodo.value}>
+                  {metodo.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+            {form.formState.errors.metodo_pago && (
+            <p className="text-xs text-red-600">{form.formState.errors.metodo_pago.message}</p>
+          )}
+        </div>
       </div>
 
       {/* Fecha Pago Calendar */}
