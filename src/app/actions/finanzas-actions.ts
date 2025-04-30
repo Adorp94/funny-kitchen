@@ -134,72 +134,110 @@ export async function getFinancialMetrics(): Promise<{ success: boolean; data?: 
   }
 }
 
-// Server action to get all ingresos with pagination
-export async function getAllIngresos(page = 1, pageSize = 10): Promise<{ 
+// Updated server action to get all ingresos with pagination and filters
+export async function getAllIngresos(
+  page = 1, 
+  pageSize = 10, 
+  month?: number, 
+  year?: number
+): Promise<{ 
   success: boolean; 
   data?: IngresoData[]; 
   pagination?: PaginationResult;
   error?: string 
 }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
-    
-    // Get total count for pagination
-    const { count, error: countError } = await supabase
+    let query = supabase
       .from('cotizacion_pagos_view')
       .select('*', { count: 'exact', head: true });
+
+    // Apply filters if provided
+    if (year) {
+      query = query.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
+      query = query.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
+    }
+    if (month && year) {
+       // Adjust month filter to work correctly with Supabase date functions
+       // Supabase/Postgres MONTH is 1-12
+       const startDate = new Date(year, month - 1, 1).toISOString();
+       const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString(); // Last day of the month
+       query = query.filter('fecha_pago', 'gte', startDate);
+       query = query.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString()); // Use less than the start of the next month
+       // Alternative using EXTRACT - requires function call or RPC
+       // query = query.filter('EXTRACT(MONTH FROM fecha_pago)', 'eq', month);
+       // query = query.filter('EXTRACT(YEAR FROM fecha_pago)', 'eq', year);
+    }
+
+    // Get total count for pagination WITH filters applied
+    const { count, error: countError } = await query;
     
     if (countError) {
-      console.error('Error counting ingresos:', countError);
-      // Continue with count as 0 instead of throwing
+      console.error('Error counting filtered ingresos:', countError);
+      // Return success: false on count error
+      return {
+        success: false, 
+        error: `Failed to count ingresos: ${countError.message}`
+      };
     }
     
     // Calculate pagination values
     const totalItems = count || 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.min(page, totalPages);
+    const currentPage = Math.max(1, Math.min(page, totalPages)); // Ensure page is at least 1
     const offset = (currentPage - 1) * pageSize;
     
-    // Get paginated ingresos - Corrected select string
-    const selectString = `
-      anticipo_id,
-      cotizacion_id,
-      folio,
-      cliente_id,
-      moneda,
-      monto,
-      monto_mxn,
-      metodo_pago,
-      fecha_pago,
-      porcentaje,
-      precio_total
-    `;
-    const { data, error } = await supabase
+    // Build the data query with filters
+    let dataQuery = supabase
       .from('cotizacion_pagos_view')
-      .select(selectString)
+      .select(`
+        anticipo_id,
+        cotizacion_id,
+        folio,
+        cliente_id, 
+        moneda,
+        monto,
+        monto_mxn,
+        metodo_pago,
+        fecha_pago,
+        porcentaje,
+        precio_total
+      `);
+
+    // Apply filters to data query
+    if (year) {
+      dataQuery = dataQuery.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
+      dataQuery = dataQuery.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
+    }
+    if (month && year) {
+       const startDate = new Date(year, month - 1, 1).toISOString();
+       const endDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString(); // Last day of the month
+       dataQuery = dataQuery.filter('fecha_pago', 'gte', startDate);
+       dataQuery = dataQuery.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString()); // Use less than the start of the next month
+       // Alternative using EXTRACT - requires function call or RPC
+       // dataQuery = dataQuery.filter('EXTRACT(MONTH FROM fecha_pago)', 'eq', month);
+       // dataQuery = dataQuery.filter('EXTRACT(YEAR FROM fecha_pago)', 'eq', year);
+    }
+
+    // Apply ordering and pagination
+    dataQuery = dataQuery
       .order('fecha_pago', { ascending: false })
       .range(offset, offset + pageSize - 1);
 
+    // Execute the data query
+    const { data, error } = await dataQuery;
+
     if (error) {
-       console.error('Error fetching ingresos:', error);
-      // Return empty data with pagination
+       console.error('Error fetching filtered ingresos:', error);
+      // Return success: false on data fetch error
       return {
-        success: true,
-        data: [],
-        pagination: {
-          page: 1,
-          totalPages: 1,
-          totalItems: 0,
-          itemsPerPage: pageSize
-        },
-        error: error.message
+        success: false,
+        error: `Failed to fetch ingresos: ${error.message}`
       };
     }
     
     const ingresos = Array.isArray(data) ? data : [];
     
-    // Get client names only if we have ingresos with cliente_id
+    // Get client names (remains the same)
     const clienteIds = ingresos
       .map(ingreso => ingreso?.cliente_id)
       .filter(id => id != null) as number[];
@@ -214,7 +252,7 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
       
       if (clientesError) {
         console.error('Error fetching cliente names:', clientesError);
-        // Continue with empty clientesMap
+        // Log but don't fail the whole request
       } else if (Array.isArray(clientes)) {
         clientesMap = clientes.reduce((acc, cliente) => {
           if (cliente && cliente.cliente_id != null) {
@@ -225,13 +263,11 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
       }
     }
     
-    // Map ingresos with client names
+    // Map ingresos with client names (remains the same)
     const formattedIngresos = ingresos.map(ingreso => ({
-      // Explicitly map only needed fields to match IngresoData type
       anticipo_id: ingreso.anticipo_id,
       cotizacion_id: ingreso.cotizacion_id,
       folio: ingreso.folio,
-      // cliente_id: ingreso.cliente_id, // Don't need to return cliente_id itself
       cliente_nombre: ingreso.cliente_id != null ? 
         (clientesMap[ingreso.cliente_id] || 'Cliente desconocido') : 
         'Cliente no especificado',
@@ -254,50 +290,70 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
       }
     };
   } catch (error) {
-    console.error('Error getting ingresos:', error);
+    console.error('Error in getAllIngresos:', error);
     return { 
-      success: true, 
-      data: [],
-      pagination: {
-        page: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: pageSize
-      },
-      error: error instanceof Error ? error.message : 'Failed to fetch ingresos' 
+      success: false, 
+      error: error instanceof Error ? error.message : 'An unknown error occurred fetching ingresos' 
     };
   }
 }
 
-// Server action to get all egresos with pagination
-export async function getAllEgresos(page = 1, pageSize = 10): Promise<{ 
+// Updated server action to get all egresos with pagination and filters
+export async function getAllEgresos(
+  page = 1, 
+  pageSize = 10, 
+  month?: number, 
+  year?: number
+): Promise<{ 
   success: boolean; 
   data?: EgresoData[]; 
   pagination?: PaginationResult;
   error?: string 
 }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
-    
-    // Get total count for pagination
-    const { count, error: countError } = await supabase
+    let countQuery = supabase
       .from('egresos')
       .select('*', { count: 'exact', head: true });
+
+    // Apply filters to count query
+    if (year) {
+      countQuery = countQuery.filter('fecha', 'gte', `${year}-01-01`);
+      countQuery = countQuery.filter('fecha', 'lte', `${year}-12-31`);
+    }
+    if (month && year) {
+      // Supabase/Postgres MONTH is 1-12
+      // Use date range for month filtering
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+      countQuery = countQuery.filter('fecha', 'gte', startDate);
+      countQuery = countQuery.filter('fecha', 'lt', endDate); // Less than start of next month
+       // Alternative using EXTRACT - requires function call or RPC
+       // countQuery = countQuery.filter('EXTRACT(MONTH FROM fecha)', 'eq', month);
+       // countQuery = countQuery.filter('EXTRACT(YEAR FROM fecha)', 'eq', year);
+    }
+
+    // Get total count for pagination WITH filters applied
+    const { count, error: countError } = await countQuery;
     
     if (countError) {
-      console.error('Error counting egresos:', countError);
-      // Continue with count as 0 instead of throwing
+      console.error('Error counting filtered egresos:', countError);
+       // Return success: false on count error
+      return {
+        success: false, 
+        error: `Failed to count egresos: ${countError.message}`
+      };
     }
     
     // Calculate pagination values
     const totalItems = count || 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.min(page, totalPages);
+    const currentPage = Math.max(1, Math.min(page, totalPages)); // Ensure page is at least 1
     const offset = (currentPage - 1) * pageSize;
     
-    // Get paginated egresos
-    const { data, error } = await supabase
+    // Build the data query with filters
+    let dataQuery = supabase
       .from('egresos')
       .select(`
         egreso_id, 
@@ -307,24 +363,40 @@ export async function getAllEgresos(page = 1, pageSize = 10): Promise<{
         monto, 
         monto_mxn, 
         moneda, 
-        metodo_pago 
-      `)
+        metodo_pago
+      `);
+
+    // Apply filters to data query
+    if (year) {
+      dataQuery = dataQuery.filter('fecha', 'gte', `${year}-01-01`);
+      dataQuery = dataQuery.filter('fecha', 'lte', `${year}-12-31`);
+    }
+    if (month && year) {
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      const endDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+      dataQuery = dataQuery.filter('fecha', 'gte', startDate);
+      dataQuery = dataQuery.filter('fecha', 'lt', endDate);
+       // Alternative using EXTRACT - requires function call or RPC
+       // dataQuery = dataQuery.filter('EXTRACT(MONTH FROM fecha)', 'eq', month);
+       // dataQuery = dataQuery.filter('EXTRACT(YEAR FROM fecha)', 'eq', year);
+    }
+
+    // Apply ordering and pagination
+    dataQuery = dataQuery
       .order('fecha', { ascending: false })
       .range(offset, offset + pageSize - 1);
+
+    // Execute data query
+    const { data, error } = await dataQuery;
     
     if (error) {
-      console.error('Error fetching egresos:', error);
-      // Return empty data with pagination
+      console.error('Error fetching filtered egresos:', error);
+      // Return success: false on data fetch error
       return {
-        success: true,
-        data: [],
-        pagination: {
-          page: 1,
-          totalPages: 1,
-          totalItems: 0,
-          itemsPerPage: pageSize
-        },
-        error: error.message
+        success: false,
+        error: `Failed to fetch egresos: ${error.message}`
       };
     }
     
@@ -344,15 +416,8 @@ export async function getAllEgresos(page = 1, pageSize = 10): Promise<{
   } catch (error) {
     console.error('Error getting egresos:', error);
     return { 
-      success: true, 
-      data: [],
-      pagination: {
-        page: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: pageSize
-      },
-      error: error instanceof Error ? error.message : 'Failed to fetch egresos' 
+      success: false, 
+      error: error instanceof Error ? error.message : 'An unknown error occurred fetching egresos' 
     };
   }
 }
