@@ -248,8 +248,8 @@ export default function DashboardPage() {
                <CardFooter className="p-0">
                  <Button 
                    variant="outline"
-                   className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
                    size="sm" 
+                   className="w-full"
                    onClick={() => handleNavigate('/dashboard/cotizaciones')}
                  >
                    Ir a Cotizaciones
@@ -259,22 +259,22 @@ export default function DashboardPage() {
              
              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
                 <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-2 mb-2">
-                    <DollarSign className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  <div className="bg-red-100 dark:bg-red-900/30 rounded-lg p-2 mb-2">
+                    <DollarSign className="h-6 w-6 text-red-600 dark:text-red-400" />
                   </div>
-                  <CardTitle className="text-base font-semibold text-center">Finanzas</CardTitle>
-                  <CardDescription className="text-center text-xs mt-1">Gestión de pagos</CardDescription>
+                  <CardTitle className="text-base font-semibold text-center">Finanzas</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Ingresos y Egresos</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 p-0 mb-4">
                   <p className="text-xs text-muted-foreground text-center">
-                    Administra pagos, anticipos y el estado financiero de las cotizaciones.
+                    Registra y visualiza tus movimientos financieros, pagos y gastos.
                   </p>
                 </CardContent>
                 <CardFooter className="p-0">
                   <Button 
                     variant="outline"
-                    className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
                     size="sm" 
+                    className="w-full"
                     onClick={() => handleNavigate('/dashboard/finanzas')}
                   >
                     Ir a Finanzas
@@ -282,98 +282,80 @@ export default function DashboardPage() {
                 </CardFooter>
               </Card>
 
-              <Card className={cn(
-                  "flex flex-col h-full shadow-sm p-5",
-                  "bg-gray-50 dark:bg-gray-900 opacity-70 cursor-not-allowed"
-               )}>
+              <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
                 <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-lg p-2 mb-2">
-                    <ShoppingBag className="h-6 w-6 text-gray-500 dark:text-gray-400" />
+                  <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-2 mb-2">
+                    <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <CardTitle className="text-base font-semibold text-center">Productos</CardTitle>
-                  <CardDescription className="text-center text-xs mt-1">Administra tu catálogo</CardDescription>
+                  <CardTitle className="text-base font-semibold text-center">Clientes</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Administra tus clientes</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 p-0 mb-4">
                   <p className="text-xs text-muted-foreground text-center">
-                    Agrega, edita y organiza tus productos. Controla precios, inventario y categorías.
-                  </p>
-                </CardContent>
-                <CardFooter className="p-0">
-                  <Button variant="secondary" className="w-full text-muted-foreground" size="sm" disabled>
-                    Próximamente
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className={cn(
-                  "flex flex-col h-full shadow-sm p-5",
-                  "bg-gray-50 dark:bg-gray-900 opacity-70 cursor-not-allowed"
-               )}>
-                <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-lg p-2 mb-2">
-                    <Users className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-                  </div>
-                  <CardTitle className="text-base font-semibold text-center">Clientes</CardTitle>
-                  <CardDescription className="text-center text-xs mt-1">Gestiona tus clientes</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 mb-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Administra información de clientes, historial de pedidos y datos de contacto.
-                  </p>
-                </CardContent>
-                <CardFooter className="p-0">
-                  <Button variant="secondary" className="w-full text-muted-foreground" size="sm" disabled>
-                    Próximamente
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
-                <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-2 mb-2">
-                    <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <CardTitle className="text-base font-semibold text-center">Reportes</CardTitle>
-                  <CardDescription className="text-center text-xs mt-1">Analiza el rendimiento</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 mb-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Visualiza reportes de ventas, productos más vendidos y estadísticas de clientes.
-                  </p>
-                </CardContent>
-                <CardFooter className="p-0">
-                   <Button 
-                    variant="outline"
-                    className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-                    size="sm" 
-                    onClick={() => handleNavigate('/dashboard/reportes')}
-                   >
-                     Ir a Reportes
-                   </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
-                <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-2 mb-2">
-                    <ClipboardList className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <CardTitle className="text-base font-semibold text-center">Nueva Cotización</CardTitle>
-                  <CardDescription className="text-center text-xs mt-1">Crea una nueva</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 mb-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Acceso directo para crear una nueva cotización para tus clientes.
+                    Consulta, añade y modifica la información de contacto y datos de tus clientes.
                   </p>
                 </CardContent>
                 <CardFooter className="p-0">
                   <Button 
                     variant="outline"
-                    className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
                     size="sm" 
-                    onClick={() => handleNavigate('/nueva-cotizacion')}
+                    className="w-full"
+                    disabled
+                    title="Módulo en desarrollo"
                   >
-                    Nueva Cotización
+                    Ir a Clientes
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
+                <CardHeader className="flex flex-col items-center p-0 pb-3">
+                  <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-lg p-2 mb-2">
+                    <ShoppingBag className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <CardTitle className="text-base font-semibold text-center">Inventario</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Controla tu stock</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 mb-4">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Gestiona productos, materiales y niveles de stock para una mejor planificación.
+                  </p>
+                </CardContent>
+                <CardFooter className="p-0">
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="w-full"
+                    disabled
+                    title="Módulo en desarrollo"
+                  >
+                    Ir a Inventario
+                  </Button>
+                </CardFooter>
+              </Card>
+              
+              <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
+                <CardHeader className="flex flex-col items-center p-0 pb-3">
+                  <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-2 mb-2">
+                    <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <CardTitle className="text-base font-semibold text-center">Producción</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Seguimiento de órdenes</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 mb-4">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Visualiza y gestiona el estado de las órdenes de producción. (Próximamente)
+                  </p>
+                </CardContent>
+                <CardFooter className="p-0">
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="w-full"
+                    disabled
+                    title="Módulo en desarrollo"
+                  >
+                    Ir a Producción
                   </Button>
                 </CardFooter>
               </Card>

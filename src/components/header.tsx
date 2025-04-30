@@ -140,13 +140,17 @@ export default function Header() {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "px-3 py-2 rounded-md text-sm flex items-center transition-colors",
+                    "px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors",
                     isActive(item.href)
-                      ? "font-semibold text-primary"
-                      : "font-medium text-muted-foreground hover:text-foreground"
+                      ? "bg-muted text-primary font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   )}
                 >
-                  <item.icon className="mr-2 h-4 w-4" />
+                  <item.icon className={cn(
+                      "mr-2 h-4 w-4",
+                      isActive(item.href) ? "text-primary" : "text-muted-foreground"
+                    )} 
+                  />
                   {item.name}
                 </Link>
               ))}
@@ -247,11 +251,15 @@ export default function Header() {
                           className={cn(
                             "flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors",
                             isActive(item.href)
-                              ? "text-emerald-600 bg-emerald-50"
-                              : "text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                              ? "bg-muted text-primary font-semibold"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                           )}
                         >
-                          <item.icon className="mr-3 h-5 w-5" />
+                          <item.icon className={cn(
+                              "mr-3 h-5 w-5",
+                              isActive(item.href) ? "text-primary" : "text-muted-foreground"
+                            )} 
+                          />
                           {item.name}
                         </Link>
                       </SheetClose>
