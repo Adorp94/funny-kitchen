@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import { UseFormReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-import { IngresoFormValues } from "./ingreso-modal"; // Assuming types are exported from modal
+import { IngresoFormValues } from "./ingreso-modal";
+import { Card } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 // Define the available payment methods (can be passed as prop or kept here)
 const METODOS_PAGO = [
@@ -27,122 +35,106 @@ const METODOS_PAGO = [
   ];
 
 // Interface for the props the form component will need
-interface IngresoFormProps extends React.ComponentProps<"form"> { // Allow passing standard form props like className
+interface IngresoFormProps extends React.ComponentProps<"form"> {
   form: UseFormReturn<IngresoFormValues>;
-  selectedCotizacion: any; // Consider defining a proper type for cotizacion
-  isLoadingCotizaciones: boolean;
+  selectedCotizacion: any;
   cotizaciones: any[];
-  openCombobox: boolean;
-  setOpenCombobox: (open: boolean) => void;
-  queryCombobox: string;
-  setQueryCombobox: (query: string) => void;
   getRemainingAmount: () => number;
   calculatePercentage: () => string;
-  filteredCotizaciones: any[];
-  watchedCotizacionId: number | undefined;
+  onOpenSearch?: () => void;
 }
 
 export function IngresoForm({ 
   className, 
   form, 
   selectedCotizacion, 
-  isLoadingCotizaciones, 
-  cotizaciones, 
-  openCombobox,
-  setOpenCombobox,
-  queryCombobox,
-  setQueryCombobox,
+  cotizaciones,
   getRemainingAmount,
   calculatePercentage,
-  filteredCotizaciones,
-  watchedCotizacionId,
-  ...props // Pass rest of the props to the form element
+  onOpenSearch,
+  ...props
 }: IngresoFormProps) {
+  const [openCotizacionPopover, setOpenCotizacionPopover] = useState(false);
 
   return (
-    // Apply className and use space-y-4 for structure
     <form className={cn("space-y-4", className)} {...props}>
-      {/* Cotizacion Combobox */}
+      {/* --- Cotizacion Selection --- */}
       <div className="space-y-2">
-        <Label htmlFor="cotizacion_id" className="text-sm">Cotización *</Label>
-        {isLoadingCotizaciones ? (
-          <div className="flex items-center space-x-2 h-10 px-3 py-2 border rounded-md bg-muted">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Cargando cotizaciones...</span>
-          </div>
+        <Label className="text-sm">Cotización *</Label>
+        
+        {/* Display selected cotizacion */} 
+        {selectedCotizacion ? (
+             <Card className="p-3 text-sm border-dashed border-primary bg-primary/5">
+                <p className="font-medium">{selectedCotizacion.folio}</p>
+                <p className="text-muted-foreground">{selectedCotizacion.cliente_nombre}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                    Pendiente: {formatCurrency(getRemainingAmount(), selectedCotizacion.moneda)}
+                </p>
+                <Button 
+                    type="button" 
+                    variant="link"
+                    size="sm"
+                    className="p-0 h-auto text-xs mt-1"
+                    onClick={() => form.setValue("cotizacion_id", undefined as any)} // Clear selection
+                >
+                    Cambiar
+                </Button>
+            </Card>
         ) : (
-          <Popover open={openCombobox} onOpenChange={(isOpen) => {
-            setOpenCombobox(isOpen);
-            if (isOpen) setQueryCombobox("");
-          }}>
+          <Popover open={openCotizacionPopover} onOpenChange={setOpenCotizacionPopover}>
             <PopoverTrigger asChild>
               <Button
                 type="button"
-                id="cotizacion_id"
                 variant="outline"
                 role="combobox"
-                aria-expanded={openCombobox}
-                aria-controls="cotizacion-list"
-                aria-haspopup="listbox"
-                className={cn(
-                  "w-full justify-between text-left font-normal",
-                  !selectedCotizacion && "text-muted-foreground"
-                )}
+                aria-expanded={openCotizacionPopover}
+                aria-controls="cotizaciones-list"
+                className="w-full justify-between text-muted-foreground"
               >
-                {selectedCotizacion
-                  ? `${selectedCotizacion.folio} - ${selectedCotizacion.cliente_nombre}`
-                  : "Seleccionar cotización"}
+                Seleccionar cotización...
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              side="bottom"
-              sideOffset={4}
-              className="w-[--radix-popover-trigger-width] p-0 z-50"
-            >
-              <Command className="overflow-hidden">
-                <CommandInput
-                  placeholder="Buscar folio o cliente..."
-                  value={queryCombobox}
-                  onValueChange={setQueryCombobox}
-                  className="h-9"
-                />
-                <CommandList
-                  id="cotizacion-list"
-                  role="listbox"
-                  className="max-h-52"
-                >
-                  <CommandEmpty className="py-6 text-center text-sm">No hay cotizaciones disponibles.</CommandEmpty>
-                  {filteredCotizaciones.map((c) => (
-                    <CommandItem
-                      key={c.cotizacion_id}
-                      value={c.cotizacion_id.toString()}
-                      onSelect={(currentValue) => {
-                        const selectedValue = Number(currentValue);
-                        form.setValue("cotizacion_id", selectedValue);
-                        setOpenCombobox(false);
-                      }}
-                      className="text-sm"
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          watchedCotizacionId === c.cotizacion_id
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      {`${c.folio} - ${c.cliente_nombre} (${formatCurrency(c.total - (c.monto_pagado || 0), c.moneda)} pendiente)`}
-                    </CommandItem>
-                  ))}
+            <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar cotización (Folio/Cliente)..." />
+                <CommandList id="cotizaciones-list">
+                  <CommandEmpty>No se encontraron cotizaciones.</CommandEmpty>
+                  <CommandGroup>
+                    {cotizaciones?.map((cot) => (
+                      <CommandItem
+                        key={cot.cotizacion_id}
+                        value={`${cot.folio} ${cot.cliente_nombre}`}
+                        onSelect={() => {
+                          form.setValue("cotizacion_id", cot.cotizacion_id);
+                          setOpenCotizacionPopover(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            form.watch("cotizacion_id") === cot.cotizacion_id ? "opacity-100" : "opacity-0"
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span key={`span-${cot.cotizacion_id}`}>
+                            <p className="text-sm font-medium">{cot.folio}</p>
+                            <p className="text-xs text-muted-foreground">{cot.cliente_nombre}</p>
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
                 </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
         )}
-        {form.formState.errors.cotizacion_id && (
-          <p className="text-xs text-red-600">{form.formState.errors.cotizacion_id.message}</p>
+
+        {/* Error Message */}
+        {form.formState.errors.cotizacion_id && !selectedCotizacion && (
+          <p className="text-xs text-red-600 mt-1" id="cotizacion-error">
+            {form.formState.errors.cotizacion_id.message}
+          </p>
         )}
       </div>
 
@@ -235,27 +227,6 @@ export function IngresoForm({
         )}
       </div>
       
-      {/* Comprobante URL Input */}
-      <div className="space-y-2">
-        <Label htmlFor="comprobante_url" className="text-sm">URL Comprobante (opcional)</Label>
-        <Input
-          id="comprobante_url"
-          type="url"
-          placeholder="https://..."
-          {...form.register("comprobante_url")}
-        />
-      </div>
-
-      {/* Notas Textarea */}
-      <div className="space-y-2">
-        <Label htmlFor="notas" className="text-sm">Notas adicionales (opcional)</Label>
-        <Textarea
-          id="notas"
-          placeholder="Añade cualquier detalle relevante..."
-          rows={3}
-          {...form.register("notas")}
-        />
-      </div>
       {/* Submit button is handled by the parent Dialog/Drawer footer */}
     </form>
   );

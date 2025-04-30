@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Eye, Download, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils/date";
 import { Badge } from "@/components/ui/badge";
 
 interface Egreso {

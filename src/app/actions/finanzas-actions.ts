@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from '@/lib/supabase/server';
+// Import the exported Supabase client instance directly
+import { supabase } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
 // Types for financial data
@@ -49,7 +50,8 @@ interface PaginationResult {
 // Server action to get financial metrics
 export async function getFinancialMetrics(): Promise<{ success: boolean; data?: FinancialMetrics; error?: string }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // Get total ingresos in MXN
     const { data: ingresosMXN, error: errorIngresosMXN } = await supabase
@@ -141,7 +143,8 @@ export async function getAllIngresos(page = 1, pageSize = 10): Promise<{
   error?: string 
 }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // Get total count for pagination
     const { count, error: countError } = await supabase
@@ -267,7 +270,8 @@ export async function getAllEgresos(page = 1, pageSize = 10): Promise<{
   error?: string 
 }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // Get total count for pagination
     const { count, error: countError } = await supabase
@@ -351,7 +355,8 @@ export async function getAllEgresos(page = 1, pageSize = 10): Promise<{
 // Server action to create a new ingreso (payment)
 export async function createIngreso(data: any): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // First, get the cotizacion details to calculate the percentage
     const { data: cotizacion, error: cotizacionError } = await supabase
@@ -452,7 +457,8 @@ export async function createIngreso(data: any): Promise<{ success: boolean; erro
 // Server action to create a new egreso (expense)
 export async function createEgreso(data: any): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // Calculate monto_mxn based on moneda
     let montoMXN = Number(data.monto);
@@ -501,7 +507,8 @@ export async function getAvailableCotizaciones(): Promise<{
   error?: string 
 }> {
   try {
-    const supabase = createClient();
+    // Use the imported supabase instance directly
+    // const supabase = createClient(); <-- Remove this line
     
     // Get cotizaciones with pending or partial payments
     const { data, error } = await supabase
@@ -515,12 +522,14 @@ export async function getAvailableCotizaciones(): Promise<{
         porcentaje_completado,
         cliente_id
       `)
-      // .in('estado', ['enviada', 'producción']) // DEBUG: show all cotizaciones
-      // .in('estatus_pago', ['pendiente', 'parcial']) // DEBUG: show all cotizaciones
+      // .in('estado', ['enviada', 'producción']) // Keep commented or adjust as needed
+      .in('estatus_pago', ['pendiente', 'parcial']) // Restore this filter!
       .order('fecha_creacion', { ascending: false });
     
     if (error) {
-      throw error;
+      // Specific error for cotizacion fetch
+      console.error('Error fetching cotizaciones:', error);
+      throw new Error('Error al obtener cotizaciones de Supabase.'); 
     }
     
     // Get client names
@@ -535,7 +544,9 @@ export async function getAvailableCotizaciones(): Promise<{
         .in('cliente_id', clienteIds);
       
       if (clientesError) {
-        throw clientesError;
+         // Specific error for cliente fetch
+        console.error('Error fetching client names:', clientesError);
+        throw new Error('Error al obtener nombres de clientes de Supabase.'); 
       }
       
       clientesMap = clientes.reduce((acc, cliente) => {
@@ -556,6 +567,10 @@ export async function getAvailableCotizaciones(): Promise<{
     };
   } catch (error) {
     console.error('Error getting available cotizaciones:', error);
-    return { success: false, error: 'Failed to fetch available cotizaciones' };
+    // Return the specific error message from the throw statements
+    return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to fetch available cotizaciones' 
+    };
   }
 } 
