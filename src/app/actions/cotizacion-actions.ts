@@ -223,9 +223,9 @@ export async function getCotizacionDetails(cotizacionId: number) {
       descuento: item.descuento_producto
     }));
     
-    // Get payments
+    // Get payments from the correct table
     const { data: pagos, error: pagosError } = await supabase
-      .from('pagos_anticipos')
+      .from('pagos')
       .select('*')
       .eq('cotizacion_id', cotizacionId)
       .order('fecha_pago', { ascending: false });

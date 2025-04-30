@@ -12,13 +12,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CotizacionStatusModal } from "@/components/cotizacion/cotizacion-status-modal";
-import { getCotizacionDetails, updateCotizacionStatus } from "@/app/actions/cotizacion-actions";
+import { getCotizacionDetails } from "@/app/actions/cotizacion-actions";
+import { supabase } from "@/lib/supabase/client";
 
 interface PaymentFormData {
   monto: number;
   metodo_pago: string;
   porcentaje: number;
-  notas: string;
 }
 
 const DetailItem = ({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) => (
@@ -71,8 +71,8 @@ export default function CotizacionDetailPage() {
   };
   
   const handleStatusChange = async (
-    cotizacionId: number, 
-    newStatus: string, 
+    cotizacionId: number,
+    newStatus: string,
     paymentData?: PaymentFormData
   ) => {
     if (!cotizacion) {
@@ -80,19 +80,65 @@ export default function CotizacionDetailPage() {
       return false;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id ?? null;
+
     try {
-      const result = await updateCotizacionStatus(cotizacionId, newStatus, paymentData);
-      
-      if (result.success) {
+      let rpcResult;
+
+      if (newStatus === 'producción') {
+        if (!paymentData || paymentData.monto <= 0 || !paymentData.metodo_pago) {
+           toast.error("Datos de anticipo inválidos para mover a producción.");
+           return false;
+        }
+
+        const rpcParamsApprove = {
+          p_cotizacion_id: cotizacionId,
+          p_usuario_id: userId, 
+          p_monto_anticipo: paymentData.monto,
+          p_metodo_pago: paymentData.metodo_pago,
+          p_moneda: cotizacion.moneda,
+          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null 
+        };
+        console.log("Calling aprobar_cotizacion_a_produccion with params:", rpcParamsApprove);
+
+        const { data, error } = await supabase.rpc('aprobar_cotizacion_a_produccion', rpcParamsApprove);
+
+        if (error) throw error;
+        rpcResult = data;
+
+      } else if (newStatus === 'rechazada') {
+        const rpcParamsReject = {
+          p_cotizacion_id: cotizacionId,
+          p_usuario_id: userId 
+        };
+        console.log("Calling rechazar_cotizacion with params:", rpcParamsReject);
+
+        const { data, error } = await supabase.rpc('rechazar_cotizacion', rpcParamsReject);
+
+        if (error) throw error;
+        rpcResult = data;
+
+      } else {
+         toast.error(`Estado "${newStatus}" no manejado.`);
+         return false;
+      }
+
+      if (rpcResult === true) {
         await fetchCotizacion();
         return true;
       } else {
-        toast.error(result.error || "No se pudo actualizar el estado. Intenta de nuevo.");
-        return false;
+         toast.error("La operación falló en la base de datos (RPC devolvió false).");
+         return false;
       }
-    } catch (error) {
-      console.error("Error calling updateCotizacionStatus:", error);
-      toast.error(error instanceof Error ? error.message : "Error inesperado al actualizar el estado.");
+
+    } catch (error: any) {
+      console.error("Error calling RPC function (raw error object):", error);
+      const messageFromServer = error?.message || JSON.stringify(error);
+      const errorMessage = messageFromServer.includes(':')
+         ? messageFromServer.split(':').pop().trim()
+         : messageFromServer;
+      toast.error(`Error: ${errorMessage}`);
       return false;
     }
   };
