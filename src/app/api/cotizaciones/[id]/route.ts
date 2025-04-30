@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { supabase } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 interface RequestParams {
@@ -53,8 +53,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = createServerSupabaseClient();
-    
     const cotizacionId = params.id;
     
     // Get cotizacion details
@@ -159,7 +157,6 @@ export async function PUT(
 ) {
   try {
     console.log("Cotizacion update API called for ID:", params.id);
-    const supabase = createServerSupabaseClient();
     const cotizacionId = parseInt(params.id);
     
     // Basic validation
@@ -404,5 +401,64 @@ export async function PUT(
       },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const cotizacionId = parseInt(params.id, 10);
+
+  if (isNaN(cotizacionId)) {
+    return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
+  }
+
+  try {
+    // Delete related cotizacion_productos first due to potential FK constraints
+    const { error: productDeleteError } = await supabase
+      .from('cotizacion_productos')
+      .delete()
+      .eq('cotizacion_id', cotizacionId);
+      
+    if (productDeleteError) {
+       console.error('Error deleting cotizacion_productos:', productDeleteError);
+       // Decide if you want to proceed or stop here
+       // return NextResponse.json({ error: productDeleteError.message || 'Error deleting related products' }, { status: 500 });
+    }
+    
+    // Delete related cotizacion_historial
+     const { error: historyDeleteError } = await supabase
+       .from('cotizacion_historial')
+       .delete()
+       .eq('cotizacion_id', cotizacionId);
+       
+     if (historyDeleteError) {
+        console.error('Error deleting cotizacion_historial:', historyDeleteError);
+        // Decide if you want to proceed or stop here
+     }
+
+    // Now delete the cotización itself
+    const { error: cotizacionDeleteError } = await supabase
+      .from('cotizaciones')
+      .delete()
+      .eq('cotizacion_id', cotizacionId);
+
+    if (cotizacionDeleteError) {
+      console.error('Error deleting cotizacion:', cotizacionDeleteError);
+      // Handle specific errors like FK violation if pagos aren't deleted and RESTRICT is set
+      if (cotizacionDeleteError.code === '23503') { // Foreign key violation
+         return NextResponse.json({ error: 'Cannot delete cotización due to related records (e.g., payments).' }, { status: 409 });
+      }
+      return NextResponse.json({ error: cotizacionDeleteError.message || 'Error deleting cotizacion' }, { status: 500 });
+    }
+
+    // Successfully deleted (or at least no error reported for the main deletion)
+    return NextResponse.json({ message: 'Cotización deleted successfully' }, { status: 200 }); // 200 or 204 No Content
+
+  } catch (err) {
+    console.error(`Unexpected error in DELETE /api/cotizaciones/${cotizacionId}:`, err);
+    const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
