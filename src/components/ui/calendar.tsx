@@ -1,8 +1,13 @@
 "use client"
 
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+} from "lucide-react"
 import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayFlag, DayPicker, SelectionState, UI } from "react-day-picker"
 import { es } from "date-fns/locale"
 
 import { cn } from "@/lib/utils"
@@ -10,59 +15,74 @@ import { buttonVariants } from "@/components/ui/button"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
-function Calendar({
+export const Calendar = ({
   className,
   classNames,
   showOutsideDays = true,
   ...props
-}: CalendarProps) {
+}: CalendarProps) => {
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{
-        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
-        nav_button: cn(
+        [UI.Months]: "relative",
+        [UI.Month]: "space-y-4 ml-0",
+        [UI.MonthCaption]: "flex justify-center items-center h-7",
+        [UI.CaptionLabel]: "text-sm font-medium",
+        [UI.PreviousMonthButton]: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "absolute left-1 top-0 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
-        head_row: "flex",
-        head_cell:
-          "text-slate-500 rounded-md w-9 font-normal text-[0.8rem] dark:text-slate-400",
-        row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-slate-100/50 [&:has([aria-selected])]:bg-slate-100 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20 dark:[&:has([aria-selected].day-outside)]:bg-slate-800/50 dark:[&:has([aria-selected])]:bg-slate-800",
-        day: cn(
+        [UI.NextMonthButton]: cn(
+          buttonVariants({ variant: "outline" }),
+          "absolute right-1 top-0 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+        ),
+        [UI.MonthGrid]: "w-full border-collapse space-y-1",
+        [UI.Weekdays]: "flex",
+        [UI.Weekday]:
+          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+        [UI.Week]: "flex w-full mt-2",
+        [UI.Day]:
+          "h-9 w-9 text-center rounded-md text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+        [UI.DayButton]: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-primary hover:text-primary-foreground",
         ),
-        day_range_end: "day-range-end",
-        day_selected:
-          "bg-slate-900 text-slate-50 hover:bg-slate-900 hover:text-slate-50 focus:bg-slate-900 focus:text-slate-50 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50 dark:hover:text-slate-900 dark:focus:bg-slate-50 dark:focus:text-slate-900",
-        day_today: "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50",
-        day_outside:
-          "day-outside text-slate-500 opacity-50 aria-selected:bg-slate-100/50 aria-selected:text-slate-500 aria-selected:opacity-30 dark:text-slate-400 dark:aria-selected:bg-slate-800/50 dark:aria-selected:text-slate-400",
-        day_disabled: "text-slate-500 opacity-50 dark:text-slate-400",
-        day_range_middle:
-          "aria-selected:bg-slate-100 aria-selected:text-slate-900 dark:aria-selected:bg-slate-800 dark:aria-selected:text-slate-50",
-        day_hidden: "invisible",
+        [SelectionState.range_end]: "day-range-end",
+        [SelectionState.selected]:
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+        [SelectionState.range_middle]:
+          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+        [DayFlag.today]: "bg-accent text-accent-foreground",
+        [DayFlag.outside]:
+          "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
+        [DayFlag.disabled]: "text-muted-foreground opacity-50",
+        [DayFlag.hidden]: "invisible",
         ...classNames,
       }}
       components={{
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        Chevron: ({ ...props }) => <Chevron {...props} />,
       }}
       locale={es}
       {...props}
     />
   )
 }
-Calendar.displayName = "Calendar"
 
-export { Calendar } 
+const Chevron = ({ orientation = "left" }) => {
+  switch (orientation) {
+    case "left":
+      return <ChevronLeftIcon className="h-4 w-4" />
+    case "right":
+      return <ChevronRightIcon className="h-4 w-4" />
+    case "up":
+      return <ChevronUpIcon className="h-4 w-4" />
+    case "down":
+      return <ChevronDownIcon className="h-4 w-4" />
+    default:
+      return null
+  }
+}
+
+Calendar.displayName = "Calendar" 
