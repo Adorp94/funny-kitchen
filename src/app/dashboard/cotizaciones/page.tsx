@@ -380,11 +380,11 @@ export default function CotizacionesPage() {
       {/* Header with title and actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            <FileText className="mr-2 h-5 w-5 text-emerald-600"/>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <FileText className="h-5 w-5 text-emerald-600"/>
             Cotizaciones
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             Administra cotizaciones y pedidos.
           </p>
         </div>
