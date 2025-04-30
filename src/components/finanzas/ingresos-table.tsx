@@ -71,7 +71,7 @@ export function IngresosTable({
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <Table>
+        <Table className="min-w-[800px]">
           <TableHeader className="bg-slate-50 border-b border-slate-200">
             <TableRow className="hover:bg-slate-50">
               <TableHead className="h-10 text-xs font-medium text-slate-500">Folio</TableHead>

@@ -16,7 +16,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { IngresoModal } from '@/components/finanzas/ingreso-modal';
+import { IngresoResponsiveWrapper } from '@/components/finanzas/ingreso-modal';
 import { EgresoModal } from '@/components/finanzas/egreso-modal';
 import { IngresosTable } from '@/components/finanzas/ingresos-table';
 import { EgresosTable } from '@/components/finanzas/egresos-table';
@@ -28,6 +28,15 @@ import {
   getFinancialMetrics 
 } from '@/app/actions/finanzas-actions';
 import { formatCurrency } from '@/lib/utils';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define types for our components
 interface Ingreso {
@@ -185,200 +194,146 @@ export default function FinanzasPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 flex flex-col min-h-[calc(100vh-120px)]">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-10 md:mb-12">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">Finanzas</h1>
-          <p className="mt-2 text-base text-slate-500 max-w-xl">
-            Gestiona los ingresos y egresos de tu negocio. Visualiza y administra tu flujo de efectivo en tiempo real.
-          </p>
-        </div>
-        <div className="flex items-center space-x-3 mt-5 sm:mt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshData}
-            disabled={isRefreshing}
-            className="h-10 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
-          {activeTab === "ingresos" ? (
-            <Button 
-              size="sm"
-              className="h-10 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-              onClick={() => setIsIngresoModalOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Ingreso
-            </Button>
-          ) : (
-            <Button 
-              size="sm"
-              className="h-10 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white"
-              onClick={() => setIsEgresoModalOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Egreso
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10 mb-10 md:mb-12">
-        {/* Ingresos MXN Card */}
-        <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-emerald-700 dark:text-emerald-400 flex items-center">
-              <DollarSign className="h-5 w-5 mr-1.5 text-emerald-600 dark:text-emerald-500" />
-              Ingresos MXN
-            </CardTitle>
-            <CardDescription className="text-xs text-emerald-600/70 dark:text-emerald-500/70">
-              Total recibido en pesos mexicanos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                {formatCurrency(metrics.ingresos.mxn, "MXN")}
-              </span>
+    <>
+      {/* Temporarily remove outer ScrollArea to isolate issues */}
+      {/* <ScrollArea> */}
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8 md:space-y-10">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Finanzas</h1>
+              <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
+                Gestiona los ingresos y egresos de tu negocio. Visualiza y administra tu flujo de efectivo.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-        
-        {/* Egresos MXN Card */}
-        <Card className="bg-rose-50 border-rose-200 dark:bg-rose-900/30 dark:border-rose-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-rose-700 dark:text-rose-400 flex items-center">
-              <ReceiptIcon className="h-5 w-5 mr-1.5 text-rose-600 dark:text-rose-500" />
-              Egresos MXN
-            </CardTitle>
-            <CardDescription className="text-xs text-rose-600/70 dark:text-rose-500/70">
-              Total gastado en pesos mexicanos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold text-rose-700 dark:text-rose-400">
-                {formatCurrency(metrics.egresos.mxn, "MXN")}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Balance MXN Card */}
-        <Card className={
-            metrics.balance.mxn >= 0 
-              ? "bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800" 
-              : "bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800"
-          }>
-          <CardHeader className="pb-2">
-            <CardTitle className={`text-base font-medium flex items-center ${
-              metrics.balance.mxn >= 0 
-                ? 'text-blue-700 dark:text-blue-400' 
-                : 'text-amber-700 dark:text-amber-400'
-            }`}>
-              {metrics.balance.mxn >= 0 ? (
-                <TrendingUp className="h-5 w-5 mr-1.5 text-blue-600 dark:text-blue-500" />
+            <div className="flex flex-shrink-0 items-center space-x-3 mt-4 sm:mt-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshData}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+              {activeTab === "ingresos" ? (
+                <Button 
+                  size="sm"
+                  onClick={() => setIsIngresoModalOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Ingreso
+                </Button>
               ) : (
-                <ArrowDown className="h-5 w-5 mr-1.5 text-amber-600 dark:text-amber-500" />
+                <Button 
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsEgresoModalOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Egreso
+                </Button>
               )}
-              Balance MXN
-            </CardTitle>
-            <CardDescription className={`text-xs ${
-              metrics.balance.mxn >= 0 
-                ? 'text-blue-600/70 dark:text-blue-500/70' 
-                : 'text-amber-600/70 dark:text-amber-500/70'
-            }`}>
-              {metrics.balance.mxn >= 0 ? 'Saldo positivo actual' : 'Saldo negativo actual'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <span className={`text-3xl font-bold ${
-                metrics.balance.mxn >= 0 
-                  ? 'text-blue-700 dark:text-blue-400' 
-                  : 'text-amber-700 dark:text-amber-400'
-              }`}>
-                {formatCurrency(Math.abs(metrics.balance.mxn), "MXN")}
-              </span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+                  <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
+                  Ingresos (MXN)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {formatCurrency(metrics.ingresos.mxn, "MXN")}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+                   <DollarSign className="h-4 w-4 mr-2 text-red-500" />
+                   Egresos (MXN)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {formatCurrency(metrics.egresos.mxn, "MXN")}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+                   <TrendingUp className="h-4 w-4 mr-2 text-blue-500" />
+                   Balance (MXN)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${metrics.balance.mxn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {formatCurrency(metrics.balance.mxn, "MXN")}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
+                   <ReceiptIcon className="h-4 w-4 mr-2 text-indigo-500" />
+                   Cotizaciones Pagadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {metrics.cotizacionesPagadas}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
+              <TabsTrigger value="egresos">Egresos</TabsTrigger>
+            </TabsList>
+            <TabsContent value="ingresos" className="mt-0">
+               <IngresosTable 
+                  ingresos={ingresos} 
+                  loading={loadingIngresos} 
+                  pagination={ingresosPagination}
+                  onPageChange={handleIngresoPageChange}
+               />
+            </TabsContent>
+            <TabsContent value="egresos" className="mt-0">
+               <EgresosTable 
+                  egresos={egresos} 
+                  loading={loadingEgresos} 
+                  pagination={egresosPagination}
+                  onPageChange={handleEgresoPageChange}
+               />
+            </TabsContent>
+          </Tabs>
+          
+        </div>
+      {/* </ScrollArea> */}
+
+      {/* Modals remain siblings */}
+      <>
+        <IngresoResponsiveWrapper 
+          isOpen={isIngresoModalOpen} 
+          onClose={() => setIsIngresoModalOpen(false)} 
+          onSubmit={handleIngresoSubmit} 
+        />
         
-        {/* Cotizaciones Pagadas Card */}
-        <Card className="bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-indigo-700 dark:text-indigo-400 flex items-center">
-              <CreditCard className="h-5 w-5 mr-1.5 text-indigo-600 dark:text-indigo-500" />
-              Cotizaciones Pagadas
-            </CardTitle>
-            <CardDescription className="text-xs text-indigo-600/70 dark:text-indigo-500/70">
-              Total de cotizaciones completadas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <span className="text-3xl font-bold text-indigo-700 dark:text-indigo-400">
-                {metrics.cotizacionesPagadas}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200">
-          <TabsTrigger 
-            value="ingresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
-          >
-            Ingresos
-          </TabsTrigger>
-          <TabsTrigger 
-            value="egresos" 
-            className="rounded-lg px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm data-[state=inactive]:text-slate-600 data-[state=inactive]:hover:text-slate-900"
-          >
-            Egresos
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="ingresos" className="mt-8">
-          <IngresosTable 
-            ingresos={ingresos}
-            isLoading={loadingIngresos}
-            page={ingresosPagination.page}
-            totalPages={ingresosPagination.totalPages}
-            onPageChange={handleIngresoPageChange}
-          />
-        </TabsContent>
-        
-        <TabsContent value="egresos" className="mt-8">
-          <EgresosTable 
-            egresos={egresos}
-            isLoading={loadingEgresos}
-            page={egresosPagination.page}
-            totalPages={egresosPagination.totalPages}
-            onPageChange={handleEgresoPageChange}
-          />
-        </TabsContent>
-      </Tabs>
-      
-      {/* Modals */}
-      <IngresoModal 
-        isOpen={isIngresoModalOpen} 
-        onClose={() => setIsIngresoModalOpen(false)} 
-        onSubmit={handleIngresoSubmit} 
-      />
-      
-      <EgresoModal 
-        isOpen={isEgresoModalOpen} 
-        onClose={() => setIsEgresoModalOpen(false)} 
-        onSubmit={handleEgresoSubmit} 
-      />
-    </div>
+        <EgresoModal 
+          isOpen={isEgresoModalOpen} 
+          onClose={() => setIsEgresoModalOpen(false)} 
+          onSubmit={handleEgresoSubmit} 
+        />
+      </>
+    </>
   );
 } 

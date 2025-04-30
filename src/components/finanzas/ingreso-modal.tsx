@@ -1,64 +1,64 @@
 "use client";
 
+import * as React from "react";
 import { useState, useEffect } from "react";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarIcon, Loader2, Check, ChevronsUpDown } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
+  Drawer, 
+  DrawerClose, 
+  DrawerContent, 
+  DrawerDescription, 
+  DrawerFooter, 
+  DrawerHeader, 
+  DrawerTitle 
+} from "@/components/ui/drawer";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { getAvailableCotizaciones } from "@/app/actions/finanzas-actions";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-
-// Define the available payment methods
-const METODOS_PAGO = [
-  { value: "efectivo", label: "Efectivo" },
-  { value: "transferencia", label: "Transferencia" },
-  { value: "tarjeta", label: "Tarjeta" },
-  { value: "cheque", label: "Cheque" },
-  { value: "deposito", label: "Depósito" },
-];
+import { IngresoForm } from "./ingreso-form";
 
 // Form validation schema
 const formSchema = z.object({
-  cotizacion_id: z.number({
-    required_error: "La cotización es requerida",
-  }),
+  cotizacion_id: z.number({ required_error: "La cotización es requerida" }),
   monto: z.string().min(1, "El monto es requerido"),
   moneda: z.string(),
   metodo_pago: z.string().min(1, "El método de pago es requerido"),
-  fecha_pago: z.date({
-    required_error: "La fecha es requerida",
-  }),
-  comprobante_url: z.string().optional(),
+  fecha_pago: z.date({ required_error: "La fecha es requerida" }),
+  comprobante_url: z.string().url({ message: "URL inválida" }).optional().or(z.literal('')),
   notas: z.string().optional(),
 });
 
 export type IngresoFormValues = z.infer<typeof formSchema>;
 
-interface IngresoModalProps {
+// Props for the wrapper component
+interface IngresoResponsiveWrapperProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: IngresoFormValues) => Promise<boolean>;
 }
 
-export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
+export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoResponsiveWrapperProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cotizaciones, setCotizaciones] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingCotizaciones, setIsLoadingCotizaciones] = useState(true);
   const [selectedCotizacion, setSelectedCotizacion] = useState<any>(null);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState<string>("");
+  const [openCombobox, setOpenCombobox] = useState(false);
+  const [queryCombobox, setQueryCombobox] = useState<string>("");
   
+  // Determine if desktop based on media query
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+
   const form = useForm<IngresoFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -72,356 +72,155 @@ export function IngresoModal({ isOpen, onClose, onSubmit }: IngresoModalProps) {
     },
   });
 
-  // When modal opens, load cotizaciones and reset form and combobox state
+  // Effect to load cotizaciones when component mounts or isOpen changes
   useEffect(() => {
     if (isOpen) {
       loadCotizaciones();
-      // reset search query and combobox open state
-      setQuery("");
-      setOpen(false);
-      // reset form to default values
-      form.reset();
-    }
-  }, [isOpen]);
+      // Reset form and combobox state when opening
+      setQueryCombobox("");
+      setOpenCombobox(false);
+      form.reset(); // Reset form to defaults
+      setSelectedCotizacion(null); // Clear selected cotizacion visual state
+    } 
+  }, [isOpen]); // Dependency array includes isOpen
 
+  // Function to load cotizaciones
   const loadCotizaciones = async () => {
-    setIsLoading(true);
+    setIsLoadingCotizaciones(true);
     try {
       const result = await getAvailableCotizaciones();
-      if (result.success && result.cotizaciones) {
-        setCotizaciones(result.cotizaciones);
-      } else {
-        setCotizaciones([]);
-      }
+      setCotizaciones(result.success && result.cotizaciones ? result.cotizaciones : []);
     } catch (error) {
       console.error("Error loading cotizaciones:", error);
       setCotizaciones([]);
     } finally {
-      setIsLoading(false);
+      setIsLoadingCotizaciones(false);
     }
   };
 
-  // Watch cotizacion_id to update selected cotizacion and moneda
+  // Watch form value for cotizacion_id
   const watchedCotizacionId = form.watch("cotizacion_id");
   useEffect(() => {
     if (watchedCotizacionId) {
       const cot = cotizaciones.find(c => c.cotizacion_id === watchedCotizacionId);
       setSelectedCotizacion(cot);
-      // Update moneda based on selected cotizacion
-      if (cot && cot.moneda) {
+      if (cot?.moneda) {
         form.setValue("moneda", cot.moneda);
       }
     } else {
       setSelectedCotizacion(null);
     }
-  }, [watchedCotizacionId, cotizaciones]);
+  }, [watchedCotizacionId, cotizaciones, form]); // Added form dependency
 
-  // Calculate the remaining amount for the selected cotizacion
+  // Helper functions (remain the same, could be moved if needed)
   const getRemainingAmount = () => {
     if (!selectedCotizacion) return 0;
-    
     const total = Number(selectedCotizacion.total) || 0;
     const paid = Number(selectedCotizacion.monto_pagado) || 0;
     return total - paid;
   };
 
-  // Calculate the percentage of the payment
   const calculatePercentage = () => {
-    if (!selectedCotizacion) return 0;
-    
+    if (!selectedCotizacion) return "0.00";
     const total = Number(selectedCotizacion.total) || 0;
     const amount = Number(form.watch("monto")) || 0;
-    
-    if (total === 0) return 0;
+    if (total === 0) return "0.00";
     return ((amount / total) * 100).toFixed(2);
   };
 
-  // filter cotizaciones by search query
-  const filteredCotizaciones = query
+  const filteredCotizaciones = queryCombobox
     ? cotizaciones.filter((c) =>
-        c.folio.toLowerCase().includes(query.toLowerCase()) ||
-        c.cliente_nombre.toLowerCase().includes(query.toLowerCase())
+        c.folio.toLowerCase().includes(queryCombobox.toLowerCase()) ||
+        c.cliente_nombre.toLowerCase().includes(queryCombobox.toLowerCase())
       )
     : cotizaciones;
 
-  const handleSubmit = async (values: IngresoFormValues) => {
+  // Form submission handler
+  const handleFormSubmit = async (values: IngresoFormValues) => {
     setIsSubmitting(true);
     try {
-      // Add moneda from the selected cotizacion
-      const dataToSubmit = {
-        ...values,
-        moneda: selectedCotizacion?.moneda || "MXN"
-      };
-      
+      const dataToSubmit = { ...values, moneda: selectedCotizacion?.moneda || "MXN" };
       const success = await onSubmit(dataToSubmit);
       if (success) {
-        form.reset();
-        onClose();
+        form.reset(); // Reset form on success
+        onClose(); // Close the dialog/drawer
       }
     } catch (error) {
       console.error("Error submitting payment:", error);
+      // Potentially show a toast notification for the error
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Props to pass down to the IngresoForm component
+  const formProps = {
+    form,
+    selectedCotizacion,
+    isLoadingCotizaciones,
+    cotizaciones,
+    openCombobox,
+    setOpenCombobox,
+    queryCombobox,
+    setQueryCombobox,
+    getRemainingAmount,
+    calculatePercentage,
+    filteredCotizaciones,
+    watchedCotizacionId
+  };
+
+  // --- Render Dialog for Desktop ---
+  if (isDesktop) {
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}> 
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar Ingreso</DialogTitle>
+            <DialogDescription>
+              Selecciona la cotización y registra los detalles del pago recibido.
+            </DialogDescription>
+          </DialogHeader>
+          {/* Scrollable div for the form content */}
+          <div className="overflow-y-auto max-h-[60vh] px-1 py-4">
+             {/* Pass onSubmit via prop to the form component */}
+            <IngresoForm {...formProps} id="ingreso-form-desktop" onSubmit={form.handleSubmit(handleFormSubmit)} />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+            <Button type="submit" form="ingreso-form-desktop" disabled={isSubmitting || !selectedCotizacion}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? "Registrando..." : "Registrar Ingreso"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // --- Render Drawer for Mobile ---
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto p-6">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold text-slate-800">
-            Registrar Ingreso
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 mt-4">
-          <div className="grid grid-cols-1 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="cotizacion_id" className="text-sm font-medium text-slate-700">
-                Cotización
-              </Label>
-              {isLoading ? (
-                <div className="flex items-center space-x-2 h-10 px-3 py-2 border rounded-md bg-muted">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Cargando cotizaciones...</span>
-                </div>
-              ) : (
-                <Popover open={open} onOpenChange={(isOpen) => {
-                  setOpen(isOpen);
-                  if (isOpen) setQuery("");
-                }}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      id="cotizacion_id"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={open}
-                      aria-controls="cotizacion-list"
-                      aria-haspopup="listbox"
-                      className={cn(
-                        "w-full justify-between text-left",
-                        !selectedCotizacion && "text-muted-foreground"
-                      )}
-                    >
-                      {selectedCotizacion
-                        ? `${selectedCotizacion.folio} - ${selectedCotizacion.cliente_nombre}`
-                        : "Seleccionar cotización"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    side="bottom"
-                    sideOffset={4}
-                    className="w-[var(--radix-popover-trigger-width)] max-h-60 overflow-hidden z-50"
-                  >
-                    <Command className="overflow-hidden">
-                      <CommandInput
-                        autoFocus
-                        placeholder="Buscar cotización..."
-                        value={query}
-                        onValueChange={setQuery}
-                        className="px-2 py-1"
-                      />
-                      <CommandList
-                        id="cotizacion-list"
-                        role="listbox"
-                        className="max-h-52"
-                      >
-                        <CommandEmpty>No hay cotizaciones disponibles</CommandEmpty>
-                        {filteredCotizaciones.map((c) => (
-                          <CommandItem
-                            key={c.cotizacion_id}
-                            value={c.cotizacion_id.toString()}
-                            onSelect={(value) => {
-                              form.setValue("cotizacion_id", Number(value));
-                              setOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                watchedCotizacionId?.toString() ===
-                                  c.cotizacion_id.toString()
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            {c.folio} - {c.cliente_nombre}
-                          </CommandItem>
-                        ))}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              )}
-              {form.formState.errors.cotizacion_id && (
-                <p className="text-sm text-red-500 mt-1">{form.formState.errors.cotizacion_id.message}</p>
-              )}
-              
-              {selectedCotizacion && (
-                <div className="mt-2 rounded-md bg-slate-50 p-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Total:</span>
-                    <span className="font-medium">
-                      {formatCurrency(selectedCotizacion.total, selectedCotizacion.moneda)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-slate-600">Pagado:</span>
-                    <span className="font-medium">
-                      {formatCurrency(selectedCotizacion.monto_pagado || 0, selectedCotizacion.moneda)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-slate-600">Restante:</span>
-                    <span className="font-medium text-orange-600">
-                      {formatCurrency(getRemainingAmount(), selectedCotizacion.moneda)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="monto" className="text-sm font-medium text-slate-700">
-                Monto {selectedCotizacion?.moneda && `(${selectedCotizacion.moneda})`}
-              </Label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-slate-500">
-                  {selectedCotizacion?.moneda === "USD" ? "$" : "$"}
-                </span>
-                <Input
-                  id="monto"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  className="pl-8 bg-white"
-                  {...form.register("monto")}
-                />
-              </div>
-              {form.formState.errors.monto && (
-                <p className="text-sm text-red-500">{form.formState.errors.monto.message}</p>
-              )}
-              
-              {selectedCotizacion && form.watch("monto") && Number(form.watch("monto")) > 0 && (
-                <div className="mt-1 text-sm text-slate-600">
-                  Este pago representa el <span className="font-medium">{calculatePercentage()}%</span> del total
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="metodo_pago" className="text-sm font-medium text-slate-700">
-                Método de pago
-              </Label>
-              <Select
-                onValueChange={(value) => form.setValue("metodo_pago", value)}
-                defaultValue={form.watch("metodo_pago")}
-              >
-                <SelectTrigger className="bg-white border-slate-200">
-                  <SelectValue placeholder="Seleccionar método de pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  {METODOS_PAGO.map((metodo) => (
-                    <SelectItem key={metodo.value} value={metodo.value}>
-                      {metodo.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.metodo_pago && (
-                <p className="text-sm text-red-500">{form.formState.errors.metodo_pago.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fecha_pago" className="text-sm font-medium text-slate-700">
-                Fecha de pago
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-white border-slate-200",
-                      !form.watch("fecha_pago") && "text-slate-400"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 opacity-70" />
-                    {form.watch("fecha_pago") ? (
-                      format(form.watch("fecha_pago"), "PPP", { locale: es })
-                    ) : (
-                      <span>Seleccionar fecha</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={form.watch("fecha_pago")}
-                    onSelect={(date) => form.setValue("fecha_pago", date as Date)}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              {form.formState.errors.fecha_pago && (
-                <p className="text-sm text-red-500">{form.formState.errors.fecha_pago.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="comprobante_url" className="text-sm font-medium text-slate-700">
-                URL del comprobante (opcional)
-              </Label>
-              <Input
-                id="comprobante_url"
-                type="url"
-                placeholder="https://..."
-                className="bg-white"
-                {...form.register("comprobante_url")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notas" className="text-sm font-medium text-slate-700">
-                Notas adicionales (opcional)
-              </Label>
-              <Textarea
-                id="notas"
-                placeholder="Agregar notas o detalles sobre este pago..."
-                className="bg-white min-h-24 resize-none"
-                {...form.register("notas")}
-              />
-            </div>
-          </div>
-          
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="text-slate-700 border-slate-300 hover:bg-slate-50"
-              disabled={isSubmitting}
-            >
-              Cancelar
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}> 
+      <DrawerContent>
+        <DrawerHeader className="text-left">
+          <DrawerTitle>Registrar Ingreso</DrawerTitle>
+          <DrawerDescription>
+            Selecciona la cotización y registra los detalles del pago recibido.
+          </DrawerDescription>
+        </DrawerHeader>
+        {/* Scroll Area within Drawer */}
+        <div className="overflow-y-auto px-4">
+            <IngresoForm {...formProps} id="ingreso-form-mobile" onSubmit={form.handleSubmit(handleFormSubmit)} />
+        </div>
+        <DrawerFooter className="pt-4">
+           <Button type="submit" form="ingreso-form-mobile" disabled={isSubmitting || !selectedCotizacion}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isSubmitting ? "Registrando..." : "Registrar Ingreso"}
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting} 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : "Guardar Ingreso"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+          <DrawerClose asChild>
+            <Button variant="outline" disabled={isSubmitting}>Cancelar</Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 } 
