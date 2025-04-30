@@ -744,11 +744,11 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
         // Prepare the product for adding to cart
         const nuevoProducto = {
           id: data.producto.producto_id.toString(),
+          producto_id: data.producto.producto_id,
           nombre: data.producto.nombre,
-          precio: data.producto.precio || 0,
+          precio_unitario: data.producto.precio || 0,
           cantidad: parseInt(formData.cantidad) || 1,
           descuento: 0,
-          subtotal: (data.producto.precio || 0) * (parseInt(formData.cantidad) || 1),
           sku: data.producto.sku || "",
           descripcion: data.producto.descripcion || "",
           colores: data.producto.colores ? data.producto.colores.split(',') : [],

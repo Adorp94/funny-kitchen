@@ -5,9 +5,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DollarSign, Truck, Receipt, Percent, User, Clock } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ResponsiveTable } from '../ui/responsive-table';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { formatCurrency } from '@/lib/utils';
 
 interface Cliente {
   nombre: string;
@@ -19,8 +19,9 @@ interface Cliente {
 
 interface ResumenCotizacionProps {
   cliente: Cliente | null;
-  productos: any[];
+  productos: any[]; // Keep simple for now
   subtotal: number;
+  ivaAmount: number;
   globalDiscount: number;
   setGlobalDiscount: (value: number) => void;
   hasIva: boolean;
@@ -37,8 +38,9 @@ interface ResumenCotizacionProps {
 
 export function ResumenCotizacion({
   cliente,
-  productos,
+  productos, // Not used directly in this simplified version
   subtotal,
+  ivaAmount,
   globalDiscount,
   setGlobalDiscount,
   hasIva,
@@ -52,72 +54,26 @@ export function ResumenCotizacion({
   tiempoEstimadoMax = 8,
   setTiempoEstimadoMax
 }: ResumenCotizacionProps) {
-  // State for the form - using string values for inputs
   const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasShipping, setHasShipping] = useState<boolean>(false);
   const [shippingCostStr, setShippingCostStr] = useState<string>('0');
 
-  // Initialize form values from props
   useEffect(() => {
     setGlobalDiscountStr(globalDiscount.toString());
     setHasShipping(shippingCost > 0);
     setShippingCostStr(shippingCost.toString());
   }, [globalDiscount, shippingCost]);
 
-  // Format currency based on selected currency
-  const formatCurrency = (amount: number): string => {
-    if (isNaN(amount) || amount === null || amount === undefined) {
-        return "---"; // Or indicate error/loading state
-    }
-    
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: moneda,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-  
-  // Format number with commas for better readability
-  const formatNumber = (value: number): string => {
-    return new Intl.NumberFormat('es-MX', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
-  
-  // Format percentage value
-  const formatPercent = (value: number): string => {
-    return new Intl.NumberFormat('es-MX', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(value) + '%';
-  };
-
-  // Handle global discount change
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log(`ResumenCotizacion: handleGlobalDiscountChange called with value: ${value}`);
-    
-    // Allow empty string or valid numbers
-    if (value === '' || !isNaN(parseFloat(value))) {
+    if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0 && parseFloat(value) <= 100) ) {
       setGlobalDiscountStr(value);
-      
-      // Convert to number for the callback
       const numValue = value === '' ? 0 : parseFloat(value);
-      const boundedValue = Math.min(Math.max(numValue, 0), 100);
-      
-      console.log(`ResumenCotizacion: Calling setGlobalDiscount with: ${boundedValue}`);
-      setGlobalDiscount(boundedValue);
+      setGlobalDiscount(numValue);
     }
   };
 
-  // Handle IVA toggle
-  const handleIvaToggle = (checked: boolean) => {
-    setHasIva(checked);
-  };
-
-  // Handle shipping toggle
+  const handleIvaToggle = (checked: boolean) => setHasIva(checked);
   const handleShippingToggle = (checked: boolean) => {
     setHasShipping(checked);
     if (!checked) {
@@ -126,299 +82,190 @@ export function ResumenCotizacion({
     }
   };
 
-  // Handle shipping cost change
   const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    
-    // Allow empty string or valid numbers
-    if (value === '' || !isNaN(parseFloat(value))) {
+    if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
       setShippingCostStr(value);
-      
-      // Convert to number for the callback
       const numValue = value === '' ? 0 : parseFloat(value);
-      const boundedValue = Math.max(numValue, 0);
-      
-      // Store shipping cost in the selected currency
-      // This ensures the value is interpreted correctly in the products context
-      setShippingCost(boundedValue);
+      setShippingCost(numValue);
     }
   };
 
-  // Handle tiempo estimado change
   const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Parse directly from input value
-    const numValue = value === '' ? 0 : parseInt(value);
-    
-    // Ignore non-numeric input
-    if (isNaN(numValue)) return;
-
-    // Ensure min >= 1
-    const newMinValue = Math.max(numValue, 1);
-    
-    // Update parent component state if callback is provided
-    if (setTiempoEstimado) {
+    if (setTiempoEstimado && (value === '' || /^[1-9]\d*$/.test(value))) { // Only allow positive integers
+      const numValue = value === '' ? 1 : parseInt(value);
+      const newMinValue = Math.max(numValue, 1);
       setTiempoEstimado(newMinValue);
-    }
-    
-    // Ensure max value is not less than new min value
-    // Use the current max prop directly for comparison
-    if (newMinValue > tiempoEstimadoMax && setTiempoEstimadoMax) {
-      // Update parent's max state if needed
-      setTiempoEstimadoMax(newMinValue);
+      if (newMinValue > tiempoEstimadoMax && setTiempoEstimadoMax) {
+        setTiempoEstimadoMax(newMinValue);
+      }
     }
   };
   
-  // Handle tiempo estimado max change
   const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Parse directly from input value
-    const numValue = value === '' ? 0 : parseInt(value);
-    
-    // Ignore non-numeric input
-    if (isNaN(numValue)) return;
-
-    // Ensure max >= current min prop
-    const newMaxValue = Math.max(numValue, tiempoEstimado);
-    
-    // Update parent component state if callback is provided
-    if (setTiempoEstimadoMax) {
+    if (setTiempoEstimadoMax && (value === '' || /^[1-9]\d*$/.test(value))) { // Only allow positive integers
+      const numValue = value === '' ? tiempoEstimado : parseInt(value); // Default to min if empty
+      const newMaxValue = Math.max(numValue, tiempoEstimado);
       setTiempoEstimadoMax(newMaxValue);
-    }
-  };
-
-  // Helper function to format Banxico date (dd/mm/yyyy)
-  const formatBanxicoDate = (dateStr: string): string => {
-    try {
-      if (!dateStr) return '';
-      const parts = dateStr.split('/');
-      if (parts.length !== 3) return dateStr;
-      
-      // Construct date as yyyy-mm-dd for ISO format
-      const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-      return new Date(isoDate).toLocaleDateString();
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return dateStr;
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Client Info */}
+      {/* Client Info Card */}
       {cliente && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <div className="flex items-center mb-3">
-            <User className="h-5 w-5 text-emerald-600 mr-2" />
-            <h3 className="font-medium text-gray-700">Información del Cliente</h3>
-          </div>
-          <ul className="space-y-2 text-sm">
-            <li className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-gray-500 w-20 mb-1 sm:mb-0">Nombre:</span>
-              <span className="font-medium text-gray-900">{cliente?.nombre}</span>
-            </li>
-            <li className="flex flex-col sm:flex-row sm:items-center">
-              <span className="text-gray-500 w-20 mb-1 sm:mb-0">Teléfono:</span>
-              <span className="font-medium text-gray-900">{cliente?.celular}</span>
-            </li>
-            {cliente?.correo && (
-              <li className="flex flex-col sm:flex-row sm:items-center">
-                <span className="text-gray-500 w-20 mb-1 sm:mb-0">Correo:</span>
-                <span className="font-medium text-gray-900">{cliente?.correo}</span>
-              </li>
-            )}
-            {cliente?.atencion && (
-              <li className="flex flex-col sm:flex-row sm:items-center">
-                <span className="text-gray-500 w-20 mb-1 sm:mb-0">Atención:</span>
-                <span className="font-medium text-gray-900">{cliente?.atencion}</span>
-              </li>
-            )}
-          </ul>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Información del Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm space-y-1">
+            <p><span className="font-medium text-foreground">Nombre:</span> {cliente.nombre}</p>
+            <p><span className="font-medium text-foreground">Teléfono:</span> {cliente.celular}</p>
+            {cliente.correo && <p><span className="font-medium text-foreground">Correo:</span> {cliente.correo}</p>}
+            {cliente.atencion && <p><span className="font-medium text-foreground">Atención:</span> {cliente.atencion}</p>}
+          </CardContent>
+        </Card>
       )}
-      
-      {/* Products with individual discounts */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center">
-            <Receipt className="h-5 w-5 text-emerald-600 mr-2" />
-            <h3 className="font-medium text-gray-700">Productos</h3>
-          </div>
-          <div className="flex items-center">
-            <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-            <span className="text-sm text-gray-500">Moneda: {moneda}</span>
-          </div>
-        </div>
-        
-        <ResponsiveTable>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Producto</th>
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {productos.map((producto) => (
-                <tr key={producto.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900 max-w-[150px] sm:max-w-none">
-                    <div className="truncate">{producto.nombre}</div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
-                    {producto.cantidad}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                    <span className="whitespace-nowrap">{formatCurrency(producto.precio)}</span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                    {producto.descuento > 0 ? formatPercent(producto.descuento) : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
-                    <span className="whitespace-nowrap">{formatCurrency(producto.subtotal)}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </ResponsiveTable>
-      </div>
-      
-      {/* Summary calculations */}
-      <div className="bg-gray-50 rounded-lg p-4 md:p-6 space-y-5">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-base font-medium text-gray-700">Resumen</h3>
-        </div>
 
-        {/* Subtotal */}
-        <div className="flex items-center justify-between py-2">
-          <span className="text-sm font-medium text-gray-600">Subtotal:</span>
-          <span className="font-medium">{formatCurrency(subtotal)}</span>
-        </div>
-        
-        {/* Global Discount */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center space-x-2">
-            <Percent className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-600">Descuento global:</span>
+      {/* Financial Summary & Options Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" />
+            Resumen Financiero y Opciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Subtotal Display */}
+          <div className="flex justify-between items-center py-1">
+            <span className="text-sm text-muted-foreground">Subtotal Productos</span>
+            <span className="text-sm font-medium">{formatCurrency(subtotal, moneda)}</span>
           </div>
-          <div className="flex items-center space-x-1">
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={globalDiscountStr}
-              onChange={handleGlobalDiscountChange}
-              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
-              placeholder="0"
-            />
-            <span className="text-gray-500">%</span>
-          </div>
-        </div>
-        
-        {/* Discount Amount */}
-        {globalDiscount > 0 && (
-          <div className="flex items-center justify-between pl-6 py-2">
-            <span className="text-sm text-gray-600">Monto de descuento:</span>
-            <span className="text-red-600 font-medium">-{formatCurrency(subtotal * (globalDiscount / 100))}</span>
-          </div>
-        )}
-        
-        {/* Subtotal after discount */}
-        {globalDiscount > 0 && (
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3 pb-2">
-            <span className="text-sm font-medium text-gray-600">Subtotal con descuento:</span>
-            <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100))}</span>
-          </div>
-        )}
-        
-        {/* IVA Toggle */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center space-x-2">
-            <Receipt className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-600">Incluir IVA (16%):</span>
-          </div>
-          <Switch 
-            checked={hasIva} 
-            onCheckedChange={handleIvaToggle}
-            className="data-[state=checked]:bg-emerald-500"
-          />
-        </div>
-        
-        {/* IVA Amount */}
-        {hasIva && (
-          <div className="flex items-center justify-between pl-6 py-2">
-            <span className="text-sm text-gray-600">Monto IVA (16%):</span>
-            <span className="font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100) * 0.16)}</span>
-          </div>
-        )}
-        
-        {/* Shipping Toggle & Cost */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center space-x-2">
-            <Truck className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-600">Incluir envío:</span>
-          </div>
-          <Switch 
-            checked={hasShipping} 
-            onCheckedChange={handleShippingToggle}
-            className="data-[state=checked]:bg-emerald-500"
-          />
-        </div>
-        
-        {hasShipping && (
-          <div className="flex items-center justify-between pl-6 py-2">
-            <span className="text-sm text-gray-600">Costo de envío:</span>
-            <div className="flex items-center space-x-1">
-              <span className="text-gray-500">$</span>
+
+          {/* Global Discount Input */}
+          <div className="flex justify-between items-center py-1">
+            <Label htmlFor="globalDiscount" className="text-sm flex items-center gap-1.5 text-muted-foreground">
+              <Percent className="h-4 w-4" />
+              Descuento Global
+            </Label>
+            <div className="relative w-24">
               <Input
-                type="text"
-                inputMode="decimal"
-                value={shippingCostStr}
-                onChange={handleShippingCostChange}
-                className="w-20 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
+                id="globalDiscount"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={globalDiscountStr}
+                onChange={handleGlobalDiscountChange}
+                className="h-8 pr-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="0"
               />
-              <span className="text-gray-500">{moneda}</span>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
             </div>
           </div>
-        )}
-        
-        {/* Tiempo de Entrega */}
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center space-x-2">
-            <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-600">Tiempo de entrega:</span>
+          
+           {/* Discount Amount Display */}
+           {globalDiscount > 0 && (
+            <div className="flex justify-between items-center py-1 text-sm text-destructive">
+              <span className="pl-6">Monto Descuento</span>
+              <span>-{formatCurrency(subtotal * (globalDiscount / 100), moneda)}</span>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* IVA Toggle & Amount */}
+          <div className="flex justify-between items-center py-1">
+            <Label htmlFor="hasIva" className="text-sm flex items-center gap-1.5 text-muted-foreground">
+              Incluir IVA (16%)
+            </Label>
+            <Switch id="hasIva" checked={hasIva} onCheckedChange={handleIvaToggle} />
           </div>
-          <div className="flex items-center space-x-1">
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={tiempoEstimado}
-              onChange={handleTiempoEstimadoChange}
-              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
-              placeholder="6"
-            />
-            <span className="text-gray-500">a</span>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={tiempoEstimadoMax}
-              onChange={handleTiempoEstimadoMaxChange}
-              className="w-16 text-right p-1 h-8 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
-              placeholder="8"
-            />
-            <span className="text-gray-500">semanas</span>
+          {hasIva && (
+            <div className="flex justify-between items-center py-1 text-sm">
+              <span className="pl-6 text-muted-foreground">Monto IVA</span>
+              <span>{formatCurrency(ivaAmount, moneda)}</span>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Shipping Toggle & Cost */}
+          <div className="flex justify-between items-center py-1">
+             <Label htmlFor="hasShipping" className="text-sm flex items-center gap-1.5 text-muted-foreground">
+              <Truck className="h-4 w-4" />
+              Incluir Envío
+            </Label>
+            <Switch id="hasShipping" checked={hasShipping} onCheckedChange={handleShippingToggle} />
           </div>
-        </div>
-        
-        {/* Total */}
-        <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
-          <span className="font-medium text-gray-700">Total:</span>
-          <span className="font-bold text-lg text-emerald-600">{formatCurrency(total)}</span>
-        </div>
-      </div>
+          {hasShipping && (
+            <div className="flex justify-between items-center py-1">
+              <Label htmlFor="shippingCost" className="pl-6 text-sm text-muted-foreground">
+                Costo Envío ({moneda})
+              </Label>
+              <div className="relative w-28">
+                <DollarSign className="absolute left-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                 <Input
+                  id="shippingCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={shippingCostStr}
+                  onChange={handleShippingCostChange}
+                  className="h-8 pl-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          )}
+
+          <Separator />
+          
+          {/* Tiempo Entrega Inputs */}
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center py-1 gap-2 sm:gap-4">
+            <Label className="text-sm flex items-center gap-1.5 text-muted-foreground shrink-0">
+              <Clock className="h-4 w-4" />
+              Tiempo Entrega (Semanas)
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={tiempoEstimado}
+                onChange={handleTiempoEstimadoChange}
+                className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="Min"
+              />
+              <span className="text-muted-foreground">a</span>
+              <Input
+                type="number"
+                min={tiempoEstimado} // Min value is the current min estimate
+                step="1"
+                value={tiempoEstimadoMax}
+                onChange={handleTiempoEstimadoMaxChange}
+                className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="Max"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Final Total */}
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-base font-semibold">Total</span>
+            <span className="text-xl font-bold text-primary">
+              {formatCurrency(total, moneda)}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

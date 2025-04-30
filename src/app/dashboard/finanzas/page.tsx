@@ -27,7 +27,7 @@ import {
   getAllEgresos,
   getFinancialMetrics 
 } from '@/app/actions/finanzas-actions';
-import { formatCurrency, getFinancialCardGradient } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 // Define types for our components
 interface Ingreso {
@@ -229,19 +229,19 @@ export default function FinanzasPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-10 mb-10 md:mb-12">
         {/* Ingresos MXN Card */}
-        <Card className={getFinancialCardGradient('ingreso')}>
+        <Card className="bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-emerald-700 flex items-center">
-              <DollarSign className="h-5 w-5 mr-1.5 text-emerald-600" />
+            <CardTitle className="text-base font-medium text-emerald-700 dark:text-emerald-400 flex items-center">
+              <DollarSign className="h-5 w-5 mr-1.5 text-emerald-600 dark:text-emerald-500" />
               Ingresos MXN
             </CardTitle>
-            <CardDescription className="text-xs text-emerald-600/70">
+            <CardDescription className="text-xs text-emerald-600/70 dark:text-emerald-500/70">
               Total recibido en pesos mexicanos
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <span className="text-3xl font-bold text-emerald-700">
+              <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
                 {formatCurrency(metrics.ingresos.mxn, "MXN")}
               </span>
             </div>
@@ -249,19 +249,19 @@ export default function FinanzasPage() {
         </Card>
         
         {/* Egresos MXN Card */}
-        <Card className={getFinancialCardGradient('egreso')}>
+        <Card className="bg-rose-50 border-rose-200 dark:bg-rose-900/30 dark:border-rose-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-rose-700 flex items-center">
-              <ReceiptIcon className="h-5 w-5 mr-1.5 text-rose-600" />
+            <CardTitle className="text-base font-medium text-rose-700 dark:text-rose-400 flex items-center">
+              <ReceiptIcon className="h-5 w-5 mr-1.5 text-rose-600 dark:text-rose-500" />
               Egresos MXN
             </CardTitle>
-            <CardDescription className="text-xs text-rose-600/70">
+            <CardDescription className="text-xs text-rose-600/70 dark:text-rose-500/70">
               Total gastado en pesos mexicanos
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <span className="text-3xl font-bold text-rose-700">
+              <span className="text-3xl font-bold text-rose-700 dark:text-rose-400">
                 {formatCurrency(metrics.egresos.mxn, "MXN")}
               </span>
             </div>
@@ -269,23 +269,39 @@ export default function FinanzasPage() {
         </Card>
         
         {/* Balance MXN Card */}
-        <Card className={getFinancialCardGradient(metrics.balance.mxn >= 0 ? 'balance-positive' : 'balance-negative')}>
+        <Card className={
+            metrics.balance.mxn >= 0 
+              ? "bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800" 
+              : "bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800"
+          }>
           <CardHeader className="pb-2">
-            <CardTitle className={`text-base font-medium flex items-center ${metrics.balance.mxn >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+            <CardTitle className={`text-base font-medium flex items-center ${
+              metrics.balance.mxn >= 0 
+                ? 'text-blue-700 dark:text-blue-400' 
+                : 'text-amber-700 dark:text-amber-400'
+            }`}>
               {metrics.balance.mxn >= 0 ? (
-                <TrendingUp className="h-5 w-5 mr-1.5 text-blue-600" />
+                <TrendingUp className="h-5 w-5 mr-1.5 text-blue-600 dark:text-blue-500" />
               ) : (
-                <ArrowDown className="h-5 w-5 mr-1.5 text-amber-600" />
+                <ArrowDown className="h-5 w-5 mr-1.5 text-amber-600 dark:text-amber-500" />
               )}
               Balance MXN
             </CardTitle>
-            <CardDescription className={`text-xs ${metrics.balance.mxn >= 0 ? 'text-blue-600/70' : 'text-amber-600/70'}`}>
+            <CardDescription className={`text-xs ${
+              metrics.balance.mxn >= 0 
+                ? 'text-blue-600/70 dark:text-blue-500/70' 
+                : 'text-amber-600/70 dark:text-amber-500/70'
+            }`}>
               {metrics.balance.mxn >= 0 ? 'Saldo positivo actual' : 'Saldo negativo actual'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <span className={`text-3xl font-bold ${metrics.balance.mxn >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+              <span className={`text-3xl font-bold ${
+                metrics.balance.mxn >= 0 
+                  ? 'text-blue-700 dark:text-blue-400' 
+                  : 'text-amber-700 dark:text-amber-400'
+              }`}>
                 {formatCurrency(Math.abs(metrics.balance.mxn), "MXN")}
               </span>
             </div>
@@ -293,19 +309,19 @@ export default function FinanzasPage() {
         </Card>
         
         {/* Cotizaciones Pagadas Card */}
-        <Card className={getFinancialCardGradient('neutral')}>
+        <Card className="bg-indigo-50 border-indigo-200 dark:bg-indigo-900/30 dark:border-indigo-800">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-indigo-700 flex items-center">
-              <CreditCard className="h-5 w-5 mr-1.5 text-indigo-600" />
+            <CardTitle className="text-base font-medium text-indigo-700 dark:text-indigo-400 flex items-center">
+              <CreditCard className="h-5 w-5 mr-1.5 text-indigo-600 dark:text-indigo-500" />
               Cotizaciones Pagadas
             </CardTitle>
-            <CardDescription className="text-xs text-indigo-600/70">
+            <CardDescription className="text-xs text-indigo-600/70 dark:text-indigo-500/70">
               Total de cotizaciones completadas
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <span className="text-3xl font-bold text-indigo-700">
+              <span className="text-3xl font-bold text-indigo-700 dark:text-indigo-400">
                 {metrics.cotizacionesPagadas}
               </span>
             </div>

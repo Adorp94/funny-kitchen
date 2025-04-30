@@ -7,6 +7,7 @@ import { Printer } from "lucide-react";
 import { PDFService } from "@/services/pdf-service";
 import { useProductos } from "@/contexts/productos-context";
 import Image from "next/image";
+import { formatCurrency } from '@/lib/utils';
 
 interface Cliente {
   nombre: string;
@@ -99,25 +100,6 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
   // Get current date formatted
   const fechaActual = format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es });
   
-  // Format currency with proper symbol and formatting based on the currency
-  const formatCurrency = (amount: number): string => {
-    if (moneda === 'MXN') {
-      return new Intl.NumberFormat('es-MX', { 
-        style: 'currency', 
-        currency: 'MXN',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
-    } else {
-      return new Intl.NumberFormat('en-US', { 
-        style: 'currency', 
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
-    }
-  };
-
   // Calculate total discounts from products
   const totalProductDiscounts = productos.reduce((sum, producto) => {
     if (producto.descuento && producto.descuento > 0) {
@@ -133,6 +115,10 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
   // Handle print
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownload = () => {
+    // ... existing code ...
   };
 
   return (
@@ -226,17 +212,14 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
                       </div>
                     </td>
                     <td className="py-1.5 px-2 text-center text-gray-800">{producto.cantidad}</td>
-                    <td className="py-1.5 px-2 text-right text-gray-800 whitespace-nowrap">{formatCurrency(producto.precio)}</td>
+                    <td className="py-1.5 px-2 text-right text-gray-800 whitespace-nowrap">{formatCurrency(producto.precio, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</td>
                     {productos.some(p => p.descuento && p.descuento > 0) && (
                       <td className="py-1.5 px-2 text-right text-gray-800">
-                        {producto.descuento ? `${producto.descuento}%` : '-'}
+                        {producto.descuento > 0 ? `${producto.descuento}%` : '-'}
                       </td>
                     )}
                     <td className="py-1.5 px-2 text-right text-gray-800 whitespace-nowrap">
-                      {producto.descuento && producto.descuento > 0 
-                        ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100))
-                        : formatCurrency(producto.cantidad * producto.precio)
-                      }
+                      {formatCurrency(producto.subtotal, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}
                     </td>
                   </tr>
                 ))}
@@ -251,40 +234,40 @@ export function PDFCotizacion({ cliente, folio, cotizacion }: PDFCotizacionProps
           <div className="text-right text-xs leading-tight bg-gray-50 p-3 rounded-lg shadow-xs w-1/2 ml-auto">
             <div className="flex justify-between py-0.5 text-gray-700">
               <span>Subtotal:</span>
-              <span className="font-medium">{formatCurrency(subtotal)}</span>
+              <span className="font-medium">{formatCurrency(subtotal, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
             </div>
             
             {totalProductDiscounts > 0 && (
               <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Descuentos por producto:</span>
-                <span className="font-medium text-red-600">-{formatCurrency(totalProductDiscounts)}</span>
+                <span className="font-medium text-red-600">-{formatCurrency(totalProductDiscounts, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
               </div>
             )}
             
             {globalDiscount > 0 && (
               <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Descuento global ({globalDiscount}%):</span>
-                <span className="font-medium text-red-600">-{formatCurrency((subtotalAfterProductDiscounts) * (globalDiscount / 100))}</span>
+                <span className="font-medium text-red-600">-{formatCurrency(subtotal * (globalDiscount / 100), moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
               </div>
             )}
             
             {hasIva && (
               <div className="flex justify-between py-0.5 text-gray-700">
                 <span>IVA (16%):</span>
-                <span className="font-medium">{formatCurrency(ivaAmount)}</span>
+                <span className="font-medium">{formatCurrency(ivaAmount, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
               </div>
             )}
             
             {hasShipping && shippingCost > 0 && (
               <div className="flex justify-between py-0.5 text-gray-700">
                 <span>Costo de envío:</span>
-                <span className="font-medium">{formatCurrency(shippingCost)}</span>
+                <span className="font-medium">{formatCurrency(shippingCost, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
               </div>
             )}
             
             <div className="flex justify-between py-1 text-gray-900 border-t border-gray-200 mt-1">
               <span className="font-medium">Total:</span>
-              <span className="font-bold text-base">{formatCurrency(total)}</span>
+              <span className="font-bold text-base">{formatCurrency(total, moneda, moneda === 'USD' ? 'en-US' : 'es-MX')}</span>
             </div>
           </div>
         </div>

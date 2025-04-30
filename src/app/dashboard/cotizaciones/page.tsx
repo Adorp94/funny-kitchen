@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText, Download, DollarSign, Loader2, X } from "lucide-react";
+import { ArrowUp, ArrowDown, Eye, Filter, Plus, Search, FileText, Download, DollarSign, Loader2, X, FileClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -12,7 +12,8 @@ import {
   TableCell, 
   TableHead, 
   TableHeader, 
-  TableRow 
+  TableRow,
+  TableFooter
 } from "@/components/ui/table";
 import {
   Select,
@@ -27,10 +28,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CotizacionActionsButton } from '@/components/cotizacion/cotizacion-actions-button';
 import { PDFService } from '@/services/pdf-service';
+import { fetchCotizaciones } from '@/app/actions/cotizacion-actions';
+import { formatCurrency } from '@/lib/utils';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -71,9 +75,9 @@ export default function CotizacionesPage() {
   
   // Add state for pagination after the other state declarations
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // Show 10 items per page
+  const itemsPerPage = 15; // Increase items per page slightly
   
-  const fetchCotizaciones = useCallback(async () => {
+  const fetchCotizacionesData = useCallback(async () => {
     try {
       setLoading(true);
       setErrorDetails(null);
@@ -172,8 +176,8 @@ export default function CotizacionesPage() {
   }, []);
   
   useEffect(() => {
-    fetchCotizaciones();
-  }, [fetchCotizaciones]);
+    fetchCotizacionesData();
+  }, [fetchCotizacionesData]);
   
   useEffect(() => {
     // Apply filters and sorting whenever search term, estado filter, or sort criteria changes
@@ -230,19 +234,22 @@ export default function CotizacionesPage() {
   
   // Format date
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-MX', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
-    });
-  };
-  
-  // Format currency
-  const formatCurrency = (amount: number, currency: string): string => {
-    return currency === 'MXN' 
-      ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount)
-      : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida';
+      }
+      return date.toLocaleDateString('es-MX', { 
+        day: '2-digit', 
+        month: 'short', // Use short month name
+        year: 'numeric' 
+      });
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return 'Fecha inválida';
+    }
   };
   
   const handleViewCotizacion = (id: number) => {
@@ -280,14 +287,14 @@ export default function CotizacionesPage() {
     const status = estado?.toLowerCase() || 'desconocido';
     switch (status) {
       case 'pendiente':
-        return <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-400">Pendiente</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700">Pendiente</Badge>;
       case 'producción':
-        return <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400">Producción</Badge>;
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700">Producción</Badge>;
       case 'rechazada':
       case 'cancelada':
-        return <Badge variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-400">{estado}</Badge>;
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">{estado}</Badge>;
       case 'enviada':
-        return <Badge variant="outline" className="border-purple-300 text-purple-700 dark:border-purple-700 dark:text-purple-400">Enviada</Badge>;
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700">Enviada</Badge>;
       case 'vencida':
         return <Badge variant="secondary">Vencida</Badge>; // Use secondary for neutral/past
       default:
@@ -299,22 +306,28 @@ export default function CotizacionesPage() {
     if (!errorDetails) return null;
     
     return (
-      <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded-md">
-        <h3 className="text-lg font-medium text-red-800 mb-2">Error al conectar con la base de datos</h3>
-        <p className="text-red-700 text-sm whitespace-pre-wrap break-words font-mono">{errorDetails}</p>
-        <div className="mt-4">
+      <Card className="border-destructive/50 bg-destructive/10">
+        <CardHeader>
+          <CardTitle className="text-destructive">Error de Conexión</CardTitle>
+          <CardDescription className="text-destructive/90">No se pudo conectar con la base de datos.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <pre className="text-xs text-destructive/80 whitespace-pre-wrap break-words font-mono bg-destructive/5 p-2 rounded">{errorDetails}</pre>
           <Button 
-            onClick={() => fetchCotizaciones()}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            onClick={fetchCotizacionesData}
+            variant="destructive"
+            size="sm"
+            className="mt-4"
           >
-            Reintentar conexión
+            Reintentar
           </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   };
   
-  // Add a function to get current page items after the formatCurrency function
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCotizaciones.length / itemsPerPage);
   const getCurrentPageItems = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -322,21 +335,20 @@ export default function CotizacionesPage() {
   };
   
   return (
-    <div className="flex flex-col flex-1 bg-gray-50/70 dark:bg-gray-950/50 py-6 md:py-8 gap-y-6 md:gap-y-8">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Header with title and actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
              Cotizaciones
           </h1>
           <p className="text-sm text-muted-foreground">
-            Gestión de cotizaciones y pedidos
+            Administra cotizaciones y pedidos.
           </p>
         </div>
         
         <Button
           onClick={handleNewCotizacion}
-          variant="default"
           size="sm"
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -348,291 +360,186 @@ export default function CotizacionesPage() {
       {errorDetails && renderErrorDetails()}
       
       {/* Summary Cards - Adjusted styling */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Total Cotizaciones */}
-        <Card className="shadow-sm p-4">
-          <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Cotizaciones
-            </CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cotizaciones</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent>
             <div className="text-2xl font-bold">{metrics.totalCotizaciones}</div>
           </CardContent>
         </Card>
         
         {/* Cotizaciones Pendientes */}
-        <Card className="shadow-sm p-4">
-          <CardHeader className="p-0 flex flex-row items-center justify-between space-y-0 pb-1">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-               Pendientes
-            </CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
+            <FileClock className="h-4 w-4 text-muted-foreground" /> 
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent>
             <div className="text-2xl font-bold">{metrics.cotizacionesPendientes}</div>
           </CardContent>
         </Card>
       </div>
       
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-grow">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por folio o cliente..."
+            placeholder="Buscar folio o cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-8 h-10"
+            className="pl-8 pr-8 h-9" // Adjusted padding and height
           />
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
-          </div>
           {searchTerm && (
             <Button 
               variant="ghost" 
               size="icon" 
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
               onClick={() => setSearchTerm('')}
             >
               <X className="h-4 w-4" />
-              <span className="sr-only">Limpiar búsqueda</span>
+              <span className="sr-only">Limpiar</span>
             </Button>
           )}
         </div>
         
-        <div className="flex gap-4">
-          <div className="w-full sm:w-[180px]">
-            <Select value={filterEstado} onValueChange={setFilterEstado}>
-              <SelectTrigger className="h-10 bg-white">
-                <div className="flex items-center">
-                  <Filter className="mr-2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">
-                    {filterEstado === "todos" ? "Todos los estados" : 
-                     filterEstado.charAt(0).toUpperCase() + filterEstado.slice(1)}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent className="min-w-[180px] bg-white">
-                <SelectItem value="todos" className="bg-white hover:bg-gray-50">Todos los estados</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="producción">Producción</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-                <SelectItem value="enviada">Enviada</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="w-full sm:w-auto">
+          <Select value={filterEstado} onValueChange={setFilterEstado}>
+            <SelectTrigger className="h-9 w-full sm:w-[180px]">
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Filtrar estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los estados</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+              <SelectItem value="producción">Producción</SelectItem>
+              <SelectItem value="cancelada">Cancelada</SelectItem>
+              <SelectItem value="enviada">Enviada</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
       {/* Table Section */}
-      <section>
-        {loading ? (
-          // Use Card for loading state
-          <Card className="shadow-sm p-6 text-center">
-            <div className="flex justify-center items-center py-10">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-            <p className="text-muted-foreground text-sm">Cargando cotizaciones...</p>
-          </Card>
-        ) : filteredCotizaciones.length === 0 ? (
-          // Use Card for empty state
-          <Card className="shadow-sm p-6 text-center">
-            <div className="flex flex-col items-center py-10">
-              <div className="bg-muted rounded-full p-3 mb-3">
-                <FileText className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-1">No hay cotizaciones</h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                {searchTerm || filterEstado !== "todos" 
-                  ? "No se encontraron cotizaciones con los filtros aplicados."
-                  : "Aún no hay cotizaciones registradas."}
-              </p>
-              
-              {(searchTerm || filterEstado !== "todos") && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterEstado("todos");
-                  }}
-                >
-                  Limpiar filtros
-                </Button>
-              )}
-            </div>
-          </Card>
-        ) : (
-          // Use Card as table container
-          <Card className="shadow-sm overflow-hidden"> 
-            {/* Removed CardHeader - Assuming title is handled by page header */}
-            {/* Removed CardContent - Table manages its own structure */}
-            <Table>
-              <TableHeader className="bg-muted/50"><TableRow>
-                  {/* Folio */}
-                  <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[110px] sm:w-[150px]">
-                    <div className="flex items-center">
-                      Folio
-                      {sortBy.field === 'folio' && (
-                        sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
-                          : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                  {/* Fecha */}
-                  <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[120px]">
-                    <div className="flex items-center">
-                      Fecha
-                      {sortBy.field === 'fecha_creacion' && (
-                        sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
-                          : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                   {/* Cliente */}
-                  <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer hidden lg:table-cell lg:w-[250px] xl:w-[300px]">
-                    <div className="flex items-center">
-                      Cliente
-                      {sortBy.field === 'cliente' && (
-                        sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
-                          : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                   {/* Estado */}
-                  <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
-                   {/* Moneda */}
-                  <TableHead className="hidden sm:table-cell w-[100px]">Moneda</TableHead>
-                   {/* Total */}
-                  <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
-                    <div className="flex items-center justify-end">
-                      Total
-                      {sortBy.field === 'total' && (
-                        sortBy.direction === 'asc' 
-                          ? <ArrowUp className="ml-1 h-3 w-3" /> 
-                          : <ArrowDown className="ml-1 h-3 w-3" />
-                      )}
-                    </div>
-                  </TableHead>
-                   {/* Acciones */}
-                  <TableHead className="text-right w-[150px] sm:w-[180px]">Acciones</TableHead>
-                </TableRow></TableHeader>
-              <TableBody>
-                {getCurrentPageItems().map((cotizacion) => (
-                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-muted/50">
-                    {/* Use TableCell component */} 
+      <Card>
+        <CardContent className="p-0"> {/* Remove padding for table */}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[120px]">
+                  <div className="flex items-center gap-1">
+                    Folio
+                    {sortBy.field === 'folio' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[100px]">
+                  <div className="flex items-center gap-1">
+                    Fecha
+                    {sortBy.field === 'fecha_creacion' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer hidden md:table-cell">
+                  <div className="flex items-center gap-1">
+                    Cliente
+                    {sortBy.field === 'cliente' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
+                <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
+                  <div className="flex items-center justify-end gap-1">
+                    Total
+                    {sortBy.field === 'total' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead className="text-right w-[100px]">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : getCurrentPageItems().length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    No se encontraron cotizaciones.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                getCurrentPageItems().map((cotizacion) => (
+                  <TableRow key={cotizacion.cotizacion_id}>
                     <TableCell>
-                      <button 
+                      <Button 
+                        variant="link"
+                        className="font-medium p-0 h-auto"
                         onClick={() => router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`)}
-                        className="font-medium text-primary hover:underline"
                       >
                         {cotizacion.folio}
-                      </button>
-                      {/* Mobile only info */} 
-                      <div className="lg:hidden text-xs text-muted-foreground mt-1">
+                      </Button>
+                      {/* Mobile Client Name */}
+                       <div className="md:hidden text-xs text-muted-foreground mt-1 truncate">
                         {cotizacion.cliente.nombre}
                       </div>
-                      <div className="lg:hidden text-xs mt-0.5">
-                        {getStatusBadge(cotizacion.estado)}
-                      </div>
                     </TableCell>
-                    <TableCell className="text-sm"> {/* Apply text size */} 
-                      {formatDate(cotizacion.fecha_creacion)}
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="font-medium truncate max-w-[200px] lg:max-w-[300px]" title={cotizacion.cliente.nombre}>{cotizacion.cliente.nombre}</div>
+                      <div className="text-xs text-muted-foreground truncate">{cotizacion.cliente.celular || '—'}</div>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div>
-                        <div className="font-medium line-clamp-2 break-words max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.nombre}>
-                          {cotizacion.cliente.nombre}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate max-w-[250px] xl:max-w-[350px]" title={cotizacion.cliente.celular}>
-                          {cotizacion.cliente.celular || '—'}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {getStatusBadge(cotizacion.estado)}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {/* Replaced Badge variant */}
-                      <Badge variant="secondary"> 
-                        {cotizacion.moneda}
-                      </Badge>
+                    <TableCell className="hidden lg:table-cell">{getStatusBadge(cotizacion.estado)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-medium">{formatCurrency(cotizacion.total, cotizacion.moneda as 'MXN' | 'USD')}</div>
+                      <div className="text-xs text-muted-foreground">{cotizacion.moneda}</div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="font-medium text-foreground">{formatCurrency(cotizacion.total, cotizacion.moneda)}</span>
-                        {/* Mobile only info */} 
-                        <div className="sm:hidden text-xs text-muted-foreground mt-1">
-                          {cotizacion.moneda}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        <CotizacionActionsButton 
-                          cotizacion={cotizacion}
-                          onStatusChanged={fetchCotizaciones}
-                          // Pass size="sm" or similar if needed for consistency
-                        />
-                        {/* Adjusted PDF button style */}
-                        <Button
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8" 
-                          onClick={async () => {
-                            // ... PDF generation logic ...
-                          }}
-                          title="Descargar PDF"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <CotizacionActionsButton 
+                        cotizacion={cotizacion}
+                        onStatusChanged={fetchCotizacionesData}
+                        // Use size="sm" for consistency
+                        buttonSize="sm" 
+                      />
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            {/* Pagination Controls - Placed inside CardFooter */}
-            {filteredCotizaciones.length > itemsPerPage && (
-              <div className="px-6 py-4 border-t flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Mostrando {Math.min(filteredCotizaciones.length, (currentPage - 1) * itemsPerPage + 1)} 
-                  - {Math.min(filteredCotizaciones.length, currentPage * itemsPerPage)} 
-                  de {filteredCotizaciones.length} cotizaciones
-                </div>
-                
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 px-3"
-                  >
-                    Anterior
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => 
-                      Math.min(prev + 1, Math.ceil(filteredCotizaciones.length / itemsPerPage))
-                    )}
-                    disabled={currentPage >= Math.ceil(filteredCotizaciones.length / itemsPerPage)}
-                    className="h-8 px-3"
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+        {/* Pagination - Moved inside Card but uses totalPages calculated above */}
+        {totalPages > 1 && (
+          <CardFooter className="flex items-center justify-between border-t px-6 py-3">
+            <div className="text-xs text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex space-x-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="h-7 px-2.5" // Smaller pagination buttons
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages}
+                className="h-7 px-2.5" // Smaller pagination buttons
+              >
+                Siguiente
+              </Button>
+            </div>
+          </CardFooter>
         )}
-      </section>
+      </Card>
     </div>
   );
 } 

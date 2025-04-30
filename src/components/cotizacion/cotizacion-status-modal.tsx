@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { AlertCircle, CreditCard, DollarSign, FileClock, FileText, Check, X, ArrowRight, TruckIcon } from 'lucide-react';
+import { AlertCircle, CreditCard, DollarSign, FileClock, FileText, Check, X, ArrowRight, TruckIcon, Loader2 } from 'lucide-react';
 import { toast } from "sonner";
+import { formatCurrency } from '@/lib/utils';
 // Removed incorrect imports from @/lib/utils
 // Imports will be added from where they are defined, assuming nueva-cotizacion page or similar
 
@@ -10,9 +11,14 @@ import { toast } from "sonner";
 // Assuming formatDate and formatCurrency might be defined in a parent or utils file
 // For now, we'll define basic placeholders here to remove the error, 
 // but these should be replaced with the actual imports/definitions.
-const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString() || 'Invalid Date';
-const formatCurrency = (amount: number | undefined | null, currency: string) => 
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: currency || 'MXN' }).format(amount || 0);
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  try {
+    return new Date(dateString).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch (e) {
+    return 'Fecha inválida';
+  }
+};
 
 import {
   Dialog,
@@ -20,7 +26,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogOverlay,
+  DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -37,6 +43,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 interface Cliente {
   nombre: string;
@@ -70,6 +78,7 @@ interface Cotizacion {
   monto_iva?: number;
   incluye_envio?: boolean;
   costo_envio?: number;
+  descuento_global?: number;
 }
 
 interface PaymentFormData {
@@ -106,480 +115,288 @@ export function CotizacionStatusModal({
   useEffect(() => {
     if (cotizacion) {
       setNewStatus(cotizacion.estado || 'pendiente');
-      
-      // Reset payment data to empty instead of setting a default value
-      setPaymentData(prev => ({
-        ...prev,
-        monto: 0,
-        porcentaje: 50
-      }));
-      
-      console.log('Cotizacion loaded in modal:', cotizacion);
+      setPaymentData({ monto: 0, metodo_pago: 'transferencia', porcentaje: 50, notas: '' });
+      setActiveTab('resumen');
+      setErrors({});
+    } else {
+      setLoading(false);
+      setActiveTab('resumen');
+      setNewStatus('');
+      setPaymentData({ monto: 0, metodo_pago: 'transferencia', porcentaje: 50, notas: '' });
+      setErrors({});
     }
-  }, [cotizacion]);
-
-  // Reset form when status changes
-  useEffect(() => {
-    if (newStatus === 'producción') {
-      // If changing to a status requiring payment, switch to actions tab
-      setActiveTab('acciones');
-    }
-    
-    // Clear any previous validation errors
-    setErrors({});
-  }, [newStatus]);
+  }, [cotizacion, isOpen]);
 
   const validatePaymentForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
     if (!paymentData.monto || paymentData.monto <= 0) {
       newErrors.monto = 'El monto debe ser mayor a 0';
     }
-
     if (!paymentData.metodo_pago) {
       newErrors.metodo_pago = 'Seleccione un método de pago';
     }
-
-    // Set the errors and return validation result
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleStatusChange = async () => {
-    if (!cotizacion) return;
+    if (!cotizacion || newStatus === cotizacion.estado) return;
 
-    console.log('Status change initiated', { 
-      cotizacionId: cotizacion.cotizacion_id, 
-      newStatus, 
-      currentStatus: cotizacion.estado 
-    });
-
-    // Don't allow changing to same status
-    if (newStatus === cotizacion.estado) {
-      toast("Sin cambios", {
-        description: "El estado seleccionado es el mismo que el actual",
-      });
-      return;
-    }
-
-    // For status changes to 'producción', we require payment data
     const requiresPayment = newStatus === 'producción';
-    
+    let finalPaymentData: PaymentFormData | undefined = undefined;
+
     if (requiresPayment) {
-      console.log('Payment data required. Validating form...', paymentData);
       if (!validatePaymentForm()) {
-        console.log('Payment form validation failed:', errors);
-        toast("Error", {
-          description: "Por favor corrija los errores en el formulario de pago",
-        });
+        toast.error("Por favor corrija los errores en el formulario de pago.");
+        setActiveTab('acciones');
         return;
       }
-      console.log('Payment form validation passed');
+      const percentage = cotizacion.total > 0 ? Math.round((paymentData.monto / cotizacion.total) * 100) : 0;
+      finalPaymentData = { ...paymentData, porcentaje: percentage };
     }
 
     setLoading(true);
     try {
-      // Calculate percentage based on monto if payment is required
-      if (requiresPayment && cotizacion.total > 0) {
-        const percentage = Math.round((paymentData.monto / cotizacion.total) * 100);
-        const updatedPaymentData = {
-          ...paymentData,
-          porcentaje: percentage
-        };
-        
-        console.log('Calling onStatusChange with data:', {
-          cotizacionId: cotizacion.cotizacion_id,
-          newStatus,
-          paymentData: updatedPaymentData
-        });
-        
-        // Call the onStatusChange function with the updated payment data
-        const success = await onStatusChange(
-          cotizacion.cotizacion_id, 
-          newStatus,
-          updatedPaymentData
-        );
+      const success = await onStatusChange(
+        cotizacion.cotizacion_id, 
+        newStatus,
+        finalPaymentData
+      );
 
-        console.log('Status change result:', success);
-        
-        if (success) {
-          toast.success(`Cotización ${newStatus === 'producción' ? 'enviada a producción con anticipo' : 
-                         'actualizada'} correctamente`);
-          
-          // Close the modal after a delay to ensure state updates
-          setTimeout(() => {
-            onClose();
-          }, 300);
-        } else {
-          toast.error("No se pudo actualizar el estado. Por favor, inténtelo de nuevo.");
-        }
+      if (success) {
+        toast.success(`Cotización actualizada a "${newStatus}"`);
+        onClose();
       } else {
-        // For statuses that don't require payment
-        console.log('Calling onStatusChange without payment data:', {
-          cotizacionId: cotizacion.cotizacion_id,
-          newStatus
-        });
-        
-        // For status changes not requiring payment
-        const success = await onStatusChange(
-          cotizacion.cotizacion_id, 
-          newStatus,
-          undefined // Explicitly pass undefined instead of optional payment data
-        );
-
-        console.log('Status change result:', success);
-        
-        if (success) {
-          toast.success(`Cotización actualizada a "${newStatus}" correctamente`);
-          
-          // Close the modal after a delay to ensure state updates
-          setTimeout(() => {
-            onClose();
-          }, 300);
-        } else {
-          toast.error("No se pudo actualizar el estado. Por favor, inténtelo de nuevo.");
-        }
+        toast.error("No se pudo actualizar el estado.");
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      toast.error(error instanceof Error ? error.message : "Ha ocurrido un error al actualizar el estado");
+      toast.error(error instanceof Error ? error.message : "Error al actualizar el estado");
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusBadge = (estado: string) => {
-    switch (estado?.toLowerCase()) {
+    const status = estado?.toLowerCase() || 'desconocido';
+    switch (status) {
       case 'pendiente':
-        return <Badge className="bg-blue-50 text-blue-700 border-blue-200 font-medium">Pendiente</Badge>;
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700">Pendiente</Badge>;
       case 'producción':
-        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">Producción</Badge>;
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700">Producción</Badge>;
+      case 'rechazada':
       case 'cancelada':
-        return <Badge className="bg-red-50 text-red-700 border-red-200 font-medium">Cancelada</Badge>;
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700">{estado}</Badge>;
       case 'enviada':
-        return <Badge className="bg-purple-50 text-purple-700 border-purple-200 font-medium">Enviada</Badge>;
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-700">Enviada</Badge>;
       default:
-        return <Badge className="bg-gray-50">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'No definido'}</Badge>;
+        return <Badge variant="secondary">{estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : 'Desconocido'}</Badge>;
     }
   };
 
-  // Safely format currency
-  const safeCurrency = (value: any, currency: string) => {
+  const safeCurrency = (value: any, currency: string): string => {
     const amount = Number(value);
-    if (isNaN(amount)) {
-      return 'N/A';
-    }
-    return formatCurrency(amount, currency || 'MXN');
+    if (isNaN(amount)) return 'N/A';
+    return formatCurrency(amount, currency as 'MXN' | 'USD');
   };
 
   const renderPaymentForm = () => (
-    <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-xs space-y-4 sm:space-y-5">
-      <div className="flex items-center gap-3 pb-3 border-b border-gray-100">
-        <div className="bg-blue-50 p-2 rounded-lg">
-          <CreditCard className="h-5 w-5 text-blue-600" />
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-primary" />
+          Registrar Anticipo
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="monto" className={errors.monto ? "text-destructive" : ""}>Monto ({cotizacion?.moneda})</Label>
+            {cotizacion && paymentData.monto > 0 && cotizacion.total > 0 && (
+              <span className="text-xs text-muted-foreground">
+                ~{Math.round((paymentData.monto / cotizacion.total) * 100)}%
+              </span>
+            )}
+          </div>
+          <div className="relative">
+            <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              id="monto"
+              type="number"
+              step="0.01"
+              min="0.01"
+              placeholder="0.00"
+              value={paymentData.monto || ''}
+              onChange={e => setPaymentData({ ...paymentData, monto: Number(e.target.value) || 0 })}
+              className={`pl-8 text-right ${errors.monto ? 'border-destructive focus-visible:ring-destructive/50' : ''}`}
+            />
+          </div>
+          {errors.monto && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.monto}</p>}
         </div>
-        <h3 className="font-medium text-gray-900">
-          Registro de Anticipo para Producción
-        </h3>
-      </div>
-      
-      <div>
-        <div className="flex justify-between items-center flex-wrap gap-1">
-          <Label htmlFor="monto" className="text-sm text-gray-700 font-medium">Monto de anticipo</Label>
-          {cotizacion && paymentData.monto ? (
-            <span className="text-xs text-gray-500">
-              Aproximadamente el {Math.round((paymentData.monto / cotizacion.total) * 100)}% del total
-            </span>
-          ) : null}
+        <div className="space-y-1.5">
+          <Label htmlFor="metodo_pago" className={errors.metodo_pago ? "text-destructive" : ""}>Método de pago</Label>
+          <Select 
+            value={paymentData.metodo_pago} 
+            onValueChange={value => setPaymentData({...paymentData, metodo_pago: value})}
+          >
+            <SelectTrigger className={errors.metodo_pago ? 'border-destructive focus:ring-destructive/50' : ''}>
+              <SelectValue placeholder="Seleccionar método" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="efectivo">Efectivo</SelectItem>
+              <SelectItem value="transferencia">Transferencia</SelectItem>
+              <SelectItem value="tarjeta">Tarjeta</SelectItem>
+              <SelectItem value="cheque">Cheque</SelectItem>
+              <SelectItem value="deposito">Depósito</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.metodo_pago && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.metodo_pago}</p>}
         </div>
-        <div className="relative mt-1.5">
-          <Input
-            id="monto"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={paymentData.monto || ''}
-            onChange={e => {
-              const value = Number(e.target.value);
-              setPaymentData({
-                ...paymentData, 
-                monto: value
-              });
-            }}
-            className={`pl-7 pr-14 h-11 text-right bg-white ${errors.monto ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-blue-500'}`}
+        <div className="space-y-1.5">
+          <Label htmlFor="notas">Notas / Referencia</Label>
+          <Textarea
+            id="notas"
+            placeholder="Detalles del pago, referencia, etc."
+            value={paymentData.notas}
+            onChange={e => setPaymentData({...paymentData, notas: e.target.value})}
+            className="resize-none"
+            rows={2}
           />
-          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
-            <DollarSign className="h-4 w-4 text-gray-500" />
-          </div>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none z-10">
-            <span>{cotizacion?.moneda || 'MXN'}</span>
-          </div>
         </div>
-        {errors.monto && (
-          <div className="text-red-500 text-xs mt-1.5 flex items-center">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            {errors.monto}
-          </div>
-        )}
-      </div>
-      
-      <div>
-        <Label htmlFor="metodo_pago" className="text-sm text-gray-700 font-medium">Método de pago</Label>
-        <Select 
-          value={paymentData.metodo_pago} 
-          onValueChange={value => setPaymentData({...paymentData, metodo_pago: value})}
-        >
-          <SelectTrigger className={`mt-1.5 h-11 bg-white ${errors.metodo_pago ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}>
-            <SelectValue placeholder="Seleccionar método de pago" />
-          </SelectTrigger>
-          <SelectContent className="bg-white rounded-lg">
-            <SelectItem value="efectivo">Efectivo</SelectItem>
-            <SelectItem value="transferencia">Transferencia Bancaria</SelectItem>
-            <SelectItem value="tarjeta">Tarjeta de Crédito/Débito</SelectItem>
-            <SelectItem value="cheque">Cheque</SelectItem>
-            <SelectItem value="deposito">Depósito Bancario</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.metodo_pago && (
-          <div className="text-red-500 text-xs mt-1.5 flex items-center">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            {errors.metodo_pago}
-          </div>
-        )}
-      </div>
-      
-      <div>
-        <Label htmlFor="notas" className="text-sm text-gray-700 font-medium">Notas o referencia de pago</Label>
-        <Textarea
-          id="notas"
-          placeholder="Ingrese detalles del pago, número de referencia, o notas adicionales"
-          value={paymentData.notas}
-          onChange={e => setPaymentData({...paymentData, notas: e.target.value})}
-          className="mt-1.5 resize-none bg-white rounded-lg"
-          rows={3}
-        />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 
   if (!cotizacion) return null;
 
-  // Define constants for totals
   const subtotal = cotizacion.productos?.reduce((acc, p) => acc + (p.subtotal || 0), 0) || 0;
-  const ivaAmount = cotizacion.iva ? (subtotal * (1 - (cotizacion.descuento_global || 0) / 100)) * 0.16 : 0;
+  const descuentoTotal = subtotal * ((cotizacion.descuento_global || 0) / 100);
+  const subtotalConDescuento = subtotal - descuentoTotal;
+  const ivaAmount = cotizacion.iva ? subtotalConDescuento * 0.16 : 0;
   const shippingAmount = cotizacion.incluye_envio ? (cotizacion.costo_envio || 0) : 0;
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogOverlay className="bg-black/40 backdrop-blur-[2px]" />
-      <DialogPrimitive.Content
-        className="sm:max-w-2xl max-h-[92vh] w-[95vw] overflow-hidden bg-white rounded-lg shadow-xl border-0 p-0 flex flex-col fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
-      >
-        <DialogHeader className="p-4 sm:p-6 border-b border-gray-100 shrink-0">
+      <DialogContent className="sm:max-w-xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-4 border-b">
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-2">
-              <div className="bg-gray-50 p-2 rounded-lg">
-                <FileText className="h-5 w-5 text-gray-600" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg sm:text-xl font-semibold text-gray-900">
-                  Cotización {cotizacion.folio || `#${cotizacion.cotizacion_id}`}
-                </DialogTitle>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                  {formatDate(cotizacion.fecha_creacion)} • {cotizacion.cliente.nombre}
-                </p>
-                <div className="mt-1">
-                  {getStatusBadge(cotizacion.estado)}
-                </div>
+            <div>
+              <DialogTitle className="text-lg font-semibold">Cotización {cotizacion.folio}</DialogTitle>
+              <DialogDescription className="mt-1">
+                {formatDate(cotizacion.fecha_creacion)} • {cotizacion.cliente.nombre}
+              </DialogDescription>
+              <div className="mt-2">
+                {getStatusBadge(cotizacion.estado)}
               </div>
             </div>
-            <DialogClose className="rounded-full h-7 w-7 p-0 flex items-center justify-center text-gray-400 hover:text-gray-500 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-gray-200">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Cerrar</span>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" className="rounded-full h-7 w-7 text-muted-foreground">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Cerrar</span>
+              </Button>
             </DialogClose>
           </div>
         </DialogHeader>
 
-        <div className="overflow-y-auto grow" style={{ maxHeight: 'calc(92vh - 184px)' }}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-4 sm:p-6">
-            <TabsList className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-lg mb-4 sm:mb-5 w-full">
-              <TabsTrigger value="resumen" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-xs">
-                Resumen
-              </TabsTrigger>
-              <TabsTrigger value="acciones" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-xs">
-                Cambiar Estado
-              </TabsTrigger>
+        <div className="overflow-y-auto max-h-[calc(90vh-180px)]">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="p-6">
+            <TabsList className="grid w-full grid-cols-2 h-9">
+              <TabsTrigger value="resumen">Resumen</TabsTrigger>
+              <TabsTrigger value="acciones">Acciones</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="resumen" className="space-y-4 sm:space-y-6 mt-0">
-              <div className="rounded-lg bg-white border border-gray-200 shadow-xs overflow-hidden">
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
-                  <div className="p-4 sm:p-5">
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
-                    <p className="font-medium text-gray-900">{cotizacion.cliente.nombre}</p>
-                    {cotizacion.cliente.celular && (
-                      <p className="text-sm text-gray-500 mt-1">{cotizacion.cliente.celular}</p>
-                    )}
+            <TabsContent value="resumen" className="mt-6 space-y-4">
+              <Card>
+                <CardContent className="p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{safeCurrency(subtotal, cotizacion.moneda)}</span>
                   </div>
-                  <div className="p-4 sm:p-5">
-                    <h3 className="text-sm font-medium text-gray-500 mb-1">Monto Total</h3>
-                    <p className="font-semibold text-lg text-emerald-600">
-                      {safeCurrency(cotizacion.total, cotizacion.moneda)}
-                    </p>
-                    {cotizacion.total_mxn && cotizacion.moneda !== 'MXN' && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Equivalente: {safeCurrency(cotizacion.total_mxn, 'MXN')}
-                      </p>
-                    )}
+                  {cotizacion.descuento_global && cotizacion.descuento_global > 0 && (
+                    <div className="flex justify-between text-destructive">
+                      <span className="text-muted-foreground">Desc. Global ({cotizacion.descuento_global}%)</span>
+                      <span>-{safeCurrency(descuentoTotal, cotizacion.moneda)}</span>
+                    </div>
+                  )}
+                  {ivaAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">IVA (16%)</span>
+                      <span>{safeCurrency(ivaAmount, cotizacion.moneda)}</span>
+                    </div>
+                  )}
+                  {shippingAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Envío</span>
+                      <span>{safeCurrency(shippingAmount, cotizacion.moneda)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-2" />
+                  <div className="flex justify-between font-semibold">
+                    <span>Total</span>
+                    <span>{safeCurrency(cotizacion.total, cotizacion.moneda)}</span>
                   </div>
-                </div>
-                
-                <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-100">
-                  <div className="flex items-center gap-2">
-                    <FileClock className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">Estado de Pago:</span>
-                    {cotizacion.estatus_pago === 'pagado' ? (
-                      <span className="text-sm text-emerald-600 font-medium">Pagado completamente</span>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Estado de Pago</CardTitle>
+                </CardHeader>
+                <CardContent>
+                   {cotizacion.estatus_pago === 'pagado' ? (
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Pagado</Badge>
                     ) : cotizacion.estatus_pago === 'anticipo' ? (
-                      <span className="text-sm text-blue-600 font-medium">Con anticipo</span>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Con anticipo</Badge>
                     ) : (
-                      <span className="text-sm text-amber-600 font-medium">Pendiente de pago</span>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pendiente</Badge>
                     )}
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Products table */}
-              {cotizacion.productos && cotizacion.productos.length > 0 && (
-                <div className="rounded-lg overflow-hidden border border-gray-200 shadow-xs">
-                  <div className="p-4 bg-white border-b border-gray-100">
-                    <h3 className="font-medium text-gray-900">Productos</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                          <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Cant.</th>
-                          <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                          <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {cotizacion.productos.map((producto) => (
-                          <tr key={producto.id} className="hover:bg-gray-50">
-                            <td className="px-3 sm:px-4 py-3 text-sm text-gray-900">
-                              <div className="truncate max-w-[100px] sm:max-w-none">{producto.nombre}</div>
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 text-center">{producto.cantidad}</td>
-                            <td className="px-3 sm:px-4 py-3 text-sm text-gray-600 text-right">
-                              {safeCurrency(producto.precio_unitario || producto.precio, cotizacion.moneda)}
-                            </td>
-                            <td className="px-3 sm:px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                              {safeCurrency(producto.subtotal || producto.precio_total || (producto.cantidad * (producto.precio_unitario || producto.precio)), cotizacion.moneda)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        {cotizacion.iva && cotizacion.monto_iva && cotizacion.monto_iva > 0 && (
-                          <tr>
-                            <td colSpan={2}></td>
-                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 text-right">IVA (16%):</td>
-                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-900 text-right">
-                              {safeCurrency(cotizacion.monto_iva, cotizacion.moneda)}
-                            </td>
-                          </tr>
-                        )}
-                        {cotizacion.incluye_envio && cotizacion.costo_envio && cotizacion.costo_envio > 0 && (
-                          <tr>
-                            <td colSpan={2}></td>
-                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-700 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <TruckIcon className="h-3.5 w-3.5 text-gray-500" />
-                                <span>Envío:</span>
-                              </div>
-                            </td>
-                            <td className="px-3 sm:px-4 py-2 text-sm font-medium text-gray-900 text-right">
-                              {safeCurrency(cotizacion.costo_envio, cotizacion.moneda)}
-                            </td>
-                          </tr>
-                        )}
-                        <tr className="bg-gray-100">
-                          <td colSpan={2}></td>
-                          <td className="px-3 sm:px-4 py-3 text-sm font-bold text-gray-700 text-right">Total:</td>
-                          <td className="px-3 sm:px-4 py-3 text-sm font-bold text-emerald-600 text-right">
-                            {safeCurrency(cotizacion.total, cotizacion.moneda)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              )}
             </TabsContent>
             
-            <TabsContent value="acciones" className="space-y-4 sm:space-y-6 mt-0">
-              <div className="rounded-lg bg-white p-4 sm:p-6 border border-gray-200 shadow-xs">
-                <h3 className="font-medium text-gray-900 mb-3">Cambiar estado de cotización</h3>
+            <TabsContent value="acciones" className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="newStatus">Cambiar estado a</Label>
                 <Select 
                   value={newStatus} 
                   onValueChange={setNewStatus}
                 >
-                  <SelectTrigger className="w-full h-11 bg-white rounded-lg">
-                    <SelectValue placeholder="Seleccionar nuevo estado" />
+                  <SelectTrigger id="newStatus">
+                    <SelectValue placeholder="Seleccionar estado" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white rounded-lg">
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="producción">Mandar a producción</SelectItem>
-                    <SelectItem value="cancelada">Rechazada</SelectItem>
+                  <SelectContent>
+                    {cotizacion.estado !== 'pendiente' && <SelectItem value="pendiente">Pendiente</SelectItem>}
+                    {cotizacion.estado !== 'producción' && <SelectItem value="producción">Producción</SelectItem>}
+                    {cotizacion.estado !== 'cancelada' && <SelectItem value="cancelada">Cancelada</SelectItem>}
+                    {cotizacion.estado !== 'enviada' && <SelectItem value="enviada">Enviada</SelectItem>} 
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Payment form for 'producción' status */}
               {newStatus === 'producción' && renderPaymentForm()}
             </TabsContent>
           </Tabs>
         </div>
 
-        <DialogFooter className="p-4 sm:p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center shrink-0">
-          <Button 
-            variant="outline" 
-            onClick={onClose} 
-            disabled={loading}
-            className="h-11 rounded-lg bg-white w-full sm:w-auto order-2 sm:order-1"
-          >
-            <X className="mr-2 h-4 w-4" />
+        <DialogFooter className="p-6 pt-4 border-t flex flex-col-reverse sm:flex-row sm:justify-between">
+          <Button variant="ghost" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
             Cancelar
           </Button>
           <Button 
             onClick={handleStatusChange}
-            disabled={loading || newStatus === cotizacion.estado} 
-            className="bg-blue-600 hover:bg-blue-700 text-white h-11 rounded-lg w-full sm:w-auto order-1 sm:order-2"
+            disabled={loading || !newStatus || newStatus === cotizacion.estado} 
+            className="w-full sm:w-auto"
           >
             {loading ? (
-              <div className="flex items-center">
-                <span className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
-                <span>Procesando...</span>
-              </div>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <div className="flex items-center">
-                {newStatus === cotizacion.estado ? (
-                  <span>Mismo estado</span>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    <span>Guardar cambios</span>
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </div>
+              <Check className="mr-2 h-4 w-4" />
             )}
+            Guardar Cambios
           </Button>
         </DialogFooter>
-      </DialogPrimitive.Content>
+      </DialogContent>
     </Dialog>
   );
 }

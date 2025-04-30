@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image, Link } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/utils';
 
 // Register fonts
 Font.register({
@@ -330,25 +331,6 @@ interface ReactPDFDocumentProps {
   folio?: string;
   cotizacion: Cotizacion;
 }
-
-// Helper function to format currency
-const formatCurrency = (amount: number, currency: 'MXN' | 'USD'): string => {
-  if (currency === 'MXN') {
-    return new Intl.NumberFormat('es-MX', { 
-      style: 'currency', 
-      currency: 'MXN',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  } else {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  }
-};
 
 // PDF Document Component
 const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cotizacion }) => {

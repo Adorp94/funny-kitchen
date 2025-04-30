@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Download } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Download, Check } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
 import { ListaProductos } from "@/components/cotizacion/lista-productos";
@@ -15,6 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Cliente } from "@/lib/supabase";
 import { useExchangeRate } from '@/hooks/useExchangeRate';
 import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
+import { formatCurrency, convertToDollars } from '@/lib/utils';
+import { generateUniqueId } from "@/lib/utils/misc";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -28,6 +31,7 @@ interface ExtendedProductoBase extends ProductoBase {
 interface Producto extends ExtendedProductoBase {
   subtotal: number;
   producto_id?: number | null;
+  cotizacion_producto_id?: number | null;
 }
 
 interface ProductoFormData {
@@ -63,9 +67,14 @@ function EditCotizacionClient() {
   const [clienteData, setClienteData] = useState<Cliente | null>(null);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [cotizacionOriginal, setCotizacionOriginal] = useState<any>(null);
   const { convertMXNtoUSD, convertUSDtoMXN } = useExchangeRate();
   const [error, setError] = useState<string | null>(null);
+  const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
+  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number>(8);
+  const [clienteFormMode, setClienteFormMode] = useState<'search' | 'create'>('search');
 
   // Get productos from context
   const {
@@ -85,18 +94,22 @@ function EditCotizacionClient() {
     shippingCost,
     setShippingCost,
     exchangeRate,
-    setProductos
+    setProductos,
+    financials
   } = useProductos();
 
-  // Fix: Helper to generate a unique id for new products
-  function generateUniqueId() {
-    return `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Helper function to format currency after potential conversion
+  const formatAndConvertCurrency = (amountMXN: number): string => {
+    const displayAmount = moneda === 'USD' && exchangeRate ? convertToDollars(amountMXN, exchangeRate) : amountMXN;
+    // Always use the central formatCurrency, ensuring the currency code matches the displayAmount's currency
+    return formatCurrency(displayAmount, moneda);
   }
 
   // Fetch the cotizacion data on mount
   useEffect(() => {
     async function fetchCotizacion() {
       setInitialLoading(true);
+      setError(null);
       try {
         // Fetch valid product IDs and store them in window for validation
         const fetchValidProductIds = async () => {
@@ -117,7 +130,7 @@ function EditCotizacionClient() {
           }
         };
 
-        fetchValidProductIds();
+        await fetchValidProductIds();
         
         // Then fetch the cotizacion data
         const response = await fetch(`/api/cotizaciones?id=${cotizacionId}`);
@@ -165,6 +178,14 @@ function EditCotizacionClient() {
         // Set shipping cost
         if (data.cotizacion.incluye_envio && data.cotizacion.costo_envio) {
           setShippingCost(data.cotizacion.costo_envio);
+        }
+        
+        // Set tiempo estimado
+        if (data.cotizacion.tiempo_estimado) {
+          setTiempoEstimado(data.cotizacion.tiempo_estimado);
+        }
+        if (data.cotizacion.tiempo_estimado_max) {
+          setTiempoEstimadoMax(data.cotizacion.tiempo_estimado_max);
         }
         
         // Log the raw API response for productos
@@ -357,23 +378,6 @@ function EditCotizacionClient() {
     }
   };
 
-  // Format currency with proper conversion
-  const formatCurrency = (amount: number): string => {
-    let displayAmount = amount;
-    
-    // Convert to USD if needed
-    if (moneda === 'USD' && exchangeRate) {
-      displayAmount = amount / exchangeRate;
-    }
-    
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: moneda,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(displayAmount);
-  };
-
   // Handle currency change
   const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
     setMoneda(newCurrency);
@@ -431,365 +435,292 @@ function EditCotizacionClient() {
     }
   };
 
+  // Cliente Form Handlers
+  const handleClientSelect = useCallback((selected: Cliente | null) => { setClienteData(selected); setCliente(selected); }, []);
+  const handleModeChange = useCallback((newMode: 'search' | 'create') => { setClienteFormMode(newMode); }, []);
+  const clienteInitialData = useMemo(() => clienteData || {}, [clienteData]);
+  
+  // Step Indicator Component
+  const StepIndicator = ({ currentStep }: { currentStep: number }) => (
+    <div className="flex w-full max-w-md justify-between relative">
+      <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-200">
+        <div 
+          className="absolute h-0.5 bg-teal-500 transition-all duration-500" 
+          style={{ width: `${(currentStep - 1) * 50}%` }}
+        ></div>
+      </div>
+      
+      {/* Step 1 */}
+      <div className="flex flex-col items-center relative z-10">
+        <button 
+          onClick={() => setActiveStep(1)}
+          className={`
+            h-9 w-9 rounded-full ring-2 flex items-center justify-center
+            transition-all duration-200 font-medium text-sm
+            ${getStepClasses(1)}
+          `}
+        >
+          1
+        </button>
+        <span className="mt-2 text-sm font-medium text-gray-700">Cliente</span>
+      </div>
+      
+      {/* Step 2 */}
+      <div className="flex flex-col items-center relative z-10">
+        <button 
+          onClick={() => cliente && setActiveStep(2)}
+          className={`
+            h-9 w-9 rounded-full ring-2 flex items-center justify-center
+            transition-all duration-200 font-medium text-sm
+            ${getStepClasses(2)}
+          `}
+        >
+          2
+        </button>
+        <span className="mt-2 text-sm font-medium text-gray-700">Productos</span>
+      </div>
+      
+      {/* Step 3 */}
+      <div className="flex flex-col items-center relative z-10">
+        <button 
+          onClick={() => cliente && productos.length > 0 && setActiveStep(3)}
+          className={`
+            h-9 w-9 rounded-full ring-2 flex items-center justify-center
+            transition-all duration-200 font-medium text-sm
+            ${getStepClasses(3)}
+          `}
+        >
+          3
+        </button>
+        <span className="mt-2 text-sm font-medium text-gray-700">Finalizar</span>
+      </div>
+    </div>
+  );
+
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-emerald-500" />
-          <p className="text-gray-500">Cargando cotización...</p>
-        </div>
+      <div className="container mx-auto px-4 py-20 flex justify-center items-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Cargando cotización...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error al Cargar</CardTitle>
+            <CardDescription className="text-destructive/90">No se pudieron cargar los datos de la cotización.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-destructive/80">{error}</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => router.push('/dashboard/cotizaciones')}>Volver a la Lista</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="py-12 px-4 sm:px-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col items-center mb-12">
-          <h1 className="text-2xl font-medium text-gray-900 mb-2">Editar Cotización</h1>
-          <p className="text-gray-500 mb-8">Folio: {cotizacionOriginal?.folio}</p>
-          
-          {/* Step indicators */}
-          <div className="flex w-full max-w-md justify-between relative">
-            {/* Progress bar */}
-            <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-200">
-              <div 
-                className="absolute h-0.5 bg-teal-500 transition-all duration-500" 
-                style={{ width: `${(activeStep - 1) * 50}%` }}
-              ></div>
-            </div>
-            
-            {/* Step 1 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => setActiveStep(1)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(1)}
-                `}
-              >
-                1
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Cliente</span>
-            </div>
-            
-            {/* Step 2 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => cliente && setActiveStep(2)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(2)}
-                `}
-              >
-                2
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Productos</span>
-            </div>
-            
-            {/* Step 3 */}
-            <div className="flex flex-col items-center relative z-10">
-              <button 
-                onClick={() => cliente && productos.length > 0 && setActiveStep(3)}
-                className={`
-                  h-9 w-9 rounded-full ring-2 flex items-center justify-center
-                  transition-all duration-200 font-medium text-sm
-                  ${getStepClasses(3)}
-                `}
-              >
-                3
-              </button>
-              <span className="mt-2 text-sm font-medium text-gray-700">Finalizar</span>
-            </div>
-          </div>
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Editar Cotización</h1>
+          <p className="text-sm text-muted-foreground">Folio: {cotizacionOriginal?.folio}</p>
         </div>
-        
-        {/* Step content */}
-        <div className="space-y-6">
-          {/* Step 1: Cliente */}
-          {activeStep === 1 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 text-teal-600 mr-2" />
-                  <h2 className="text-lg font-medium text-gray-900">Información del Cliente</h2>
-                </div>
-              </div>
-              <div className="p-6">
-                <ClienteForm 
-                  onClienteChange={setClienteData} 
-                  clienteId={cliente?.cliente_id} 
-                  initialCliente={cliente}
-                  defaultTab="existente"
-                  readOnly={false}
-                />
-              </div>
-              <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t border-gray-100">
-                <Button 
-                  variant="outline" 
-                  onClick={() => router.push('/dashboard/cotizaciones')}
-                  className="text-gray-600 border-gray-300 px-4 h-10 text-sm font-medium"
-                  size="md"
-                >
+      </div>
+
+      {/* Step Indicator */} 
+      <div className="flex justify-center pb-6">
+         <StepIndicator currentStep={activeStep} />
+      </div>
+
+      {/* Step Content */}
+      <div className="max-w-3xl mx-auto">
+        {/* Step 1: Cliente */} 
+        {activeStep === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <User className="h-5 w-5 text-primary" />
+                Información del Cliente
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ClienteForm 
+                onClientSelect={handleClientSelect} 
+                initialData={cliente || {}}
+                mode={cliente ? 'edit' : clienteFormMode}
+                onModeChange={handleModeChange}
+              />
+            </CardContent>
+            <CardFooter className="flex justify-between border-t pt-4">
+                <Button variant="outline" onClick={() => router.push('/dashboard/cotizaciones')} disabled={isSaving || isDownloading}>
                   Cancelar
                 </Button>
-                <Button 
-                  onClick={nextStep} 
-                  disabled={!cliente} 
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium"
-                  size="md"
-                >
-                  <span className="whitespace-nowrap">Continuar</span> <ArrowRight className="ml-2 h-4 w-4" />
+                <Button onClick={nextStep} disabled={!cliente || isSaving || isDownloading}>
+                  Continuar <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 2: Productos */}
-          {activeStep === 2 && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center">
-                      <Package className="h-5 w-5 text-emerald-600 mr-2" />
-                      <h2 className="text-lg font-medium text-gray-900">Agregar Productos</h2>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">Moneda:</span>
-                      <Select
-                        value={moneda}
-                        onValueChange={(value: 'MXN' | 'USD') => handleCurrencyChange(value)}
-                      >
-                        <SelectTrigger className="w-[110px] h-9">
+            </CardFooter>
+          </Card>
+        )}
+        
+        {/* Step 2: Productos */} 
+        {activeStep === 2 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Package className="h-5 w-5 text-primary" />
+                    Editar Productos
+                  </CardTitle>
+                   <div className="flex items-center space-x-2">
+                      <span className="text-sm text-muted-foreground">Moneda:</span>
+                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                        <SelectTrigger className="w-[100px] h-9">
                           <SelectValue placeholder="Moneda" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="MXN">MXN (Peso)</SelectItem>
-                          <SelectItem value="USD">USD (Dólar)</SelectItem>
+                          <SelectItem value="MXN">MXN</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
                 </div>
-                <div className="p-6">
-                  <ProductoFormTabs onProductoChange={(producto: any) => {
-                    if (producto) {
-                      // Always set producto_id for new products
-                      let productoIdValue = producto.producto_id;
-                      // If producto_id is not set, try to use id if it's numeric
-                      if (!productoIdValue && producto.id && /^\d+$/.test(producto.id)) {
-                        productoIdValue = Number(producto.id);
-                      }
-                      const productoToAdd = {
-                        id: "new",
-                        nombre: producto.nombre || '',
-                        cantidad: Number(producto.cantidad) || 1,
-                        precio: producto.precio || 0,
-                        descuento: producto.descuento || 0,
-                        subtotal: (producto.precio || 0) * (Number(producto.cantidad) || 1),
-                        sku: producto.sku || '',
-                        descripcion: producto.descripcion || '',
-                        colores: Array.isArray(producto.colores) 
-                          ? producto.colores 
-                          : typeof producto.colores === 'string' 
-                            ? producto.colores.split(',') 
-                            : [],
-                        acabado: producto.acabado || '',
-                        producto_id: productoIdValue || null
-                      };
-                      handleAddProduct(productoToAdd);
-                    }
-                  }} />
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex items-center">
-                    <Receipt className="h-5 w-5 text-teal-600 mr-2" />
-                    <h2 className="text-lg font-medium text-gray-900">Productos Seleccionados</h2>
-                  </div>
-                </div>
-                <div className="p-6">
+              </CardHeader>
+              <CardContent>
+                  <ProductoFormTabs onProductoChange={handleAddProduct} /> 
+              </CardContent>
+            </Card>
+
+             {cliente && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-base font-medium">Cliente</CardTitle>
+                  <Button variant="link" className="h-auto p-0 text-sm" onClick={() => setActiveStep(1)}>Cambiar</Button>
+                </CardHeader>
+                <CardContent className="text-sm">
+                  <p className="font-semibold text-foreground">{cliente.nombre}</p>
+                  <p className="text-muted-foreground">{cliente.celular}</p>
+                  {cliente.correo && <p className="text-muted-foreground">{cliente.correo}</p>}
+                </CardContent>
+              </Card>
+            )}
+            
+            {productos.length > 0 && (
+              <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <FileText className="h-5 w-5 text-primary" />
+                      Productos Agregados
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ListaProductosConDescuento 
+                      productos={productos}
+                      onRemoveProduct={handleRemoveProduct}
+                      onUpdateProductDiscount={updateProductoDiscount}
+                      moneda={moneda}
+                      editMode={true}
+                    />
+                  </CardContent>
+              </Card>
+            )}
+            
+            <div className="flex justify-between items-center pt-2">
+              <Button variant="outline" onClick={prevStep} disabled={isSaving || isDownloading}>
+                 <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
+              </Button>
+              <Button onClick={nextStep} disabled={productos.length === 0 || isSaving || isDownloading}>
+                 Continuar <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 3: Finalizar */} 
+        {activeStep === 3 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Resumen y Opciones Finales
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-3">Productos</h3>
                   <ListaProductosConDescuento 
-                    productos={productos} 
+                    productos={productos}
                     onRemoveProduct={handleRemoveProduct}
                     onUpdateProductDiscount={updateProductoDiscount}
                     moneda={moneda}
+                    editMode={true}
                   />
                 </div>
-              </div>
-              
-              <div className="flex justify-between px-0">
-                <Button 
-                  variant="outline" 
-                  onClick={prevStep}
-                  className="text-gray-600 border-gray-300 px-4 h-10 text-sm font-medium flex items-center"
-                  size="md"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  <span className="whitespace-nowrap">Anterior</span>
-                </Button>
-                <Button 
-                  onClick={nextStep} 
-                  disabled={productos.length === 0}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium flex items-center"
-                  size="md"
-                >
-                  <span className="whitespace-nowrap">Continuar</span>
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 3: Resumen y finalización */}
-          {activeStep === 3 && (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-100">
-                  <div className="flex items-center">
-                    <FileText className="h-5 w-5 text-teal-600 mr-2" />
-                    <h2 className="text-lg font-medium text-gray-900">Resumen de Cotización</h2>
-                  </div>
-                </div>
-                <div className="p-6">
+                <div>
+                  <h3 className="text-base font-medium text-foreground mb-3">Totales y Opciones</h3>
                   <ResumenCotizacion 
-                    cliente={cliente} 
+                    cliente={cliente}
                     productos={productos}
                     moneda={moneda}
-                    subtotal={subtotal}
+                    subtotal={financials.displaySubtotal}
                     globalDiscount={globalDiscount}
-                    setGlobalDiscount={(value) => {
-                      console.log("Setting global discount to:", value);
-                      setGlobalDiscount(value);
-                    }}
+                    setGlobalDiscount={setGlobalDiscount}
                     hasIva={hasIva}
                     setHasIva={setHasIva}
                     shippingCost={shippingCost}
                     setShippingCost={setShippingCost}
-                    total={total}
+                    total={financials.displayTotal}
+                    tiempoEstimado={tiempoEstimado}
+                    setTiempoEstimado={setTiempoEstimado}
+                    tiempoEstimadoMax={tiempoEstimadoMax}
+                    setTiempoEstimadoMax={setTiempoEstimadoMax}
                   />
                 </div>
-              </div>
-              
-              <div className="flex justify-between px-0">
-                <Button 
-                  variant="outline" 
-                  onClick={prevStep}
-                  className="text-gray-600 border-gray-300 px-4 h-10 text-sm font-medium flex items-center"
-                  size="md"
+              </CardContent>
+            </Card>
+            
+            <div className="flex flex-col sm:flex-row justify-between items-center pt-2 gap-3">
+              <Button variant="outline" onClick={prevStep} disabled={isSaving || isDownloading} className="w-full sm:w-auto">
+                 <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
+              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsDownloading(true);
+                    handleDownloadPDF();
+                  }}
+                  disabled={isSaving || isDownloading}
+                  className="w-full sm:w-auto"
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  <span className="whitespace-nowrap">Anterior</span>
+                  {isDownloading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Descargando...</>
+                  ) : (
+                    <><Download className="mr-2 h-4 w-4" /> Descargar PDF</>
+                  )}
                 </Button>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        setIsLoading(true);
-                        console.log("Starting PDF download for cotizacion ID:", cotizacionId);
-                        const response = await fetch(`/api/cotizaciones?id=${cotizacionId}`);
-                        
-                        if (!response.ok) {
-                          throw new Error(`Error fetching data: ${response.status} ${response.statusText}`);
-                        }
-                        
-                        const data = await response.json();
-                        
-                        if (!data.cotizacion) {
-                          throw new Error('No cotizacion data found in API response');
-                        }
-
-                        console.log(`Successfully fetched cotizacion with ${data.cotizacion.productos?.length || 0} products`);
-
-                        // Dynamically import the PDF Wrapper component
-                        const { default: PDFWrapper } = await import('@/components/cotizacion/pdf-wrapper');
-                        
-                        // Create a temporary container for the PDF renderer
-                        const tempContainer = document.createElement('div');
-                        tempContainer.style.position = 'absolute';
-                        tempContainer.style.left = '-9999px';
-                        document.body.appendChild(tempContainer);
-                        
-                        // Create a root for rendering the PDF wrapper
-                        const { createRoot } = await import('react-dom/client');
-                        const root = createRoot(tempContainer);
-                        
-                        console.log("Rendering PDF component with autoDownload=true");
-                        // Render the PDF wrapper with autoDownload set to true
-                        root.render(
-                          <PDFWrapper
-                            cliente={data.cotizacion.cliente}
-                            folio={data.cotizacion.folio}
-                            cotizacion={data.cotizacion}
-                            autoDownload={true}
-                          />
-                        );
-                        
-                        // Clean up after a timeout to allow PDF generation to complete
-                        setTimeout(() => {
-                          if (tempContainer.parentNode) {
-                            root.unmount();
-                            document.body.removeChild(tempContainer);
-                          }
-                          setIsLoading(false);
-                        }, 3000);
-                      } catch (error) {
-                        console.error('Error downloading PDF:', error);
-                        toast.error(error instanceof Error 
-                          ? `No se pudo descargar el PDF: ${error.message}` 
-                          : "No se pudo descargar el PDF. Intente nuevamente.");
-                        setIsLoading(false);
-                      }
-                    }}
-                    disabled={isLoading}
-                    className="border-emerald-500 text-emerald-500 hover:bg-emerald-50 px-4 h-10 text-sm font-medium flex items-center"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span className="whitespace-nowrap">Generando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 h-4 w-4" />
-                        <span className="whitespace-nowrap">Descargar PDF</span>
-                      </>
-                    )}
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      if (!isLoading) {
-                        setIsLoading(true);
-                        handleUpdateCotizacion().catch(() => setIsLoading(false));
-                      }
-                    }} 
-                    disabled={isLoading}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 h-10 text-sm font-medium flex items-center"
-                    size="md"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        <span className="whitespace-nowrap">Actualizando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        <span className="whitespace-nowrap">Actualizar Cotización</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
+                <Button 
+                  onClick={handleUpdateCotizacion}
+                  disabled={isSaving || isDownloading || productos.length === 0 || !cliente}
+                  className="w-full sm:w-auto"
+                >
+                  {isSaving ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Actualizando...</>
+                  ) : (
+                    <><Save className="mr-2 h-4 w-4" /> Actualizar Cotización</>
+                  )}
+                </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

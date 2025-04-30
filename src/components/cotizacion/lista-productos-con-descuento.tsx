@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { Trash2, Percent } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Producto } from './producto-simplificado';
-import { ResponsiveTable } from '../ui/responsive-table';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow, 
+  TableFooter
+} from "@/components/ui/table";
+import { formatCurrency } from '@/lib/utils';
 
 // Extended product interface with discount
 export interface ProductoConDescuento extends Producto {
@@ -33,23 +42,6 @@ export function ListaProductosConDescuento({
     console.log('Current currency in ListaProductos:', moneda);
   }, [moneda]);
 
-  // Format currency with proper currency symbol
-  const formatCurrency = (amount: number): string => {
-    // The amount received should already be in the correct display currency
-    // We just need to format it.
-    // Handle potential null/undefined/NaN values gracefully.
-    if (isNaN(amount) || amount === null || amount === undefined) {
-        return "---"; // Or indicate an error/loading state
-    }
-
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: moneda,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amount);
-  };
-
   // Format percentage
   const formatPercent = (value: number): string => {
     return new Intl.NumberFormat('es-MX', {
@@ -61,7 +53,7 @@ export function ListaProductosConDescuento({
   // Calculate price after discount for a product
   const getPriceAfterDiscount = (producto: ProductoConDescuento): number => {
     const discount = producto.descuento || 0;
-    const originalPrice = producto.precio; // This is already the display price
+    const originalPrice = producto.precio || 0; // Added default value
     const discountedPrice = originalPrice * (1 - discount / 100);
     return discountedPrice;
   };
@@ -69,7 +61,8 @@ export function ListaProductosConDescuento({
   // Calculate subtotal after discount for a product
   const getSubtotalAfterDiscount = (producto: ProductoConDescuento): number => {
     const priceAfterDiscount = getPriceAfterDiscount(producto);
-    return priceAfterDiscount * producto.cantidad;
+    const quantity = producto.cantidad || 0; // Added default value
+    return priceAfterDiscount * quantity;
   };
 
   // Calculate total after individual discounts
@@ -80,118 +73,104 @@ export function ListaProductosConDescuento({
 
   // Handle discount change
   const handleDiscountChange = (id: string, value: string) => {
-    // Allow empty string or valid number
     if (value === '' || !isNaN(parseFloat(value))) {
-      // Convert to number for the callback but allow empty input
       const numValue = value === '' ? 0 : parseFloat(value);
-      // Ensure discount is between 0 and 100
       const validDiscount = Math.min(Math.max(numValue, 0), 100);
-      
       onUpdateProductDiscount(id, validDiscount);
     }
   };
 
   // Render the discount input for a product
   const renderDiscountInput = (producto: ProductoConDescuento) => {
-    // Display empty string if discount is 0, otherwise show the value
     const displayValue = producto.descuento === 0 ? '' : producto.descuento?.toString();
-    
     return (
-      <div className="flex items-center justify-center">
+      <div className="relative w-20 mx-auto">
         <Input
           type="text"
           inputMode="numeric"
           value={displayValue}
           onChange={(e) => handleDiscountChange(producto.id, e.target.value)}
-          className="w-16 text-right p-1 h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-full h-8 pr-5 text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           placeholder="0"
         />
-        <span className="ml-1 text-gray-500">%</span>
+        <Percent className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
       </div>
     );
   };
 
   if (productos.length === 0) {
     return (
-      <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
-        <p className="text-gray-500">No hay productos agregados.</p>
-        <p className="text-sm text-gray-400 mt-1">Agrega productos utilizando el formulario.</p>
+      <div className="text-center py-10 border border-dashed rounded-lg">
+        <p className="text-muted-foreground">No hay productos agregados.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <ResponsiveTable>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-              <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cant.</th>
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Precio</th>
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Producto</TableHead>
+            <TableHead className="text-center w-[80px]">Cant.</TableHead>
+            <TableHead className="text-right w-[120px]">Precio Unit.</TableHead>
+            {editMode && (
+              <TableHead className="text-center w-[100px]">Descuento</TableHead>
+            )}
+            <TableHead className="text-right w-[120px]">Subtotal</TableHead>
+            {editMode && (
+              <TableHead className="text-center w-[80px]">Acción</TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {productos.map((producto) => (
+            <TableRow key={producto.id}>
+              <TableCell className="font-medium">{producto.nombre}</TableCell>
+              <TableCell className="text-center">{producto.cantidad}</TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(producto.precio || 0, moneda)}
+              </TableCell>
               {editMode && (
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descuento</th>
+                <TableCell className="text-center">
+                  {renderDiscountInput(producto)}
+                </TableCell>
               )}
-              <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Subtotal</th>
+              <TableCell className="text-right font-medium">
+                {formatCurrency(getSubtotalAfterDiscount(producto), moneda)}
+                {producto.descuento && producto.descuento > 0 && editMode ? (
+                  <div className="text-xs text-green-600">
+                    (-{formatPercent(producto.descuento)})
+                  </div>
+                ) : null}
+              </TableCell>
               {editMode && (
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Acciones</th>
+                <TableCell className="text-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onRemoveProduct(producto.id)}
+                    className="text-destructive hover:text-destructive h-7 w-7"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Eliminar</span>
+                  </Button>
+                </TableCell>
               )}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {productos.map((producto) => (
-              <tr key={producto.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-900">
-                  {producto.nombre}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
-                  {producto.cantidad}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-500 text-right whitespace-nowrap">
-                  {formatCurrency(producto.precio)}
-                </td>
-                {editMode && (
-                  <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
-                    {renderDiscountInput(producto)}
-                  </td>
-                )}
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right whitespace-nowrap">
-                  {formatCurrency(producto.subtotal)}
-                  {producto.descuento ? (
-                    <div className="text-xs text-green-600">
-                      Descuento: {formatPercent(producto.descuento)}
-                    </div>
-                  ) : null}
-                </td>
-                {editMode && (
-                  <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
-                    <Button
-                      variant="ghost"
-                      size="sm" 
-                      onClick={() => onRemoveProduct(producto.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Eliminar</span>
-                    </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="bg-gray-50">
-            <tr>
-              <td colSpan={editMode ? 4 : 3} className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                Total:
-              </td>
-              <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
-                {formatCurrency(productos.reduce((sum, p) => sum + (p.subtotal || 0), 0))}
-              </td>
-              {editMode && <td></td>}
-            </tr>
-          </tfoot>
-        </table>
-      </ResponsiveTable>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={editMode ? 4 : 3} className="text-right font-semibold">Total</TableCell>
+            <TableCell className="text-right font-bold text-lg">
+              {formatCurrency(totalAfterDiscounts, moneda)}
+            </TableCell>
+            {editMode && <TableCell />}
+          </TableRow>
+        </TableFooter>
+      </Table>
     </div>
   );
 }
