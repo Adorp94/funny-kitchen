@@ -107,7 +107,7 @@ export function ListaProductosConDescuento({
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -148,9 +148,9 @@ export function ListaProductosConDescuento({
                 <TableCell className="text-center">
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onClick={() => onRemoveProduct(producto.id)}
-                    className="text-destructive hover:text-destructive h-7 w-7"
+                    className="text-destructive hover:text-destructive h-8 w-8 p-1"
                     title="Eliminar"
                   >
                     <Trash2 className="h-4 w-4" />
