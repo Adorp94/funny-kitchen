@@ -473,75 +473,94 @@ export default function CotizacionesPage() {
       
       {/* Table Section */}
       <Card>
-        <CardContent className="p-0"> {/* Remove padding for table */}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[120px]">
-                  <div className="flex items-center gap-1">
-                    Folio
-                    {sortBy.field === 'folio' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                  </div>
-                </TableHead>
-                <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[100px]">
-                  <div className="flex items-center gap-1">
-                    Fecha
-                    {sortBy.field === 'fecha_creacion' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                  </div>
-                </TableHead>
-                <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer hidden md:table-cell">
-                  <div className="flex items-center gap-1">
-                    Cliente
-                    {sortBy.field === 'cliente' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                  </div>
-                </TableHead>
-                <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
-                <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
-                  <div className="flex items-center justify-end gap-1">
-                    Total
-                    {sortBy.field === 'total' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                  </div>
-                </TableHead>
-                <TableHead className="text-right w-[100px]">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableSkeletonLoader />
-              ) : getCurrentPageItems().length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No se encontraron cotizaciones.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                getCurrentPageItems().map((cotizacion) => (
-                  <TableRow key={cotizacion.cotizacion_id} className="hover:bg-slate-50">
-                    <TableCell className="py-2.5 px-3 font-medium text-emerald-600 cursor-pointer hover:underline whitespace-nowrap" onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}>
-                      {cotizacion.folio || 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(cotizacion.fecha_creacion)}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="font-medium truncate max-w-[200px] lg:max-w-[300px]" title={cotizacion.cliente.nombre}>{cotizacion.cliente.nombre}</div>
-                      <div className="text-xs text-muted-foreground truncate">{cotizacion.cliente.celular || '—'}</div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">{getStatusBadge(cotizacion.estado)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="font-medium">{formatCurrency(cotizacion.total, cotizacion.moneda as 'MXN' | 'USD')}</div>
-                      <div className="text-xs text-muted-foreground">{cotizacion.moneda}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <CotizacionActionsButton 
-                        cotizacion={cotizacion}
-                        onStatusChanged={fetchCotizacionesData}
-                        buttonSize="sm" 
-                      />
-                    </TableCell>
+        <CardHeader>
+          {/* ... CardHeader content ... */}
+        </CardHeader>
+        <CardContent>
+          {errorDetails ? renderErrorDetails() : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[120px]">
+                      <div className="flex items-center gap-1">
+                        Folio
+                        {sortBy.field === 'folio' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                      </div>
+                    </TableHead>
+                    <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[100px]">
+                      <div className="flex items-center gap-1">
+                        Fecha
+                        {sortBy.field === 'fecha_creacion' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                      </div>
+                    </TableHead>
+                    <TableHead onClick={() => handleSort('cliente')} className="cursor-pointer hidden md:table-cell">
+                      <div className="flex items-center gap-1">
+                        Cliente
+                        {sortBy.field === 'cliente' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                      </div>
+                    </TableHead>
+                    <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
+                    <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
+                      <div className="flex items-center justify-end gap-1">
+                        Total
+                        {sortBy.field === 'total' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right w-[100px]">Acciones</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableSkeletonLoader />
+                  ) : getCurrentPageItems().length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                        No se encontraron cotizaciones.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    getCurrentPageItems().map((cotizacion) => (
+                      <TableRow key={cotizacion.cotizacion_id} className="hover:bg-slate-50">
+                        <TableCell className="py-2.5 px-3 font-medium text-emerald-600 cursor-pointer hover:underline whitespace-nowrap" onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}>
+                          {cotizacion.folio || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="font-medium truncate max-w-[200px] lg:max-w-[300px]" title={cotizacion.cliente.nombre}>{cotizacion.cliente.nombre}</div>
+                          <div className="text-xs text-muted-foreground truncate">{cotizacion.cliente.celular || '—'}</div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">{getStatusBadge(cotizacion.estado)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="font-medium">{formatCurrency(cotizacion.total, cotizacion.moneda as 'MXN' | 'USD')}</div>
+                          <div className="text-xs text-muted-foreground">{cotizacion.moneda}</div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <CotizacionActionsButton 
+                            cotizacion={cotizacion}
+                            onStatusChanged={fetchCotizacionesData}
+                            buttonSize="sm" 
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3}>Total Cotizaciones</TableCell>
+                    <TableCell className="text-right">{metrics.totalCotizaciones}</TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={3}>Monto Total (Estimado MXN)</TableCell>
+                    <TableCell className="text-right font-semibold">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          )}
         </CardContent>
         {totalPages > 1 && renderPagination()}
       </Card>
