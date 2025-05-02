@@ -19,6 +19,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { generateQuotationPDF } from "@/app/actions/pdf-actions";
 import { generateUniqueId } from "@/lib/utils/misc";
 import { formatCurrency } from '@/lib/utils';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -78,7 +81,8 @@ function NuevaCotizacionClient() {
   // --- Local state now primarily forTiempo Estimado ---
   // Other financial states (discount, iva, shipping, moneda) are managed by context
   const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
-  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number>(8);
+  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number | string>(8); // Allow string for empty input
+  const [incluyeEnvio, setIncluyeEnvio] = useState<boolean>(false);
   // -----------------------------------------------------
 
   // Add state for ClienteForm mode
@@ -131,6 +135,13 @@ function NuevaCotizacionClient() {
     }
   }, [clienteData]);
   
+  // Effect to set shipping cost to 0 if 'incluyeEnvio' is unchecked
+  useEffect(() => {
+    if (!incluyeEnvio) {
+      setShippingCost(0);
+    }
+  }, [incluyeEnvio, setShippingCost]);
+
   // Add a useEffect to preserve client data when navigating between steps
   useEffect(() => {
     // Save client data to sessionStorage whenever it changes
@@ -252,36 +263,46 @@ function NuevaCotizacionClient() {
         sessionStorage.setItem('cotizacion_cliente', JSON.stringify(result.cliente_creado));
       }
       
-      // Create cotizacion object for PDF generation (Use DISPLAY values)
-      const cotizacionForPDF = {
-        id: result.cotizacion_id,
-        folio: result.folio,
+      // Now handle PDF Generation using the result (contains cotizacion_id)
+      const cotizacionId = result.cotizacion_id;
+      if (!cotizacionId) {
+        throw new Error("API did not return a cotizacion_id after saving.");
+      }
+      console.log(`Cotización ${cotizacionId} guardada, generando PDF...`);
+
+      // --- Prepare data specifically for PDF generation (using DISPLAY values) ---
+      const pdfData = {
+        cliente: cliente,
+        productos: productos.map(p => ({ // Use display products directly
+          ...p,
+          colores: Array.isArray(p.colores) ? p.colores.join(', ') : p.colores,
+          // Ensure precio and subtotal are numbers for PDF
+          precio: Number(p.precio || 0),
+          subtotal: Number(p.subtotal || 0),
+        })),
+        folio: result.folio || `TEMP-${generateUniqueId()}`, // Use folio from API result
         moneda: moneda,
         subtotal: financials.displaySubtotal, // Use display subtotal
+        costo_envio: financials.displayShippingCost, // Use display shipping cost
+        total: financials.displayTotal,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: financials.displayIvaAmount, // Use display IVA
-        incluye_envio: financials.shippingCostMXN > 0, // Base decision on MXN cost
-        costo_envio: financials.displayShippingCost, // Use display shipping cost
-        total: financials.displayTotal, // Use display total
+        monto_iva: financials.displayIvaAmount, // Use display IVA amount
+        incluye_envio: incluyeEnvio, // Use state variable
         tipo_cambio: exchangeRate,
         tiempo_estimado: tiempoEstimado,
-        tiempo_estimado_max: tiempoEstimadoMax,
-        // Pass the DISPLAY products array directly for PDF
-        productos: productos.map(p => ({
-          ...p, // Spread display product properties (incl display price/subtotal)
-          precio_unitario: p.precio, // Already display price
-          // subtotal is already display subtotal
-        }))
+        tiempo_estimado_max: tiempoEstimadoMax === '' ? null : Number(tiempoEstimadoMax), // Handle empty string
+        fecha_creacion: new Date().toLocaleDateString('es-MX'), // Use current date
+        cotizacion_id: cotizacionId
       };
-      console.log("Data being sent to PDF generation:", cotizacionForPDF);
+      console.log("Data being sent for PDF generation:", pdfData);
       
       // Generate PDF (remains similar)
       try {
         await PDFService.generateReactPDF(
           cliente,
           result.folio,
-          cotizacionForPDF,
+          pdfData,
           { download: true, filename: `${result.folio}-${cliente.nombre.replace(/\s+/g, '-')}.pdf` }
         );
         toast.success(`Cotización ${result.folio} generada exitosamente`);
@@ -420,6 +441,32 @@ function NuevaCotizacionClient() {
         </ol>
       </nav>
     );
+  };
+
+  // Handler for Tiempo Estimado Min
+  const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTiempoEstimado(value === '' ? 0 : parseInt(value, 10) || 0);
+  };
+
+  // Handler for Tiempo Estimado Max
+  const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setTiempoEstimadoMax(value); // Store as string to allow empty input
+  };
+
+  // Handler for Global Discount change
+  const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty input, parse to 0 if empty or NaN
+    setGlobalDiscount(value === '' ? 0 : parseFloat(value) || 0);
+  };
+
+  // Handler for Shipping Cost change
+  const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow empty input, parse to 0 if empty or NaN
+    setShippingCost(value === '' ? 0 : parseFloat(value) || 0);
   };
 
   return (

@@ -54,21 +54,21 @@ export function ResumenCotizacion({
   tiempoEstimadoMax = 8,
   setTiempoEstimadoMax
 }: ResumenCotizacionProps) {
-  const [globalDiscountStr, setGlobalDiscountStr] = useState<string>('0');
   const [hasShipping, setHasShipping] = useState<boolean>(false);
-  const [shippingCostStr, setShippingCostStr] = useState<string>('0');
+  const [tiempoEstimadoMaxStr, setTiempoEstimadoMaxStr] = useState<string>(tiempoEstimadoMax?.toString() ?? '8');
 
   useEffect(() => {
-    setGlobalDiscountStr(globalDiscount.toString());
     setHasShipping(shippingCost > 0);
-    setShippingCostStr(shippingCost.toString());
-  }, [globalDiscount, shippingCost]);
+  }, []);
+
+  useEffect(() => {
+    setTiempoEstimadoMaxStr(tiempoEstimadoMax?.toString() ?? '8');
+  }, [tiempoEstimadoMax]);
 
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0 && parseFloat(value) <= 100) ) {
-      setGlobalDiscountStr(value);
-      const numValue = value === '' ? 0 : parseFloat(value);
+    const numValue = value === '' ? 0 : parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
       setGlobalDiscount(numValue);
     }
   };
@@ -77,38 +77,34 @@ export function ResumenCotizacion({
   const handleShippingToggle = (checked: boolean) => {
     setHasShipping(checked);
     if (!checked) {
-      setShippingCostStr('0');
       setShippingCost(0);
     }
   };
 
   const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === '' || (!isNaN(parseFloat(value)) && parseFloat(value) >= 0)) {
-      setShippingCostStr(value);
-      const numValue = value === '' ? 0 : parseFloat(value);
+    const numValue = value === '' ? 0 : parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
       setShippingCost(numValue);
     }
   };
 
   const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (setTiempoEstimado && (value === '' || /^[1-9]\d*$/.test(value))) { // Only allow positive integers
-      const numValue = value === '' ? 1 : parseInt(value);
-      const newMinValue = Math.max(numValue, 1);
-      setTiempoEstimado(newMinValue);
-      if (newMinValue > tiempoEstimadoMax && setTiempoEstimadoMax) {
-        setTiempoEstimadoMax(newMinValue);
-      }
+    const numValue = value === '' ? 0 : parseInt(value, 10);
+    if (setTiempoEstimado && !isNaN(numValue) && numValue >= 0) {
+      setTiempoEstimado(numValue);
     }
   };
   
   const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (setTiempoEstimadoMax && (value === '' || /^[1-9]\d*$/.test(value))) { // Only allow positive integers
-      const numValue = value === '' ? tiempoEstimado : parseInt(value); // Default to min if empty
-      const newMaxValue = Math.max(numValue, tiempoEstimado);
-      setTiempoEstimadoMax(newMaxValue);
+    setTiempoEstimadoMaxStr(value);
+    if (setTiempoEstimadoMax) {
+      const numValue = value === '' ? 0 : parseInt(value, 10);
+      if (!isNaN(numValue) && numValue >= 0) {
+        setTiempoEstimadoMax(numValue);
+      }
     }
   };
 
@@ -160,7 +156,7 @@ export function ResumenCotizacion({
                 min="0"
                 max="100"
                 step="0.01"
-                value={globalDiscountStr}
+                value={globalDiscount === 0 ? '' : globalDiscount}
                 onChange={handleGlobalDiscountChange}
                 className="h-8 pr-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="0"
@@ -215,10 +211,10 @@ export function ResumenCotizacion({
                   type="number"
                   min="0"
                   step="0.01"
-                  value={shippingCostStr}
+                  value={shippingCost === 0 ? '' : shippingCost}
                   onChange={handleShippingCostChange}
                   className="h-8 pl-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="0.00"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -237,7 +233,7 @@ export function ResumenCotizacion({
                 type="number"
                 min="1"
                 step="1"
-                value={tiempoEstimado}
+                value={tiempoEstimado === 0 ? '' : tiempoEstimado}
                 onChange={handleTiempoEstimadoChange}
                 className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="Min"
@@ -245,9 +241,9 @@ export function ResumenCotizacion({
               <span className="text-muted-foreground">a</span>
               <Input
                 type="number"
-                min={tiempoEstimado} // Min value is the current min estimate
+                min="0"
                 step="1"
-                value={tiempoEstimadoMax}
+                value={tiempoEstimadoMaxStr}
                 onChange={handleTiempoEstimadoMaxChange}
                 className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="Max"
