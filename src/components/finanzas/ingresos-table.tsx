@@ -33,7 +33,7 @@ interface Ingreso {
 }
 
 interface IngresoTableProps {
-  ingresos: Ingreso[];
+  ingresos?: Ingreso[];
   isLoading?: boolean;
   page: number;
   totalPages: number;
@@ -41,7 +41,7 @@ interface IngresoTableProps {
 }
 
 export function IngresosTable({ 
-  ingresos, 
+  ingresos = [],
   isLoading = false, 
   page, 
   totalPages, 
@@ -96,7 +96,7 @@ export function IngresosTable({
                   </div>
                 </TableCell>
               </TableRow>
-            ) : ingresos.length === 0 ? (
+            ) : !Array.isArray(ingresos) || ingresos.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-[300px] text-center">
                   <div className="flex flex-col items-center justify-center h-full">
@@ -109,86 +109,92 @@ export function IngresosTable({
                 </TableCell>
               </TableRow>
             ) : (
-              ingresos.map((ingreso) => (
-                <TableRow 
-                  key={ingreso.pago_id}
-                  className="hover:bg-slate-50 transition-colors"
-                >
-                  <TableCell className="py-3 font-medium text-slate-900">
-                    {ingreso.tipo_ingreso === 'cotizacion' ? (
-                      <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
-                        Cotización
+              ingresos.map((ingreso, index) => { 
+                if (!ingreso) {
+                  console.warn("[IngresosTable] Skipping rendering of null/undefined ingreso item.");
+                  return null;
+                }
+                return (
+                  <TableRow 
+                    key={ingreso.pago_id || index}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <TableCell className="py-3 font-medium text-slate-900">
+                      {ingreso.tipo_ingreso === 'cotizacion' ? (
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                          Cotización
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                          Otro Ingreso
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 text-slate-700">
+                      {ingreso.tipo_ingreso === 'cotizacion' ? (
+                        <div className="flex flex-col">
+                          {ingreso.folio && ingreso.cotizacion_id ? (
+                            <Link href={`/dashboard/cotizaciones/${ingreso.cotizacion_id}/edit`} className="font-medium text-primary hover:underline">
+                              {ingreso.folio}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-muted-foreground italic">Folio no disponible</span>
+                          )}
+                          <span className="text-xs text-muted-foreground">{ingreso.cliente_nombre || 'Cliente no especificado'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-slate-800 font-medium">{ingreso.descripcion || 'Sin descripción'}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 text-slate-700">
+                      {formatDate(ingreso.fecha_pago)}
+                    </TableCell>
+                    <TableCell className="py-3 font-medium text-emerald-700 text-right">
+                      {formatCurrency(ingreso.monto, ingreso.moneda)}
+                      {ingreso.moneda === 'USD' && ingreso.monto_mxn && (
+                        <span className="block text-xs text-muted-foreground">({formatCurrency(ingreso.monto_mxn, 'MXN')})</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge className={`border ${getMetodoPagoBadgeStyle(ingreso.metodo_pago)}`}>
+                        {getMetodoPagoLabel(ingreso.metodo_pago)}
                       </Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-                        Otro Ingreso
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-3 text-slate-700">
-                    {ingreso.tipo_ingreso === 'cotizacion' ? (
-                      <div className="flex flex-col">
-                        {ingreso.folio && ingreso.cotizacion_id ? (
-                          <Link href={`/dashboard/cotizaciones/${ingreso.cotizacion_id}/edit`} className="font-medium text-primary hover:underline">
-                            {ingreso.folio}
-                          </Link>
-                        ) : (
-                          <span className="font-medium text-muted-foreground italic">Folio no disponible</span>
-                        )}
-                        <span className="text-xs text-muted-foreground">{ingreso.cliente_nombre || 'Cliente no especificado'}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-slate-800 font-medium">{ingreso.descripcion || 'Sin descripción'}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-3 text-slate-700">
-                    {formatDate(ingreso.fecha_pago)}
-                  </TableCell>
-                  <TableCell className="py-3 font-medium text-emerald-700 text-right">
-                    {formatCurrency(ingreso.monto, ingreso.moneda)}
-                    {ingreso.moneda === 'USD' && ingreso.monto_mxn && (
-                      <span className="block text-xs text-muted-foreground">({formatCurrency(ingreso.monto_mxn, 'MXN')})</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge className={`border ${getMetodoPagoBadgeStyle(ingreso.metodo_pago)}`}>
-                      {getMetodoPagoLabel(ingreso.metodo_pago)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                        title="Ver detalles (próximamente)"
-                        disabled
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {ingreso.comprobante_url && (
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <div className="flex justify-end gap-1">
                         <Button 
-                          asChild
                           variant="ghost" 
                           size="icon" 
                           className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                          title="Descargar comprobante"
+                          title="Ver detalles (próximamente)"
+                          disabled
                         >
-                          <a href={ingreso.comprobante_url} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                          </a>
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {ingreso.comprobante_url && (
+                          <Button 
+                            asChild
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                            title="Descargar comprobante"
+                          >
+                            <a href={ingreso.comprobante_url} target="_blank" rel="noopener noreferrer">
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
       
-      {!isLoading && totalPages > 1 && (
+      {!isLoading && Array.isArray(ingresos) && totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
           <div className="text-sm text-slate-500">
             Página {page} de {totalPages}

@@ -28,7 +28,7 @@ interface Egreso {
 }
 
 interface EgresosTableProps {
-  egresos: Egreso[];
+  egresos?: Egreso[];
   isLoading?: boolean;
   page: number;
   totalPages: number;
@@ -36,7 +36,7 @@ interface EgresosTableProps {
 }
 
 export function EgresosTable({ 
-  egresos, 
+  egresos = [],
   isLoading = false, 
   page, 
   totalPages, 
@@ -131,7 +131,7 @@ export function EgresosTable({
                   </div>
                 </TableCell>
               </TableRow>
-            ) : egresos.length === 0 ? (
+            ) : !Array.isArray(egresos) || egresos.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-[300px] text-center">
                   <div className="flex flex-col items-center justify-center h-full">
@@ -144,61 +144,67 @@ export function EgresosTable({
                 </TableCell>
               </TableRow>
             ) : (
-              egresos.map((egreso) => (
-                <TableRow 
-                  key={egreso.egreso_id}
-                  className="hover:bg-slate-50 transition-colors"
-                >
-                  <TableCell className="py-3 font-medium text-slate-900">
-                    {egreso.descripcion}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge className={`border ${getCategoriaBadgeStyle(egreso.categoria)}`}>
-                      {getCategoriaLabel(egreso.categoria)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-slate-700">
-                    {formatDate(egreso.fecha)}
-                  </TableCell>
-                  <TableCell className="py-3 font-medium text-rose-700">
-                    {formatCurrency(egreso.monto, egreso.moneda)}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge variant="outline" className={getMetodoPagoBadgeStyle(egreso.metodo_pago)}>
-                      {getMetodoPagoLabel(egreso.metodo_pago)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                        title="Ver detalles"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {egreso.comprobante_url && (
+              egresos.map((egreso) => {
+                if (!egreso) {
+                  console.warn("Skipping rendering of null/undefined egreso item.");
+                  return null;
+                }
+                return (
+                  <TableRow 
+                    key={egreso.egreso_id || Math.random()}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <TableCell className="py-3 font-medium text-slate-900">
+                      {egreso.descripcion}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge className={`border ${getCategoriaBadgeStyle(egreso.categoria)}`}>
+                        {getCategoriaLabel(egreso.categoria)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-slate-700">
+                      {formatDate(egreso.fecha)}
+                    </TableCell>
+                    <TableCell className="py-3 font-medium text-rose-700">
+                      {formatCurrency(egreso.monto, egreso.moneda)}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className={getMetodoPagoBadgeStyle(egreso.metodo_pago)}>
+                        {getMetodoPagoLabel(egreso.metodo_pago)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-right">
+                      <div className="flex justify-end gap-2">
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                          title="Descargar comprobante"
-                          onClick={() => window.open(egreso.comprobante_url!, '_blank')}
+                          title="Ver detalles"
                         >
-                          <Download className="h-4 w-4" />
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {egreso.comprobante_url && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                            title="Descargar comprobante"
+                            onClick={() => window.open(egreso.comprobante_url!, '_blank')}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
       
-      {!isLoading && totalPages > 1 && (
+      {!isLoading && Array.isArray(egresos) && totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
           <div className="text-sm text-slate-500">
             Página {page} de {totalPages}

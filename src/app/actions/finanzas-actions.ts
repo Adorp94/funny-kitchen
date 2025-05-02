@@ -3,6 +3,7 @@
 // Import the exported Supabase client instance directly
 import { supabase } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { convertToCSV } from '@/lib/utils'; // Import the helper
 
 // Types for financial data
 interface FinancialMetrics {
@@ -815,6 +816,134 @@ export async function getAvailableCotizaciones(): Promise<{
     return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to fetch available cotizaciones' 
+    };
+  }
+}
+
+// --- SERVER ACTION for Ingresos CSV (Downloads ALL) ---
+export async function getAllIngresosForCSV(
+  // Remove month/year parameters
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    let query = supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        tipo_ingreso,
+        descripcion,
+        cotizacion_id,
+        cotizaciones!pagos_cotizacion_id_fkey ( folio, clientes ( nombre ) ), 
+        monto,
+        moneda,
+        monto_mxn,
+        metodo_pago,
+        fecha_pago,
+        notas,
+        comprobante_url
+      `)
+      .order('fecha_pago', { ascending: false });
+
+    // Remove date filter logic
+    /* 
+    if (year) { ... } 
+    */
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching all ingresos for CSV:', error);
+      return {
+        success: false,
+        error: `Failed to fetch ingresos for CSV: ${error.message}`
+      };
+    }
+
+    // Flatten and structure data for CSV
+    const formattedData = data?.map(pago => ({
+        ID_Pago: pago.pago_id,
+        Tipo: pago.tipo_ingreso,
+        Descripcion: pago.descripcion || 'N/A',
+        ID_Cotizacion: pago.cotizacion_id || 'N/A',
+        Folio_Cotizacion: pago.cotizaciones?.folio || 'N/A',
+        Cliente: pago.cotizaciones?.clientes?.nombre || 'N/A',
+        Monto_Original: pago.monto,
+        Moneda: pago.moneda,
+        Monto_MXN: pago.monto_mxn,
+        Metodo_Pago: pago.metodo_pago,
+        Fecha_Pago: pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString('es-MX') : '',
+        Notas: pago.notas || '',
+        URL_Comprobante: pago.comprobante_url || ''
+    })) || [];
+
+    // Convert to CSV string
+    const csvString = convertToCSV(formattedData);
+
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('Error in getAllIngresosForCSV catch block:', error);
+    // Ensure a meaningful error string is always returned
+    const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+            ? error 
+            : JSON.stringify(error) || 'An unexpected error occurred while generating Ingresos CSV';
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+}
+
+// --- SERVER ACTION for Egresos CSV (Downloads ALL) ---
+export async function getAllEgresosForCSV(
+  // Remove month/year parameters
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    let query = supabase
+      .from('egresos')
+      .select('*') 
+      .order('fecha', { ascending: false });
+
+    // Remove date filter logic
+    /* 
+     if (year) { ... } 
+    */
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching all egresos for CSV:', error);
+      return {
+        success: false,
+        error: `Failed to fetch egresos for CSV: ${error.message}`
+      };
+    }
+
+     // Optional: Flatten or structure data if needed, otherwise use raw data
+     const formattedData = data?.map(egreso => ({
+        ID_Egreso: egreso.egreso_id,
+        Descripcion: egreso.descripcion,
+        Categoria: egreso.categoria,
+        Fecha: egreso.fecha ? new Date(egreso.fecha + 'T00:00:00').toLocaleDateString('es-MX') : '', // Adjust date parsing if needed
+        Monto_Original: egreso.monto,
+        Moneda: egreso.moneda,
+        Monto_MXN: egreso.monto_mxn,
+        Metodo_Pago: egreso.metodo_pago,
+        Notas: egreso.notas || '',
+        URL_Comprobante: egreso.comprobante_url || ''
+     })) || [];
+
+    // Convert to CSV string
+    const csvString = convertToCSV(formattedData);
+
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('Error in getAllEgresosForCSV:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred while generating Egresos CSV'
     };
   }
 } 

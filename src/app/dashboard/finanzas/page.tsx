@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ArrowDown, ArrowUp, DollarSign, FileText, ReceiptIcon, Plus, CreditCard, RefreshCw, TrendingUp, Calendar } from 'lucide-react';
+import { ArrowDown, ArrowUp, DollarSign, FileText, ReceiptIcon, Plus, CreditCard, RefreshCw, TrendingUp, Calendar, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,9 +32,11 @@ import {
   createEgreso, 
   getAllIngresos, 
   getAllEgresos,
-  getFinancialMetrics 
+  getFinancialMetrics,
+  getAllIngresosForCSV,
+  getAllEgresosForCSV
 } from '@/app/actions/finanzas-actions';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, convertToCSV } from '@/lib/utils';
 import { 
   Table, 
   TableBody, 
@@ -46,16 +48,20 @@ import {
 
 // Define types for our components
 interface Ingreso {
-  anticipo_id: number;
-  cotizacion_id: number;
-  folio: string;
-  cliente_nombre: string;
+  pago_id: number; 
+  tipo_ingreso: 'cotizacion' | 'otro';
+  descripcion?: string | null;
+  cotizacion_id?: number | null;
+  folio?: string | null;
+  cliente_nombre?: string | null;
   moneda: string;
   monto: number;
   monto_mxn: number;
   metodo_pago: string;
   fecha_pago: string;
-  porcentaje: number;
+  porcentaje?: number | null;
+  notas?: string | null;
+  comprobante_url?: string | null;
 }
 
 interface Egreso {
@@ -109,6 +115,8 @@ export default function FinanzasPage() {
   const [loadingIngresos, setLoadingIngresos] = useState(false);
   const [loadingEgresos, setLoadingEgresos] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDownloadingIngresos, setIsDownloadingIngresos] = useState(false);
+  const [isDownloadingEgresos, setIsDownloadingEgresos] = useState(false);
 
   // State for financial metrics
   const [metrics, setMetrics] = useState({
@@ -152,26 +160,38 @@ export default function FinanzasPage() {
   // Updated fetchIngresos to handle month/year being potentially 0
   const fetchIngresos = async (page: number, month: number | undefined, year: number | undefined) => {
     setLoadingIngresos(true);
+    console.log(`[fetchIngresos] Fetching page ${page}, month: ${month}, year: ${year}`); // Log input
     try {
       // Pass 0 or undefined directly (backend will handle)
       const result = await getAllIngresos(page, 10, month, year); 
+      console.log("[fetchIngresos] Result:", JSON.stringify(result, null, 2)); // Log the full result
+
       if (result.success && result.data) {
-        setIngresos(result.data);
+        // Ensure result.data is an array before setting state
+        if (Array.isArray(result.data)) {
+            console.log(`[fetchIngresos] Success, setting ${result.data.length} ingresos.`);
+            setIngresos(result.data);
+        } else {
+            console.warn("[fetchIngresos] getAllIngresos successful but data is not an array:", result.data);
+            setIngresos([]); // Set to empty array if data is not array
+        }
+        
         if (result.pagination) {
           setIngresosPagination({
             page: result.pagination.page,
             totalPages: result.pagination.totalPages
           });
         } else {
+           console.warn("[fetchIngresos] Pagination data missing in successful result.");
            setIngresosPagination({ page: 1, totalPages: 1 });
         }
       } else {
-        console.warn("Failed to fetch ingresos or no data for filter:", result.error);
+        console.warn("[fetchIngresos] Failed to fetch ingresos or no data for filter. Error:", result?.error);
         setIngresos([]); 
         setIngresosPagination({ page: 1, totalPages: 1 }); 
       }
     } catch (error) {
-      console.error("Error fetching ingresos:", error);
+      console.error("[fetchIngresos] Error fetching ingresos (catch block):", error);
       setIngresos([]); 
       setIngresosPagination({ page: 1, totalPages: 1 }); 
     } finally {
@@ -280,6 +300,77 @@ export default function FinanzasPage() {
     const month = parseInt(value, 10); // value will be "0" for "Todos"
     setSelectedMonth(month); 
     // No need to re-fetch here, useEffect handles it
+  };
+
+  // --- Download Handlers ---
+  const handleDownloadIngresosCSV = async () => {
+    setIsDownloadingIngresos(true);
+    try {
+      const result = await getAllIngresosForCSV(); 
+      
+      // Check for success and if data is a non-empty string
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `ingresos_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+         // Handle successful request but no data (e.g., empty CSV)
+         console.log("Ingresos CSV generated successfully, but it is empty (no data found for filters).");
+         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
+      } else {
+        // Handle failure
+        console.error("Error generating Ingresos CSV. Full result:", result);
+        // TODO: Show toast notification error
+      }
+    } catch (error) {
+      console.error("Error downloading Ingresos CSV (catch block):", error);
+      // TODO: Show toast notification error
+    } finally {
+      setIsDownloadingIngresos(false);
+    }
+  };
+
+  const handleDownloadEgresosCSV = async () => {
+    setIsDownloadingEgresos(true);
+    try {
+      const result = await getAllEgresosForCSV();
+      
+      // Check for success and if data is a non-empty string
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `egresos_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+         // Handle successful request but no data (e.g., empty CSV)
+         console.log("Egresos CSV generated successfully, but it is empty (no data found for filters).");
+         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
+      } else {
+        // Handle failure
+        console.error("Error generating Egresos CSV. Full result:", result);
+        // TODO: Show toast notification error using result.error
+      }
+    } catch (error) {
+      console.error("Error downloading Egresos CSV (catch block):", error);
+      // TODO: Show toast notification error
+    } finally {
+      setIsDownloadingEgresos(false);
+    }
   };
 
   return (
@@ -443,23 +534,67 @@ export default function FinanzasPage() {
              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
              <TabsTrigger value="egresos">Egresos</TabsTrigger>
            </TabsList>
-           <TabsContent value="ingresos" className="mt-0">
-              <IngresosTable 
-                 ingresos={ingresos} 
-                 isLoading={loadingIngresos}
-                 page={ingresosPagination.page}
-                 totalPages={ingresosPagination.totalPages}
-                 onPageChange={handleIngresoPageChange}
-              />
+           <TabsContent value="ingresos" className="space-y-4">
+             <div className="flex items-center justify-between">
+               <h3 className="text-xl font-semibold tracking-tight">Ingresos Recientes</h3>
+               <div className="flex items-center space-x-2">
+                  <Button 
+                     variant="outline"
+                     size="sm"
+                     onClick={handleDownloadIngresosCSV}
+                     disabled={isDownloadingIngresos}
+                  >
+                    {isDownloadingIngresos ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Descargar CSV
+                  </Button>
+                 <IngresoResponsiveWrapper 
+                     isOpen={isIngresoModalOpen} 
+                     setIsOpen={setIsIngresoModalOpen}
+                 />
+               </div>
+             </div>
+             <IngresosTable 
+               ingresos={ingresos}
+               page={ingresosPagination.page}
+               totalPages={ingresosPagination.totalPages}
+               onPageChange={handleIngresoPageChange}
+               isLoading={loadingIngresos}
+             />
            </TabsContent>
-           <TabsContent value="egresos" className="mt-0">
-              <EgresosTable 
-                 egresos={egresos} 
-                 isLoading={loadingEgresos}
-                 page={egresosPagination.page}
-                 totalPages={egresosPagination.totalPages}
-                 onPageChange={handleEgresoPageChange}
-              />
+           <TabsContent value="egresos" className="space-y-4">
+             <div className="flex items-center justify-between">
+                 <h3 className="text-xl font-semibold tracking-tight">Egresos Recientes</h3>
+                  <div className="flex items-center space-x-2">
+                   <Button 
+                       variant="outline"
+                       size="sm"
+                       onClick={handleDownloadEgresosCSV}
+                       disabled={isDownloadingEgresos}
+                   >
+                     {isDownloadingEgresos ? (
+                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                     ) : (
+                       <Download className="mr-2 h-4 w-4" />
+                     )}
+                     Descargar CSV
+                   </Button>
+                   <EgresoModal 
+                       isOpen={isEgresoModalOpen} 
+                       setIsOpen={setIsEgresoModalOpen}
+                   />
+                 </div>
+             </div>
+             <EgresosTable 
+              egresos={egresos}
+              page={egresosPagination.page}
+              totalPages={egresosPagination.totalPages}
+              onPageChange={handleEgresoPageChange}
+              isLoading={loadingEgresos}
+            />
            </TabsContent>
          </Tabs>
       </div>
