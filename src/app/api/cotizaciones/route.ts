@@ -246,38 +246,57 @@ export async function POST(req: NextRequest) {
         const nextId = maxIdData ? maxIdData.cliente_id + 1 : 1;
         console.log(`Using next cliente_id: ${nextId} for new client`);
         
+        // Prepare client data for insertion
+        const clientInsertData = {
+          cliente_id: nextId, 
+          nombre: cliente.nombre,
+          celular: cliente.celular, 
+          correo: cliente.correo,
+          razon_social: cliente.razon_social,
+          rfc: cliente.rfc,
+          tipo_cliente: cliente.tipo_cliente,
+          atencion: cliente.atencion,
+          direccion_envio: cliente.direccion_envio,
+          recibe: cliente.recibe
+        };
+        console.log("[API /cotizaciones POST] Attempting to insert client with data:", clientInsertData);
+
         // Insert client into database with explicit cliente_id
         const { data: newClient, error: clientError } = await supabase
           .from('clientes')
-          .insert({
-            cliente_id: nextId,
-            nombre: cliente.nombre.trim().toUpperCase(),
-            celular: cliente.celular,
-            correo: cliente.correo || null,
-            razon_social: cliente.razon_social || null,
-            rfc: cliente.rfc || null,
-            tipo_cliente: cliente.tipo_cliente || 'Normal',
-            direccion_envio: cliente.direccion_envio || null,
-            recibe: cliente.recibe || null,
-            atencion: cliente.atencion || null
-          })
-          .select()
+          .insert(clientInsertData) // Use prepared object
+          .select('*') 
           .single();
         
+        // --- Enhanced Logging --- 
         if (clientError) {
-          console.error("Error creating client:", clientError);
+          console.error(`[API /cotizaciones POST] Error inserting new client with ID ${nextId}. Error Details:`, JSON.stringify(clientError, null, 2));
+          // Consider returning more detailed error info if safe
           return NextResponse.json(
-            { error: `Error al crear el cliente: ${clientError.message}` }, 
+            { error: `Error DB al crear cliente: ${clientError.message}` }, 
             { status: 500 }
           );
         }
         
-        // Update client_id with the newly created ID
-        client_id = newClient.cliente_id;
-        cliente_creado = newClient;
-        console.log("Client created successfully with ID:", client_id);
-      } catch (clientError) {
-        console.error("Unexpected error creating client:", clientError);
+        // Log the result even if no error, check if it's null/undefined
+        console.log(`[API /cotizaciones POST] Result of client insertion (ID: ${nextId}):`, newClient);
+
+        if (!newClient) {
+          console.error(`[API /cotizaciones POST] Failed to insert new client or select it back (ID: ${nextId}), but no explicit error was returned from Supabase.`);
+          // This case indicates a potential logic error or unexpected DB behavior
+          return NextResponse.json(
+            { error: 'Error al crear el cliente: No se pudo verificar la creación (resultado nulo).' }, 
+            { status: 500 }
+          );
+        }
+        // --- End Enhanced Logging ---
+
+        client_id = newClient.cliente_id; 
+        cliente_creado = newClient; 
+        console.log("[API /cotizaciones POST] New client created successfully:", cliente_creado);
+
+      } catch (createClientErr: any) {
+        console.error("Unexpected error creating client:", createClientErr);
         return NextResponse.json(
           { error: 'Error al crear el cliente' }, 
           { status: 500 }

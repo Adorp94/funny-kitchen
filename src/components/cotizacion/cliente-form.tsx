@@ -59,6 +59,50 @@ const highlightMatch = (text: string, query: string): React.ReactNode => {
   });
 };
 
+// Helper function to format E.164 to storage format
+const formatPhoneNumberForStorage = (phoneNumber: string | undefined): string => {
+  if (!phoneNumber) return '';
+  const cleaned = phoneNumber.replace(/[^\d+]/g, ''); 
+  let digits = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
+  if (!digits.startsWith('52')) {
+    if (digits.length === 10) {
+      digits = '52' + digits;
+    } else {
+      return digits; 
+    }
+  }
+  if (digits.length === 12) {
+    const cc = digits.substring(0, 2); 
+    const area = digits.substring(2, 4);
+    const part1 = digits.substring(4, 8);
+    const part2 = digits.substring(8, 12);
+    return `${cc} ${area} ${part1} ${part2}`; 
+  } else {
+    return digits;
+  }
+};
+
+// Helper function to normalize storage format back to E.164 for the input
+const normalizePhoneNumberToE164 = (phoneNumber: string | undefined): string => {
+  if (!phoneNumber) return '';
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  // If it starts with country code (e.g., 52) and has the right length, add '+'
+  if (digits.startsWith('52') && digits.length === 12) {
+    return `+${digits}`;
+  }
+  // Basic check for 10 digits (assume MX local), prepend +52
+  if (digits.length === 10) {
+    return `+52${digits}`;
+  }
+  // If it already looks like E.164, return as is
+  if (phoneNumber.startsWith('+') && digits.length > 5) { // Basic E.164 check
+      return phoneNumber;
+  }
+  // Fallback: return EMPTY string if it cannot be normalized
+  return ''; 
+};
+
 interface ClienteFormProps {
   onClientSelect: (cliente: Cliente | null, needsCreation?: boolean) => void; // Pass creation flag separately
   initialData?: Partial<Cliente>;
@@ -90,26 +134,30 @@ export function ClienteForm({
 
   // Sync formData with initialData when it changes
   useEffect(() => {
-    // Find the client from search results if initialData provides an ID
-    // This handles cases where initialData might be partial but contains the ID
     const initialClient = initialData.cliente_id 
-        ? searchResults.find(c => c.cliente_id === initialData.cliente_id) ?? (initialData as Cliente) // Fallback to initialData cast
-        : (initialData as Cliente); // Assume initialData is a full Cliente if no ID check needed or no searchResults yet
+        ? searchResults.find(c => c.cliente_id === initialData.cliente_id) ?? (initialData as Cliente)
+        : (initialData as Cliente);
 
-    setFormData(initialClient); // Use the potentially resolved client
+    // IMPORTANT: Normalize phone number from initialData before setting formData
+    const normalizedInitialData = {
+        ...initialClient,
+        celular: normalizePhoneNumberToE164(initialClient.celular)
+    };
+
+    setFormData(normalizedInitialData); // Use normalized data
 
     if (initialClient?.cliente_id) {
-      setSelectedClient(initialClient);
-      setSearchTerm(''); // Clear search term when a client is set initially
-      setSearchResults([]); // Maybe clear results, or keep them if needed? Let's clear for now.
+      setSelectedClient(initialClient); // Keep original client for display/selection logic if needed
+      setSearchTerm(''); 
+      setSearchResults([]);
     } else if (selectedClient) {
-      // Clear selection if initialData becomes null/empty AND we had a selected client
       setSelectedClient(null);
       setSearchTerm('');
       setSearchResults([]);
-      fetchClientes(''); // Fetch initial list when selection is cleared via initialData
+      fetchClientes('');
     }
-  }, [initialData]); // Removed searchResults dependency to avoid potential loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]); // Keep dependency only on initialData
 
   // Fetch function using useCallback
   const fetchClientes = useCallback(async (query: string) => {
@@ -229,8 +277,8 @@ export function ClienteForm({
     setFormData((prev: Partial<Cliente>) => ({ ...prev, tipo_cliente: value }));
   };
 
-  // Specific handler for PhoneInput component
   const handlePhoneChange = (value: PhoneNumberValue | undefined) => {
+    // Store the raw E.164 value (or empty string) from the input
     setFormData((prev: Partial<Cliente>) => ({ ...prev, celular: value || '' }));
   };
 
@@ -241,20 +289,26 @@ export function ClienteForm({
       return;
     }
     setError(null);
-    const newClientData: Partial<Cliente> = {
-      cliente_id: 0, // Indicate this is a new client, ID will be assigned by backend/parent
-      nombre: formData.nombre.trim().toUpperCase(),
-      celular: formData.celular,
+    
+    // Format the E.164 number from state ONLY for sending up
+    const formattedCelular = formatPhoneNumberForStorage(formData.celular as string);
+    
+    // Initialize the object ensuring all fields required by Cliente type are present
+    const newClientData: Cliente = {
+      cliente_id: 0, 
+      nombre: formData.nombre.trim().toUpperCase(), 
+      celular: formattedCelular, // Use FORMATTED number here
       correo: formData.correo || null,
       razon_social: formData.razon_social || null,
       rfc: formData.rfc || null,
-      tipo_cliente: formData.tipo_cliente || 'Normal',
+      atencion: formData.atencion || null,
       direccion_envio: formData.direccion_envio || null,
       recibe: formData.recibe || null,
-      atencion: formData.atencion || null,
+      tipo_cliente: formData.tipo_cliente || null,
     };
-    console.log("Creating client (form data):", newClientData);
-    onClientSelect(newClientData as Cliente, true); // Pass true for needsCreation
+
+    console.log("Creating client with formatted data:", newClientData);
+    onClientSelect(newClientData, true);
   };
 
   // Get the currently selected client's ID as a string for the Popover value
@@ -386,16 +440,17 @@ export function ClienteForm({
               <Input id="nombre" name="nombre" value={formData.nombre || ''} onChange={handleInputChange} required placeholder="Ej: Juan Pérez García" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="celular">Celular*</Label>
+              <Label htmlFor="celular-create">Celular <span className="text-destructive">*</span></Label>
               <PhoneInput
-                id="celular"
+                id="celular-create"
                 name="celular"
-                placeholder="Ej: 33 1234 5678"
-                value={formData.celular as PhoneNumberValue | undefined} 
-                onChange={handlePhoneChange}
-                defaultCountry="MX" 
-                required
-                className="w-full" 
+                value={formData.celular as PhoneNumberValue} // Should be E.164
+                onChange={handlePhoneChange} // Receives E.164
+                placeholder="Celular"
+                defaultCountry="MX"
+                className="w-full"
+                // Add required attribute for basic HTML validation
+                required 
               />
             </div>
           </div>
