@@ -338,20 +338,41 @@ export async function PUT(
 
         // 4c. Inserts
         if (productsToInsert.length > 0) {
-            console.log("Inserting new products:", productsToInsert);
-            const { error: insertError } = await supabase
-                .from('cotizacion_productos')
-                .insert(productsToInsert);
-            if (insertError) {
-                console.error("Error inserting new products:", insertError, "Data:", productsToInsert);
-                 // Check for unique constraint violation on (cotizacion_id, producto_id)
-                 if (insertError.code === '23505' && insertError.message.includes('cotizacion_productos_cotizacion_id_producto_id_key')) {
-                     return NextResponse.json({ 
-                         error: "Error: Uno de los productos agregados ya existe en esta cotización.", 
-                         details: insertError.message 
-                     }, { status: 409 }); // Conflict
-                 }
-                return NextResponse.json({ error: "Error al agregar nuevos productos", details: insertError.message }, { status: 500 });
+            console.log("Inserting new products (one by one):", productsToInsert);
+            for (const prodToInsert of productsToInsert) {
+                console.log("Attempting insert for:", prodToInsert);
+                const { error: insertError } = await supabase
+                    .from('cotizacion_productos')
+                    .insert(prodToInsert) // Insert individually
+                    .select(); // Optionally select to confirm insert
+
+                if (insertError) {
+                    console.error("Error inserting new product:", insertError, "Data:", prodToInsert);
+                    // Check for specific constraint violations
+                    if (insertError.code === '23505') { // Unique constraint violation
+                        if (insertError.message.includes('cotizacion_productos_pkey')) {
+                           return NextResponse.json({ 
+                                error: "Error interno: Conflicto de ID de producto al insertar. Por favor, intente guardar de nuevo.", 
+                                details: insertError.message 
+                            }, { status: 500 }); // Internal Server Error
+                        } else if (insertError.message.includes('cotizacion_productos_cotizacion_id_producto_id_key')) {
+                           return NextResponse.json({ 
+                               error: "Error: El producto \"" + prodToInsert.nombre + "\" ya existe en esta cotización.", 
+                               details: insertError.message 
+                           }, { status: 409 }); // Conflict
+                        } else {
+                           // Other unique constraint?
+                            return NextResponse.json({ error: "Error de constraint único al agregar producto", details: insertError.message }, { status: 500 });
+                        }
+                    } else if (insertError.code === '23503') { // Foreign key violation (e.g., producto_id doesn't exist)
+                         return NextResponse.json({ 
+                             error: `Error: El producto base con ID ${prodToInsert.producto_id} no existe.`, 
+                             details: insertError.message 
+                         }, { status: 400 }); // Bad Request
+                    }
+                     // Generic error for other insert issues
+                    return NextResponse.json({ error: "Error al agregar nuevo producto", details: insertError.message }, { status: 500 });
+                }
             }
         }
 
