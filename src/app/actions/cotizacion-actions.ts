@@ -218,8 +218,8 @@ export async function getCotizacionDetails(cotizacionId: number) {
       id: item.cotizacion_producto_id.toString(),
       nombre: item.producto?.nombre || 'Producto personalizado',
       cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario,
-      precio_total: item.subtotal,
+      precio: item.precio_unitario,
+      subtotal: item.subtotal,
       descuento: item.descuento_producto
     }));
     

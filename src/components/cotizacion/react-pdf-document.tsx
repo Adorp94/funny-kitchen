@@ -488,7 +488,8 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                   <Text style={styles.tableRowText}>{producto.cantidad}</Text>
                 </View>
                 <View style={styles.tableCol3}>
-                  <Text style={styles.tableRowText}>{formatCurrency(producto.precio, moneda)}</Text>
+                  {/* Use Number.isFinite to check if precio is a valid number */}
+                  <Text style={styles.tableRowText}>{Number.isFinite(producto.precio) ? formatCurrency(producto.precio, moneda) : '$0.00'}</Text>
                 </View>
                 {productos.some(p => p.descuento && p.descuento > 0) && (
                   <View style={styles.tableCol4}>
@@ -499,9 +500,13 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                 )}
                 <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
                   <Text style={styles.tableRowText}>
-                    {producto.descuento && producto.descuento > 0 
-                      ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100), moneda)
-                      : formatCurrency(producto.cantidad * producto.precio, moneda)
+                    {/* Add check here as well */}
+                    {Number.isFinite(producto.precio) ? 
+                      (producto.descuento && producto.descuento > 0 
+                        ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100), moneda)
+                        : formatCurrency(producto.cantidad * producto.precio, moneda)
+                      )
+                      : '$0.00'
                     }
                   </Text>
                 </View>
