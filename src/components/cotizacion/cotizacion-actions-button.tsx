@@ -83,7 +83,7 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
   };
 
   const handleEditCotizacion = () => {
-    router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}`);
+    router.push(`/dashboard/cotizaciones/${cotizacion.cotizacion_id}/edit`);
   };
 
   const handleDownloadPDF = async () => {
