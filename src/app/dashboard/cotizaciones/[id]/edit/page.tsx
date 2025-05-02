@@ -186,10 +186,6 @@ function EditCotizacionClient() {
           setMoneda(cotizacionData.moneda);
         }
 
-        if (cotizacionData.descuento_global) {
-          setGlobalDiscount(cotizacionData.descuento_global);
-        }
-
         // Process products FIRST
         if (cotizacionData.productos && Array.isArray(cotizacionData.productos)) {
           const initialProductos = cotizacionData.productos.map((producto: any) => ({
@@ -200,7 +196,7 @@ function EditCotizacionClient() {
              precio: producto.precio_unitario || producto.precio || 0,
              cantidad: producto.cantidad || 1,
              descuento: producto.descuento_producto ?? producto.descuento ?? 0,
-             subtotal: producto.subtotal ?? producto.precio_total ?? (producto.precio_unitario || producto.precio || 0) * (producto.cantidad || 1),
+             subtotal: producto.subtotal ?? ( (producto.precio_unitario || producto.precio || 0) * (producto.cantidad || 1) * (1 - (producto.descuento_producto ?? producto.descuento ?? 0)/100) ),
              sku: producto.sku || "",
              descripcion: producto.descripcion || "",
              colores: Array.isArray(producto.colores) ? producto.colores :
@@ -220,7 +216,14 @@ function EditCotizacionClient() {
            clearProductos();
         }
 
-        // Set IVA and Shipping Cost AFTER products are processed
+        // Set financial options AFTER products are processed
+        console.log(`[Fetch] Setting globalDiscount based on cotizacionData.descuento_global: ${cotizacionData.descuento_global}`);
+        if (cotizacionData.descuento_global !== null && cotizacionData.descuento_global !== undefined) {
+            setGlobalDiscount(Number(cotizacionData.descuento_global) || 0);
+        } else {
+            setGlobalDiscount(0);
+        }
+
         console.log(`[Fetch] Setting hasIva based on cotizacionData.iva: ${cotizacionData.iva}`);
         setHasIva(!!cotizacionData.iva);
 
