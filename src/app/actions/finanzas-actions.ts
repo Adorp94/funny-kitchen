@@ -12,18 +12,22 @@ interface FinancialMetrics {
   cotizacionesPagadas: number;
 }
 
+// Updated IngresoData to include new fields and make cotizacion-specific fields optional
 interface IngresoData {
-  anticipo_id: number;
-  cotizacion_id: number;
-  folio: string;
-  cliente_nombre: string;
+  pago_id: number; // Use pago_id as the primary identifier
+  tipo_ingreso: 'cotizacion' | 'otro';
+  descripcion?: string | null; // For 'otro' type
+  cotizacion_id?: number | null; // Optional, for 'cotizacion' type
+  folio?: string | null; // Optional, for 'cotizacion' type
+  cliente_nombre?: string | null; // Optional, for 'cotizacion' type
   moneda: string;
   monto: number;
   monto_mxn: number;
   metodo_pago: string;
   fecha_pago: string;
-  porcentaje: number;
-  // notes and comprobante_url are removed / already optional
+  porcentaje?: number | null; // Optional, for 'cotizacion' type
+  notas?: string | null;
+  comprobante_url?: string | null;
 }
 
 interface EgresoData {
@@ -187,80 +191,99 @@ export async function getFinancialMetrics(
 
 // Updated server action to get all ingresos with pagination and filters
 export async function getAllIngresos(
-  page = 1, 
-  pageSize = 10, 
+  page = 1,
+  pageSize = 10,
   month?: number, // Can be 0 for "Todos"
   year?: number   // Can be 0 for "Todos"
-): Promise<{ 
-  success: boolean; 
-  data?: IngresoData[]; 
+): Promise<{
+  success: boolean;
+  data?: IngresoData[];
   pagination?: PaginationResult;
-  error?: string 
+  error?: string
 }> {
   try {
-    let query = supabase
-      .from('cotizacion_pagos_view')
+    // Base query now targets the 'pagos' table
+    let countQuery = supabase
+      .from('pagos')
       .select('*', { count: 'exact', head: true });
 
-    // Apply filters only if year is provided and not 0 ("Todos")
-    if (year) { 
-      query = query.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
-      query = query.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
-      
-      // Apply month filter only if month and year are provided and not 0 ("Todos")
-      if (month) { 
-         const startDate = new Date(year, month - 1, 1).toISOString();
-         query = query.filter('fecha_pago', 'gte', startDate);
-         query = query.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString());
+    // Apply filters directly to 'pagos' table 'fecha_pago'
+    if (year) {
+      const yearStart = `${year}-01-01T00:00:00Z`;
+      const yearEnd = `${year}-12-31T23:59:59Z`;
+      countQuery = countQuery.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
+
+      if (month) {
+         const monthStart = new Date(year, month - 1, 1).toISOString();
+         // Calculate the first day of the next month
+         let nextMonthYear = year;
+         let nextMonth = month + 1;
+         if (nextMonth > 12) {
+             nextMonth = 1;
+             nextMonthYear += 1;
+         }
+         const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+         countQuery = countQuery.filter('fecha_pago', 'gte', monthStart);
+         countQuery = countQuery.filter('fecha_pago', 'lt', monthEnd); // Use 'lt' for end date exclusive
       }
     }
 
     // Get total count for pagination WITH filters applied
-    const { count, error: countError } = await query;
-    
+    const { count, error: countError } = await countQuery;
+
     if (countError) {
-      console.error('Error counting filtered ingresos:', countError);
+      console.error('Error counting filtered ingresos (pagos):', countError);
       return {
-        success: false, 
+        success: false,
         error: `Failed to count ingresos: ${countError.message}`
       };
     }
-    
+
     // Calculate pagination values
     const totalItems = count || 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const currentPage = Math.max(1, Math.min(page, totalPages));
     const offset = (currentPage - 1) * pageSize;
-    
-    // Build the data query 
+
+    // Build the data query from 'pagos'
     let dataQuery = supabase
-      .from('cotizacion_pagos_view')
+      .from('pagos')
       .select(`
-        anticipo_id,
+        pago_id,
         cotizacion_id,
-        folio,
-        cliente_id, 
-        moneda,
         monto,
         monto_mxn,
+        tipo_cambio,
+        moneda,
         metodo_pago,
         fecha_pago,
-        porcentaje,
-        precio_total
-      `);
+        comprobante_url,
+        notas,
+        tipo_ingreso,
+        descripcion,
+        porcentaje_aplicado
+      `); // Select all relevant fields from pagos
 
-    // Apply filters to data query only if year is provided and not 0 ("Todos")
-    if (year) { 
-      dataQuery = dataQuery.filter('fecha_pago', 'gte', `${year}-01-01T00:00:00Z`);
-      dataQuery = dataQuery.filter('fecha_pago', 'lte', `${year}-12-31T23:59:59Z`);
-      
-      // Apply month filter only if month and year are provided and not 0 ("Todos")
-      if (month) { 
-         const startDate = new Date(year, month - 1, 1).toISOString();
-         dataQuery = dataQuery.filter('fecha_pago', 'gte', startDate);
-         dataQuery = dataQuery.filter('fecha_pago', 'lt', new Date(year, month, 1).toISOString());
-      }
+    // Apply filters to data query
+    if (year) {
+       const yearStart = `${year}-01-01T00:00:00Z`;
+       const yearEnd = `${year}-12-31T23:59:59Z`;
+       dataQuery = dataQuery.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
+
+       if (month) {
+         const monthStart = new Date(year, month - 1, 1).toISOString();
+         let nextMonthYear = year;
+         let nextMonth = month + 1;
+         if (nextMonth > 12) {
+             nextMonth = 1;
+             nextMonthYear += 1;
+         }
+         const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+         dataQuery = dataQuery.filter('fecha_pago', 'gte', monthStart);
+         dataQuery = dataQuery.filter('fecha_pago', 'lt', monthEnd);
+       }
     }
+
 
     // Apply ordering and pagination
     dataQuery = dataQuery
@@ -268,57 +291,93 @@ export async function getAllIngresos(
       .range(offset, offset + pageSize - 1);
 
     // Execute the data query
-    const { data, error } = await dataQuery;
+    const { data: pagosData, error: pagosError } = await dataQuery;
 
-    if (error) {
-       console.error('Error fetching filtered ingresos:', error);
+    if (pagosError) {
+       console.error('Error fetching filtered ingresos (pagos):', pagosError);
       return {
         success: false,
-        error: `Failed to fetch ingresos: ${error.message}`
+        error: `Failed to fetch ingresos: ${pagosError.message}`
       };
     }
-    
-    const ingresos = Array.isArray(data) ? data : [];
-    
-    // Get client names
-    const clienteIds = ingresos
-      .map(ingreso => ingreso?.cliente_id)
-      .filter(id => id != null) as number[];
-    
+
+    const ingresos = Array.isArray(pagosData) ? pagosData : [];
+
+    // --- Fetch related data for 'cotizacion' type ingresos ---
+    const cotizacionIds = ingresos
+      .filter(ing => ing.tipo_ingreso === 'cotizacion' && ing.cotizacion_id != null)
+      .map(ing => ing.cotizacion_id as number);
+
+    let cotizacionesMap: Record<number, { folio: string | null; cliente_id: number | null }> = {};
     let clientesMap: Record<number, string> = {};
-    
-    if (clienteIds.length > 0) {
-      const { data: clientes, error: clientesError } = await supabase
-        .from('clientes')
-        .select('cliente_id, nombre')
-        .in('cliente_id', clienteIds);
-      
-      if (clientesError) {
-        console.error('Error fetching cliente names:', clientesError);
-      } else if (Array.isArray(clientes)) {
-        clientesMap = clientes.reduce((acc, cliente) => {
-          if (cliente && cliente.cliente_id != null) {
-            acc[cliente.cliente_id] = cliente.nombre || 'Cliente sin nombre';
+
+    if (cotizacionIds.length > 0) {
+      // Fetch related cotizaciones
+      const { data: cotizaciones, error: cotizacionesError } = await supabase
+        .from('cotizaciones')
+        .select('cotizacion_id, folio, cliente_id')
+        .in('cotizacion_id', cotizacionIds);
+
+      if (cotizacionesError) {
+        console.error('Error fetching related cotizaciones:', cotizacionesError);
+        // Decide if this is a critical error or if we can proceed without folio/cliente
+      } else if (Array.isArray(cotizaciones)) {
+        cotizacionesMap = cotizaciones.reduce((acc, cot) => {
+          if (cot && cot.cotizacion_id != null) {
+            acc[cot.cotizacion_id] = { folio: cot.folio, cliente_id: cot.cliente_id };
           }
           return acc;
-        }, {} as Record<number, string>);
+        }, {} as Record<number, { folio: string | null; cliente_id: number | null }>);
+
+        // Fetch related client names based on cotizaciones found
+        const clienteIds = cotizaciones
+          .map(cot => cot.cliente_id)
+          .filter(id => id != null) as number[];
+
+        if (clienteIds.length > 0) {
+          const { data: clientes, error: clientesError } = await supabase
+            .from('clientes')
+            .select('cliente_id, nombre')
+            .in('cliente_id', clienteIds);
+
+          if (clientesError) {
+            console.error('Error fetching cliente names:', clientesError);
+          } else if (Array.isArray(clientes)) {
+            clientesMap = clientes.reduce((acc, cliente) => {
+              if (cliente && cliente.cliente_id != null) {
+                acc[cliente.cliente_id] = cliente.nombre || 'Cliente sin nombre';
+              }
+              return acc;
+            }, {} as Record<number, string>);
+          }
+        }
       }
     }
-    
-    const formattedIngresos = ingresos.map(ingreso => ({
-      anticipo_id: ingreso.anticipo_id,
-      cotizacion_id: ingreso.cotizacion_id,
-      folio: ingreso.folio,
-      cliente_nombre: ingreso.cliente_id != null ? 
-        (clientesMap[ingreso.cliente_id] || 'Cliente desconocido') : 
-        'Cliente no especificado',
-      moneda: ingreso.moneda,
-      monto: ingreso.monto,
-      monto_mxn: ingreso.monto_mxn,
-      metodo_pago: ingreso.metodo_pago,
-      fecha_pago: ingreso.fecha_pago,
-      porcentaje: ingreso.porcentaje,
-    }));
+    // --- End related data fetch ---
+
+
+    const formattedIngresos = ingresos.map((ingreso): IngresoData => {
+      const cotizacionDetails = ingreso.cotizacion_id ? cotizacionesMap[ingreso.cotizacion_id] : null;
+      const clienteId = cotizacionDetails?.cliente_id;
+      const clienteNombre = clienteId ? clientesMap[clienteId] : null;
+
+      return {
+        pago_id: ingreso.pago_id,
+        tipo_ingreso: ingreso.tipo_ingreso as 'cotizacion' | 'otro',
+        descripcion: ingreso.descripcion,
+        cotizacion_id: ingreso.cotizacion_id,
+        folio: cotizacionDetails?.folio || null,
+        cliente_nombre: clienteNombre || (ingreso.tipo_ingreso === 'cotizacion' ? 'Cliente no encontrado' : null),
+        moneda: ingreso.moneda,
+        monto: ingreso.monto,
+        monto_mxn: ingreso.monto_mxn,
+        metodo_pago: ingreso.metodo_pago,
+        fecha_pago: ingreso.fecha_pago,
+        porcentaje: ingreso.porcentaje_aplicado, // Use the specific percentage field if available
+        notas: ingreso.notas,
+        comprobante_url: ingreso.comprobante_url,
+      };
+    });
 
     return {
       success: true,
@@ -332,9 +391,9 @@ export async function getAllIngresos(
     };
   } catch (error) {
     console.error('Error in getAllIngresos:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'An unknown error occurred fetching ingresos' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unknown error occurred fetching ingresos'
     };
   }
 }
@@ -456,105 +515,186 @@ export async function getAllEgresos(
   }
 }
 
-// Server action to create a new ingreso (payment)
+// Server action to create a new ingreso (payment or general income)
+// Input data expected:
+// - tipo_ingreso: 'cotizacion' | 'otro'
+// - cotizacion_id: number (required if tipo_ingreso is 'cotizacion')
+// - descripcion: string (required if tipo_ingreso is 'otro')
+// - monto: number (required)
+// - moneda: string (required, e.g., 'MXN', 'USD')
+// - metodo_pago: string (required)
+// - fecha_pago: string (ISO format, optional, defaults to now)
+// - tipo_cambio: number (optional, required/used if moneda is 'USD')
+// - comprobante_url: string (optional)
+// - notas: string (optional)
+// - usuario_id: number (optional)
 export async function createIngreso(data: any): Promise<{ success: boolean; error?: string }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
-    
-    // First, get the cotizacion details to calculate the percentage
-    const { data: cotizacion, error: cotizacionError } = await supabase
-      .from('cotizaciones')
-      .select('total, moneda, total_mxn')
-      .eq('cotizacion_id', data.cotizacion_id)
-      .single();
-    
-    if (cotizacionError) {
-      throw cotizacionError;
-    }
-    
-    // Calculate percentage of the total
-    const cotizacionTotal = Number(cotizacion.total);
+    const tipoIngreso = data.tipo_ingreso || (data.cotizacion_id ? 'cotizacion' : 'otro'); // Infer type if not provided
+    const cotizacionId = tipoIngreso === 'cotizacion' ? Number(data.cotizacion_id) : null;
+    const descripcion = tipoIngreso === 'otro' ? data.descripcion : null;
     const ingresoMonto = Number(data.monto);
-    const porcentaje = (ingresoMonto / cotizacionTotal) * 100;
-    
-    // Calculate monto_mxn based on moneda
+    const moneda = data.moneda || 'MXN';
+
+    // --- Input Validation ---
+    if (isNaN(ingresoMonto) || ingresoMonto <= 0) {
+      return { success: false, error: 'Monto inválido.' };
+    }
+    if (!data.metodo_pago) {
+      return { success: false, error: 'Método de pago requerido.' };
+    }
+    if (tipoIngreso === 'cotizacion' && (!cotizacionId || isNaN(cotizacionId))) {
+      return { success: false, error: 'Se requiere un ID de cotización válido para ingresos de tipo cotización.' };
+    }
+     if (tipoIngreso === 'otro' && (!descripcion || typeof descripcion !== 'string' || descripcion.trim().length === 0)) {
+       return { success: false, error: 'Se requiere una descripción para ingresos de tipo "otro".' };
+     }
+    // --- End Validation ---
+
+
+    let cotizacionTotal = null;
+    let porcentajeAplicado = null;
     let montoMXN = ingresoMonto;
     let tipoCambio = null;
-    
-    if (data.moneda === 'USD') {
-      tipoCambio = data.tipo_cambio || 18; // Default exchange rate
+
+    // Calculate monto_mxn based on moneda
+    if (moneda === 'USD') {
+      tipoCambio = data.tipo_cambio || 18; // Consider fetching this dynamically or using a better default
       montoMXN = ingresoMonto * tipoCambio;
     }
-    
-    // Create the payment record
+
+    // If it's related to a cotizacion, fetch its details and calculate percentage
+    if (tipoIngreso === 'cotizacion' && cotizacionId) {
+      const { data: cotizacion, error: cotizacionError } = await supabase
+        .from('cotizaciones')
+        .select('total, total_mxn, moneda') // Select total_mxn as well
+        .eq('cotizacion_id', cotizacionId)
+        .single();
+
+      if (cotizacionError || !cotizacion) {
+        console.error(`Error fetching cotizacion ${cotizacionId}:`, cotizacionError);
+        return { success: false, error: `No se encontró la cotización con ID ${cotizacionId} o hubo un error al buscarla.` };
+      }
+
+      // Use total_mxn if available and consistent, otherwise use total based on payment moneda
+      // This logic might need refinement based on how totals are stored
+      const baseTotal = (moneda === 'MXN' && cotizacion.total_mxn)
+          ? cotizacion.total_mxn
+          : cotizacion.total;
+
+      cotizacionTotal = Number(baseTotal);
+
+      if (isNaN(cotizacionTotal) || cotizacionTotal <= 0) {
+           console.warn(`Cotización ${cotizacionId} tiene un total inválido (${cotizacionTotal}) para calcular porcentaje.`);
+           porcentajeAplicado = 0; // Avoid division by zero or NaN
+       } else {
+          // Calculate percentage based on MXN amounts for consistency? Or based on original currency?
+          // Using MXN amounts:
+          // const pagoActualMXN = await getPagoActualMXN(cotizacionId); // Helper needed?
+          // const porcentajeCalculado = ((pagoActualMXN + montoMXN) / cotizacion.total_mxn) * 100;
+
+          // Or simpler: percentage of this specific payment relative to total
+          porcentajeAplicado = (ingresoMonto / cotizacionTotal) * 100;
+       }
+
+    }
+
+    // Create the payment record in 'pagos' table
     const { error: insertError } = await supabase
       .from('pagos')
       .insert({
-        cotizacion_id: data.cotizacion_id,
+        cotizacion_id: cotizacionId, // Will be null for 'otro'
         monto: ingresoMonto,
         monto_mxn: montoMXN,
-        moneda: data.moneda,
-        tipo_cambio: tipoCambio,
+        moneda: moneda,
+        tipo_cambio: tipoCambio, // Store exchange rate used
         metodo_pago: data.metodo_pago,
         fecha_pago: data.fecha_pago || new Date().toISOString(),
         comprobante_url: data.comprobante_url,
         notas: data.notas,
-        usuario_id: data.usuario_id
+        usuario_id: data.usuario_id, // Make sure this is passed correctly from the frontend/API
+        tipo_ingreso: tipoIngreso,
+        descripcion: descripcion, // Will be null for 'cotizacion'
+        porcentaje_aplicado: porcentajeAplicado // Store calculated percentage for this payment
       });
-    
+
     if (insertError) {
-      throw insertError;
+      console.error("Error inserting pago:", insertError);
+      return { success: false, error: `Error al guardar el registro de pago: ${insertError.message}` };
     }
-    
-    // Update the cotizacion with the payment information
-    const { data: cotizacionActual, error: getCotizacionError } = await supabase
-      .from('cotizaciones')
-      .select('monto_pagado, monto_pagado_mxn, porcentaje_completado')
-      .eq('cotizacion_id', data.cotizacion_id)
-      .single();
-    
-    if (getCotizacionError) {
-      throw getCotizacionError;
+
+    // If it was a cotizacion payment, update the cotizacion totals and status
+    if (tipoIngreso === 'cotizacion' && cotizacionId) {
+        // Recalculate totals from the 'pagos' table for accuracy
+        const { data: pagosCotizacion, error: pagosError } = await supabase
+            .from('pagos')
+            .select('monto, monto_mxn')
+            .eq('cotizacion_id', cotizacionId);
+
+        if (pagosError) {
+            console.error(`Error fetching payments for cotizacion ${cotizacionId} after insert:`, pagosError);
+            // Continue, but log the issue. The payment is saved, but totals might be off.
+        }
+
+        const totalPagado = pagosCotizacion?.reduce((sum, p) => sum + Number(p.monto || 0), 0) || 0;
+        const totalPagadoMXN = pagosCotizacion?.reduce((sum, p) => sum + Number(p.monto_mxn || 0), 0) || 0;
+
+        // Fetch cotizacion total again just in case (or use value from above if confident)
+        const { data: cotizacion, error: cotizacionCheckError } = await supabase
+          .from('cotizaciones')
+          .select('total, total_mxn, monto_pagado') // Check current monto_pagado for fecha_pago_inicial logic
+          .eq('cotizacion_id', cotizacionId)
+          .single();
+
+        if (cotizacionCheckError || !cotizacion) {
+           console.error(`Error re-fetching cotizacion ${cotizacionId} for update:`, cotizacionCheckError);
+           return { success: false, error: `Error al actualizar la cotización después de guardar el pago.` };
+        }
+
+        const cotizacionTotalMXN = Number(cotizacion.total_mxn || 0); // Use MXN total for status calculation
+        const nuevoPorcentajeCompletado = (cotizacionTotalMXN > 0) ? (totalPagadoMXN / cotizacionTotalMXN) * 100 : 0;
+
+        // Determine payment status based on MXN amounts
+        let estatusPago = 'pendiente';
+        if (nuevoPorcentajeCompletado >= 99.5) { // Use a threshold for floating point issues
+          estatusPago = 'pagado';
+        } else if (nuevoPorcentajeCompletado > 0) {
+          estatusPago = 'parcial';
+        }
+
+        // Update cotizacion
+        const { error: updateError } = await supabase
+          .from('cotizaciones')
+          .update({
+            monto_pagado: totalPagado,
+            monto_pagado_mxn: totalPagadoMXN,
+            porcentaje_completado: nuevoPorcentajeCompletado,
+            estatus_pago: estatusPago,
+            // Set initial payment date only if it was previously 0
+            fecha_pago_inicial: (Number(cotizacion.monto_pagado || 0) === 0 && totalPagado > 0) ? new Date().toISOString() : undefined
+          })
+          .eq('cotizacion_id', cotizacionId);
+
+        if (updateError) {
+          console.error(`Error updating cotizacion ${cotizacionId}:`, updateError);
+          // Payment was saved, but cotizacion update failed. Log and possibly return partial success/warning?
+          return { success: false, error: `Pago guardado, pero error al actualizar la cotización: ${updateError.message}` };
+        }
+        // Revalidate cotizaciones path only if a cotizacion was updated
+        revalidatePath(`/dashboard/cotizaciones/${cotizacionId}`); // More specific revalidation
+        revalidatePath('/dashboard/cotizaciones');
     }
-    
-    // Calculate new payment values
-    const nuevoPagado = Number(cotizacionActual.monto_pagado || 0) + ingresoMonto;
-    const nuevoPagadoMXN = Number(cotizacionActual.monto_pagado_mxn || 0) + montoMXN;
-    const nuevoProcentaje = (nuevoPagado / cotizacionTotal) * 100;
-    
-    // Determine payment status
-    let estatusPago = 'pendiente';
-    if (nuevoProcentaje >= 99.5) {
-      estatusPago = 'pagado';
-    } else if (nuevoProcentaje > 0) {
-      estatusPago = 'parcial';
-    }
-    
-    // Update cotizacion
-    const { error: updateError } = await supabase
-      .from('cotizaciones')
-      .update({
-        monto_pagado: nuevoPagado,
-        monto_pagado_mxn: nuevoPagadoMXN,
-        porcentaje_completado: nuevoProcentaje,
-        estatus_pago: estatusPago,
-        fecha_pago_inicial: cotizacionActual.monto_pagado === 0 ? new Date().toISOString() : undefined
-      })
-      .eq('cotizacion_id', data.cotizacion_id);
-    
-    if (updateError) {
-      throw updateError;
-    }
-    
-    // Revalidate the finance and cotizaciones pages
+
+    // Revalidate the finance page always
     revalidatePath('/dashboard/finanzas');
-    revalidatePath('/dashboard/cotizaciones');
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error creating ingreso:', error);
-    return { success: false, error: 'Failed to create payment record' };
+    // Distinguish between known errors (like validation) and unexpected ones
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido al crear el ingreso.';
+    // Avoid exposing raw DB errors directly if possible
+    return { success: false, error: errorMessage.includes('constraint') ? 'Error de base de datos.' : errorMessage };
   }
 }
 

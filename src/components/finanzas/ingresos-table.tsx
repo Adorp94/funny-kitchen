@@ -9,24 +9,27 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Eye, Download, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Eye, Download, ArrowLeft, ArrowRight, Loader2, FileText, FileInput } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
 import { Badge } from "@/components/ui/badge";
+import Link from 'next/link';
 
 interface Ingreso {
-  anticipo_id: number;
-  cotizacion_id: number;
-  folio: string;
-  cliente_nombre: string;
+  pago_id: number;
+  tipo_ingreso: 'cotizacion' | 'otro';
+  descripcion?: string | null;
+  cotizacion_id?: number | null;
+  folio?: string | null;
+  cliente_nombre?: string | null;
   moneda: string;
   monto: number;
   monto_mxn: number;
   metodo_pago: string;
   fecha_pago: string;
-  porcentaje: number;
-  notas?: string;
-  comprobante_url?: string;
+  porcentaje?: number | null;
+  notas?: string | null;
+  comprobante_url?: string | null;
 }
 
 interface IngresoTableProps {
@@ -75,19 +78,18 @@ export function IngresosTable({
         <Table className="min-w-[800px]">
           <TableHeader className="bg-slate-50 border-b border-slate-200">
             <TableRow className="hover:bg-slate-50">
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Folio</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Cliente</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Fecha</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Monto</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Porcentaje</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500">Método</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500 text-right">Acciones</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[100px]">Tipo</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500">Detalle</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[120px]">Fecha</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[150px] text-right">Monto</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[140px]">Método</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[100px] text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-[300px] text-center">
+                <TableCell colSpan={6} className="h-[300px] text-center">
                   <div className="flex flex-col items-center justify-center h-full">
                     <Loader2 className="h-8 w-8 text-emerald-500 animate-spin mb-3" />
                     <p className="text-sm text-slate-500">Cargando ingresos...</p>
@@ -96,10 +98,10 @@ export function IngresosTable({
               </TableRow>
             ) : ingresos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-[300px] text-center">
+                <TableCell colSpan={6} className="h-[300px] text-center">
                   <div className="flex flex-col items-center justify-center h-full">
                     <div className="rounded-full bg-slate-50 p-3 mb-3">
-                      <Eye className="h-6 w-6 text-slate-400" />
+                      <FileText className="h-6 w-6 text-slate-400" />
                     </div>
                     <p className="text-sm font-medium text-slate-900 mb-1">No hay ingresos registrados</p>
                     <p className="text-sm text-slate-500">Usa el botón "Nuevo Ingreso" para agregar uno.</p>
@@ -109,25 +111,44 @@ export function IngresosTable({
             ) : (
               ingresos.map((ingreso) => (
                 <TableRow 
-                  key={ingreso.anticipo_id}
+                  key={ingreso.pago_id}
                   className="hover:bg-slate-50 transition-colors"
                 >
                   <TableCell className="py-3 font-medium text-slate-900">
-                    {ingreso.folio}
+                    {ingreso.tipo_ingreso === 'cotizacion' ? (
+                      <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                        Cotización
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                        Otro Ingreso
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="py-3 text-slate-700">
-                    {ingreso.cliente_nombre}
+                    {ingreso.tipo_ingreso === 'cotizacion' ? (
+                      <div className="flex flex-col">
+                        {ingreso.folio && ingreso.cotizacion_id ? (
+                          <Link href={`/dashboard/cotizaciones/${ingreso.cotizacion_id}/edit`} className="font-medium text-primary hover:underline">
+                            {ingreso.folio}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-muted-foreground italic">Folio no disponible</span>
+                        )}
+                        <span className="text-xs text-muted-foreground">{ingreso.cliente_nombre || 'Cliente no especificado'}</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-800 font-medium">{ingreso.descripcion || 'Sin descripción'}</span>
+                    )}
                   </TableCell>
                   <TableCell className="py-3 text-slate-700">
                     {formatDate(ingreso.fecha_pago)}
                   </TableCell>
-                  <TableCell className="py-3 font-medium text-emerald-700">
+                  <TableCell className="py-3 font-medium text-emerald-700 text-right">
                     {formatCurrency(ingreso.monto, ingreso.moneda)}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
-                      {ingreso.porcentaje}%
-                    </Badge>
+                    {ingreso.moneda === 'USD' && ingreso.monto_mxn && (
+                      <span className="block text-xs text-muted-foreground">({formatCurrency(ingreso.monto_mxn, 'MXN')})</span>
+                    )}
                   </TableCell>
                   <TableCell className="py-3">
                     <Badge className={`border ${getMetodoPagoBadgeStyle(ingreso.metodo_pago)}`}>
@@ -135,24 +156,27 @@ export function IngresosTable({
                     </Badge>
                   </TableCell>
                   <TableCell className="py-3 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                        title="Ver detalles"
+                        className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                        title="Ver detalles (próximamente)"
+                        disabled
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       {ingreso.comprobante_url && (
                         <Button 
+                          asChild
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                          className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                           title="Descargar comprobante"
-                          onClick={() => window.open(ingreso.comprobante_url, '_blank')}
                         >
-                          <Download className="h-4 w-4" />
+                          <a href={ingreso.comprobante_url} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-4 w-4" />
+                          </a>
                         </Button>
                       )}
                     </div>
