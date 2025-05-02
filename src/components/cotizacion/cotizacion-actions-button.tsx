@@ -201,12 +201,12 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={handleEditCotizacion}>
             <FileEdit className="mr-2 h-4 w-4" />
-            Ver / Editar
+            Editar
           </DropdownMenuItem>
           
           <DropdownMenuItem onClick={handleOpenModal} disabled={isLoadingDetails}>
             <DollarSign className="mr-2 h-4 w-4" />
-            Procesar / Estado
+            Cambiar estado
           </DropdownMenuItem>
           
           <DropdownMenuSeparator /> 

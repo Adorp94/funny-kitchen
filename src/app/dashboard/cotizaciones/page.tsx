@@ -406,7 +406,7 @@ export default function CotizacionesPage() {
       {/* Error details section */}
       {errorDetails && renderErrorDetails()}
       
-      {/* Summary Cards - Adjusted styling */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Total Cotizaciones */}
         <Card>
@@ -546,18 +546,6 @@ export default function CotizacionesPage() {
                     ))
                   )}
                 </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={3}>Total Cotizaciones</TableCell>
-                    <TableCell className="text-right">{metrics.totalCotizaciones}</TableCell>
-                    <TableCell colSpan={2}></TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={3}>Monto Total (Estimado MXN)</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(metrics.montoTotalMXN, 'MXN')}</TableCell>
-                    <TableCell colSpan={2}></TableCell>
-                  </TableRow>
-                </TableFooter>
               </Table>
             </div>
           )}
