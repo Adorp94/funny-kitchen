@@ -59,26 +59,33 @@ const highlightMatch = (text: string, query: string): React.ReactNode => {
   });
 };
 
-// Helper function to format E.164 to storage format
+// Helper function to format phone number for storage
 const formatPhoneNumberForStorage = (phoneNumber: string | undefined): string => {
   if (!phoneNumber) return '';
+  
   const cleaned = phoneNumber.replace(/[^\d+]/g, ''); 
   let digits = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
+  
   if (!digits.startsWith('52')) {
     if (digits.length === 10) {
       digits = '52' + digits;
     } else {
-      return digits; 
+      // If not 10 digits and not starting with 52, return original cleaned value or empty
+      // Prepend + if original started with it
+      return cleaned.startsWith('+') ? `+${digits}` : digits; 
     }
   }
+  
+  // Expecting 12 digits now (52 + 10)
   if (digits.length === 12) {
     const cc = digits.substring(0, 2); 
-    const area = digits.substring(2, 4);
-    const part1 = digits.substring(4, 8);
-    const part2 = digits.substring(8, 12);
-    return `${cc} ${area} ${part1} ${part2}`; 
+    const area = digits.substring(2, 4); 
+    const part1 = digits.substring(4, 8); 
+    const part2 = digits.substring(8, 12); 
+    return `+${cc} ${area} ${part1} ${part2}`; // "+52 33 1234 5678"
   } else {
-    return digits;
+    // If length is not 12 after processing, return digits prepended with +
+    return `+${digits}`; 
   }
 };
 
@@ -504,7 +511,7 @@ export function ClienteForm({
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <Button type="submit">Crear y Usar Cliente</Button>
+          <Button type="submit">Confirmar Datos Cliente</Button>
         </form>
       </TabsContent>
     </Tabs>
