@@ -190,24 +190,7 @@ function EditCotizacionClient() {
           setGlobalDiscount(cotizacionData.descuento_global);
         }
 
-        setHasIva(!!cotizacionData.iva);
-
-        if (cotizacionData.incluye_envio && cotizacionData.costo_envio) {
-          setShippingCost(cotizacionData.costo_envio);
-        } else {
-           setShippingCost(0);
-        }
-
-        if (cotizacionData.tiempo_estimado) {
-          setTiempoEstimado(cotizacionData.tiempo_estimado);
-        }
-        if (cotizacionData.tiempo_estimado_max) {
-          setTiempoEstimadoMax(cotizacionData.tiempo_estimado_max);
-        }
-
-        // ---> Log products array before mapping
-        console.log('[Fetch] cotizacionData.productos before mapping:', cotizacionData.productos);
-
+        // Process products FIRST
         if (cotizacionData.productos && Array.isArray(cotizacionData.productos)) {
           const initialProductos = cotizacionData.productos.map((producto: any) => ({
              id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id.toString() : generateUniqueId(),
@@ -227,7 +210,7 @@ function EditCotizacionClient() {
 
           console.log('[Fetch] initialProductos after mapping:', initialProductos);
 
-          clearProductos();
+          clearProductos(); // Clear before adding
           initialProductos.forEach((p: Producto) => {
              console.log("[Fetch] Adding product to context:", p);
              addProducto(p);
@@ -235,6 +218,20 @@ function EditCotizacionClient() {
         } else {
            console.log('[Fetch] No products found or not an array in cotizacionData.');
            clearProductos();
+        }
+
+        // Set IVA and Shipping Cost AFTER products are processed
+        console.log(`[Fetch] Setting hasIva based on cotizacionData.iva: ${cotizacionData.iva}`);
+        setHasIva(!!cotizacionData.iva);
+
+        console.log(`[Fetch] Setting shippingCost based on cotizacionData.costo_envio: ${cotizacionData.costo_envio}`);
+        setShippingCost(cotizacionData.costo_envio ? Number(cotizacionData.costo_envio) : 0);
+
+        if (cotizacionData.tiempo_estimado) {
+          setTiempoEstimado(cotizacionData.tiempo_estimado);
+        }
+        if (cotizacionData.tiempo_estimado_max) {
+          setTiempoEstimadoMax(cotizacionData.tiempo_estimado_max);
         }
 
       } catch (error: any) {

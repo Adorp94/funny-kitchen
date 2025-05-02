@@ -73,6 +73,20 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   // Shipping cost state - value is assumed to be in the 'moneda' currency
   const [shippingCostInput, setShippingCostInput] = useState<number>(0);
 
+  // --- Modified Setters with Logging ---
+  const setHasIvaWithLog = useCallback((newValue: boolean) => {
+    console.log(`[Context] Setting hasIva from ${hasIva} to ${newValue}`);
+    setHasIva(newValue);
+  }, [hasIva]); // Dependency on hasIva to log the 'from' value correctly
+
+  const setShippingCostInputWithLog = useCallback((newCost: number) => {
+    const parsedCost = Number(newCost);
+    const finalCost = isNaN(parsedCost) ? 0 : parsedCost;
+    console.log(`[Context] Setting shippingCostInput from ${shippingCostInput} to ${finalCost} (received: ${newCost})`);
+    setShippingCostInput(finalCost);
+  }, [shippingCostInput]); // Dependency on shippingCostInput to log the 'from' value correctly
+  // --- End Modified Setters ---
+
   const {
     exchangeRate,
     loading: exchangeRateLoading,
@@ -301,9 +315,9 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     globalDiscount,
     setGlobalDiscount,
     hasIva,
-    setHasIva,
+    setHasIva: setHasIvaWithLog,
     shippingCost: shippingCostInput, // Expose the input value
-    setShippingCost: setShippingCostInput, // Allow setting the input value
+    setShippingCost: setShippingCostInputWithLog, // Allow setting the input value
     moneda,
     setMoneda,
     exchangeRate,
@@ -320,9 +334,9 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     globalDiscount,
     setGlobalDiscount,
     hasIva,
-    setHasIva,
+    setHasIvaWithLog,
     shippingCostInput,
-    setShippingCostInput,
+    setShippingCostInputWithLog,
     moneda,
     setMoneda,
     exchangeRate,
