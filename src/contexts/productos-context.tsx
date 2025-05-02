@@ -135,19 +135,34 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     // Expects producto.precio to be the base MXN price
     const precioMXN = producto.precio || 0;
     const cantidad = producto.cantidad || 1;
-    const subtotalMXN = precioMXN * cantidad;
+    // Get the individual discount from the passed product data
+    const descuento = producto.descuento || 0;
+    // Calculate the subtotal *after* applying the individual discount
+    const subtotalMXN = (precioMXN * cantidad) * (1 - descuento / 100);
 
     const nuevoProductoInterno: ProductoEnContext = {
       ...producto, // Spread base details
       id: producto.id || `temp_${Date.now()}`, // Ensure ID exists
       cantidad: cantidad,
-      precioMXN: precioMXN,
-      subtotalMXN: subtotalMXN,
-      descuento: producto.descuento || 0,
+      precioMXN: precioMXN, // Store the base price
+      subtotalMXN: subtotalMXN, // Store the subtotal *with* individual discount applied
+      descuento: descuento, // Store the individual discount percentage
     };
 
-    console.log("Context addProducto: Adding internal product:", nuevoProductoInterno);
-    setInternalProductos(prev => [...prev, nuevoProductoInterno]);
+    console.log("Context addProducto: Adding internal product (with individual discount applied to subtotalMXN):", nuevoProductoInterno);
+    // Avoid adding duplicates if possible (e.g., during HMR) - check by id
+    setInternalProductos(prev => {
+        const existingIndex = prev.findIndex(p => p.id === nuevoProductoInterno.id);
+        if (existingIndex > -1) {
+            console.warn(`[Context addProducto] Product with id ${nuevoProductoInterno.id} already exists. Not adding again.`);
+            // Optionally update if needed, but for initial load, maybe skipping is fine
+            // const newState = [...prev];
+            // newState[existingIndex] = nuevoProductoInterno;
+            // return newState;
+            return prev; // Keep existing state if duplicate found during initial load/HMR
+        }
+        return [...prev, nuevoProductoInterno];
+    });
   }, []); // Dependencies? Only stable setters.
 
 
@@ -199,7 +214,6 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     });
 
     const subtotalAfterDiscountMXN = baseSubtotalMXN * (1 - globalDiscount / 100);
-    const ivaAmountMXN = hasIva ? subtotalAfterDiscountMXN * 0.16 : 0;
 
     // 2. Determine Shipping Cost in MXN
     let shippingCostMXN = 0;
@@ -216,6 +230,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     }
      console.log(` - Calculated Shipping MXN: ${shippingCostMXN}`);
 
+    // --- Reverted IVA Calculation ---
+    // Calculate IVA ONLY on the subtotal after global discount
+    const ivaAmountMXN = hasIva ? subtotalAfterDiscountMXN * 0.16 : 0;
+    // --- END Reverted IVA Calculation ---
+
+    // Calculate total by summing the discounted subtotal, the IVA (calculated above), and shipping
     const totalMXN = subtotalAfterDiscountMXN + ivaAmountMXN + shippingCostMXN;
 
     // 3. Calculate display values based on moneda

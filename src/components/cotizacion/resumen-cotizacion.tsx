@@ -62,6 +62,11 @@ export function ResumenCotizacion({
   const [localShippingCostStr, setLocalShippingCostStr] = useState<string>(
     shippingCost === 0 ? '' : shippingCost.toString()
   );
+  
+  // --- Local state for the global discount input string ---
+  const [localGlobalDiscountStr, setLocalGlobalDiscountStr] = useState<string>(
+    globalDiscount === 0 ? '' : globalDiscount.toString()
+  );
 
   // Effect to update local string state if the prop changes from outside
   // (e.g., loading data, or toggling the switch off)
@@ -75,18 +80,55 @@ export function ResumenCotizacion({
     }
   }, [shippingCost]); // Run only when the context prop changes
 
+  // --- Effect to sync localGlobalDiscountStr from prop ---
+  useEffect(() => {
+    const propStr = globalDiscount === 0 ? '' : globalDiscount.toString();
+    const localNum = localGlobalDiscountStr === '' ? 0 : parseFloat(localGlobalDiscountStr);
+     if (globalDiscount !== localNum) {
+         console.log(`[Resumen Effect] Syncing localGlobalDiscountStr from prop. Prop=${globalDiscount}, CurrentLocalStr="${localGlobalDiscountStr}"`);
+         setLocalGlobalDiscountStr(propStr);
+     }
+  }, [globalDiscount]);
+
   // --- End local state management ---
 
   useEffect(() => {
     setTiempoEstimadoMaxStr(tiempoEstimadoMax?.toString() ?? '8');
   }, [tiempoEstimadoMax]);
 
+  // Updated: Only updates local string state
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numValue = value === '' ? 0 : parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
-      setGlobalDiscount(numValue);
-    }
+     // Allow numbers, one decimal point, prevent minus sign, max 100
+     if (/^(?:100(?:\.0*)?|\d{1,2}(?:\.\d*)?)$/.test(value) && !value.startsWith('-')) {
+        setLocalGlobalDiscountStr(value);
+     } else if (value === '') {
+        setLocalGlobalDiscountStr(''); // Allow clearing the input
+     }
+  };
+
+  // New: Blur handler to update context
+  const handleGlobalDiscountBlur = () => {
+     let numValue = localGlobalDiscountStr === '' ? 0 : parseFloat(localGlobalDiscountStr);
+
+     if (isNaN(numValue) || numValue < 0) {
+       numValue = 0;
+     } else if (numValue > 100) {
+       numValue = 100;
+     }
+
+     // Format local string state
+     const formattedStr = numValue === 0 ? '' : numValue.toString();
+     // Ensure the local state reflects the possibly corrected number
+     if (localGlobalDiscountStr !== formattedStr) {
+        setLocalGlobalDiscountStr(formattedStr);
+     }
+
+     // Update context only if the numeric value is different
+     if (numValue !== globalDiscount) {
+       console.log(`[Resumen Blur] Updating context globalDiscount from ${globalDiscount} to ${numValue}`);
+       setGlobalDiscount(numValue);
+     }
   };
 
   const handleIvaToggle = (checked: boolean) => setHasIva(checked);
@@ -200,8 +242,9 @@ export function ResumenCotizacion({
                 min="0"
                 max="100"
                 step="0.01"
-                value={globalDiscount === 0 ? '' : globalDiscount}
+                value={localGlobalDiscountStr}
                 onChange={handleGlobalDiscountChange}
+                onBlur={handleGlobalDiscountBlur}
                 className="h-8 pr-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="0"
               />
