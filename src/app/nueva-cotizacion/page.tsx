@@ -82,7 +82,6 @@ function NuevaCotizacionClient() {
   // Other financial states (discount, iva, shipping, moneda) are managed by context
   const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
   const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number | string>(8); // Allow string for empty input
-  const [incluyeEnvio, setIncluyeEnvio] = useState<boolean>(false);
   // -----------------------------------------------------
 
   // Add state for ClienteForm mode
@@ -135,13 +134,6 @@ function NuevaCotizacionClient() {
     }
   }, [clienteData]);
   
-  // Effect to set shipping cost to 0 if 'incluyeEnvio' is unchecked
-  useEffect(() => {
-    if (!incluyeEnvio) {
-      setShippingCost(0);
-    }
-  }, [incluyeEnvio, setShippingCost]);
-
   // Add a useEffect to preserve client data when navigating between steps
   useEffect(() => {
     // Save client data to sessionStorage whenever it changes
@@ -288,7 +280,7 @@ function NuevaCotizacionClient() {
         descuento_global: globalDiscount,
         iva: hasIva,
         monto_iva: financials.displayIvaAmount, // Use display IVA amount
-        incluye_envio: incluyeEnvio, // Use state variable
+        incluye_envio: true, // Use state variable
         tipo_cambio: exchangeRate,
         tiempo_estimado: tiempoEstimado,
         tiempo_estimado_max: tiempoEstimadoMax === '' ? null : Number(tiempoEstimadoMax), // Handle empty string

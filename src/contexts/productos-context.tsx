@@ -174,6 +174,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
   // --- Clear products ---
   const clearProductos = useCallback(() => {
+    console.log("[Context] clearProductos called");
     setInternalProductos([]);
     // Consider resetting other fields like discount, shipping etc. if needed
     setGlobalDiscount(0);

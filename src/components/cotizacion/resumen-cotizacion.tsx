@@ -54,12 +54,28 @@ export function ResumenCotizacion({
   tiempoEstimadoMax = 8,
   setTiempoEstimadoMax
 }: ResumenCotizacionProps) {
-  const [hasShipping, setHasShipping] = useState<boolean>(false);
+  // Initialize based on the initial prop value
+  const [hasShipping, setHasShipping] = useState<boolean>(shippingCost > 0);
   const [tiempoEstimadoMaxStr, setTiempoEstimadoMaxStr] = useState<string>(tiempoEstimadoMax?.toString() ?? '8');
+  
+  // --- Local state for the shipping cost input string ---
+  const [localShippingCostStr, setLocalShippingCostStr] = useState<string>(
+    shippingCost === 0 ? '' : shippingCost.toString()
+  );
 
+  // Effect to update local string state if the prop changes from outside
+  // (e.g., loading data, or toggling the switch off)
   useEffect(() => {
-    setHasShipping(shippingCost > 0);
-  }, []);
+    const propStr = shippingCost === 0 ? '' : shippingCost.toString();
+    // Only update local state if the prop is different from what the local state represents numerically
+    const localNum = localShippingCostStr === '' ? 0 : parseFloat(localShippingCostStr);
+    if (shippingCost !== localNum) {
+        console.log(`[Resumen Effect] Syncing localShippingCostStr from prop. Prop=${shippingCost}, CurrentLocalStr="${localShippingCostStr}"`);
+        setLocalShippingCostStr(propStr);
+    }
+  }, [shippingCost]); // Run only when the context prop changes
+
+  // --- End local state management ---
 
   useEffect(() => {
     setTiempoEstimadoMaxStr(tiempoEstimadoMax?.toString() ?? '8');
@@ -74,17 +90,45 @@ export function ResumenCotizacion({
   };
 
   const handleIvaToggle = (checked: boolean) => setHasIva(checked);
+  
+  // Updated: Toggle now just controls visibility and sets cost to 0 when turned off
   const handleShippingToggle = (checked: boolean) => {
+    console.log(`[Resumen Toggle] handleShippingToggle called with: ${checked}`);
     setHasShipping(checked);
     if (!checked) {
-      setShippingCost(0);
+      console.log("[Resumen Toggle] Shipping turned off, setting context cost to 0.");
+      setShippingCost(0); // Update context directly
+      // Local state will be updated by the useEffect watching shippingCost
+    } else {
+      // If turning on, maybe default to a value or just let user input?
+      // For now, do nothing, user needs to input a value > 0.
     }
   };
 
-  const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Updated: Input onChange only updates local string state
+  const handleShippingCostInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    const numValue = value === '' ? 0 : parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 0) {
+     // Basic filtering: Allow numbers, one decimal point, prevent minus sign
+     if (/^[0-9]*\.?\d*$/.test(value) && !value.startsWith('-')) {
+        setLocalShippingCostStr(value);
+     }
+  };
+
+  // Updated: Input onBlur updates the context
+  const handleShippingCostInputBlur = () => {
+    let numValue = localShippingCostStr === '' ? 0 : parseFloat(localShippingCostStr);
+    
+    if (isNaN(numValue) || numValue < 0) {
+      numValue = 0; // Default to 0 if invalid
+    }
+
+    // Format the local string state to match the parsed number (e.g., remove leading zeros)
+    const formattedStr = numValue === 0 ? '' : numValue.toString();
+    setLocalShippingCostStr(formattedStr);
+
+    // Update context only if the numeric value is different
+    if (numValue !== shippingCost) {
+      console.log(`[Resumen Blur] Updating context shippingCost from ${shippingCost} to ${numValue}`);
       setShippingCost(numValue);
     }
   };
@@ -211,8 +255,9 @@ export function ResumenCotizacion({
                   type="number"
                   min="0"
                   step="0.01"
-                  value={shippingCost === 0 ? '' : shippingCost}
-                  onChange={handleShippingCostChange}
+                  value={localShippingCostStr}
+                  onChange={handleShippingCostInputChange}
+                  onBlur={handleShippingCostInputBlur}
                   className="h-8 pl-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0"
                 />
