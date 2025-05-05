@@ -484,11 +484,11 @@ export default function CotizacionesPage() {
                   <TableRow>
                     <TableHead onClick={() => handleSort('folio')} className="cursor-pointer w-[120px]">
                       <div className="flex items-center gap-1">
-                        Folio
+                        Folio / Cliente
                         {sortBy.field === 'folio' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                       </div>
                     </TableHead>
-                    <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[100px]">
+                    <TableHead onClick={() => handleSort('fecha_creacion')} className="cursor-pointer w-[100px] hidden sm:table-cell">
                       <div className="flex items-center gap-1">
                         Fecha
                         {sortBy.field === 'fecha_creacion' && (sortBy.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
@@ -522,10 +522,18 @@ export default function CotizacionesPage() {
                   ) : (
                     getCurrentPageItems().map((cotizacion) => (
                       <TableRow key={cotizacion.cotizacion_id} className="hover:bg-slate-50">
-                        <TableCell className="py-2.5 px-3 font-medium text-emerald-600 cursor-pointer hover:underline whitespace-nowrap" onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}>
-                          {cotizacion.folio || 'N/A'}
+                        <TableCell className="py-2.5 px-3">
+                          <div 
+                            className="font-medium text-emerald-600 cursor-pointer hover:underline whitespace-nowrap"
+                            onClick={() => handleViewCotizacion(cotizacion.cotizacion_id)}
+                          >
+                            {cotizacion.folio || 'N/A'}
+                          </div>
+                          <div className="text-xs text-muted-foreground md:hidden" title={cotizacion.cliente.nombre}>
+                            {cotizacion.cliente.nombre}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{formatDate(cotizacion.fecha_creacion)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">{formatDate(cotizacion.fecha_creacion)}</TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="font-medium truncate max-w-[200px] lg:max-w-[300px]" title={cotizacion.cliente.nombre}>{cotizacion.cliente.nombre}</div>
                           <div className="text-xs text-muted-foreground truncate">{cotizacion.cliente.celular || '—'}</div>
