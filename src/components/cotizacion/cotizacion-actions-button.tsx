@@ -127,12 +127,16 @@ const handleStatusChange = async (
     }
 
   } catch (error: any) {
-    console.error("Error calling RPC function (raw error object):", error);
-    const messageFromServer = error?.message || JSON.stringify(error);
-    const errorMessage = messageFromServer.includes(':')
-      ? messageFromServer.split(':').pop().trim()
-      : messageFromServer;
-    throw new Error(errorMessage);
+    // This catch block logs the raw error and re-throws a new error with the message
+    console.error("Error during status change process (raw error object):", error);
+    // const messageFromServer = error?.message || JSON.stringify(error);
+    //  const errorMessage = messageFromServer.includes(':')
+    //    ? messageFromServer.split(':').pop().trim()
+    //    : messageFromServer;
+    // Re-throwing just the message might be causing the strange "\"rechazada\"" error if the original error object was unusual
+    // Let's try re-throwing the original error object to preserve its structure
+    // throw new Error(errorMessage); // Original re-throw
+    throw error; // Re-throw the original error
   }
 };
 
