@@ -25,7 +25,7 @@ import { es } from 'date-fns/locale'; // Import Spanish locale
 
 // Schema definition (can be imported if centralized)
 const formSchema = z.object({
-  newStatus: z.enum(['producción', 'rechazada'], {
+  newStatus: z.enum(['producción', 'rechazada', 'enviar_inventario'], {
     required_error: "Debes seleccionar un nuevo estado.",
   }),
   fecha: z.date({ // Add fecha field
@@ -35,7 +35,7 @@ const formSchema = z.object({
   metodoPago: z.string().optional(),
   notas: z.string().optional(),
 }).refine((data) => {
-  if (data.newStatus === 'producción') {
+  if (data.newStatus === 'producción' || data.newStatus === 'enviar_inventario') {
     const monto = parseFloat(data.montoAnticipo || 'NaN');
     return !!data.montoAnticipo && !isNaN(monto) && monto > 0 && !!data.metodoPago;
   }
@@ -80,7 +80,7 @@ export function CotizacionStatusForm({
       <div className="space-y-3">
         <Label className="font-semibold">Nuevo Estado *</Label>
         <RadioGroup
-          onValueChange={(value) => form.setValue("newStatus", value as 'producción' | 'rechazada', { shouldValidate: true })} // Set value and trigger validation
+          onValueChange={(value) => form.setValue("newStatus", value as 'producción' | 'rechazada' | 'enviar_inventario', { shouldValidate: true })} // Updated type
           value={form.watch("newStatus")} // Watch value directly
           className="flex flex-col space-y-2"
           disabled={isSubmitting}
@@ -92,7 +92,14 @@ export function CotizacionStatusForm({
                 Marcar como Producción (Requiere Anticipo)
              </Label>
           </div>
-          {/* Item 2: Rechazada */}
+          {/* Item 2: Enviar Inventario - ADDED */}
+          <div className="flex items-center space-x-3 space-y-0">
+             <RadioGroupItem value="enviar_inventario" id={`${props.id}-status-inventario`} />
+             <Label htmlFor={`${props.id}-status-inventario`} className="font-normal cursor-pointer">
+                Enviar de Inventario (Requiere Anticipo)
+             </Label>
+          </div>
+          {/* Item 3: Rechazada */}
           <div className="flex items-center space-x-3 space-y-0">
              <RadioGroupItem value="rechazada" id={`${props.id}-status-rechazada`} />
              <Label htmlFor={`${props.id}-status-rechazada`} className="font-normal cursor-pointer">
@@ -140,7 +147,7 @@ export function CotizacionStatusForm({
       </div>
 
       {/* Conditional Payment Section */}
-      {watchedStatus === 'producción' && (
+      {(watchedStatus === 'producción' || watchedStatus === 'enviar_inventario') && (
         <Card className="bg-muted/50 border-primary/20 pt-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">

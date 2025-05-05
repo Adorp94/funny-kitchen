@@ -87,46 +87,47 @@ export default function CotizacionDetailPage() {
 
     try {
       let rpcResult;
+      let rpcName = '';
+      let rpcParams: any = {};
 
       if (newStatus === 'producción') {
-        if (!paymentData || paymentData.monto <= 0 || !paymentData.metodo_pago) {
-           toast.error("Datos de anticipo inválidos para mover a producción.");
-           return false;
-        }
-
-        const rpcParamsApprove = {
+        if (!paymentData) throw new Error("Datos de anticipo requeridos para producción.");
+        rpcName = 'aprobar_cotizacion_a_produccion';
+        rpcParams = {
           p_cotizacion_id: cotizacionId,
-          p_usuario_id: userId, 
           p_monto_anticipo: paymentData.monto,
           p_metodo_pago: paymentData.metodo_pago,
           p_moneda: cotizacion.moneda,
           p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null, 
           p_fecha_cambio: fechaISO
         };
-        console.log("Calling aprobar_cotizacion_a_produccion with params:", rpcParamsApprove);
-
-        const { data, error } = await supabase.rpc('aprobar_cotizacion_a_produccion', rpcParamsApprove);
-
-        if (error) throw error;
-        rpcResult = data;
-
-      } else if (newStatus === 'rechazada') {
-        const rpcParamsReject = {
+      } else if (newStatus === 'enviar_inventario') {
+        if (!paymentData) throw new Error("Datos de anticipo requeridos para enviar de inventario.");
+        rpcName = 'enviar_cotizacion_de_inventario';
+        rpcParams = {
           p_cotizacion_id: cotizacionId,
-          p_usuario_id: userId, 
+          p_monto_anticipo: paymentData.monto,
+          p_metodo_pago: paymentData.metodo_pago,
+          p_moneda: cotizacion.moneda,
+          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null, 
           p_fecha_cambio: fechaISO
         };
-        console.log("Calling rechazar_cotizacion with params:", rpcParamsReject);
-
-        const { data, error } = await supabase.rpc('rechazar_cotizacion', rpcParamsReject);
-
-        if (error) throw error;
-        rpcResult = data;
-
+      } else if (newStatus === 'rechazada') {
+        rpcName = 'rechazar_cotizacion';
+        rpcParams = {
+          p_cotizacion_id: cotizacionId,
+          p_fecha_cambio: fechaISO
+        };
       } else {
          toast.error(`Estado "${newStatus}" no manejado.`);
          return false;
       }
+      
+      console.log(`Calling ${rpcName} with params:`, rpcParams);
+      const { data, error } = await supabase.rpc(rpcName, rpcParams);
+
+      if (error) throw error;
+      rpcResult = data;
 
       if (rpcResult === true) {
         await fetchCotizacion();

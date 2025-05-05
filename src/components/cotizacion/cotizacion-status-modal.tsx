@@ -52,7 +52,7 @@ interface CotizacionStatusModalProps {
 
 // --- Zod Schema --- 
 const formSchema = z.object({
-  newStatus: z.enum(['producción', 'rechazada'], {
+  newStatus: z.enum(['producción', 'rechazada', 'enviar_inventario'], {
     required_error: "Debes seleccionar un nuevo estado.",
   }),
   fecha: z.date({
@@ -61,7 +61,7 @@ const formSchema = z.object({
   montoAnticipo: z.string().optional(),
   metodoPago: z.string().optional(),
 }).refine((data) => {
-  if (data.newStatus === 'producción') {
+  if (data.newStatus === 'producción' || data.newStatus === 'enviar_inventario') {
     const monto = parseFloat(data.montoAnticipo || 'NaN');
     return !!data.montoAnticipo && !isNaN(monto) && monto > 0 && !!data.metodoPago;
   }
@@ -108,7 +108,7 @@ export function CotizacionStatusModal({
     
     const fechaCambio = values.fecha;
 
-    if (values.newStatus === 'producción') {
+    if (values.newStatus === 'producción' || values.newStatus === 'enviar_inventario') {
       const monto = parseFloat(values.montoAnticipo!);
       const porcentaje = cotizacion.total > 0 ? Math.round((monto / cotizacion.total) * 100) : 0;
       paymentData = {

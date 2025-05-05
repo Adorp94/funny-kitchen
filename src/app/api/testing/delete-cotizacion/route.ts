@@ -39,7 +39,20 @@ export async function POST(request: NextRequest) {
         console.log(`[Testing Delete API] Successfully deleted cotizacion_historial for ID ${cotizacionId}.`);
      }
 
-    // --- Step 3: Delete the cotización itself ---
+    // --- Step 3: Delete related pagos ---
+    const { error: pagosDeleteError } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('cotizacion_id', cotizacionId);
+
+    if (pagosDeleteError) {
+       console.error(`[Testing Delete API] Error deleting pagos for ID ${cotizacionId}:`, pagosDeleteError);
+       // Log the error but proceed
+    } else {
+        console.log(`[Testing Delete API] Successfully deleted pagos for ID ${cotizacionId}.`);
+    }
+
+    // --- Step 4: Delete the cotización itself ---
     const { data: deletedCotizacion, error: cotizacionDeleteError } = await supabase
       .from('cotizaciones')
       .delete()
@@ -63,7 +76,7 @@ export async function POST(request: NextRequest) {
         console.log(`[Testing Delete API] Successfully deleted cotizacion ID ${cotizacionId}.`);
     }
 
-    // --- Step 4: Reset Sequences ---
+    // --- Step 5: Reset Sequences ---
     console.log(`[Testing Delete API] Resetting sequences after deleting ID ${cotizacionId}...`);
 
     // Reset cotizacion_productos sequence
@@ -85,7 +98,7 @@ export async function POST(request: NextRequest) {
          console.log(`[Testing Delete API] Reset cotizaciones sequence. Next value will be > ${maxCotIdData}`);
       }
 
-    return NextResponse.json({ message: `Cotización ${cotizacionId} deleted and sequences reset successfully.` }, { status: 200 });
+    return NextResponse.json({ message: `Cotización ${cotizacionId} and related data deleted, sequences reset.` }, { status: 200 });
 
   } catch (err) {
     console.error(`[Testing Delete API] Unexpected error:`, err);

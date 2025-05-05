@@ -61,10 +61,79 @@ interface CotizacionActionsButtonProps {
   buttonSize?: "sm" | "icon" | "default" | "lg";
 }
 
-// Function to determine if status can be changed via the modal
+// Function to determine if status can be changed
 const canChangeStatus = (currentStatus: string): boolean => {
-  // Currently, the modal only handles transitions from 'pendiente'
   return currentStatus?.toLowerCase() === 'pendiente';
+};
+
+// Helper function to handle status change (RPC call)
+const handleStatusChange = async (
+  cotizacion: Cotizacion, // Pass the full cotizacion object
+  newStatus: string,
+  fecha: Date, 
+  paymentData?: PaymentFormData
+) => {
+  const fechaISO = fecha.toISOString().split('T')[0];
+  const cotizacionId = cotizacion.cotizacion_id; 
+
+  try {
+    let rpcResult;
+    let rpcName = ''; // Define variables to hold RPC details
+    let rpcParams: any = {};
+
+    if (newStatus === 'producción') {
+      if (!paymentData) throw new Error("Datos de anticipo requeridos para producción.");
+      rpcName = 'aprobar_cotizacion_a_produccion';
+      rpcParams = {
+        p_cotizacion_id: cotizacionId,
+        p_monto_anticipo: paymentData.monto,
+        p_metodo_pago: paymentData.metodo_pago,
+        p_moneda: cotizacion.moneda, 
+        p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null,
+        p_fecha_cambio: fechaISO
+      };
+    } else if (newStatus === 'enviar_inventario') { // ADDED Handling for enviar_inventario
+      if (!paymentData) throw new Error("Datos de anticipo requeridos para enviar de inventario.");
+      rpcName = 'enviar_cotizacion_de_inventario'; // Use the correct RPC function name
+      rpcParams = {
+        p_cotizacion_id: cotizacionId,
+        p_monto_anticipo: paymentData.monto,
+        p_metodo_pago: paymentData.metodo_pago,
+        p_moneda: cotizacion.moneda, 
+        p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null, 
+        p_fecha_cambio: fechaISO
+      };
+    } else if (newStatus === 'rechazada') {
+      rpcName = 'rechazar_cotizacion';
+      rpcParams = {
+        p_cotizacion_id: cotizacionId,
+        p_fecha_cambio: fechaISO
+      };
+    } else {
+      // This error was being thrown because 'enviar_inventario' wasn't handled
+      throw new Error(`Estado "${newStatus}" no manejado.`); 
+    }
+
+    // Execute the determined RPC call
+    console.log(`[ActionBtn] Calling ${rpcName} with params:`, rpcParams);
+    const { data, error } = await supabase.rpc(rpcName, rpcParams);
+    if (error) throw error;
+    rpcResult = data;
+
+    if (rpcResult === true) {
+      return true;
+    } else {
+      throw new Error("La operación falló en la base de datos (RPC devolvió false).");
+    }
+
+  } catch (error: any) {
+    console.error("Error calling RPC function (raw error object):", error);
+    const messageFromServer = error?.message || JSON.stringify(error);
+    const errorMessage = messageFromServer.includes(':')
+      ? messageFromServer.split(':').pop().trim()
+      : messageFromServer;
+    throw new Error(errorMessage);
+  }
 };
 
 export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSize = "sm" }: CotizacionActionsButtonProps) {
@@ -142,66 +211,6 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
       toast.error("Error al descargar el PDF", { id: toastId, description: error.message || "Ocurrió un error inesperado." });
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handleStatusChange = async (
-    cotizacion: Cotizacion,
-    newStatus: string,
-    fecha: Date,
-    paymentData?: PaymentFormData
-  ) => {
-    const fechaISO = fecha.toISOString().split('T')[0];
-    const cotizacionId = cotizacion.cotizacion_id;
-
-    try {
-      let rpcResult;
-
-      if (newStatus === 'producción') {
-        if (!paymentData || paymentData.monto <= 0 || !paymentData.metodo_pago) {
-          throw new Error("Datos de anticipo inválidos para mover a producción.");
-        }
-
-        const rpcParamsApprove = {
-          p_cotizacion_id: cotizacionId,
-          p_monto_anticipo: paymentData.monto,
-          p_metodo_pago: paymentData.metodo_pago,
-          p_moneda: cotizacion.moneda,
-          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null,
-          p_fecha_cambio: fechaISO
-        };
-        console.log("[ActionBtn] Calling aprobar_cotizacion_a_produccion with params:", rpcParamsApprove);
-        const { data, error } = await supabase.rpc('aprobar_cotizacion_a_produccion', rpcParamsApprove);
-        if (error) throw error;
-        rpcResult = data;
-
-      } else if (newStatus === 'rechazada') {
-        const rpcParamsReject = {
-          p_cotizacion_id: cotizacionId,
-          p_fecha_cambio: fechaISO
-        };
-        console.log("[ActionBtn] Calling rechazar_cotizacion with params:", rpcParamsReject);
-        const { data, error } = await supabase.rpc('rechazar_cotizacion', rpcParamsReject);
-        if (error) throw error;
-        rpcResult = data;
-
-      } else {
-        throw new Error(`Estado "${newStatus}" no manejado.`);
-      }
-
-      if (rpcResult === true) {
-        return true;
-      } else {
-        throw new Error("La operación falló en la base de datos (RPC devolvió false).");
-      }
-
-    } catch (error: any) {
-      console.error("Error calling RPC function (raw error object):", error);
-      const messageFromServer = error?.message || JSON.stringify(error);
-      const errorMessage = messageFromServer.includes(':')
-        ? messageFromServer.split(':').pop().trim()
-        : messageFromServer;
-      throw new Error(errorMessage);
     }
   };
 
