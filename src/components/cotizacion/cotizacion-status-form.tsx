@@ -3,7 +3,7 @@
 import * as React from "react";
 import { UseFormReturn } from "react-hook-form";
 import { z } from "zod";
-import { CreditCard, DollarSign, FileWarning } from 'lucide-react';
+import { CalendarIcon, CreditCard, DollarSign, FileWarning } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from "@/components/ui/label"; // Use standard Label
 import { Input } from '@/components/ui/input';
@@ -17,11 +17,19 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from 'date-fns/locale'; // Import Spanish locale
 
 // Schema definition (can be imported if centralized)
 const formSchema = z.object({
   newStatus: z.enum(['producción', 'rechazada'], {
     required_error: "Debes seleccionar un nuevo estado.",
+  }),
+  fecha: z.date({ // Add fecha field
+    required_error: "La fecha de cambio es requerida.",
   }),
   montoAnticipo: z.string().optional(),
   metodoPago: z.string().optional(),
@@ -61,6 +69,7 @@ export function CotizacionStatusForm({
 }: CotizacionStatusFormProps) {
 
   const watchedStatus = form.watch("newStatus");
+  const watchedFecha = form.watch("fecha"); // Watch fecha for the button display
   const formErrors = form.formState.errors;
 
   return (
@@ -93,6 +102,40 @@ export function CotizacionStatusForm({
         </RadioGroup>
         {formErrors.newStatus && (
           <p className="text-xs text-red-600">{formErrors.newStatus.message}</p>
+        )}
+      </div>
+
+      {/* Fecha Selection - ADDED */}
+      <div className="space-y-2">
+        <Label htmlFor={`${props.id}-fecha`} className="font-semibold">Fecha de Cambio *</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              id={`${props.id}-fecha`}
+              variant={"outline"}
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !watchedFecha && "text-muted-foreground"
+              )}
+              disabled={isSubmitting}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {watchedFecha ? format(watchedFecha, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={watchedFecha}
+              onSelect={(date) => form.setValue("fecha", date as Date, { shouldValidate: true })}
+              initialFocus
+              locale={es} // Set Spanish locale for Calendar
+              disabled={isSubmitting}
+            />
+          </PopoverContent>
+        </Popover>
+        {formErrors.fecha && (
+          <p className="text-xs text-red-600">{formErrors.fecha.message}</p>
         )}
       </div>
 

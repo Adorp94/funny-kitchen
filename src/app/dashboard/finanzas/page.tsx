@@ -551,10 +551,6 @@ export default function FinanzasPage() {
                     )}
                     Descargar CSV
                   </Button>
-                 <IngresoResponsiveWrapper 
-                     isOpen={isIngresoModalOpen} 
-                     setIsOpen={setIsIngresoModalOpen}
-                 />
                </div>
              </div>
              <IngresosTable 

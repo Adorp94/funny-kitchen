@@ -47,13 +47,16 @@ interface CotizacionStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
   cotizacion: Cotizacion | null;
-  onStatusChange: (cotizacionId: number, newStatus: string, paymentData?: PaymentFormData) => Promise<boolean>;
+  onStatusChange: (cotizacionId: number, newStatus: string, fecha: Date, paymentData?: PaymentFormData) => Promise<boolean>;
 }
 
 // --- Zod Schema --- 
 const formSchema = z.object({
   newStatus: z.enum(['producción', 'rechazada'], {
     required_error: "Debes seleccionar un nuevo estado.",
+  }),
+  fecha: z.date({
+    required_error: "La fecha de cambio es requerida.",
   }),
   montoAnticipo: z.string().optional(),
   metodoPago: z.string().optional(),
@@ -85,6 +88,7 @@ export function CotizacionStatusModal({
     resolver: zodResolver(formSchema),
     defaultValues: {
       newStatus: undefined,
+      fecha: new Date(),
       montoAnticipo: "",
       metodoPago: "transferencia",
     },
@@ -97,11 +101,13 @@ export function CotizacionStatusModal({
     }
   }, [isOpen, form]);
 
-  // Submission handler remains the same
   const handleFormSubmit = async (values: FormValues) => {
     if (!cotizacion) return;
     setIsSubmitting(true);
     let paymentData: PaymentFormData | undefined = undefined;
+    
+    const fechaCambio = values.fecha;
+
     if (values.newStatus === 'producción') {
       const monto = parseFloat(values.montoAnticipo!);
       const porcentaje = cotizacion.total > 0 ? Math.round((monto / cotizacion.total) * 100) : 0;
@@ -111,8 +117,9 @@ export function CotizacionStatusModal({
         porcentaje: porcentaje,
       };
     }
+    
     try {
-      const success = await onStatusChange(cotizacion.cotizacion_id, values.newStatus, paymentData);
+      const success = await onStatusChange(cotizacion.cotizacion_id, values.newStatus, fechaCambio, paymentData);
       if (success) {
         toast.success(`Cotización #${cotizacion.folio} actualizada a "${values.newStatus}".`);
         onClose();

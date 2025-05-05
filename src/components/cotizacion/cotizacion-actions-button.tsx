@@ -10,7 +10,8 @@ import {
   FileEdit, 
   MoreVertical, 
   Download,
-  Loader2
+  Loader2,
+  Edit
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { updateCotizacionStatus, getCotizacionDetails } from '@/app/actions/cotizacion-actions';
 import { useRouter } from 'next/navigation';
 import { PDFService } from '@/services/pdf-service';
+import { supabase } from '@/lib/supabase/client';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -43,6 +45,7 @@ interface Cotizacion {
   monto_iva?: number;
   incluye_envio?: boolean;
   costo_envio?: number;
+  tipo_cambio?: number;
 }
 
 interface PaymentFormData {
@@ -58,12 +61,19 @@ interface CotizacionActionsButtonProps {
   buttonSize?: "sm" | "icon" | "default" | "lg";
 }
 
+// Function to determine if status can be changed via the modal
+const canChangeStatus = (currentStatus: string): boolean => {
+  // Currently, the modal only handles transitions from 'pendiente'
+  return currentStatus?.toLowerCase() === 'pendiente';
+};
+
 export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSize = "sm" }: CotizacionActionsButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailedCotizacion, setDetailedCotizacion] = useState<any>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const router = useRouter();
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
   const handleOpenModal = async () => {
     setIsLoadingDetails(true);
@@ -135,37 +145,82 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
     }
   };
 
-  const handleStatusChange = async (cotizacionId: number, newStatus: string, paymentData?: PaymentFormData) => {
+  const handleStatusChange = async (
+    cotizacion: Cotizacion,
+    newStatus: string,
+    fecha: Date,
+    paymentData?: PaymentFormData
+  ) => {
+    const fechaISO = fecha.toISOString().split('T')[0];
+    const cotizacionId = cotizacion.cotizacion_id;
+
     try {
-      console.log('CotizacionActionsButton: handleStatusChange called with', { cotizacionId, newStatus, paymentData });
-      const numericCotizacionId = typeof cotizacionId === 'string' ? parseInt(cotizacionId) : cotizacionId;
-      if (isNaN(numericCotizacionId)) {
-        throw new Error('ID de cotización inválido');
-      }
-      let processedPaymentData = undefined;
-      if (paymentData) {
-        processedPaymentData = {
-          ...paymentData,
-          monto: Number(paymentData.monto), 
-          porcentaje: Number(paymentData.porcentaje), 
-        };
-      }
-      const result = await updateCotizacionStatus(numericCotizacionId, newStatus, processedPaymentData);
-      console.log('CotizacionActionsButton: Status update result:', result);
-      if (result.success) {
-        if (onStatusChanged) {
-          console.log('CotizacionActionsButton: Calling onStatusChanged callback');
-          onStatusChanged();
+      let rpcResult;
+
+      if (newStatus === 'producción') {
+        if (!paymentData || paymentData.monto <= 0 || !paymentData.metodo_pago) {
+          throw new Error("Datos de anticipo inválidos para mover a producción.");
         }
+
+        const rpcParamsApprove = {
+          p_cotizacion_id: cotizacionId,
+          p_monto_anticipo: paymentData.monto,
+          p_metodo_pago: paymentData.metodo_pago,
+          p_moneda: cotizacion.moneda,
+          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null,
+          p_fecha_cambio: fechaISO
+        };
+        console.log("[ActionBtn] Calling aprobar_cotizacion_a_produccion with params:", rpcParamsApprove);
+        const { data, error } = await supabase.rpc('aprobar_cotizacion_a_produccion', rpcParamsApprove);
+        if (error) throw error;
+        rpcResult = data;
+
+      } else if (newStatus === 'rechazada') {
+        const rpcParamsReject = {
+          p_cotizacion_id: cotizacionId,
+          p_fecha_cambio: fechaISO
+        };
+        console.log("[ActionBtn] Calling rechazar_cotizacion with params:", rpcParamsReject);
+        const { data, error } = await supabase.rpc('rechazar_cotizacion', rpcParamsReject);
+        if (error) throw error;
+        rpcResult = data;
+
+      } else {
+        throw new Error(`Estado "${newStatus}" no manejado.`);
+      }
+
+      if (rpcResult === true) {
         return true;
       } else {
-        console.error('CotizacionActionsButton: Error updating status:', result.error);
-        toast.error("No se pudo actualizar el estado", { description: result.error });
-        return false;
+        throw new Error("La operación falló en la base de datos (RPC devolvió false).");
       }
+
     } catch (error: any) {
-      console.error('CotizacionActionsButton: Unexpected error in handleStatusChange:', error);
-      toast.error("Error desconocido", { description: error.message });
+      console.error("Error calling RPC function (raw error object):", error);
+      const messageFromServer = error?.message || JSON.stringify(error);
+      const errorMessage = messageFromServer.includes(':')
+        ? messageFromServer.split(':').pop().trim()
+        : messageFromServer;
+      throw new Error(errorMessage);
+    }
+  };
+
+  const handleModalSubmit = async (
+    cotizacionId: number,
+    newStatus: string,
+    fecha: Date,
+    paymentData?: PaymentFormData
+  ) => {
+    try {
+      const success = await handleStatusChange(cotizacion, newStatus, fecha, paymentData);
+      if (success) {
+        toast.success(`Estado de ${cotizacion.folio} actualizado.`);
+        onStatusChanged();
+      }
+      return success;
+    } catch (error: any) {
+      console.error("CotizacionActionsButton: Error updating status:", error.message);
+      toast.error(`Error al actualizar estado: "${error.message}"`);
       return false;
     }
   };
@@ -204,13 +259,15 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
             Editar
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={handleOpenModal} disabled={isLoadingDetails}>
-            <DollarSign className="mr-2 h-4 w-4" />
-            Cambiar estado
+          <DropdownMenuItem 
+            onClick={() => setIsStatusModalOpen(true)}
+            disabled={!canChangeStatus(cotizacion.estado)}
+            className="cursor-pointer"
+          >
+            <Edit className="mr-2 h-4 w-4" />
+            <span>Cambiar Estado</span>
           </DropdownMenuItem>
           
-          <DropdownMenuSeparator /> 
-
           <DropdownMenuItem onClick={handleDownloadPDF} disabled={isDownloading}>
             {isDownloading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -222,12 +279,19 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
         </DropdownMenuContent>
       </DropdownMenu>
       
-      <CotizacionStatusModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        cotizacion={detailedCotizacion}
-        onStatusChange={handleStatusChange}
-      />
+      {isStatusModalOpen && (
+        <CotizacionStatusModal
+          isOpen={isStatusModalOpen}
+          onClose={() => setIsStatusModalOpen(false)}
+          cotizacion={{
+            cotizacion_id: cotizacion.cotizacion_id,
+            folio: cotizacion.folio,
+            moneda: cotizacion.moneda,
+            total: cotizacion.total
+          }} 
+          onStatusChange={handleModalSubmit}
+        />
+      )}
     </>
   );
 }

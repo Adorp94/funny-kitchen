@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth0 } from "@auth0/auth0-react";
+// import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn, DollarSign } from "lucide-react";
-import UserDropdown from "@/components/auth/user-dropdown";
+import { cn } from "@/lib/utils";
+// import UserDropdown from "@/components/auth/user-dropdown";
 
 // Improved navigation items for a more general app with multiple modules
 const navigation = [
@@ -38,26 +39,25 @@ const navigation = [
   // }
 ];
 
-export function Header() {
+const LayoutHeader = () => {
+  // const { isAuthenticated, isLoading } = useAuth0();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, isLoading, loginWithRedirect } = useAuth0();
   
   // Check if a given path is active
   const isActive = (path: string) => {
-    // Special case for dashboard paths
-    if (path === "/dashboard") {
-      // Only consider active if we're on the dashboard home page exactly
-      return pathname === "/dashboard";
-    }
-    
-    // For other paths, check if the current path starts with the given path
-    return pathname === path || pathname.startsWith(path);
+    // Add null check for pathname
+    return pathname ? pathname === path || pathname.startsWith(path) : false;
+  };
+  
+  // Mobile menu navigation logic
+  const handleMobileLinkClick = () => {
+    setMobileMenuOpen(false);
   };
 
   return (
-    <header className="w-full bg-white border-b border-gray-100">
-      <div className="flex h-16 items-center justify-between max-w-[1440px] mx-auto px-6 sm:px-8 lg:px-10">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
         {/* Left section with logo */}
         <div className="flex items-center">
           <Link href="/dashboard" className="flex items-center mr-10">
@@ -88,20 +88,13 @@ export function Header() {
         </div>
         
         {/* Right section with authentication */}
-        <div className="flex items-center space-x-4">
-          {isLoading ? (
-            <div className="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
-          ) : user ? (
-            <UserDropdown />
-          ) : (
-            <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => loginWithRedirect()}
-            >
-              <LogIn className="mr-2 h-4 w-4" />
-              <span className="whitespace-nowrap">Iniciar Sesión</span>
-            </Button>
-          )}
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <nav className="flex items-center">
+            {/* Remove UserDropdown and conditional rendering */}
+            {/* {!isLoading && isAuthenticated && (
+              <UserDropdown />
+            )} */}
+          </nav>
           
           {/* Mobile menu button */}
           <Button
@@ -122,39 +115,32 @@ export function Header() {
       
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 py-2 px-4">
-          <nav className="flex flex-col space-y-1 max-w-[1440px] mx-auto">
+        <div className="absolute top-16 left-0 w-full bg-white shadow-md py-4 px-6 md:hidden z-40">
+          <nav className="flex flex-col space-y-3">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                onClick={handleMobileLinkClick}
+                className={cn(
+                  "flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors",
                   isActive(item.href)
-                    ? "text-emerald-600 bg-emerald-50"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
+                    ? "bg-muted text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
               >
-                <item.icon className="mr-2 h-4 w-4" />
+                <item.icon className={cn(
+                  "mr-3 h-5 w-5", 
+                  isActive(item.href) ? "text-primary" : "text-muted-foreground"
+                )} />
                 {item.name}
               </Link>
             ))}
-            
-            {/* Mobile authentication */}
-            {!user && !isLoading && (
-              <div className="px-3 py-3 mt-2">
-                <Button 
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => loginWithRedirect()}
-                >
-                  <LogIn className="mr-2 h-4 w-4" />
-                  <span className="whitespace-nowrap">Iniciar Sesión</span>
-                </Button>
-              </div>
-            )}
           </nav>
         </div>
       )}
     </header>
   );
-}
+};
+
+export default LayoutHeader;

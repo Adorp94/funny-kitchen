@@ -184,26 +184,24 @@ export function IngresoForm({
                       {cotizaciones?.map((cot) => (
                         <CommandItem
                           key={cot.cotizacion_id}
-                          // Use a unique value combining name/id for filtering
                           value={`cot-${cot.cotizacion_id}`}
                           onSelect={(currentValue) => {
                             const selectedId = parseInt(currentValue.split('-')[1]);
-                            form.setValue("cotizacion_id", selectedId);
-                            // Trigger validation if needed: form.trigger("cotizacion_id");
+                            form.setValue("cotizacion_id", selectedId, { shouldValidate: true });
                             setOpenCotizacionPopover(false);
                           }}
+                          className="flex items-center justify-between w-full"
                         >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              watchedCotizacionId === cot.cotizacion_id ? "opacity-100" : "opacity-0"
-                            )}
-                            aria-hidden="true"
-                          />
-                          <span key={`span-${cot.cotizacion_id}`}>
-                              <p className="text-sm font-medium">{cot.folio}</p>
-                              <p className="text-xs text-muted-foreground">{cot.cliente_nombre}</p>
-                          </span>
+                          <div className="flex items-center">
+                             <Check
+                               className={cn(
+                                 "mr-2 h-4 w-4",
+                                 watchedCotizacionId === cot.cotizacion_id ? "opacity-100" : "opacity-0"
+                               )}
+                               aria-hidden="true"
+                             />
+                             <span className="truncate text-sm">{cot.label}</span>
+                          </div>
                         </CommandItem>
                       ))}
                     </CommandGroup>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from 'react';
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, ShoppingBag, Users, TrendingUp, ClipboardList, DollarSign, Loader2 } from "lucide-react";
 import { 
   Card, 
@@ -13,7 +13,6 @@ import {
   CardTitle 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAuth0 } from "@auth0/auth0-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -23,32 +22,20 @@ interface DashboardMetrics {
   egresos: number;
 }
 
-export default function DashboardPage() {
-  const { isAuthenticated, isLoading: isAuthLoading, user } = useAuth0();
+function DashboardPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
 
-  // Log authentication state for debugging
-  console.log("[Dashboard] Auth state:", { isAuthenticated, isAuthLoading, user });
+  useEffect(() => {
+    // ... existing logic for search params ...
+  }, [searchParams]);
 
-  // Run only once on component mount to check authentication
   useEffect(() => {
-    if (!isAuthLoading) {
-      if (isAuthenticated) {
-        console.log("[Dashboard] User is authenticated with Auth0, showing dashboard");
-        setIsAuthorized(true);
-      } else {
-        console.log("[Dashboard] User is not authenticated, redirecting to login");
-        router.push('/');
-      }
-    }
-  }, [isAuthenticated, isAuthLoading, router]);
-  
-  // Fetch dashboard data when authentication is confirmed
-  useEffect(() => {
-    if (isAuthorized) {
+    if (isDataLoading) {
       console.log("[Dashboard] User is authorized, fetching dashboard data");
       setIsDataLoading(true);
       
@@ -95,30 +82,12 @@ export default function DashboardPage() {
       
       fetchDashboardData();
     }
-  }, [isAuthorized]);
-  
-  // Combined loading state for initial auth check
-  if (isAuthLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="mt-4 text-sm text-muted-foreground">Verificando sesión...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If not authorized and not loading auth, don't render anything (will redirect)
-  if (!isAuthorized) {
-    return null;
-  }
+  }, [isDataLoading]);
 
   const handleNavigate = (path: string) => {
     router.push(path);
   };
 
-  // Skeleton components slightly adjusted for new design
   const MetricCardSkeleton = () => (
     <Card className="p-4 shadow-sm">
       <CardHeader className="p-0 mb-1 flex flex-row items-center justify-between space-y-0 pb-1">
@@ -364,5 +333,73 @@ export default function DashboardPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+// Define DashboardSkeleton component
+const DashboardSkeleton = () => {
+  const MetricCardSkeleton = () => (
+    <Card className="p-4 shadow-sm">
+      <CardHeader className="p-0 mb-1 flex flex-row items-center justify-between space-y-0 pb-1">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-4" />
+      </CardHeader>
+      <CardContent className="p-0">
+        <Skeleton className="h-7 w-16" />
+      </CardContent>
+    </Card>
+  );
+
+  const ModuleCardSkeleton = () => (
+    <Card className="flex flex-col h-full shadow-sm p-5">
+      <CardHeader className="flex flex-col items-center p-0 pb-3">
+        <Skeleton className="h-9 w-9 rounded-lg mb-2" />
+        <Skeleton className="h-5 w-3/4 mb-1" />
+        <Skeleton className="h-3 w-1/2" />
+      </CardHeader>
+      <CardContent className="flex-1 p-0 mb-3">
+        <Skeleton className="h-3 w-full mb-1" />
+        <Skeleton className="h-3 w-5/6 mb-1" />
+        <Skeleton className="h-3 w-4/6" />
+      </CardContent>
+      <CardFooter className="p-0">
+        <Skeleton className="h-9 w-full" />
+      </CardFooter>
+    </Card>
+  );
+
+  return (
+    <div className="flex flex-col flex-1 py-6 md:py-8 gap-y-6 md:gap-y-8">
+      <header>
+        <Skeleton className="h-7 w-1/2 mb-2" /> 
+        <Skeleton className="h-4 w-3/4" />
+      </header>
+      <section>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+        </div>
+      </section>
+      <section>
+        <Skeleton className="h-6 w-1/3 mb-4 md:mb-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+          <ModuleCardSkeleton />
+          <ModuleCardSkeleton />
+          <ModuleCardSkeleton />
+          <ModuleCardSkeleton />
+          <ModuleCardSkeleton />
+          <ModuleCardSkeleton />
+        </div>
+      </section>
+    </div>
+  );
+};
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardPageContent />
+    </Suspense>
   );
 } 

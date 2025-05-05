@@ -3,7 +3,7 @@
 // Import the exported Supabase client instance directly
 import { supabase } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { convertToCSV } from '@/lib/utils'; // Import the helper
+import { convertToCSV, formatCurrency } from '@/lib/utils'; // Import the helper and formatCurrency
 
 // Types for financial data
 interface FinancialMetrics {
@@ -752,10 +752,9 @@ export async function getAvailableCotizaciones(): Promise<{
   error?: string 
 }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
-    
-    // Get cotizaciones with pending or partial payments
+    const allowedStatuses = ['pendiente', 'aprobada', 'anticipo_pagado', 'pagada_parcial', 'producción']; 
+
+    // Fetch cotizaciones and join client name
     const { data, error } = await supabase
       .from('cotizaciones')
       .select(`
@@ -765,51 +764,38 @@ export async function getAvailableCotizaciones(): Promise<{
         total,
         monto_pagado,
         porcentaje_completado,
-        cliente_id
+        cliente_id,
+        clientes ( nombre ) /* Join and select client name */ 
       `)
-      // .in('estado', ['enviada', 'producción']) // Keep commented or adjust as needed
-      .in('estatus_pago', ['pendiente', 'parcial']) // Restore this filter!
+      .in('estado', allowedStatuses)
       .order('fecha_creacion', { ascending: false });
     
     if (error) {
-      // Specific error for cotizacion fetch
-      console.error('Error fetching cotizaciones:', error);
-      throw new Error('Error al obtener cotizaciones de Supabase.'); 
+      console.error("Error fetching available cotizaciones:", error);
+      return { success: false, error: error.message };
     }
-    
-    // Get client names
-    const clienteIds = data.map(cotizacion => cotizacion.cliente_id).filter(Boolean);
-    
-    let clientesMap: Record<number, string> = {};
-    
-    if (clienteIds.length > 0) {
-      const { data: clientes, error: clientesError } = await supabase
-        .from('clientes')
-        .select('cliente_id, nombre')
-        .in('cliente_id', clienteIds);
+
+    // Map data, now using the joined client name
+    const mappedCotizaciones = data?.map(c => {
+      const total = c.total || 0;
+      const pagado = c.monto_pagado || 0;
+      const restante = Math.max(0, total - pagado);
+      const restanteFormatted = formatCurrency(restante, c.moneda);
+      // Access the nested client name correctly
+      const clienteNombre = c.clientes?.nombre || 'Cliente Desconocido'; 
+      const label = `${c.folio} - ${clienteNombre} (${restanteFormatted} ${restante > 0 ? 'restante' : 'pagado'})`;
       
-      if (clientesError) {
-         // Specific error for cliente fetch
-        console.error('Error fetching client names:', clientesError);
-        throw new Error('Error al obtener nombres de clientes de Supabase.'); 
-      }
-      
-      clientesMap = clientes.reduce((acc, cliente) => {
-        acc[cliente.cliente_id] = cliente.nombre || 'Cliente sin nombre';
-        return acc;
-      }, {} as Record<number, string>);
-    }
-    
-    // Map cotizaciones with client names
-    const cotizacionesWithClients = data.map(cotizacion => ({
-      ...cotizacion,
-      cliente_nombre: clientesMap[cotizacion.cliente_id] || 'Cliente desconocido'
-    }));
-    
-    return {
-      success: true,
-      cotizaciones: cotizacionesWithClients
-    };
+      return {
+        ...c,
+        label: label, 
+        value: c.cotizacion_id, 
+        restante: restante
+        // No need to spread c.clientes here unless other client fields are needed downstream
+      };
+    }) || [];
+
+    return { success: true, cotizaciones: mappedCotizaciones };
+
   } catch (error) {
     console.error('Error getting available cotizaciones:', error);
     // Return the specific error message from the throw statements

@@ -73,6 +73,7 @@ export default function CotizacionDetailPage() {
   const handleStatusChange = async (
     cotizacionId: number,
     newStatus: string,
+    fecha: Date,
     paymentData?: PaymentFormData
   ) => {
     if (!cotizacion) {
@@ -82,6 +83,7 @@ export default function CotizacionDetailPage() {
 
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id ?? null;
+    const fechaISO = fecha.toISOString().split('T')[0];
 
     try {
       let rpcResult;
@@ -98,7 +100,8 @@ export default function CotizacionDetailPage() {
           p_monto_anticipo: paymentData.monto,
           p_metodo_pago: paymentData.metodo_pago,
           p_moneda: cotizacion.moneda,
-          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null 
+          p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null, 
+          p_fecha_cambio: fechaISO
         };
         console.log("Calling aprobar_cotizacion_a_produccion with params:", rpcParamsApprove);
 
@@ -110,7 +113,8 @@ export default function CotizacionDetailPage() {
       } else if (newStatus === 'rechazada') {
         const rpcParamsReject = {
           p_cotizacion_id: cotizacionId,
-          p_usuario_id: userId 
+          p_usuario_id: userId, 
+          p_fecha_cambio: fechaISO
         };
         console.log("Calling rechazar_cotizacion with params:", rpcParamsReject);
 
