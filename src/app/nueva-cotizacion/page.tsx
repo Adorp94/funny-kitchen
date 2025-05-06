@@ -440,27 +440,22 @@ function NuevaCotizacionClient() {
 
   // Step indicator component (Keep existing)
   const StepIndicator = ({ currentStep }: { currentStep: number }) => {
-    const steps = ['Cliente', 'Productos', 'Resumen']; 
-    // Revert StepIndicator styling to previous state if changed, 
-    // focusing on removing extra centering/padding added recently
+    const steps = ['Cliente', 'Productos', 'Resumen'];
     return (
-      <nav aria-label="Progress" className="w-full max-w-xl"> {/* Ensure this max-width is intended */} 
-         {/* ... StepIndicator JSX, ensure it matches previous correct layout ... */}
-         {/* Example structure based on previous context, adjust if needed */}
+      <nav aria-label="Progress" className="w-full max-w-xl">
          <ol role="list" className="flex items-center space-x-8 sm:space-x-16">
            {steps.map((name, stepIdx) => {
              const stepNumber = stepIdx + 1;
              const isCompleted = stepNumber < currentStep;
              const isCurrent = stepNumber === currentStep;
-             // Original Navigation logic (allowing going back, step 3 requires products)
-             const canNavigate = stepNumber < currentStep || 
-                                (stepNumber === 3 && currentStep === 2 && productos.length > 0 && cliente) || 
+             const canNavigate = stepNumber < currentStep ||
+                                (stepNumber === 3 && currentStep === 2 && productos.length > 0 && cliente) ||
                                 (stepNumber === 2 && currentStep === 1 && cliente);
 
              return (
                <li key={name} className={`relative flex-1 ${stepIdx === steps.length - 1 ? 'flex-grow-0' : ''}`}>
                  {stepIdx < steps.length - 1 ? (
-                   <div className={`absolute left-4 top-4 -ml-px h-0.5 w-full ${isCompleted ? 'bg-primary' : 'bg-muted'}`} aria-hidden="true" />
+                   <div className={`absolute left-4 top-4 -ml-px h-0.5 ${isCompleted ? 'bg-primary' : 'bg-muted'} w-[calc(100%+2rem)] sm:w-[calc(100%+4rem)]`} aria-hidden="true" />
                  ) : null}
                  <button
                    onClick={() => {
@@ -511,20 +506,19 @@ function NuevaCotizacionClient() {
   // --- Render Logic --- 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Page Header - Revert alignment if changed */}
-      <div className="max-w-6xl mx-auto"> {/* Use original max-width if needed */} 
+      {/* Page Header */}
+      <div className="max-w-xl mx-auto"> {/* Changed from max-w-6xl */}
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Nueva Cotización
           </h1>
       </div>
-      {/* Step Indicator - Revert alignment if changed */} 
+      {/* Step Indicator */}
       <div className="flex justify-center pb-12">
          <StepIndicator currentStep={activeStep} />
       </div>
 
-      {/* Step Content - Revert alignment/width changes */} 
-      <div className="max-w-4xl mx-auto"> 
-        {/* Step 1: Cliente */} 
+      {/* Step Content */}
+      <div className="max-w-xl mx-auto"> {/* Changed from max-w-6xl */}
         {activeStep === 1 && (
           <Card>
             <CardHeader>
