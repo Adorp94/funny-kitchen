@@ -251,6 +251,31 @@ function DashboardPageContent() {
                 </CardFooter>
               </Card>
 
+              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
+                <CardHeader className="flex flex-col items-center p-0 pb-3">
+                  <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-2 mb-2">
+                    <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <CardTitle className="text-base font-semibold text-center">Producción</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Seguimiento de órdenes</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 mb-4">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Visualiza y gestiona el estado de las órdenes en la cola de producción.
+                  </p>
+                </CardContent>
+                <CardFooter className="p-0">
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => handleNavigate('/produccion')}
+                  >
+                    Ir a Producción
+                  </Button>
+                </CardFooter>
+              </Card>
+
               <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
                 <CardHeader className="flex flex-col items-center p-0 pb-3">
                   <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-2 mb-2">
@@ -299,31 +324,6 @@ function DashboardPageContent() {
                     title="Módulo en desarrollo"
                   >
                     Ir a Inventario
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
-                <CardHeader className="flex flex-col items-center p-0 pb-3">
-                  <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-2 mb-2">
-                    <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <CardTitle className="text-base font-semibold text-center">Producción</CardTitle> 
-                  <CardDescription className="text-center text-xs mt-1">Seguimiento de órdenes</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 p-0 mb-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Visualiza y gestiona el estado de las órdenes en la cola de producción.
-                  </p>
-                </CardContent>
-                <CardFooter className="p-0">
-                  <Button 
-                    variant="outline"
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleNavigate('/produccion')}
-                  >
-                    Ir a Producción
                   </Button>
                 </CardFooter>
               </Card>

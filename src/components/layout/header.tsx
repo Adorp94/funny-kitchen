@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 // import { useAuth0 } from "@auth0/auth0-react";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn, DollarSign } from "lucide-react";
+import { LayoutDashboard, Menu, X, FileText, ShoppingBag, Users, LogIn, DollarSign, Factory } from "lucide-react";
 import { cn } from "@/lib/utils";
 // import UserDropdown from "@/components/auth/user-dropdown";
 
@@ -20,6 +20,11 @@ const navigation = [
     name: "Cotizaciones",
     href: "/dashboard/cotizaciones",
     icon: FileText,
+  },
+  {
+    name: "Producción",
+    href: "/produccion", // Or /dashboard/produccion if that's the correct path
+    icon: Factory,
   },
   {
     name: "Finanzas",
