@@ -23,6 +23,7 @@ type QueueApiResponseItem = {
   producto_nombre: string | null;
   vueltas_max_dia: number;
   moldes_disponibles: number;
+  assigned_molds: number;
   vaciado_duration_days: number | null;
 };
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
         qty_total,
         qty_pendiente,
         vaciado_duration_days,
+        assigned_molds,
         cotizacion_productos!inner (
             cotizacion_id,
             producto_id,
@@ -124,6 +126,7 @@ export async function GET(request: NextRequest) {
         producto_nombre: producto?.nombre ?? null,
         vueltas_max_dia: producto?.vueltas_max_dia ?? 1,
         moldes_disponibles: producto?.moldes_disponibles ?? 1,
+        assigned_molds: item.assigned_molds ?? 1,
         vaciado_duration_days: item.vaciado_duration_days,
       };
     });
@@ -147,45 +150,119 @@ export async function GET(request: NextRequest) {
 // TODO: Implement PATCH handler for status updates
 export async function PATCH(request: NextRequest) {
     try {
-         const { queue_id, status } = await request.json();
+         const { queue_id, status, assigned_molds: newAssignedMolds } = await request.json();
          
-         console.log(`[API /production/queue PATCH] Received update request for queue_id: ${queue_id}, status: ${status}`);
+         console.log(`[API /production/queue PATCH] Received update request for queue_id: ${queue_id}, status: ${status}, assigned_molds: ${newAssignedMolds}`);
 
-         if (!queue_id || !status) {
-             return NextResponse.json({ error: 'queue_id y status son requeridos' }, { status: 400 });
+         if (!queue_id) {
+             return NextResponse.json({ error: 'queue_id es requerido' }, { status: 400 });
          }
 
-         // Validate status maybe?
-         const validStatuses = ['queued', 'in_progress', 'done', 'cancelled'];
-         if (!validStatuses.includes(status)) {
-             return NextResponse.json({ error: `Estado inválido: ${status}` }, { status: 400 });
+         // Initialize an object to hold the fields to be updated
+         const updatePayload: { status?: string; assigned_molds?: number; vaciado_duration_days?: number | null } = {};
+         let needsRecalculation = false;
+
+         // Get current Supabase client
+         const cookieStore = cookies();
+         const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+              cookies: {
+                get: (name: string) => cookieStore.get(name)?.value,
+                set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
+                remove: (name: string, options: any) => cookieStore.remove(name, options),
+              },
+            }
+          );
+        
+          const plannerService = new ProductionPlannerService(supabase);
+
+         // Handle status update
+         if (status) {
+            const validStatuses = ['queued', 'in_progress', 'done', 'cancelled'];
+            if (!validStatuses.includes(status)) {
+                return NextResponse.json({ error: `Estado inválido: ${status}` }, { status: 400 });
+            }
+            updatePayload.status = status;
+            if (status === 'done' || status === 'cancelled') {
+                needsRecalculation = true;
+            }
          }
 
-         // Update the status in the database
+         // Handle assigned_molds update
+         if (newAssignedMolds !== undefined) {
+            if (typeof newAssignedMolds !== 'number' || newAssignedMolds <= 0) {
+                return NextResponse.json({ error: 'assigned_molds debe ser un número positivo.' }, { status: 400 });
+            }
+
+            // Fetch current queue item and related product data for validation and calculation
+            const { data: currentItemData, error: itemError } = await supabase
+              .from('production_queue')
+              .select(`
+                qty_total,
+                cotizacion_productos!inner (
+                  productos!inner (
+                    moldes_disponibles
+                  )
+                )
+              `)
+              .eq('queue_id', queue_id)
+              .single();
+
+            if (itemError || !currentItemData) {
+              console.error(`[API /production/queue PATCH] Error fetching item ${queue_id} for mold update:`, itemError);
+              return NextResponse.json({ error: `Item con ID ${queue_id} no encontrado o error al leerlo.` }, { status: 404 });
+            }
+            
+            const productDetails = currentItemData.cotizacion_productos?.productos;
+            if (!productDetails || productDetails.moldes_disponibles === null || productDetails.moldes_disponibles === undefined) {
+                 console.error(`[API /production/queue PATCH] No se pudo obtener moldes_disponibles para el producto del item ${queue_id}.`);
+                 return NextResponse.json({ error: 'No se pudo obtener información del producto para validar moldes.' }, { status: 500 });
+            }
+
+            if (newAssignedMolds > productDetails.moldes_disponibles) {
+                return NextResponse.json({ error: `assigned_molds (${newAssignedMolds}) no puede exceder los moldes disponibles del producto (${productDetails.moldes_disponibles}).` }, { status: 400 });
+            }
+            
+            updatePayload.assigned_molds = newAssignedMolds;
+            
+            // Calculate new vaciado_duration_days based on the VBA logic
+            // vaciado_duration_days = Ceiling((qty_total / assigned_molds) * 1.08, 1) + 5
+            const qtyTotal = currentItemData.qty_total;
+            if (qtyTotal === null || qtyTotal === undefined) {
+                 console.error(`[API /production/queue PATCH] qty_total es nulo para el item ${queue_id}.`);
+                return NextResponse.json({ error: 'No se pudo calcular duración, cantidad total no disponible.' }, { status: 500 });
+            }
+            updatePayload.vaciado_duration_days = Math.ceil((qtyTotal / newAssignedMolds) * 1.08) + 5;
+            needsRecalculation = true; // Changing molds or duration requires full queue recalc
+         }
+
+         if (Object.keys(updatePayload).length === 0) {
+            return NextResponse.json({ error: 'No se proporcionaron campos para actualizar (status o assigned_molds).' }, { status: 400 });
+         }
+         
+         console.log(`[API /production/queue PATCH] Updating queue_id ${queue_id} with payload:`, updatePayload);
+
          const { data, error } = await supabase
              .from('production_queue')
-             .update({ status: status })
+             .update(updatePayload)
              .eq('queue_id', queue_id)
-             .select() // Optionally select the updated row to return
+             .select() 
              .single();
 
          if (error) {
-             console.error(`[API /production/queue PATCH] Error updating status for queue_id ${queue_id}:`, error);
-             if (error.code === 'PGRST116') { // row not found
+             console.error(`[API /production/queue PATCH] Error updating queue_id ${queue_id}:`, error);
+             if (error.code === 'PGRST116') { 
                   return NextResponse.json({ error: `Item con ID ${queue_id} no encontrado.` }, { status: 404 });
              }
-             return NextResponse.json({ error: 'Error al actualizar el estado' }, { status: 500 });
+             return NextResponse.json({ error: 'Error al actualizar el item en la cola' }, { status: 500 });
          }
 
-         console.log(`[API /production/queue PATCH] Successfully updated status for queue_id ${queue_id} to ${status}.`);
+         console.log(`[API /production/queue PATCH] Successfully updated queue_id ${queue_id}.`);
 
-         // Decide if recalculation is needed
-         // Maybe only recalculate if status changes TO done/cancelled?
-         if (status === 'done' || status === 'cancelled') {
-             console.log(`[API /production/queue PATCH] Status changed to ${status}, triggering queue recalculation.`);
-             // Import and instantiate the service
-             const plannerService = new ProductionPlannerService(supabase);
-             // Run recalculation in the background (don't await)
+         if (needsRecalculation) {
+             console.log(`[API /production/queue PATCH] Triggering queue recalculation due to changes.`);
              plannerService.recalculateEntireQueue().catch(err => {
                  console.error("[API /production/queue PATCH] Background recalculation failed:", err);
              }); 
@@ -195,6 +272,6 @@ export async function PATCH(request: NextRequest) {
 
     } catch (error) {
          console.error('[API /production/queue PATCH] Unexpected error:', error);
-         return NextResponse.json({ error: 'Error interno del servidor al actualizar estado' }, { status: 500 });
+         return NextResponse.json({ error: 'Error interno del servidor al actualizar item de la cola' }, { status: 500 });
     }
 } 

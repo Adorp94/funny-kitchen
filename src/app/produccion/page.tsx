@@ -89,8 +89,43 @@ export default function ProduccionPage() {
       }
   }, [fetchData]);
 
+  const handleAssignedMoldsChange = useCallback(async (queueId: number, newMolds: number) => {
+    console.log(`ProduccionPage: handleAssignedMoldsChange called for queueId ${queueId} to ${newMolds} molds`);
+    try {
+      const response = await fetch('/api/production/queue', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ queue_id: queueId, assigned_molds: newMolds }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`API PATCH (Molds) Error Response: ${response.status}`, errorData);
+        throw new Error(errorData.error || `Error al actualizar moldes asignados (HTTP ${response.status})`);
+      }
+
+      const result = await response.json();
+      console.log("Assigned molds update successful:", result);
+      toast.success("Éxito", {
+        description: `Moldes asignados para el item ${queueId} actualizados a ${newMolds}. La cola se recalculará.`,
+      });
+
+      // Refresh data after successful update (recalculation happens server-side)
+      await fetchData();
+
+    } catch (err: any) {
+      console.error("Failed to update assigned molds:", err);
+      const errorMsg = err.message || "No se pudo actualizar los moldes asignados.";
+      toast.error("Error al actualizar moldes", {
+        description: errorMsg,
+      });
+    }
+  }, [fetchData]);
+
   // Define columns using the function, passing the handler and refetch
-  const columns = useMemo(() => getColumns(handleStatusUpdate, fetchData), [handleStatusUpdate, fetchData]);
+  const columns = useMemo(() => getColumns(handleStatusUpdate, handleAssignedMoldsChange, fetchData), [handleStatusUpdate, handleAssignedMoldsChange, fetchData]);
 
   useEffect(() => {
     fetchData();

@@ -40,8 +40,9 @@ export type ProductionQueueItem = {
   created_at: string; // ISO String
   eta_start_date: string | null; // YYYY-MM-DD String
   eta_end_date: string | null; // YYYY-MM-DD String
-  vueltas_max_dia: number;
-  moldes_disponibles: number;
+  vueltas_max_dia: number; // This might become less relevant or represent max possible for product type
+  moldes_disponibles: number; // This is total for product type, used as max for assigned_molds
+  assigned_molds: number; // New: Molds assigned to this specific queue item
   vaciado_duration_days: number | null;
 }
 
@@ -64,7 +65,11 @@ const formatDateCell = (dateString: string | null | undefined): string => {
 };
 
 // Make columns a function that accepts the callback
-export const getColumns = (onStatusChange: (queueId: number, newStatus: string) => Promise<void>, refetchData: () => void): ColumnDef<ProductionQueueItem>[] => [
+export const getColumns = (
+  onStatusChange: (queueId: number, newStatus: string) => Promise<void>,
+  onAssignedMoldsChange: (queueId: number, newMolds: number) => Promise<void>,
+  refetchData: () => void
+): ColumnDef<ProductionQueueItem>[] => [
     {
         id: "select",
         header: ({ table }) => (
@@ -118,23 +123,10 @@ export const getColumns = (onStatusChange: (queueId: number, newStatus: string) 
     cell: ({ row }) => {
       const item = row.original;
       const productoNombre = item.producto_nombre ?? 'N/A';
-      const moldes = item.moldes_disponibles ?? 'N/A';
-      const vueltas = item.vueltas_max_dia ?? 'N/A';
-
       return (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="min-w-[150px] font-medium cursor-help">
-                {productoNombre}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Moldes Disp: {moldes}</p>
-              <p>Vueltas/Día: {vueltas}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="min-w-[150px] font-medium">
+          {productoNombre}
+        </div>
       );
     },
   },
@@ -153,6 +145,62 @@ export const getColumns = (onStatusChange: (queueId: number, newStatus: string) 
     ),
     cell: ({ row }) => <div className="text-right">{row.getValue("qty_pendiente")}</div>,
     enableSorting: true,
+  },
+  {
+    accessorKey: "assigned_molds",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Moldes Asig." />
+    ),
+    cell: ({ row }) => {
+      const item = row.original;
+      // Using React.useState for inline editing of assigned_molds
+      const [currentMolds, setCurrentMolds] = useState<number | string>(item.assigned_molds ?? '');
+      const [isLoading, setIsLoading] = useState(false);
+
+      const handleMoldsInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setCurrentMolds(event.target.value);
+      };
+
+      const handleMoldsSave = async () => {
+        const newMoldsValue = Number(currentMolds);
+        if (currentMolds === '' || isNaN(newMoldsValue) || newMoldsValue <= 0) {
+          // Revert to original value or show error and revert
+          setCurrentMolds(item.assigned_molds);
+          // TODO: Consider showing a toast notification for invalid input
+          return;
+        }
+
+        if (newMoldsValue !== item.assigned_molds) {
+          setIsLoading(true);
+          try {
+            await onAssignedMoldsChange(item.queue_id, newMoldsValue);
+            // refetchData(); // Parent component will call refetchData
+          } catch (error) {
+            console.error("Failed to update molds:", error);
+            setCurrentMolds(item.assigned_molds); // Revert on error
+            // TODO: Consider showing a toast notification for the error
+          } finally {
+            setIsLoading(false);
+          }
+        }
+      };
+
+      return (
+        <input
+          type="number"
+          value={currentMolds}
+          onChange={handleMoldsInputChange}
+          onBlur={handleMoldsSave} // Save on blur
+          onKeyDown={(e) => { if (e.key === 'Enter') handleMoldsSave(); }} // Save on Enter
+          className="w-20 text-right p-1 border rounded-md focus:ring-2 focus:ring-blue-500"
+          min="1"
+          disabled={isLoading}
+          // Max validation against product.moldes_disponibles should ideally be handled
+          // by the API, but can also be added here if that data is easily available.
+        />
+      );
+    },
+    enableSorting: false, // Usually, don't sort by an input field
   },
   {
     accessorKey: "status",
@@ -194,7 +242,7 @@ export const getColumns = (onStatusChange: (queueId: number, newStatus: string) 
   {
     accessorKey: "vaciado_duration_days",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Días Vaciado" />
+      <DataTableColumnHeader column={column} title="Días Prod. (Calc)" />
     ),
     cell: ({ row }) => {
       const days = row.getValue("vaciado_duration_days") as number | null;

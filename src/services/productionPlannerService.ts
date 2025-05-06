@@ -26,13 +26,17 @@ interface QueueItem {
     premium: boolean;
     created_at: string; // ISO string date
     vueltas_max_dia: number;
-    eta_start_date?: Date | string | null; // Allow string for input
-    eta_end_date?: Date | string | null; // Allow string for input
+    moldes_disponibles_producto: number;
+    assigned_molds: number;
+    vaciado_duration_days: number | null;
+    eta_start_date?: Date | string | null;
+    eta_end_date?: Date | string | null;
     // --- Simulation-specific state ---
     sim_qty_pendiente?: number;
     sim_eta_start_date?: Date | null;
     sim_eta_end_date?: Date | null;
     sim_days_in_production?: number;
+    sim_is_active_in_simulation?: boolean; // New flag for active items
 }
 
 interface SimulationResult {
@@ -132,7 +136,19 @@ export class ProductionPlannerService {
         this.supabase = supabaseClient;
     }
 
-    // Fetches queue items ready for simulation, joins to get vueltas_max_dia
+    private _calculateVaciadoDurationDays(qtyTotal: number, assignedMolds: number): number {
+        if (assignedMolds <= 0) {
+            // Avoid division by zero or non-sensical results; return a large number or throw error
+            // For now, let's assume assignedMolds is validated to be > 0 before calling this.
+            console.warn("[_calculateVaciadoDurationDays] assignedMolds is 0 or less, returning high duration.");
+            return 999; 
+        }
+        // Formula from VBA: Ceiling((qty_total / assigned_molds) * 1.08, 1) + 5
+        const duration = Math.ceil((qtyTotal / assignedMolds) * 1.08) + 5;
+        return duration;
+    }
+
+    // Fetches queue items ready for simulation, joins to get product capabilities
     private async _fetchQueueForSimulation(): Promise<QueueItem[]> {
         const { data, error } = await this.supabase
             .from('production_queue')
@@ -140,37 +156,39 @@ export class ProductionPlannerService {
                 *,
                 cotizacion_productos!inner (
                     producto_id,
-                    productos!inner ( vueltas_max_dia )
+                    productos!inner ( vueltas_max_dia, moldes_disponibles ) 
                 )
             `)
-            .in('status', ['queued', 'in_progress']) // Only fetch items not done/cancelled
-            .order('premium', { ascending: false }) // Premium first
-            .order('created_at', { ascending: true }); // Then FIFO by creation
+            .in('status', ['queued', 'in_progress'])
+            .order('premium', { ascending: false })
+            .order('created_at', { ascending: true });
 
         if (error) {
             console.error('Error fetching production queue for simulation:', error);
             throw new Error('Failed to fetch production queue.');
         }
 
-        // Transform data, ensuring vueltas_max_dia is correctly extracted
         const queueItems: QueueItem[] = data.map((item: any) => {
-             // Safely navigate the potentially complex nested structure
-             const vueltas = item.cotizacion_productos?.productos?.vueltas_max_dia ?? 1;
+             const producto = item.cotizacion_productos?.productos;
              return {
                  queue_id: item.queue_id,
                  cotizacion_producto_id: item.cotizacion_producto_id,
-                 product_id: item.cotizacion_productos?.producto_id, // Get product_id from relation
+                 product_id: item.cotizacion_productos?.producto_id,
                  qty_total: item.qty_total,
-                 qty_pendiente: item.qty_pendiente, // Use actual pending qty
+                 qty_pendiente: item.qty_pendiente,
                  premium: item.premium,
                  created_at: item.created_at,
-                 vueltas_max_dia: vueltas,
-                 eta_start_date: item.eta_start_date, // Keep original dates
+                 // Product capabilities:
+                 vueltas_max_dia: producto?.vueltas_max_dia ?? 1,
+                 moldes_disponibles_producto: producto?.moldes_disponibles ?? 1,
+                 // Item specific:
+                 assigned_molds: item.assigned_molds ?? 1, // Default if null, though DB has NOT NULL DEFAULT 1
+                 vaciado_duration_days: item.vaciado_duration_days, // Should be populated by API or recalculate
+                 eta_start_date: item.eta_start_date,
                  eta_end_date: item.eta_end_date,
-                 status: item.status // Include status if needed elsewhere
+                 // status: item.status // if needed
              };
-         }).filter(item => item.product_id != null); // Filter out items where product_id couldn't be determined
-
+         }).filter(item => item.product_id != null);
 
         console.log(`[_fetchQueueForSimulation] Fetched ${queueItems.length} items for simulation.`);
         return queueItems;
@@ -181,109 +199,126 @@ export class ProductionPlannerService {
     private _runSimulation(queueSnapshot: QueueItem[]): Map<number, SimulationResult> {
         console.log(`[_runSimulation] Starting simulation for ${queueSnapshot.length} items.`);
         const simulationResults = new Map<number, SimulationResult>();
-        const itemsToProcess = new Map<number, QueueItem>(); // Use map for efficient lookup/update
-
+        
         // Initialize simulation state for each item
-        queueSnapshot.forEach(item => {
-            itemsToProcess.set(item.queue_id, {
-                ...item,
-                sim_qty_pendiente: item.qty_pendiente > 0 ? item.qty_pendiente : item.qty_total, // Reset pending if needed or use existing
-                sim_eta_start_date: null,
-                sim_eta_end_date: null,
-                sim_days_in_production: 0
-            });
-        });
+        // Sort by premium then created_at to process in order of priority
+        const itemsToProcess = queueSnapshot.sort((a, b) => {
+            if (a.premium && !b.premium) return -1;
+            if (!a.premium && b.premium) return 1;
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }).map(item => ({
+            ...item,
+            sim_qty_pendiente: item.qty_total, // Production is for the whole qty
+            sim_eta_start_date: null,
+            sim_eta_end_date: null,
+            sim_days_in_production: 0,
+            sim_is_active_in_simulation: false,
+            // Ensure vaciado_duration_days is available and valid
+            vaciado_duration_days: item.vaciado_duration_days && item.vaciado_duration_days > 0 
+                                   ? item.vaciado_duration_days 
+                                   : this._calculateVaciadoDurationDays(item.qty_total, item.assigned_molds || 1)
+        }));
 
-        let currentDate = new Date();
-        currentDate.setHours(0, 0, 0, 0); // Start simulation from today
-        let remainingItemsCount = itemsToProcess.size;
+        let currentDate = new Date(); // Or a specific start date for simulation if needed
+        currentDate.setHours(0, 0, 0, 0);
+        
+        let remainingItemsToComplete = itemsToProcess.filter(item => item.sim_qty_pendiente > 0).length;
 
-        const MAX_SIMULATION_DAYS = 365 * 2; // Safety break: 2 years
-        let simulationDay = 0;
+        const MAX_SIMULATION_DAYS = 365 * 3; // Safety break: 3 years
+        let simulationDayCounter = 0;
 
-        while (remainingItemsCount > 0 && simulationDay < MAX_SIMULATION_DAYS) {
-            simulationDay++;
+        console.log(`[_runSimulation] Initial items to complete: ${remainingItemsToComplete}`);
+
+        while (remainingItemsToComplete > 0 && simulationDayCounter < MAX_SIMULATION_DAYS) {
+            simulationDayCounter++;
             const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
             let moldesDisponiblesHoy = 0;
 
-            // Determine available molds based on day of week
             if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday - Friday
                 moldesDisponiblesHoy = MOLDS_LUN_VIE;
             } else if (dayOfWeek === 6) { // Saturday
                 moldesDisponiblesHoy = MOLDS_SAB;
-            } else { // Sunday
+            } else { // Sunday - 0 molds, but still advance day for active items
                 moldesDisponiblesHoy = 0;
             }
+            
+            // console.log(`\nSim Day ${simulationDayCounter} (${formatDate(currentDate)}, Day ${dayOfWeek}), Capacity: ${moldesDisponiblesHoy}`);
 
-            if (moldesDisponiblesHoy > 0) {
-                // Process items strictly by the pre-sorted order (premium -> created_at)
-                for (const queueItem of queueSnapshot) {
-                    const simItem = itemsToProcess.get(queueItem.queue_id);
-
-                    // Skip if item not found, already finished, or no molds left today
-                    if (!simItem || simItem.sim_qty_pendiente <= 0) continue;
-                    if (moldesDisponiblesHoy <= 0) break;
-
-                    // Set start date on the first day of production for this item
-                    if (!simItem.sim_eta_start_date) {
-                        simItem.sim_eta_start_date = new Date(currentDate);
-                        console.log(`  Sim [${formatDate(currentDate)}]: Item ${simItem.queue_id} (P${simItem.product_id}) starting.`);
-                    }
-
-                    const vueltas = Math.max(1, simItem.vueltas_max_dia); // Ensure at least 1 vuelta
-                    // Calculate max items this specific product can produce per mold today
-                    const maxItemsPerMold = vueltas;
-                    // Calculate molds needed assuming full vueltas for remaining qty
-                    const moldsNeeded = Math.ceil(simItem.sim_qty_pendiente / maxItemsPerMold);
-                    // How many molds can we actually assign to this item today?
-                    const moldsAssigned = Math.min(moldsNeeded, moldesDisponiblesHoy);
-
-                    // How many items can be produced with the assigned molds and vueltas?
-                    const qtyProducedToday = Math.min(simItem.sim_qty_pendiente, moldsAssigned * maxItemsPerMold);
-
-                    if (qtyProducedToday > 0) {
-                        simItem.sim_qty_pendiente -= qtyProducedToday;
-                        moldesDisponiblesHoy -= moldsAssigned; // Reduce global molds
+            // 1. Process ACTIVE items: increment their production days, check for completion
+            for (const simItem of itemsToProcess) {
+                if (simItem.sim_is_active_in_simulation && simItem.sim_qty_pendiente > 0) {
+                    if (moldesDisponiblesHoy >= 0) { // Even on Sundays/0-mold days, production day counts
                         simItem.sim_days_in_production = (simItem.sim_days_in_production || 0) + 1;
-                         console.log(`  Sim [${formatDate(currentDate)}]: Item ${simItem.queue_id} (P${simItem.product_id}) produced ${qtyProducedToday} (rem ${simItem.sim_qty_pendiente}), used ${moldsAssigned} molds. Global left: ${moldesDisponiblesHoy}`);
+                        // console.log(`  Active: Item ${simItem.queue_id} (P${simItem.product_id}) now at ${simItem.sim_days_in_production}/${simItem.vaciado_duration_days} days.`);
                     }
 
-                    // Check if finished
-                    if (simItem.sim_qty_pendiente <= 0) {
-                        simItem.sim_eta_end_date = new Date(currentDate); // Finished today
-                        remainingItemsCount--;
-                        console.log(`  Sim [${formatDate(currentDate)}]: Item ${simItem.queue_id} (P${simItem.product_id}) FINISHED. ${remainingItemsCount} items left.`);
-                        // Store final result for this item
-                         simulationResults.set(simItem.queue_id, {
-                             item: simItem, // Keep the simulation state
-                             startDate: simItem.sim_eta_start_date,
-                             endDate: simItem.sim_eta_end_date
-                         });
+                    if (simItem.sim_days_in_production >= simItem.vaciado_duration_days) {
+                        simItem.sim_eta_end_date = new Date(currentDate);
+                        simItem.sim_qty_pendiente = 0;
+                        simItem.sim_is_active_in_simulation = false; // No longer actively uses molds from tomorrow
+                        remainingItemsToComplete--;
+                        console.log(`  COMPLETED: Item ${simItem.queue_id} (P${simItem.product_id}) finished on ${formatDate(currentDate)}. Remaining items: ${remainingItemsToComplete}`);
+                        simulationResults.set(simItem.queue_id, {
+                            item: simItem, // Store the original item for reference if needed
+                            startDate: simItem.sim_eta_start_date,
+                            endDate: simItem.sim_eta_end_date,
+                        });
                     }
                 }
             }
+            
+            // 2. Try to START NEW items based on priority and available capacity *for today*
+            if (moldesDisponiblesHoy > 0) {
+                for (const simItem of itemsToProcess) {
+                    if (simItem.sim_qty_pendiente > 0 && !simItem.sim_is_active_in_simulation && !simItem.sim_eta_start_date) {
+                        if (moldesDisponiblesHoy >= simItem.assigned_molds) {
+                            simItem.sim_eta_start_date = new Date(currentDate);
+                            simItem.sim_is_active_in_simulation = true;
+                            moldesDisponiblesHoy -= simItem.assigned_molds;
+                            // First day of production also counts towards sim_days_in_production
+                            simItem.sim_days_in_production = (simItem.sim_days_in_production || 0) + 1; 
+                            console.log(`  STARTED: Item ${simItem.queue_id} (P${simItem.product_id}) using ${simItem.assigned_molds} molds. Capacity left: ${moldesDisponiblesHoy}. Duration: ${simItem.vaciado_duration_days} days.`);
+                            
+                            // Check for immediate completion if duration is 1 day
+                            if (simItem.sim_days_in_production >= simItem.vaciado_duration_days) {
+                                simItem.sim_eta_end_date = new Date(currentDate);
+                                simItem.sim_qty_pendiente = 0;
+                                simItem.sim_is_active_in_simulation = false;
+                                remainingItemsToComplete--;
+                                console.log(`  COMPLETED (1-day): Item ${simItem.queue_id} (P${simItem.product_id}) finished on ${formatDate(currentDate)}. Remaining items: ${remainingItemsToComplete}`);
+                                simulationResults.set(simItem.queue_id, {
+                                    item: simItem,
+                                    startDate: simItem.sim_eta_start_date,
+                                    endDate: simItem.sim_eta_end_date,
+                                });
+                            } // end immediate completion check
+                        } else {
+                            // console.log(`  Skipping start for Item ${simItem.queue_id} (P${simItem.product_id}): needs ${simItem.assigned_molds}, has ${moldesDisponiblesHoy}`);
+                        }
+                    }
+                    if (moldesDisponiblesHoy <= 0) break; // No more capacity for today
+                }
+            }
 
-            // Move to the next day
+            // Advance to the next day
             currentDate.setDate(currentDate.getDate() + 1);
-        } // End while loop
-
-        if (simulationDay >= MAX_SIMULATION_DAYS) {
-             console.warn(`[_runSimulation] Simulation stopped after ${MAX_SIMULATION_DAYS} days. ${remainingItemsCount} items might be unfinished.`);
         }
 
-         // Ensure items that started but didn't finish get a result entry (with null end date)
-         itemsToProcess.forEach(simItem => {
-             if (simItem.sim_qty_pendiente > 0 && !simulationResults.has(simItem.queue_id)) {
-                 simulationResults.set(simItem.queue_id, {
-                     item: simItem,
-                     startDate: simItem.sim_eta_start_date,
-                     endDate: null // Indicate it didn't finish within simulation time
-                 });
-             }
-         });
-
-
-        console.log(`[_runSimulation] Simulation finished in ${simulationDay} days. Processed ${simulationResults.size} items.`);
+        if (simulationDayCounter >= MAX_SIMULATION_DAYS && remainingItemsToComplete > 0) {
+            console.warn(`[_runSimulation] Simulation reached MAX_SIMULATION_DAYS (${MAX_SIMULATION_DAYS}) with ${remainingItemsToComplete} items still pending.`);
+            // Handle items that didn't finish: record them as not having ETAs or partial ETAs
+            itemsToProcess.forEach(simItem => {
+                if (simItem.sim_qty_pendiente > 0 && !simulationResults.has(simItem.queue_id)) {
+                     simulationResults.set(simItem.queue_id, {
+                        item: simItem,
+                        startDate: simItem.sim_eta_start_date, // Might have started
+                        endDate: null, // But did not finish
+                    });
+                }
+            });
+        }
+        
+        console.log(`[_runSimulation] Finished simulation in ${simulationDayCounter} days. Results collected for ${simulationResults.size} items.`);
         return simulationResults;
     }
 
@@ -292,23 +327,61 @@ export class ProductionPlannerService {
         productId: number,
         qty: number,
         isPremium: boolean,
-        vueltasMaxDia: number
+        assignedMoldsForItem: number
     ): Promise<ETAResult> {
-        console.log(`[calculateETA] Product ${productId}, Qty ${qty}, Premium: ${isPremium}, Vueltas: ${vueltasMaxDia}`);
+        console.log(`[calculateETA] Product ${productId}, Qty ${qty}, Premium: ${isPremium}, Assigned Molds: ${assignedMoldsForItem}`);
+        
+        if (assignedMoldsForItem <= 0) {
+            // If user hasn't specified, or an invalid value is passed, default to 1 for estimation purposes.
+            console.warn("[calculateETA] assignedMoldsForItem is 0 or less. Defaulting to 1 for estimation.");
+            assignedMoldsForItem = 1;
+        }
+
         const currentQueue = await this._fetchQueueForSimulation();
+
+        // Fetch product capabilities for the item being estimated
+        const { data: productData, error: productError } = await this.supabase
+            .from('productos')
+            .select('moldes_disponibles, vueltas_max_dia') 
+            .eq('producto_id', productId)
+            .single();
+
+        if (productError || !productData) {
+            console.error(`[calculateETA] Error fetching product data for product ${productId}:`, productError);
+            throw new Error("Failed to calculate ETA due to missing product data.");
+        }
+
+        const moldesDisponiblesProducto = productData.moldes_disponibles ?? 1;
+        // Ensure the estimate doesn't use more molds than the product has.
+        if (assignedMoldsForItem > moldesDisponiblesProducto) {
+            console.warn(`[calculateETA] assignedMoldsForItem (${assignedMoldsForItem}) exceeds product's available molds (${moldesDisponiblesProducto}). Clamping to available molds for estimate.`);
+            assignedMoldsForItem = moldesDisponiblesProducto;
+        }
 
         // Create a temporary item representing the new order
         const tempItemId = -1; // Special ID for temporary item
+        const tempItemVaciadoDuration = this._calculateVaciadoDurationDays(qty, assignedMoldsForItem);
+
         const tempItem: QueueItem = {
             queue_id: tempItemId,
-            cotizacion_producto_id: -1, // Not relevant for calculation
+            cotizacion_producto_id: -1, 
             product_id: productId,
             qty_total: qty,
-            qty_pendiente: qty,
+            qty_pendiente: qty, // For simulation, initially all is pending
             premium: isPremium,
-            created_at: new Date().toISOString(), // Represents "now"
-            vueltas_max_dia: vueltasMaxDia,
-            // Simulation state will be added in _runSimulation
+            created_at: new Date().toISOString(), 
+            assigned_molds: assignedMoldsForItem,
+            vaciado_duration_days: tempItemVaciadoDuration,
+            vueltas_max_dia: productData.vueltas_max_dia ?? 1, // From product data
+            moldes_disponibles_producto: moldesDisponiblesProducto, // From product data
+            // Fields for simulation state, matching how _runSimulation initializes its items
+            eta_start_date: null,
+            eta_end_date: null,
+            sim_qty_pendiente: qty,
+            sim_eta_start_date: null,
+            sim_eta_end_date: null,
+            sim_days_in_production: 0,
+            sim_is_active_in_simulation: false
         };
 
         // Create the queue snapshot for simulation, adding the temp item
@@ -376,183 +449,152 @@ export class ProductionPlannerService {
         cotizacionProductoId: number,
         productId: number,
         qty: number,
-        isPremium: boolean,
-        vueltasMaxDia: number // Passed from API route after fetching
-    ): Promise<{ eta_start_date: string | null; eta_end_date: string | null }> {
-        console.log(`[addToQueue] Item cProdId ${cotizacionProductoId}, ProdId ${productId}, Qty ${qty}, Premium ${isPremium}`);
+        isPremium: boolean
+        // vueltasMaxDia parameter is removed as it's now part of product capabilities fetched or less directly used
+        // assigned_molds will default to 1 on insert, vaciado_duration_days will be calculated
+    ): Promise<{ eta_start_date: string | null; eta_end_date: string | null; final_delivery_date: string | null }> {
+        console.log(`[addToQueueAndCalculateDates] For cotizacion_producto_id: ${cotizacionProductoId}, product: ${productId}, qty: ${qty}, premium: ${isPremium}`);
 
-        // 1. Insert the new item into the actual queue
-        const { data: newItemData, error: insertError } = await this.supabase
+        // 1. Add item to queue with default assigned_molds and calculated vaciado_duration_days
+        const initialAssignedMolds = 1; // Default for new items
+        const vaciadoDuration = this._calculateVaciadoDurationDays(qty, initialAssignedMolds);
+
+        const { data: newQueueItem, error: insertError } = await this.supabase
             .from('production_queue')
             .insert({
                 cotizacion_producto_id: cotizacionProductoId,
-                producto_id: productId,
                 qty_total: qty,
                 qty_pendiente: qty,
                 premium: isPremium,
                 status: 'queued',
-                // created_at defaults to now() in DB
-                // eta dates initially null
+                assigned_molds: initialAssignedMolds,
+                vaciado_duration_days: vaciadoDuration,
+                // eta_start_date and eta_end_date will be set by recalculateEntireQueue
             })
-            .select('queue_id, created_at') // Get the generated ID and creation time
+            .select()
             .single();
 
-        if (insertError || !newItemData) {
-            console.error('Error inserting item into production queue:', insertError);
-            throw new Error(`Failed to add item to production queue: ${insertError?.message}`);
+        if (insertError || !newQueueItem) {
+            console.error('Error inserting item into production_queue:', insertError);
+            throw new Error('Failed to add item to production queue.');
+        }
+        console.log(`[addToQueueAndCalculateDates] Inserted new queue item ID: ${newQueueItem.queue_id} with duration ${vaciadoDuration} days.`);
+
+        // 2. Recalculate the entire queue to update ETAs for all items
+        // This operation is now more complex and critical.
+        // It needs to consider assigned_molds and the new vaciado_duration_days calculation.
+        try {
+            await this.recalculateEntireQueue(); // This will update ETAs in the DB
+            
+            // Fetch the updated item to get its new ETAs
+            const { data: updatedItem, error: fetchError } = await this.supabase
+                .from('production_queue')
+                .select('eta_start_date, eta_end_date')
+                .eq('queue_id', newQueueItem.queue_id)
+                .single();
+
+            if (fetchError || !updatedItem) {
+                console.error('Error fetching updated ETAs for new queue item:', fetchError);
+                // Return nulls or throw, but the item is in queue. Recalc might run in background.
+                return { eta_start_date: null, eta_end_date: null, final_delivery_date: null };
+            }
+            
+            let finalDeliveryDate: Date | null = null;
+            if (updatedItem.eta_end_date) {
+                let tempEndDate = new Date(updatedItem.eta_end_date);
+                tempEndDate = addBusinessDays(tempEndDate, DIAS_POST_VACIADO); // Add post-processing
+                finalDeliveryDate = addBusinessDays(tempEndDate, DIAS_ENVIO); // Add shipping
+            }
+
+
+            console.log(`[addToQueueAndCalculateDates] Recalculated queue. New item ${newQueueItem.queue_id} ETAs: Start ${updatedItem.eta_start_date}, End ${updatedItem.eta_end_date}, Final Delivery: ${formatDate(finalDeliveryDate)}`);
+            return { 
+                eta_start_date: updatedItem.eta_start_date, 
+                eta_end_date: updatedItem.eta_end_date,
+                final_delivery_date: formatDate(finalDeliveryDate)
+            };
+
+        } catch (recalcError) {
+            console.error('Error during recalculateEntireQueue after adding item:', recalcError);
+            // Item is added, but ETAs might be stale. Consider how to handle this.
+            // Maybe return the initially calculated duration or nulls for ETA.
+             return { eta_start_date: null, eta_end_date: null, final_delivery_date: null };
+        }
+    }
+
+    // Recalculates ETAs for all relevant items in the queue and updates the database.
+    async recalculateEntireQueue(): Promise<boolean> {
+        console.log("[recalculateEntireQueue] Starting full queue recalculation...");
+        let allItemsInQueueForSim: QueueItem[];
+        try {
+            allItemsInQueueForSim = await this._fetchQueueForSimulation();
+        } catch (error) {
+            console.error("[recalculateEntireQueue] Failed to fetch queue for simulation:", error);
+            return false;
         }
 
-        console.log(`[addToQueue] Item inserted with queue_id: ${newItemData.queue_id}, created_at: ${newItemData.created_at}`);
-        const newQueueId = newItemData.queue_id;
+        if (allItemsInQueueForSim.length === 0) {
+            console.log("[recalculateEntireQueue] No items to simulate.");
+            return true;
+        }
 
-        // 2. Recalculate ETAs for the *entire* queue
-        const fullQueue = await this._fetchQueueForSimulation(); // Fetch includes the new item now
-        const simulationResults = this._runSimulation(fullQueue);
+        // Run the simulation logic
+        const simulationResults = this._runSimulation(allItemsInQueueForSim);
 
-        // 3. Prepare updates for the database
-        const updates: Array<Partial<QueueItem> & { queue_id: number }> = [];
+        // Prepare updates for the database
+        const updates: Array<Partial<ProductionQueueItem> & { queue_id: number }> = [];
         simulationResults.forEach((result, queue_id) => {
             updates.push({
                 queue_id: queue_id,
                 eta_start_date: formatDate(result.startDate),
-                eta_end_date: formatDate(result.endDate)
+                eta_end_date: formatDate(result.endDate),
+                // Update status based on simulation results if necessary
+                // For example, if eta_start_date is set and in past/present, status could be 'in_progress'
+                // If eta_end_date is set and in past, status could be 'done' (though PATCH handler also does this)
+                // For now, let's just update dates. Status is handled by PATCH or manual updates.
+                qty_pendiente: result.item.sim_qty_pendiente, // Update pending quantity based on simulation
+                // vaciado_duration_days could also be updated if it was re-calculated in _runSimulation init
+                vaciado_duration_days: result.item.vaciado_duration_days 
             });
         });
 
-        console.log(`[addToQueue] Preparing to update ${updates.length} queue items with simulation results.`);
+        if (updates.length === 0) {
+            console.log("[recalculateEntireQueue] No updates to apply after simulation.");
+            return true;
+        }
+        
+        console.log(`[recalculateEntireQueue] Preparing to update ${updates.length} queue items with new ETAs.`);
 
-        // 4. Update the database using upsert (or individual updates if needed)
-        // Using multiple updates might be safer than upsert if columns differ
-        let updateErrorOccurred = false;
+        let success = true;
+        // Batch updates or individual updates
         for (const update of updates) {
-             const { error: updateError } = await this.supabase
-                 .from('production_queue')
-                 .update({
-                     eta_start_date: update.eta_start_date,
-                     eta_end_date: update.eta_end_date,
-                     // Potentially update status based on dates? e.g., 'in_progress' if start date is today/past
-                 })
-                 .eq('queue_id', update.queue_id);
+            const { error: updateError } = await this.supabase
+                .from('production_queue')
+                .update({
+                    eta_start_date: update.eta_start_date,
+                    eta_end_date: update.eta_end_date,
+                    qty_pendiente: update.qty_pendiente,
+                    vaciado_duration_days: update.vaciado_duration_days,
+                    // Only update status if it makes sense from a full recalc perspective
+                    // e.g., if an item is now done based on simulation.
+                    status: update.qty_pendiente === 0 && update.eta_end_date ? 'done' : 
+                           (update.eta_start_date ? 'in_progress' : 'queued')
+                })
+                .eq('queue_id', update.queue_id);
 
-             if (updateError) {
-                 console.error(`[addToQueue] Error updating queue item ${update.queue_id}:`, updateError);
-                 updateErrorOccurred = true; // Log and continue, maybe collect failures
-             }
-         }
-
-        if (updateErrorOccurred) {
-             console.warn("[addToQueue] One or more errors occurred while updating queue item ETAs.");
-             // Decide on error handling: maybe throw a specific error?
-             // For now, we proceed but the state might be inconsistent.
-         } else {
-            console.log("[addToQueue] Successfully updated all queue item ETAs.")
-         }
-
-        // 5. Return the calculated dates for the *newly added* item
-        const resultForItem = simulationResults.get(newQueueId);
-        if (!resultForItem) {
-             console.error(`[addToQueue] Failed to find simulation result for the newly added item (queue_id: ${newQueueId}) after simulation.`);
-             // This shouldn't happen if the simulation included it
-             return { eta_start_date: null, eta_end_date: null };
-         }
-
-        return {
-            eta_start_date: formatDate(resultForItem.startDate),
-            eta_end_date: formatDate(resultForItem.endDate)
-        };
-    }
-
-    /**
-     * Manually triggers a recalculation of the entire queue.
-     * Useful if external factors change or after manual status updates.
-     */
-    async recalculateEntireQueue(): Promise<boolean> {
-         console.log("[recalculateEntireQueue] Triggered full queue recalculation...");
-         try {
-             const fullQueue = await this._fetchQueueForSimulation();
-             if (fullQueue.length === 0) {
-                 console.log("[recalculateEntireQueue] Queue is empty, nothing to recalculate.");
-                 return true;
-             }
-             const simulationResults = this._runSimulation(fullQueue);
-
-             const updates: Array<Partial<QueueItem> & { queue_id: number }> = [];
-             simulationResults.forEach((result, queue_id) => {
-                 updates.push({
-                     queue_id: queue_id,
-                     eta_start_date: formatDate(result.startDate),
-                     eta_end_date: formatDate(result.endDate)
-                 });
-             });
-
-             console.log(`[recalculateEntireQueue] Preparing to update ${updates.length} queue items.`);
-
-             let updateErrorOccurred = false;
-             for (const update of updates) {
-                 const { error: updateError } = await this.supabase
-                     .from('production_queue')
-                     .update({
-                         eta_start_date: update.eta_start_date,
-                         eta_end_date: update.eta_end_date
-                     })
-                     .eq('queue_id', update.queue_id);
-
-                 if (updateError) {
-                     console.error(`[recalculateEntireQueue] Error updating queue item ${update.queue_id}:`, updateError);
-                     updateErrorOccurred = true;
-                 }
-             }
-
-             if (updateErrorOccurred) {
-                 console.warn("[recalculateEntireQueue] Recalculation finished with one or more update errors.");
-                 return false; // Indicate partial failure
-             }
-
-             console.log("[recalculateEntireQueue] Successfully recalculated and updated all queue item ETAs.");
-             return true;
-         } catch (error) {
-             console.error("[recalculateEntireQueue] Failed during recalculation:", error);
-             return false;
-         }
-     }
-
-    /**
-     * Adds a new item to the production queue BUT DOES NOT run the simulation yet.
-     * Returns the newly created queue item ID.
-     */
-    async addItemToQueue(
-        cotizacionProductoId: number,
-        productId: number,
-        qty: number,
-        isPremium: boolean
-    ): Promise<number | null> {
-        console.log(`[addItemToQueue] Adding Item: cProdId ${cotizacionProductoId}, ProdId ${productId}, Qty ${qty}, Premium ${isPremium}`);
-        const { data: newItemData, error: insertError } = await this.supabase
-            .from('production_queue')
-            .insert({
-                cotizacion_producto_id: cotizacionProductoId,
-                producto_id: productId,
-                qty_total: qty,
-                qty_pendiente: qty,
-                premium: isPremium,
-                status: 'queued', // Initial status
-                // eta_start_date, eta_end_date, vaciado_duration_days are calculated later
-            })
-            .select('queue_id')
-            .single();
-
-        if (insertError) {
-            console.error('[addItemToQueue] Error inserting item:', insertError);
-            throw new Error(`Failed to add item to production queue: ${insertError.message}`);
+            if (updateError) {
+                console.error(`[recalculateEntireQueue] Error updating queue item ${update.queue_id}:`, updateError);
+                success = false; // Mark as failed but continue trying other updates
+            }
         }
-        if (!newItemData) {
-            console.error('[addItemToQueue] No data returned after insert.');
-            throw new Error('Failed to get new queue item ID after insert.');
-        }
-        console.log(`[addItemToQueue] Item added successfully with queue_id: ${newItemData.queue_id}`);
-        return newItemData.queue_id;
-    }
 
+        if (success) {
+            console.log("[recalculateEntireQueue] Successfully updated ETAs for all simulated items.");
+        } else {
+            console.warn("[recalculateEntireQueue] One or more errors occurred while updating queue item ETAs.");
+        }
+        return success;
+    }
 
     /**
      * Runs the production simulation for ALL 'queued' or 'in_progress' items.
