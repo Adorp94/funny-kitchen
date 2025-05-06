@@ -442,8 +442,8 @@ function NuevaCotizacionClient() {
   const StepIndicator = ({ currentStep }: { currentStep: number }) => {
     const steps = ['Cliente', 'Productos', 'Resumen'];
     return (
-      <nav aria-label="Progress" className="w-full max-w-xl">
-         <ol role="list" className="flex items-center space-x-8 sm:space-x-16">
+      <nav aria-label="Progress" className="w-full max-w-3xl">
+         <ol role="list" className="flex items-center w-full space-x-8 sm:space-x-16">
            {steps.map((name, stepIdx) => {
              const stepNumber = stepIdx + 1;
              const isCompleted = stepNumber < currentStep;
@@ -475,7 +475,7 @@ function NuevaCotizacionClient() {
                  >
                    {isCompleted ? <Check className="h-5 w-5" /> : <span className="font-bold">{stepNumber}</span>}
                  </button>
-                 <span className={`absolute top-full mt-2 text-xs font-medium text-center w-full whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>{name}</span>
+                 <span className={`absolute top-full left-4 -translate-x-1/2 mt-2 text-xs font-medium whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>{name}</span>
                </li>
              );
            })}
@@ -507,7 +507,7 @@ function NuevaCotizacionClient() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Page Header */}
-      <div className="max-w-xl mx-auto"> {/* Changed from max-w-6xl */}
+      <div className="max-w-3xl mx-auto">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Nueva Cotización
           </h1>
@@ -518,7 +518,7 @@ function NuevaCotizacionClient() {
       </div>
 
       {/* Step Content */}
-      <div className="max-w-xl mx-auto"> {/* Changed from max-w-6xl */}
+      <div className="max-w-3xl mx-auto">
         {activeStep === 1 && (
           <Card>
             <CardHeader>
