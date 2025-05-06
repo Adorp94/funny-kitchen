@@ -89,8 +89,13 @@ export default function ProduccionPage() {
       }
   }, [fetchData]);
 
+  // Define a custom error type or a specific error message prefix
+  const MOLD_VALIDATION_ERROR_PREFIX = "MoldValidationError:";
+
   const handleAssignedMoldsChange = useCallback(async (queueId: number, newMolds: number) => {
     console.log(`ProduccionPage: handleAssignedMoldsChange called for queueId ${queueId} to ${newMolds} molds`);
+    // No need to find originalMoldsValue here, cell will manage its own state for revert
+
     try {
       const response = await fetch('/api/production/queue', {
         method: 'PATCH',
@@ -101,9 +106,20 @@ export default function ProduccionPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error(`API PATCH (Molds) Error Response: ${response.status}`, errorData);
-        throw new Error(errorData.error || `Error al actualizar moldes asignados (HTTP ${response.status})`);
+        const errorData = await response.json().catch(() => ({ error: "Error desconocido del servidor." }));
+        console.error(`API PATCH (Molds) Error Response: ${response.status}`, errorData); // This log is fine for dev
+        
+        if (errorData.error && typeof errorData.error === 'string' && errorData.error.includes("no puede exceder los moldes disponibles")) {
+            toast.warning("Entrada Inválida", {
+                description: errorData.error,
+            });
+            // Throw a specific error that the cell can catch to revert its state
+            throw new Error(MOLD_VALIDATION_ERROR_PREFIX + errorData.error); 
+        } else {
+            // For other errors, throw to be caught by the generic error handler below
+            throw new Error(errorData.error || `Error al actualizar moldes asignados (HTTP ${response.status})`);
+        }
+        // No 'return;' needed here as we are throwing in all !response.ok cases
       }
 
       const result = await response.json();
@@ -116,11 +132,18 @@ export default function ProduccionPage() {
       await fetchData();
 
     } catch (err: any) {
-      console.error("Failed to update assigned molds:", err);
-      const errorMsg = err.message || "No se pudo actualizar los moldes asignados.";
-      toast.error("Error al actualizar moldes", {
-        description: errorMsg,
-      });
+      // This catch block will now also catch the MOLD_VALIDATION_ERROR_PREFIX
+      // We only want to show a generic error toast if it's NOT our specific validation error.
+      if (err.message && err.message.startsWith(MOLD_VALIDATION_ERROR_PREFIX)) {
+        // Log for debugging, but the specific toast was already shown and cell should revert.
+        console.log("Caught mold validation error in page handler, cell is responsible for reverting its input.");
+      } else {
+        console.error("Failed to update assigned molds (generic error):", err);
+        const errorMsg = err.message || "No se pudo actualizar los moldes asignados.";
+        toast.error("Error al actualizar moldes", {
+          description: errorMsg,
+        });
+      }
     }
   }, [fetchData]);
 
