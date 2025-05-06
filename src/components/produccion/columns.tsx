@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useState } from 'react'
+import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header"
+import { DataTableRowActions } from "./data-table-row-actions"
+import { format } from 'date-fns'
 
 // Define the shape of the data we expect for a production queue item
 // This should include joined data from related tables
@@ -32,6 +35,7 @@ export type ProductionQueueItem = {
   eta_start_date: string | null; // YYYY-MM-DD String
   eta_end_date: string | null; // YYYY-MM-DD String
   vueltas_max_dia: number;
+  vaciado_duration_days: number | null;
 }
 
 // Define status mapping for display
@@ -42,9 +46,18 @@ const statusMap: { [key: string]: { text: string; className: string } } = {
     cancelled: { text: "Cancelado", className: "bg-red-200 text-red-800" },
 };
 
+// Helper to format dates nicely, handling nulls
+const formatDateCell = (dateString: string | null | undefined): string => {
+  if (!dateString) return "N/A";
+  try {
+    return format(new Date(dateString), 'dd/MM/yyyy');
+  } catch (error) {
+    return "Invalid Date";
+  }
+};
 
 // Make columns a function that accepts the callback
-export const getColumns = (onStatusChange: (queueId: number, newStatus: string) => Promise<void>): ColumnDef<ProductionQueueItem>[] => [
+export const getColumns = (onStatusChange: (queueId: number, newStatus: string) => Promise<void>, refetchData: () => void): ColumnDef<ProductionQueueItem>[] => [
     {
         id: "select",
         header: ({ table }) => (
@@ -69,121 +82,124 @@ export const getColumns = (onStatusChange: (queueId: number, newStatus: string) 
       },
   {
     accessorKey: "queue_id",
-    header: "ID Cola",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="ID Cola" />
+    ),
+    cell: ({ row }) => <div className="text-right font-mono text-sm">{row.getValue("queue_id")}</div>,
+    enableSorting: true,
+    enableHiding: true,
   },
   {
     accessorKey: "folio",
-    header: "Folio Cotización",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Folio Cot." />
+    ),
+    cell: ({ row }) => <div className="min-w-[100px]">{row.getValue("folio")}</div>,
   },
   {
     accessorKey: "cliente_nombre",
-    header: "Cliente",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Cliente" />
+    ),
+    cell: ({ row }) => <div className="min-w-[120px]">{row.getValue("cliente_nombre")}</div>,
   },
   {
     accessorKey: "producto_nombre",
-    header: "Producto",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Producto" />
+    ),
+    cell: ({ row }) => <div className="min-w-[150px] font-medium">{row.getValue("producto_nombre")}</div>,
   },
   {
     accessorKey: "qty_total",
-    header: "Qty Total",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Cant." />
+    ),
+    cell: ({ row }) => <div className="text-right">{row.getValue("qty_total")}</div>,
+    enableSorting: true,
   },
   {
     accessorKey: "qty_pendiente",
-    header: "Qty Pendiente",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Pend." />
+    ),
+    cell: ({ row }) => <div className="text-right">{row.getValue("qty_pendiente")}</div>,
+    enableSorting: true,
   },
   {
     accessorKey: "status",
-    header: "Estado",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Status" />
+    ),
     cell: ({ row }) => {
-        const status = row.getValue("status") as string;
-        const statusInfo = statusMap[status] || { text: status, className: "bg-gray-100 text-gray-800" };
-        return <Badge variant="outline" className={statusInfo.className}>{statusInfo.text}</Badge>;
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
+      const status = row.getValue("status") as string;
+       let variant: "default" | "secondary" | "outline" | "destructive" = "default";
+       if (status === 'in_progress') variant = 'secondary';
+       else if (status === 'done') variant = 'default'; // Or success if you add it
+       else if (status === 'cancelled') variant = 'destructive';
+       else if (status === 'queued') variant = 'outline';
+
+      return (
+        <div className="flex justify-center">
+          <Badge variant={variant}>{status}</Badge>
+        </div>
+      )
+    },
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
+    },
   },
   {
     accessorKey: "premium",
-    header: "Premium",
-    cell: ({ row }) => {
-      return row.getValue("premium") ? "Sí" : "No";
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Premium" />
+    ),
+    cell: ({ row }) => (
+      <div className="text-center">
+        {row.getValue("premium") ? <Badge variant="outline">Sí</Badge> : 'No'}
+      </div>
+    ),
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
     },
+  },
+  {
+    accessorKey: "vaciado_duration_days",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Días Vaciado" />
+    ),
+    cell: ({ row }) => {
+      const days = row.getValue("vaciado_duration_days") as number | null;
+      return <div className="text-right">{days ?? '-'}</div>;
+    },
+    enableSorting: true,
   },
   {
     accessorKey: "eta_start_date",
-    header: ({
-      column,
-    }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Inicio Estimado
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="ETA Inicio" />
+    ),
+    cell: ({ row }) => <div className="text-center">{formatDateCell(row.getValue("eta_start_date"))}</div>,
+    enableSorting: true,
   },
   {
     accessorKey: "eta_end_date",
-    header: ({
-      column,
-    }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Fin Estimado (Vaciado)
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="ETA Fin Vac." />
+    ),
+    cell: ({ row }) => <div className="text-center">{formatDateCell(row.getValue("eta_end_date"))}</div>,
+    enableSorting: true,
+  },
+  {
+    accessorKey: "created_at",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Creado" />
+    ),
+    cell: ({ row }) => <div className="text-center">{formatDateCell(row.getValue("created_at"))}</div>,
+    enableSorting: true,
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const item = row.original
-      const queueId = item.queue_id
-      const [isUpdating, setIsUpdating] = useState(false);
-
-      const handleStatusClick = async (newStatus: string) => {
-          if (item.status === newStatus || isUpdating) return;
-          setIsUpdating(true);
-          try {
-             console.log(`Calling onStatusChange for ${queueId} to ${newStatus}`);
-            await onStatusChange(queueId, newStatus);
-          } catch (error) {
-             console.error(`Failed to update status for ${queueId}:`, error);
-          } finally {
-             setIsUpdating(false);
-          }
-      };
- 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0" disabled={isUpdating}>
-              <span className="sr-only">Open menu</span>
-              {isUpdating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(queueId.toString())} disabled={isUpdating}>
-              Copiar ID Cola
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Cambiar Estado</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleStatusClick('queued')} disabled={item.status === 'queued' || isUpdating}>Marcar En Cola</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleStatusClick('in_progress')} disabled={item.status === 'in_progress' || isUpdating}>Marcar En Progreso</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleStatusClick('done')} disabled={item.status === 'done' || isUpdating}>Marcar Terminado</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleStatusClick('cancelled')} disabled={item.status === 'cancelled' || isUpdating}>Marcar Cancelado</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    },
+    cell: ({ row }) => <div className="flex justify-center"><DataTableRowActions row={row} refetchData={refetchData} /></div>,
   },
 ] 

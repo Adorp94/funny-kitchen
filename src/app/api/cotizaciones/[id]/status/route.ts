@@ -168,47 +168,88 @@ export async function POST(
       
       // 4. Production Planning Logic (if status is 'producción')
       if (newStatus === 'producción') {
-          console.log(`[API /cotizaciones/[id]/status POST] Status is 'producción'. Initiating production planning...`);
-          const { data: cotizacionProductos, error: fetchProductsError } = await supabase
-            .from('cotizacion_productos')
-            .select('cotizacion_producto_id, producto_id, cantidad')
-            .eq('cotizacion_id', cotizacionId);
+          console.log(`[API /cotizaciones/[id]/status POST] Status is 'producción'. Initiating production planning for cotizacion ${cotizacionId}...`);
+          
+          const plannerService = new ProductionPlannerService(supabase); // Use the authenticated client
+          const newlyAddedQueueIds: number[] = []; // Track IDs added in this request
 
-          if (fetchProductsError) {
-            planningWarnings.push(`Error fetching products: ${fetchProductsError.message}`); 
-          } else if (!cotizacionProductos || cotizacionProductos.length === 0) {
-            planningWarnings.push(`No products found.`);
-          } else {
-              console.log(`[API /cotizaciones/[id]/status POST] Found ${cotizacionProductos.length} products to plan.`);
-              const plannerService = new ProductionPlannerService(supabase); // Use the authenticated client
-              let latestEtaEndDate: Date | null = null;
+          try {
+              // --- Step 4a: Add all items for this quote to the queue ---
+              const { data: cotizacionProductos, error: fetchProductsError } = await supabase
+                  .from('cotizacion_productos')
+                  .select('cotizacion_producto_id, producto_id, cantidad')
+                  .eq('cotizacion_id', cotizacionId);
 
-              for (const item of cotizacionProductos) {
-                if (!item.producto_id || isNaN(Number(item.producto_id))) {
-                  planningWarnings.push(`Invalid producto_id in item: ${JSON.stringify(item)}`); continue;
-                }
-                const currentProductId = Number(item.producto_id);
-                const { data: productDetails, error: productFetchError } = await supabase
-                  .from('productos')
-                  .select('vueltas_max_dia').eq('producto_id', currentProductId).single();
-
-                if (productFetchError || !productDetails) {
-                  planningWarnings.push(`Error fetching product details for ID ${currentProductId}: ${productFetchError?.message || 'Not found'}`); continue;
-                }
-                const vueltasMaxDia = productDetails.vueltas_max_dia ?? 1;
-                try {
-                  const queueResult = await plannerService.addToQueueAndCalculateDates(
-                    item.cotizacion_producto_id, currentProductId, item.cantidad, isPremium, vueltasMaxDia
-                  );
-                  if (queueResult.eta_end_date) {
-                    const currentEndDate = new Date(queueResult.eta_end_date);
-                    if (!latestEtaEndDate || currentEndDate > latestEtaEndDate) latestEtaEndDate = currentEndDate;
+              if (fetchProductsError) {
+                  planningWarnings.push(`Error fetching products: ${fetchProductsError.message}`);
+              } else if (!cotizacionProductos || cotizacionProductos.length === 0) {
+                  planningWarnings.push(`No products found for cotizacion ${cotizacionId}.`);
+              } else {
+                  console.log(`[API /cotizaciones/[id]/status POST] Adding ${cotizacionProductos.length} products to queue...`);
+                  for (const item of cotizacionProductos) {
+                      try {
+                          const newQueueId = await plannerService.addItemToQueue(
+                              item.cotizacion_producto_id, 
+                              item.producto_id, 
+                              item.cantidad, 
+                              isPremium // Use the premium status from the fetched cotizacion
+                          );
+                          if (newQueueId) {
+                              newlyAddedQueueIds.push(newQueueId);
+                          } else {
+                               planningWarnings.push(`Failed to get queue ID for cProd ${item.cotizacion_producto_id}`);
+                          }
+                      } catch (addError: any) {
+                          planningWarnings.push(`Error adding item cProd ${item.cotizacion_producto_id} to queue: ${addError.message}`);
+                      }
                   }
-                } catch (queueError: any) {
-                  planningWarnings.push(`Error adding item ${item.cotizacion_producto_id} to queue: ${queueError.message}`);
-                }
-              } // End product loop
+                  console.log(`[API /cotizaciones/[id]/status POST] Finished adding items. Added IDs: ${newlyAddedQueueIds.join(', ')}`);
+              }
 
+              // --- Step 4b: Trigger global recalculation --- 
+              // Only run if items were potentially added or need recalculation
+              if (cotizacionProductos && cotizacionProductos.length > 0) {
+                  console.log(`[API /cotizaciones/[id]/status POST] Triggering global queue date calculation...`);
+                  const { success: calcSuccess, warnings: calcWarnings } = await plannerService.calculateGlobalQueueDates();
+                  planningWarnings.push(...calcWarnings);
+                  if (!calcSuccess) {
+                       console.error(`[API /cotizaciones/[id]/status POST] Global queue calculation failed.`);
+                       // Decide if this is a fatal error for the request?
+                       // For now, we continue but log the failure.
+                  }
+                   console.log(`[API /cotizaciones/[id]/status POST] Global queue calculation finished. Success: ${calcSuccess}`);
+              }
+
+              // --- Step 4c: Fetch updated dates for this quote's items --- 
+              let latestEtaEndDate: Date | null = null;
+              // We need cotizacion_producto_ids to find the queue items again
+              const cotizacionProductoIds = cotizacionProductos?.map(cp => cp.cotizacion_producto_id) ?? [];
+              
+              if (cotizacionProductoIds.length > 0) {
+                  const { data: updatedQueueItems, error: fetchQueueError } = await supabase
+                      .from('production_queue')
+                      .select('eta_end_date')
+                      .in('cotizacion_producto_id', cotizacionProductoIds)
+                      .not('eta_end_date', 'is', null); // Only get items with calculated dates
+                      
+                  if (fetchQueueError) {
+                       planningWarnings.push(`Error fetching updated queue items: ${fetchQueueError.message}`);
+                  } else if (updatedQueueItems && updatedQueueItems.length > 0) {
+                        updatedQueueItems.forEach(item => {
+                            if (item.eta_end_date) {
+                                const currentEndDate = new Date(item.eta_end_date);
+                                if (!latestEtaEndDate || currentEndDate > latestEtaEndDate) {
+                                    latestEtaEndDate = currentEndDate;
+                                }
+                            }
+                        });
+                         console.log(`[API /cotizaciones/[id]/status POST] Found latest ETA end date for quote ${cotizacionId}: ${latestEtaEndDate?.toISOString()}`);
+                  } else {
+                       console.log(`[API /cotizaciones/[id]/status POST] No queue items with end dates found for quote ${cotizacionId} after calculation.`);
+                  }
+              }
+              
+              // --- Step 4d: Calculate final delivery date and update cotizacion --- 
               if (latestEtaEndDate) {
                   const POST_PROCESSING_DAYS = 3;
                   const SHIPPING_DAYS = 3;
@@ -217,20 +258,35 @@ export async function POST(
                   finalDeliveryDateStr = deliveryDate.toISOString().split('T')[0];
                   console.log(`[API /cotizaciones/[id]/status POST] Calculated finalDeliveryDate: ${finalDeliveryDateStr}`);
                   const { error: updateDateError } = await supabase
-                    .from('cotizaciones').update({ estimated_delivery_date: finalDeliveryDateStr })
-                    .eq('cotizacion_id', cotizacionId);
+                      .from('cotizaciones')
+                      .update({ estimated_delivery_date: finalDeliveryDateStr })
+                      .eq('cotizacion_id', cotizacionId);
                   if (updateDateError) {
-                    planningWarnings.push(`Error updating final delivery date: ${updateDateError.message}`);
-                    finalDeliveryDateStr = null;
+                      planningWarnings.push(`Error updating final delivery date: ${updateDateError.message}`);
+                      finalDeliveryDateStr = null; // Nullify if update failed
                   } else {
-                    console.log(`[API /cotizaciones/[id]/status POST] Successfully updated cotizacion with ETA.`);
+                      console.log(`[API /cotizaciones/[id]/status POST] Successfully updated cotizacion ${cotizacionId} with final ETA.`);
+                      // Optionally update the local updatedCotizacion object if needed later
+                      updatedCotizacion.estimated_delivery_date = finalDeliveryDateStr;
                   }
               } else {
-                   if (cotizacionProductos.length > 0 && !planningWarnings.some(w => w.includes('Error'))) { 
-                       planningWarnings.push("No se pudo calcular la fecha estimada de entrega.");
-                   }
+                  if (cotizacionProductos && cotizacionProductos.length > 0 && !planningWarnings.some(w => w.includes('Error'))) {
+                      planningWarnings.push("No se pudo calcular la fecha estimada de entrega final.");
+                  }
+                   console.log(`[API /cotizaciones/[id]/status POST] No latest end date found, cannot set final delivery date for cotizacion ${cotizacionId}.`);
+                   // Ensure existing delivery date is cleared if calculation fails?
+                    const { error: clearDateError } = await supabase
+                        .from('cotizaciones')
+                        .update({ estimated_delivery_date: null })
+                        .eq('cotizacion_id', cotizacionId);
+                    if (clearDateError) planningWarnings.push(`Error clearing final delivery date: ${clearDateError.message}`);
+                    else updatedCotizacion.estimated_delivery_date = null;
               }
-          } // End planning block
+              
+          } catch(planningError: any) {
+              console.error(`[API /cotizaciones/[id]/status POST] Error during overall production planning for ${cotizacionId}:`, planningError);
+              planningWarnings.push(`Error general en planificación: ${planningError.message}`);
+          }
       } // End if newStatus == producción
 
       // 5. Record History

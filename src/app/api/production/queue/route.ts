@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
-import { Database } from '@/lib/database.types';
+import { Database } from '@/lib/supabase/types';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { ProductionPlannerService } from '@/services/productionPlannerService';
 
 // Define the structure of the data returned by the GET request
 // Aligns with ProductionQueueItem in columns.tsx but suitable for API response
@@ -20,9 +22,29 @@ type QueueApiResponseItem = {
   producto_id: number | null;
   producto_nombre: string | null;
   vueltas_max_dia: number;
+  vaciado_duration_days: number;
 };
 
 export async function GET(request: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (name: string) => {
+          return cookieStore.get(name)?.value;
+        },
+        set: (name: string, value: string, options: any) => {
+          cookieStore.set(name, value, options);
+        },
+        remove: (name: string, options: any) => {
+          cookieStore.remove(name, options);
+        },
+      },
+    }
+  );
+
   try {
     console.log("[API /production/queue GET] Received request");
 
@@ -46,6 +68,7 @@ export async function GET(request: NextRequest) {
         eta_end_date,
         qty_total,
         qty_pendiente,
+        vaciado_duration_days,
         cotizacion_productos!inner (
             cotizacion_id,
             producto_id,
@@ -98,6 +121,7 @@ export async function GET(request: NextRequest) {
         producto_id: producto?.producto_id ?? null,
         producto_nombre: producto?.nombre ?? null,
         vueltas_max_dia: producto?.vueltas_max_dia ?? 1,
+        vaciado_duration_days: item.vaciado_duration_days,
       };
     });
 
@@ -157,7 +181,6 @@ export async function PATCH(request: NextRequest) {
          if (status === 'done' || status === 'cancelled') {
              console.log(`[API /production/queue PATCH] Status changed to ${status}, triggering queue recalculation.`);
              // Import and instantiate the service
-             const { ProductionPlannerService } = await import('@/services/productionPlannerService');
              const plannerService = new ProductionPlannerService(supabase);
              // Run recalculation in the background (don't await)
              plannerService.recalculateEntireQueue().catch(err => {

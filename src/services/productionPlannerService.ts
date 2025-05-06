@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'; // Assuming you use the official client
 import { Database } from '@/lib/database.types'; // Import generated types
+import { addBusinessDays, diffBusinessDays } from '@/lib/utils'; // Assuming utils has these helpers
 
 // --- Constants ---
 const MOLDS_LUN_VIE = 270;
@@ -7,6 +8,11 @@ const MOLDS_SAB = 135;
 const DIAS_POST_VACIADO = 3;
 const DIAS_ENVIO = 3;
 const DIAS_LABORABLES_SEMANA = 5; // Mon-Fri for week calculation
+const DAILY_CAPACITY = 270; // Global molds available Mon-Fri
+const SATURDAY_MULTIPLIER = 0.5;
+const MERMA_RATE = 0.09; // 9% merma
+const EFFECTIVE_DAILY_CAPACITY = DAILY_CAPACITY * (1 - MERMA_RATE);
+const EFFECTIVE_SAT_CAPACITY = EFFECTIVE_DAILY_CAPACITY * SATURDAY_MULTIPLIER;
 
 // --- Types ---
 // Define interfaces for the data structures used internally
@@ -47,6 +53,16 @@ interface ETAResult {
     fecha_fin_vaciado: string | null;
     fecha_entrega_estimada: string | null;
 }
+
+type ProductionQueueItem = Database['public']['Tables']['production_queue']['Row'] & {
+  vueltas_max_dia?: number; // Added for simulation
+  moldes_disponibles?: number; // Added for simulation
+};
+
+type ProductInfo = {
+    vueltas_max_dia: number;
+    moldes_disponibles: number;
+};
 
 // Helper to format date as YYYY-MM-DD string
 function formatDate(date: Date | null): string | null {
@@ -497,6 +513,310 @@ export class ProductionPlannerService {
          } catch (error) {
              console.error("[recalculateEntireQueue] Failed during recalculation:", error);
              return false;
+         }
+     }
+
+    /**
+     * Adds a new item to the production queue BUT DOES NOT run the simulation yet.
+     * Returns the newly created queue item ID.
+     */
+    async addItemToQueue(
+        cotizacionProductoId: number,
+        productId: number,
+        qty: number,
+        isPremium: boolean
+    ): Promise<number | null> {
+        console.log(`[addItemToQueue] Adding Item: cProdId ${cotizacionProductoId}, ProdId ${productId}, Qty ${qty}, Premium ${isPremium}`);
+        const { data: newItemData, error: insertError } = await this.supabase
+            .from('production_queue')
+            .insert({
+                cotizacion_producto_id: cotizacionProductoId,
+                producto_id: productId,
+                qty_total: qty,
+                qty_pendiente: qty,
+                premium: isPremium,
+                status: 'queued', // Initial status
+                // eta_start_date, eta_end_date, vaciado_duration_days are calculated later
+            })
+            .select('queue_id')
+            .single();
+
+        if (insertError) {
+            console.error('[addItemToQueue] Error inserting item:', insertError);
+            throw new Error(`Failed to add item to production queue: ${insertError.message}`);
+        }
+        if (!newItemData) {
+            console.error('[addItemToQueue] No data returned after insert.');
+            throw new Error('Failed to get new queue item ID after insert.');
+        }
+        console.log(`[addItemToQueue] Item added successfully with queue_id: ${newItemData.queue_id}`);
+        return newItemData.queue_id;
+    }
+
+
+    /**
+     * Runs the production simulation for ALL 'queued' or 'in_progress' items.
+     * Calculates and UPDATES eta_start_date, eta_end_date, and vaciado_duration_days
+     * for all affected items directly in the database.
+     */
+    async calculateGlobalQueueDates(): Promise<{ success: boolean; warnings: string[] }> {
+        console.log('[calculateGlobalQueueDates] Starting global queue recalculation...');
+        const warnings: string[] = [];
+        let simulationDate = new Date(); // Start simulation from today
+        // Ensure simulation starts on a weekday if today is weekend
+        const currentDay = simulationDate.getDay();
+        if (currentDay === 0) { // Sunday
+             simulationDate.setDate(simulationDate.getDate() + 1);
+        } else if (currentDay === 6) { // Saturday - start calculations next Monday
+             simulationDate.setDate(simulationDate.getDate() + 2);
+        }
+         simulationDate.setHours(0, 0, 0, 0); // Normalize time
+
+        try {
+            // 1. Fetch all pending items
+            const { data: queueItems, error: fetchError } = await this.supabase
+                .from('production_queue')
+                .select('*')
+                .in('status', ['queued', 'in_progress'])
+                .order('created_at', { ascending: true }); // FIFO
+
+            if (fetchError) throw fetchError;
+            if (!queueItems || queueItems.length === 0) {
+                console.log('[calculateGlobalQueueDates] No pending items found in queue.');
+                return { success: true, warnings: [] };
+            }
+
+            console.log(`[calculateGlobalQueueDates] Found ${queueItems.length} pending items.`);
+
+            // 2. Fetch product details (vueltas, moldes) for all unique products involved
+            const productIds = [...new Set(queueItems.map(item => item.producto_id))];
+            const { data: productDetails, error: productFetchError } = await this.supabase
+                .from('productos')
+                .select('producto_id, vueltas_max_dia, moldes_disponibles')
+                .in('producto_id', productIds);
+
+            if (productFetchError) throw productFetchError;
+
+            const productInfoMap = new Map<number, ProductInfo>();
+            productDetails?.forEach(p => {
+                 if (p.producto_id) {
+                     productInfoMap.set(p.producto_id, {
+                         vueltas_max_dia: p.vueltas_max_dia ?? 1,
+                         moldes_disponibles: p.moldes_disponibles ?? 1 // Default to 1 if null/missing
+                     });
+                 }
+            });
+            console.log(`[calculateGlobalQueueDates] Fetched product info for ${productInfoMap.size} products.`);
+
+
+            // --- Simulation Setup ---
+            let itemsInProgress: ProductionQueueItem[] = queueItems.map(item => ({
+                ...item, // Original data
+                 qty_pendiente: item.qty_total ?? 0, // Reset pending qty for simulation run
+                 eta_start_date: null, // Reset dates for simulation run
+                 eta_end_date: null,
+                 vaciado_duration_days: null,
+                 vueltas_max_dia: productInfoMap.get(item.producto_id)?.vueltas_max_dia ?? 1,
+                 moldes_disponibles: productInfoMap.get(item.producto_id)?.moldes_disponibles ?? 1,
+            }));
+            let itemsCompletedInSimulation: ProductionQueueItem[] = [];
+            let simulationDayCount = 0; // To prevent infinite loops
+
+
+            // --- Simulation Loop ---
+            while (itemsInProgress.length > 0 && simulationDayCount < 1000) { // Safety break
+                simulationDayCount++;
+                const dayOfWeek = simulationDate.getDay();
+
+                if (dayOfWeek === 0) { // Skip Sunday
+                    simulationDate.setDate(simulationDate.getDate() + 1);
+                    continue;
+                }
+
+                let effectiveGlobalCapacityToday = (dayOfWeek === 6) ? EFFECTIVE_SAT_CAPACITY : EFFECTIVE_DAILY_CAPACITY;
+                let globalSlotsUsedToday = 0;
+
+                 // Prioritize Premium items within the day
+                 itemsInProgress.sort((a, b) => {
+                     if (a.premium && !b.premium) return -1;
+                     if (!a.premium && b.premium) return 1;
+                     // Otherwise maintain original FIFO from initial fetch
+                     return 0;
+                 });
+
+                // Process items for the current day
+                for (let i = 0; i < itemsInProgress.length; i++) {
+                    const item = itemsInProgress[i];
+
+                    // Fetch product info (handle potential missing info)
+                    const info = productInfoMap.get(item.producto_id);
+                    if (!info || !info.moldes_disponibles || info.moldes_disponibles <= 0) {
+                         warnings.push(`Skipping item ${item.queue_id} due to missing/invalid product info (moldes).`);
+                         continue; // Skip processing this item if info is bad
+                    }
+                    const itemMoldes = info.moldes_disponibles;
+                    const itemVueltas = info.vueltas_max_dia;
+                    const slotsNeededForItem = itemMoldes;
+
+                    // Check if global capacity allows for this item's molds
+                    if (globalSlotsUsedToday + slotsNeededForItem <= effectiveGlobalCapacityToday) {
+                         // Record start date if not already set
+                        if (!item.eta_start_date) {
+                            item.eta_start_date = new Date(simulationDate).toISOString().split('T')[0];
+                        }
+
+                        // Calculate potential output based on product molds and vueltas
+                        const maxPotentialOutputToday = itemMoldes * itemVueltas;
+
+                        // Determine actual units to produce (limited by pending qty and potential output)
+                        const unitsToProduce = Math.min(item.qty_pendiente ?? 0, maxPotentialOutputToday);
+
+                        if (unitsToProduce > 0) {
+                             item.qty_pendiente = (item.qty_pendiente ?? 0) - unitsToProduce;
+                             globalSlotsUsedToday += slotsNeededForItem; // Consume global slots
+
+                            // Check if item completed
+                            if (item.qty_pendiente <= 0) {
+                                item.eta_end_date = new Date(simulationDate).toISOString().split('T')[0];
+                                // Calculate duration
+                                if (item.eta_start_date && item.eta_end_date) {
+                                    item.vaciado_duration_days = diffBusinessDays(new Date(item.eta_start_date), new Date(item.eta_end_date)) + 1; // Inclusive
+                                }
+                                itemsCompletedInSimulation.push(item);
+                                // Remove from inProgress (careful with loop index - iterating backwards is safer)
+                                // We will filter later instead for simplicity here
+                            }
+                        }
+                    } else {
+                        // Not enough global capacity for this item today, try next item or next day
+                        continue;
+                    }
+                 } // End loop through items for the day
+
+                 // Remove completed items from inProgress list for next day
+                 itemsInProgress = itemsInProgress.filter(item => (item.qty_pendiente ?? 0) > 0);
+
+                 // Advance simulation date to the next day
+                 simulationDate.setDate(simulationDate.getDate() + 1);
+            } // End while loop (simulation days)
+
+            if (simulationDayCount >= 1000) {
+                warnings.push("Simulation stopped after 1000 days to prevent infinite loop.");
+            }
+            console.log(`[calculateGlobalQueueDates] Simulation finished after ${simulationDayCount} days.`);
+
+            // --- Update Database ---
+            const updates: Promise<any>[] = [];
+            itemsCompletedInSimulation.forEach(item => {
+                 console.log(`[calculateGlobalQueueDates] Updating DB for completed item ${item.queue_id}: Start=${item.eta_start_date}, End=${item.eta_end_date}, Duration=${item.vaciado_duration_days}`);
+                updates.push(
+                    this.supabase.from('production_queue').update({
+                        eta_start_date: item.eta_start_date,
+                        eta_end_date: item.eta_end_date,
+                        qty_pendiente: 0, // Ensure it's 0
+                        status: 'queued', // Keep as queued until explicitly moved to in_progress/done later? Or set to 'calculated'? Let's keep 'queued' for now.
+                        vaciado_duration_days: item.vaciado_duration_days
+                    }).eq('queue_id', item.queue_id)
+                );
+            });
+            // Also update items potentially started but not finished?
+            // For now, only updating completed items with dates.
+
+            await Promise.all(updates);
+            console.log(`[calculateGlobalQueueDates] ${updates.length} completed items updated in DB.`);
+
+            return { success: true, warnings };
+
+        } catch (error: any) {
+            console.error('[calculateGlobalQueueDates] Error during simulation:', error);
+            warnings.push(`Simulation failed: ${error.message}`);
+            return { success: false, warnings };
+        }
+    }
+
+
+     /**
+      * Recalculates the entire queue and updates associated cotizaciones.
+      * Should be called when an item is finished/cancelled or context changes.
+      * NOTE: This can be resource intensive.
+      */
+     async recalculateEntireQueueAndUpdateCotizaciones(): Promise<{ success: boolean; warnings: string[] }> {
+         console.log('[recalculateEntireQueueAndUpdateCotizaciones] Starting full recalculation...');
+         const { success: calcSuccess, warnings } = await this.calculateGlobalQueueDates();
+
+         if (!calcSuccess) {
+             console.error('[recalculateEntireQueueAndUpdateCotizaciones] Failed to calculate global queue dates.');
+             return { success: false, warnings };
+         }
+         console.log('[recalculateEntireQueueAndUpdateCotizaciones] Global dates calculated. Now updating Cotizaciones...');
+
+         // Now, update the estimated_delivery_date on each affected cotizacion
+         try {
+            // Fetch all queue items with calculated end dates and their cotizacion_id
+            const { data: queueItems, error: fetchItemsError } = await this.supabase
+                .from('production_queue')
+                .select('queue_id, cotizacion_producto_id, eta_end_date')
+                .not('eta_end_date', 'is', null); // Only those with calculated dates
+
+            if (fetchItemsError) throw fetchItemsError;
+            if (!queueItems || queueItems.length === 0) {
+                 console.log('[recalculateEntireQueueAndUpdateCotizaciones] No queue items with end dates found to update cotizaciones.');
+                 return { success: true, warnings };
+            }
+
+             // Fetch cotizacion_id for each cotizacion_producto_id
+             const cpIds = queueItems.map(qi => qi.cotizacion_producto_id);
+             const { data: cpLinks, error: fetchCpLinksError } = await this.supabase
+                 .from('cotizacion_productos')
+                 .select('cotizacion_producto_id, cotizacion_id')
+                 .in('cotizacion_producto_id', cpIds);
+
+             if (fetchCpLinksError) throw fetchCpLinksError;
+             if (!cpLinks) throw new Error("Failed to fetch cotizacion_producto links.");
+
+             const cpToCotizacionMap = new Map<number, number>();
+             cpLinks.forEach(link => {
+                 if (link.cotizacion_id) cpToCotizacionMap.set(link.cotizacion_producto_id, link.cotizacion_id);
+             });
+
+             // Group latest eta_end_date by cotizacion_id
+             const latestEndDateByCotizacion = new Map<number, Date>();
+             queueItems.forEach(item => {
+                 const cotizacionId = cpToCotizacionMap.get(item.cotizacion_producto_id);
+                 if (cotizacionId && item.eta_end_date) {
+                     const currentEndDate = new Date(item.eta_end_date);
+                     const existingLatest = latestEndDateByCotizacion.get(cotizacionId);
+                     if (!existingLatest || currentEndDate > existingLatest) {
+                         latestEndDateByCotizacion.set(cotizacionId, currentEndDate);
+                     }
+                 }
+             });
+
+             // Update each cotizacion
+             const POST_PROCESSING_DAYS = 3;
+             const SHIPPING_DAYS = 3;
+             const cotizacionUpdates: Promise<any>[] = [];
+
+             latestEndDateByCotizacion.forEach((latestEndDate, cotizacionId) => {
+                 let deliveryDate = addBusinessDays(latestEndDate, POST_PROCESSING_DAYS);
+                 deliveryDate = addBusinessDays(deliveryDate, SHIPPING_DAYS);
+                 const finalDeliveryDateStr = deliveryDate.toISOString().split('T')[0];
+                 console.log(`[recalculateEntireQueueAndUpdateCotizaciones] Updating Cotizacion ${cotizacionId} final ETA to ${finalDeliveryDateStr}`);
+                 cotizacionUpdates.push(
+                     this.supabase.from('cotizaciones')
+                         .update({ estimated_delivery_date: finalDeliveryDateStr })
+                         .eq('cotizacion_id', cotizacionId)
+                 );
+             });
+
+             await Promise.all(cotizacionUpdates);
+             console.log(`[recalculateEntireQueueAndUpdateCotizaciones] ${cotizacionUpdates.length} cotizaciones updated with final ETAs.`);
+             return { success: true, warnings };
+
+         } catch (error: any) {
+             console.error('[recalculateEntireQueueAndUpdateCotizaciones] Error updating cotizaciones:', error);
+             warnings.push(`Failed to update cotizaciones after recalculation: ${error.message}`);
+             return { success: false, warnings };
          }
      }
 

@@ -89,8 +89,8 @@ export default function ProduccionPage() {
       }
   }, [fetchData]);
 
-  // Define columns using the function, passing the handler
-  const columns = useMemo(() => getColumns(handleStatusUpdate), [handleStatusUpdate]);
+  // Define columns using the function, passing the handler and refetch
+  const columns = useMemo(() => getColumns(handleStatusUpdate, fetchData), [handleStatusUpdate, fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -108,7 +108,9 @@ export default function ProduccionPage() {
       {loading && <p className="text-center py-4">Cargando datos...</p>}
       {error && <p className="text-red-500 text-center py-4">{error}</p>}
       {!loading && !error && (
-         <DataTable columns={columns} data={data} />
+        <div className="overflow-x-auto">
+           <DataTable columns={columns} data={data} />
+        </div>
       )}
     </div>
   );

@@ -45,7 +45,13 @@ export function DataTable<TData, TValue>({
     []
   )
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
+    React.useState<VisibilityState>({
+       queue_id: false,       // Hide ID Cola
+       folio: false,          // Hide Folio Cot.
+       cliente_nombre: false, // Hide Cliente
+       created_at: false,     // Hide Creado
+       // Add other columns here if you want them hidden by default too
+    })
   const [rowSelection, setRowSelection] = React.useState({}) 
 
   const table = useReactTable({
@@ -68,12 +74,10 @@ export function DataTable<TData, TValue>({
   })
 
   return (
-    <div>
-      {/* Filtering and Column Visibility Controls */}
-       <div className="flex items-center py-4">
+    <div className="px-1">
+      <div className="flex items-center py-4">
          <Input
            placeholder="Filtrar por nombre de producto..."
-           // Assuming 'producto_nombre' is a filterable column key
            value={(table.getColumn("producto_nombre")?.getFilterValue() as string) ?? ""}
            onChange={(event) =>
              table.getColumn("producto_nombre")?.setFilterValue(event.target.value)
@@ -102,7 +106,6 @@ export function DataTable<TData, TValue>({
                        column.toggleVisibility(!!value)
                      }
                    >
-                     {/* Try to get a readable header name */}
                      {typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id}
                    </DropdownMenuCheckboxItem>
                  )
@@ -110,7 +113,6 @@ export function DataTable<TData, TValue>({
            </DropdownMenuContent>
          </DropdownMenu>
        </div>
-      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -155,7 +157,6 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-       {/* Pagination */}
        <div className="flex items-center justify-end space-x-2 py-4">
          <Button
            variant="outline"
