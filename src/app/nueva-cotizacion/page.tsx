@@ -607,7 +607,7 @@ function NuevaCotizacionClient() {
                       {isPremium && <Badge variant="warning" className="mt-2"><Crown className="h-3 w-3 mr-1"/> Premium</Badge>}
                   </div>
               )}
-               {/* Production ETA Display */} 
+               {/* Production ETA Display - THIS ENTIRE BLOCK WILL BE REMOVED 
                <div className="p-4 border rounded-md">
                   <h3 className="text-lg font-semibold mb-2 flex items-center">
                       <CalendarClock className="mr-2 h-5 w-5 text-blue-600"/>
@@ -634,7 +634,6 @@ function NuevaCotizacionClient() {
                           </p>
                       </div>
                   )}
-                   {/* Allow user override */} 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
                        <div>
                           <Label htmlFor="tiempoEstimado">Tiempo Estimado Manual (Semanas - Mín)</Label>
@@ -660,7 +659,7 @@ function NuevaCotizacionClient() {
                        </div>
                    </div>
               </div>
-              {/* End Production ETA Display */} 
+              End Production ETA Display */} 
               
               <ResumenCotizacion 
                   productos={productos}
@@ -671,15 +670,17 @@ function NuevaCotizacionClient() {
                   hasIva={hasIva}
                   shippingCost={shippingCost}
                   total={financials?.displayTotal ?? 0}
-                  // Pass setters if ResumenCotizacion needs to modify these in context
                   setGlobalDiscount={setGlobalDiscount} 
                   setHasIva={setHasIva} 
                   setShippingCost={setShippingCost}
-                  // Pass manual time inputs if ResumenCotizacion shows them
                   tiempoEstimado={tiempoEstimadoInput}
-                  setTiempoEstimado={setTiempoEstimadoInput}
+                  setTiempoEstimado={handleTiempoEstimadoChange}
                   tiempoEstimadoMax={tiempoEstimadoMaxInput}
-                  setTiempoEstimadoMax={setTiempoEstimadoMaxInput}
+                  setTiempoEstimadoMax={handleTiempoEstimadoMaxChange}
+                  etaResult={etaResult}
+                  etaLoading={etaLoading}
+                  etaError={etaError}
+                  cliente={cliente}
               />
                {/* Currency Selector */} 
                <div className="flex justify-end items-center space-x-2 pt-4 border-t">

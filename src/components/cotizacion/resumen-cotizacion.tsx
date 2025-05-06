@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Truck, Receipt, Percent, User, Clock } from 'lucide-react';
+import { DollarSign, Truck, Receipt, Percent, User, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from '@/lib/utils';
@@ -17,9 +17,23 @@ interface Cliente {
   [key: string]: any;
 }
 
+// Define ETAResult interface (can be moved to a types file if shared)
+interface ETAResult {
+  dias_espera_moldes: number;
+  dias_vaciado: number;
+  dias_post_vaciado: number;
+  dias_envio: number;
+  dias_totales: number;
+  semanas_min: number;
+  semanas_max: number;
+  fecha_inicio_vaciado: string | null;
+  fecha_fin_vaciado: string | null;
+  fecha_entrega_estimada: string | null;
+}
+
 interface ResumenCotizacionProps {
   cliente: Cliente | null;
-  productos: any[]; // Keep simple for now
+  productos: any[];
   subtotal: number;
   ivaAmount: number;
   globalDiscount: number;
@@ -30,15 +44,18 @@ interface ResumenCotizacionProps {
   setShippingCost: (value: number) => void;
   total: number;
   moneda: 'MXN' | 'USD';
-  tiempoEstimado?: number;
-  setTiempoEstimado?: (weeks: number) => void;
-  tiempoEstimadoMax?: number;
-  setTiempoEstimadoMax?: (weeks: number) => void;
+  tiempoEstimado?: string;
+  setTiempoEstimado?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  tiempoEstimadoMax?: string;
+  setTiempoEstimadoMax?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  etaResult?: ETAResult | null;
+  etaLoading?: boolean;
+  etaError?: string | null;
 }
 
 export function ResumenCotizacion({
   cliente,
-  productos, // Not used directly in this simplified version
+  productos,
   subtotal,
   ivaAmount,
   globalDiscount,
@@ -49,79 +66,33 @@ export function ResumenCotizacion({
   setShippingCost,
   total,
   moneda,
-  tiempoEstimado = 6,
+  tiempoEstimado = "6",
   setTiempoEstimado,
-  tiempoEstimadoMax = 8,
-  setTiempoEstimadoMax
+  tiempoEstimadoMax = "8",
+  setTiempoEstimadoMax,
+  etaResult,
+  etaLoading,
+  etaError
 }: ResumenCotizacionProps) {
-  // Initialize based on the initial prop value
   const [hasShipping, setHasShipping] = useState<boolean>(shippingCost > 0);
-  const [tiempoEstimadoMaxStr, setTiempoEstimadoMaxStr] = useState<string>(tiempoEstimadoMax?.toString() ?? '8');
-  
-  // --- Local state for the shipping cost input string ---
-  const [localShippingCostStr, setLocalShippingCostStr] = useState<string>(
-    shippingCost === 0 ? '' : shippingCost.toString()
-  );
-  
-  // --- Local state for the global discount input string ---
-  const [localGlobalDiscountStr, setLocalGlobalDiscountStr] = useState<string>(
-    globalDiscount === 0 ? '' : globalDiscount.toString()
-  );
 
-  // Effect to update local string state if the prop changes from outside
-  // (e.g., loading data, or toggling the switch off)
-  useEffect(() => {
-    const propStr = shippingCost === 0 ? '' : shippingCost.toString();
-    // Only update local state if the prop is different from what the local state represents numerically
-    const localNum = localShippingCostStr === '' ? 0 : parseFloat(localShippingCostStr);
-    if (shippingCost !== localNum) {
-        console.log(`[Resumen Effect] Syncing localShippingCostStr from prop. Prop=${shippingCost}, CurrentLocalStr="${localShippingCostStr}"`);
-        setLocalShippingCostStr(propStr);
-    }
-  }, [shippingCost]); // Run only when the context prop changes
-
-  // --- Effect to sync localGlobalDiscountStr from prop ---
-  useEffect(() => {
-    const propStr = globalDiscount === 0 ? '' : globalDiscount.toString();
-    const localNum = localGlobalDiscountStr === '' ? 0 : parseFloat(localGlobalDiscountStr);
-     if (globalDiscount !== localNum) {
-         console.log(`[Resumen Effect] Syncing localGlobalDiscountStr from prop. Prop=${globalDiscount}, CurrentLocalStr="${localGlobalDiscountStr}"`);
-         setLocalGlobalDiscountStr(propStr);
-     }
-  }, [globalDiscount]);
-
-  // --- End local state management ---
-
-  useEffect(() => {
-    setTiempoEstimadoMaxStr(tiempoEstimadoMax?.toString() ?? '8');
-  }, [tiempoEstimadoMax]);
-
-  // Updated: Only updates local string state
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
      // Allow numbers, one decimal point, prevent minus sign, max 100
      if (/^(?:100(?:\.0*)?|\d{1,2}(?:\.\d*)?)$/.test(value) && !value.startsWith('-')) {
-        setLocalGlobalDiscountStr(value);
+        setGlobalDiscount(parseFloat(value));
      } else if (value === '') {
-        setLocalGlobalDiscountStr(''); // Allow clearing the input
+        setGlobalDiscount(0);
      }
   };
 
-  // New: Blur handler to update context
   const handleGlobalDiscountBlur = () => {
-     let numValue = localGlobalDiscountStr === '' ? 0 : parseFloat(localGlobalDiscountStr);
+     let numValue = globalDiscount;
 
      if (isNaN(numValue) || numValue < 0) {
        numValue = 0;
      } else if (numValue > 100) {
        numValue = 100;
-     }
-
-     // Format local string state
-     const formattedStr = numValue === 0 ? '' : numValue.toString();
-     // Ensure the local state reflects the possibly corrected number
-     if (localGlobalDiscountStr !== formattedStr) {
-        setLocalGlobalDiscountStr(formattedStr);
      }
 
      // Update context only if the numeric value is different
@@ -133,64 +104,37 @@ export function ResumenCotizacion({
 
   const handleIvaToggle = (checked: boolean) => setHasIva(checked);
   
-  // Updated: Toggle now just controls visibility and sets cost to 0 when turned off
   const handleShippingToggle = (checked: boolean) => {
     console.log(`[Resumen Toggle] handleShippingToggle called with: ${checked}`);
     setHasShipping(checked);
     if (!checked) {
       console.log("[Resumen Toggle] Shipping turned off, setting context cost to 0.");
-      setShippingCost(0); // Update context directly
-      // Local state will be updated by the useEffect watching shippingCost
+      setShippingCost(0);
     } else {
       // If turning on, maybe default to a value or just let user input?
       // For now, do nothing, user needs to input a value > 0.
     }
   };
 
-  // Updated: Input onChange only updates local string state
   const handleShippingCostInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
      // Basic filtering: Allow numbers, one decimal point, prevent minus sign
      if (/^[0-9]*\.?\d*$/.test(value) && !value.startsWith('-')) {
-        setLocalShippingCostStr(value);
+        setShippingCost(parseFloat(value));
      }
   };
 
-  // Updated: Input onBlur updates the context
   const handleShippingCostInputBlur = () => {
-    let numValue = localShippingCostStr === '' ? 0 : parseFloat(localShippingCostStr);
+    let numValue = shippingCost;
     
     if (isNaN(numValue) || numValue < 0) {
       numValue = 0; // Default to 0 if invalid
     }
 
-    // Format the local string state to match the parsed number (e.g., remove leading zeros)
-    const formattedStr = numValue === 0 ? '' : numValue.toString();
-    setLocalShippingCostStr(formattedStr);
-
     // Update context only if the numeric value is different
     if (numValue !== shippingCost) {
       console.log(`[Resumen Blur] Updating context shippingCost from ${shippingCost} to ${numValue}`);
       setShippingCost(numValue);
-    }
-  };
-
-  const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const numValue = value === '' ? 0 : parseInt(value, 10);
-    if (setTiempoEstimado && !isNaN(numValue) && numValue >= 0) {
-      setTiempoEstimado(numValue);
-    }
-  };
-  
-  const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setTiempoEstimadoMaxStr(value);
-    if (setTiempoEstimadoMax) {
-      const numValue = value === '' ? 0 : parseInt(value, 10);
-      if (!isNaN(numValue) && numValue >= 0) {
-        setTiempoEstimadoMax(numValue);
-      }
     }
   };
 
@@ -242,7 +186,7 @@ export function ResumenCotizacion({
                 min="0"
                 max="100"
                 step="0.01"
-                value={localGlobalDiscountStr}
+                value={globalDiscount.toString()}
                 onChange={handleGlobalDiscountChange}
                 onBlur={handleGlobalDiscountBlur}
                 className="h-8 pr-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -298,7 +242,7 @@ export function ResumenCotizacion({
                   type="number"
                   min="0"
                   step="0.01"
-                  value={localShippingCostStr}
+                  value={shippingCost.toString()}
                   onChange={handleShippingCostInputChange}
                   onBlur={handleShippingCostInputBlur}
                   className="h-8 pl-6 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -310,33 +254,59 @@ export function ResumenCotizacion({
 
           <Separator />
           
-          {/* Tiempo Entrega Inputs */}
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center py-1 gap-2 sm:gap-4">
-            <Label className="text-sm flex items-center gap-1.5 text-muted-foreground shrink-0">
-              <Clock className="h-4 w-4" />
-              Tiempo Entrega (Semanas)
-            </Label>
-            <div className="flex items-center gap-2">
+          {/* Tiempo Entrega */}
+          <div className="py-3">
+            <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    Tiempo Entrega (Semanas)
+                </Label>
+            </div>
+            <div className="flex items-center space-x-2">
               <Input
                 type="number"
-                min="1"
-                step="1"
-                value={tiempoEstimado === 0 ? '' : tiempoEstimado}
-                onChange={handleTiempoEstimadoChange}
-                className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={tiempoEstimado}
+                onChange={setTiempoEstimado}
                 placeholder="Min"
+                className="h-8 w-20 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                min={0}
               />
               <span className="text-muted-foreground">a</span>
               <Input
                 type="number"
-                min="0"
-                step="1"
-                value={tiempoEstimadoMaxStr}
-                onChange={handleTiempoEstimadoMaxChange}
-                className="h-8 w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                placeholder="Max"
+                value={tiempoEstimadoMax}
+                onChange={setTiempoEstimadoMax}
+                placeholder="Máx"
+                className="h-8 w-20 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                min={0}
               />
             </div>
+            {/* Display ETA Date Legend Below Inputs */}
+            {etaLoading && (
+                <div className="flex items-center text-muted-foreground text-sm mt-2">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculando fecha estimada...
+                </div>
+            )}
+            {etaError && !etaLoading && (
+                 <div className="text-red-600 flex items-center text-sm mt-2">
+                     <AlertTriangle className="mr-2 h-4 w-4 flex-shrink-0" /> <span>Error calculando fecha: {etaError.includes("ID válido") ? "No hay productos para estimar automáticamente." : etaError}</span>
+                 </div>
+            )}
+            {etaResult && !etaLoading && !etaError && etaResult.fecha_entrega_estimada && (
+                <p className="text-xs text-muted-foreground mt-2">
+                    Fecha estimada de entrega: {new Date(etaResult.fecha_entrega_estimada).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' })}
+                </p>
+            )}
+            {etaResult && !etaLoading && !etaError && !etaResult.fecha_entrega_estimada && (
+                 <p className="text-xs text-muted-foreground mt-2">
+                    Fecha estimada de entrega: N/D (Automático no disponible)
+                </p>
+            )}
+            {!etaResult && !etaLoading && !etaError && (
+                 <p className="text-xs text-muted-foreground mt-2">
+                    Fecha estimada de entrega: (Se calculará al guardar o con productos válidos)
+                </p>
+            )}
           </div>
 
           <Separator />
