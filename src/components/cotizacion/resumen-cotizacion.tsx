@@ -58,7 +58,9 @@ interface ProductoResumen {
   id: string | number;
   nombre: string;
   cantidad: number;
-  // Add other relevant fields if needed for display, e.g., precio unitario, subtotal
+  precioMXN?: number;      // Unit price in MXN, assuming this is what context provides as 'precio' or 'precioMXN'
+  descuento?: number;     // Discount percentage
+  subtotalMXN?: number;   // Line item subtotal in MXN, assuming this is 'subtotal' or 'subtotalMXN' from context
 }
 
 export function ResumenCotizacion({
@@ -169,7 +171,7 @@ export function ResumenCotizacion({
 
   return (
     <div className="space-y-6">
-      {/* Client Info Card */}
+      {/* Card 1: Client Info */}
       {cliente && (
         <Card>
           <CardHeader>
@@ -187,7 +189,51 @@ export function ResumenCotizacion({
         </Card>
       )}
 
-      {/* Financial Summary & Options Card */}
+      {/* Card 2: Products Summary - NEW CARD */}
+      {productos && productos.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <PackagePlus className="h-5 w-5 text-primary" />
+              Productos en la Cotización
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            {/* Header Row for Product Table */}
+            <div className="flex items-center py-2 text-xs font-semibold text-muted-foreground border-b mb-2">
+              <span className="flex-1 min-w-0 pr-2">Producto</span>
+              <span className="w-12 text-center mx-1">Cant.</span>
+              <span className="w-20 text-right mx-1">P. Unit.</span>
+              <span className="w-14 text-center mx-1">Desc.</span>
+              <span className="w-24 text-right ml-1">Subtotal</span>
+            </div>
+            <ul className="list-none pl-0 space-y-1">
+              {(productos as ProductoResumen[]).map((producto) => (
+                <li key={producto.id} className="flex items-center py-1.5 border-b last:border-b-0 text-xs">
+                  <span className="flex-1 min-w-0 truncate pr-2" title={producto.nombre}>{producto.nombre}</span>
+                  <span className="w-12 text-center mx-1">{producto.cantidad}</span>
+                  {typeof producto.precioMXN === 'number' ? (
+                    <span className="w-20 text-right mx-1">{formatCurrency(producto.precioMXN, moneda)}</span>
+                  ) : (
+                    <span className="w-20 text-right mx-1">-</span>
+                  )}
+                  <span className="w-14 text-center mx-1">
+                    {typeof producto.descuento === 'number' && producto.descuento > 0 ? `${producto.descuento}%` : '-'}
+                  </span>
+                  {typeof producto.subtotalMXN === 'number' ? (
+                    <span className="w-24 text-right ml-1 font-medium">{formatCurrency(producto.subtotalMXN, moneda)}</span>
+                  ) : (
+                    <span className="w-24 text-right ml-1 font-medium">-</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+      {/* End Card 2: Products Summary */}
+
+      {/* Card 3: Financial Summary & Options Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -196,27 +242,6 @@ export function ResumenCotizacion({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-
-          {/* Products Summary Section - NEW */}
-          {productos && productos.length > 0 && (
-            <div className="py-3">
-              <Label className="text-sm flex items-center gap-1.5 text-muted-foreground mb-2">
-                <PackagePlus className="h-4 w-4" />
-                Productos en la Cotización
-              </Label>
-              <ul className="list-none pl-0 space-y-1">
-                {(productos as ProductoResumen[]).map((producto) => (
-                  <li key={producto.id} className="text-xs flex justify-between items-center">
-                    <span>{producto.nombre}</span>
-                    <span className="text-muted-foreground">Cantidad: {producto.cantidad}</span>
-                  </li>
-                ))}
-              </ul>
-              <Separator className="my-3" /> {/* Separator after product list */}
-            </div>
-          )}
-          {/* End Products Summary Section */}
-
           {/* Subtotal Display */}
           <div className="flex justify-between items-center py-1">
             <span className="text-sm text-muted-foreground">Subtotal Productos</span>
