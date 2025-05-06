@@ -22,7 +22,8 @@ type QueueApiResponseItem = {
   producto_id: number | null;
   producto_nombre: string | null;
   vueltas_max_dia: number;
-  vaciado_duration_days: number;
+  moldes_disponibles: number;
+  vaciado_duration_days: number | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -81,7 +82,8 @@ export async function GET(request: NextRequest) {
             ),
             productos!inner (
                 nombre,
-                vueltas_max_dia
+                vueltas_max_dia,
+                moldes_disponibles
             )
         )
       `,
@@ -121,6 +123,7 @@ export async function GET(request: NextRequest) {
         producto_id: producto?.producto_id ?? null,
         producto_nombre: producto?.nombre ?? null,
         vueltas_max_dia: producto?.vueltas_max_dia ?? 1,
+        moldes_disponibles: producto?.moldes_disponibles ?? 1,
         vaciado_duration_days: item.vaciado_duration_days,
       };
     });

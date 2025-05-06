@@ -17,6 +17,12 @@ import { useState } from 'react'
 import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header"
 import { DataTableRowActions } from "./data-table-row-actions"
 import { format } from 'date-fns'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Define the shape of the data we expect for a production queue item
 // This should include joined data from related tables
@@ -35,6 +41,7 @@ export type ProductionQueueItem = {
   eta_start_date: string | null; // YYYY-MM-DD String
   eta_end_date: string | null; // YYYY-MM-DD String
   vueltas_max_dia: number;
+  moldes_disponibles: number;
   vaciado_duration_days: number | null;
 }
 
@@ -108,7 +115,28 @@ export const getColumns = (onStatusChange: (queueId: number, newStatus: string) 
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Producto" />
     ),
-    cell: ({ row }) => <div className="min-w-[150px] font-medium">{row.getValue("producto_nombre")}</div>,
+    cell: ({ row }) => {
+      const item = row.original;
+      const productoNombre = item.producto_nombre ?? 'N/A';
+      const moldes = item.moldes_disponibles ?? 'N/A';
+      const vueltas = item.vueltas_max_dia ?? 'N/A';
+
+      return (
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="min-w-[150px] font-medium cursor-help">
+                {productoNombre}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Moldes Disp: {moldes}</p>
+              <p>Vueltas/Día: {vueltas}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    },
   },
   {
     accessorKey: "qty_total",
