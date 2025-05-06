@@ -44,7 +44,10 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Check if a given path is active
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => {
+    // Add null check for pathname
+    return pathname ? pathname === path || (path !== "/dashboard" && pathname.startsWith(path)) : false;
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
