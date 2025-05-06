@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus, DollarSign } from "lucide-react";
+import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus, DollarSign, Factory } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 
 const navigation = [
@@ -16,6 +16,11 @@ const navigation = [
     name: "Cotizaciones",
     href: "/dashboard/cotizaciones",
     icon: ClipboardList,
+  },
+  {
+    name: "Producción",
+    href: "/produccion",
+    icon: Factory,
   },
   {
     name: "Finanzas",

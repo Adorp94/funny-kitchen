@@ -200,11 +200,58 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
   // --- Financial Calculations ---
   const calculatedFinancials = useMemo(() => {
-    console.log("Context: Recalculating financials...");
+    console.log("[Context] Recalculating financials...");
     console.log(` - Moneda: ${moneda}, Rate: ${exchangeRate}`);
     console.log(` - Shipping Input: ${shippingCostInput} (${moneda})`);
     console.log(` - Global Discount: ${globalDiscount}%`);
     console.log(` - Has IVA: ${hasIva}`);
+
+    // --- *** Start Product Mapping for Display *** ---
+    const displayProductos: ProductoDisplay[] = internalProductos.map((p, index) => {
+        console.log(`[Context] Mapping product index ${index} for display:`, p); // Log internal product
+        let displayPrice = 0;
+        let displaySubtotal = 0;
+
+        if (moneda === 'MXN') {
+            displayPrice = p.precioMXN;
+            displaySubtotal = p.subtotalMXN; // Subtotal already includes individual discount
+            console.log(`[Context]   - Using MXN: displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
+        } else if (moneda === 'USD') {
+            if (exchangeRate && exchangeRate > 0) { // Ensure exchangeRate is valid
+                try {
+                    displayPrice = convertMXNtoUSD(p.precioMXN);
+                    displaySubtotal = convertMXNtoUSD(p.subtotalMXN);
+                    console.log(`[Context]   - Converted to USD (Rate: ${exchangeRate}): displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
+                } catch (conversionError) {
+                    console.error(`[Context]   - Error converting product ${index} to USD:`, conversionError);
+                    displayPrice = 0; // Fallback on error
+                    displaySubtotal = 0;
+                }
+            } else {
+                 console.warn(`[Context]   - Cannot calculate USD display price/subtotal for product ${index}. Exchange rate invalid or null: ${exchangeRate}`);
+                 displayPrice = 0; // Fallback if rate is missing/invalid
+                 displaySubtotal = 0;
+            }
+        } 
+        // Log if neither MXN nor USD (should not happen with current types)
+        else {
+             console.warn(`[Context]   - Unexpected moneda value: ${moneda}. Setting display price/subtotal to 0.`);
+        }
+
+        // Construct the display product object
+        const displayProduct: ProductoDisplay = {
+            ...p, // Spread internal details like id, nombre, cantidad, sku etc.
+            precio: displayPrice,      // Set the calculated display price
+            subtotal: displaySubtotal,  // Set the calculated display subtotal
+            // Ensure ProductoDisplay specific fields are handled if any
+            precioMXN: p.precioMXN, // Keep original MXN for reference if needed by ProductoDisplay
+            subtotalMXN: p.subtotalMXN, // Keep original MXN subtotal for reference if needed
+        };
+        console.log(`[Context]   - Resulting displayProduct ${index}:`, displayProduct);
+        return displayProduct;
+    });
+    // --- *** End Product Mapping for Display *** ---
+
 
     // 1. Calculate base totals in MXN from internal state
     let baseSubtotalMXN = 0;
@@ -275,53 +322,26 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
 
     return {
-      displaySubtotal,
-      displayShippingCost,
-      displayIvaAmount,
-      displayTotal,
-      baseSubtotalMXN, // Renamed for clarity
-      subtotalAfterDiscountMXN, // Added for clarity
-      shippingCostMXN,
-      ivaAmountMXN,
-      totalMXN,
+      displayProductos,
+      financials: {
+        displaySubtotal,
+        displayShippingCost,
+        displayIvaAmount,
+        displayTotal,
+        baseSubtotalMXN,
+        subtotalAfterDiscountMXN,
+        shippingCostMXN,
+        ivaAmountMXN,
+        totalMXN,
+      },
     };
 
   }, [internalProductos, globalDiscount, hasIva, shippingCostInput, moneda, exchangeRate, convertMXNtoUSD, convertUSDtoMXN]);
 
 
-  // --- Derive Display Products ---
-  // This calculates the products array with prices/subtotals in the selected currency
-  const displayProductos = useMemo((): ProductoDisplay[] => {
-    return internalProductos.map(p => {
-      let displayPrecio: number;
-      let displaySubtotal: number;
-
-      if (moneda === 'MXN') {
-        displayPrecio = p.precioMXN;
-        displaySubtotal = p.subtotalMXN; // Already includes individual discount
-      } else if (moneda === 'USD' && exchangeRate) {
-        displayPrecio = convertMXNtoUSD(p.precioMXN);
-        // Recalculate subtotal in USD AFTER discount
-        const priceAfterDiscountUSD = displayPrecio * (1 - p.descuento / 100);
-        displaySubtotal = priceAfterDiscountUSD * p.cantidad;
-      } else {
-        // Fallback: show MXN price if no rate
-        displayPrecio = p.precioMXN;
-        displaySubtotal = p.subtotalMXN;
-      }
-
-      return {
-        ...p, // Spread all properties from internal product
-        precio: displayPrecio, // Overwrite with display price
-        subtotal: displaySubtotal, // Overwrite with display subtotal
-      };
-    });
-  }, [internalProductos, moneda, exchangeRate, convertMXNtoUSD]);
-
-
   // --- Context Value ---
   const contextValue = useMemo((): ProductosContextType => ({
-    productos: displayProductos, // Provide the derived display products
+    productos: calculatedFinancials.displayProductos,
     setProductos: (prods) => {
         // This is complex now - ideally don't allow direct setting from outside
         // If needed, would require converting display products back to internal format
@@ -332,13 +352,13 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     removeProducto,
     updateProductoDiscount,
     clearProductos,
-    financials: calculatedFinancials, // Provide the calculated financials object
+    financials: calculatedFinancials.financials,
     globalDiscount,
     setGlobalDiscount,
     hasIva,
     setHasIva: setHasIvaWithLog,
-    shippingCost: shippingCostInput, // Expose the input value
-    setShippingCost: setShippingCostInputWithLog, // Allow setting the input value
+    shippingCost: shippingCostInput,
+    setShippingCost: setShippingCostInputWithLog,
     moneda,
     setMoneda,
     exchangeRate,
@@ -346,12 +366,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     convertMXNtoUSD,
     convertUSDtoMXN,
   }), [
-    displayProductos,
+    calculatedFinancials.displayProductos,
     addProducto,
     removeProducto,
     updateProductoDiscount,
     clearProductos,
-    calculatedFinancials,
+    calculatedFinancials.financials,
     globalDiscount,
     setGlobalDiscount,
     hasIva,

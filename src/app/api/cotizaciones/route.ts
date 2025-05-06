@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase/server';
 import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
 import { getNextFolioNumber } from '@/app/actions/cotizacion-actions';
+import { ProductionPlannerService } from '@/services/productionPlannerService';
+import { Database } from '@/lib/supabase/types';
+
+// --- Helper function defined locally ---
+function addBusinessDays(startDate: Date, days: number): Date {
+    const date = new Date(startDate.valueOf());
+    let addedDays = 0;
+    while (addedDays < days) {
+        date.setDate(date.getDate() + 1);
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            addedDays++;
+        }
+    }
+    return date;
+}
+// --- End Helper Function ---
 
 export async function GET(request: NextRequest) {
   try {
@@ -139,21 +156,43 @@ export async function GET(request: NextRequest) {
       const cotizacionesArray = Array.isArray(cotizaciones) ? cotizaciones : [];
       
       // Add basic validation for each cotizacion to prevent null errors
-      const safeData = cotizacionesArray.map(cot => {
+      // Define expected type for a row in cotizaciones array for clarity
+      // Define a specific type for the list items matching the selected fields
+      type ClienteSummary = {
+        cliente_id: number | null;
+        nombre: string | null;
+        celular: string | null;
+      };
+      
+      type CotizacionListItem = {
+        cotizacion_id: number;
+        folio: string | null;
+        fecha_creacion: string | null;
+        estado: string | null;
+        moneda: string | null;
+        total: number | null;
+        total_mxn: number | null;
+        cliente: ClienteSummary | null; // Use the specific ClienteSummary type
+      };
+
+      // Use CotizacionListItem[] for the type assertion, casting through unknown
+      const safeData = (cotizacionesArray as unknown as CotizacionListItem[]).map(cot => {
         if (!cot) return null;
+        // Client data might be an array, handle that case
+        const clienteData = Array.isArray(cot.cliente) ? cot.cliente[0] : cot.cliente;
         
         return {
-          cotizacion_id: cot.cotizacion_id || 0,
-          folio: cot.folio || 'Sin folio',
-          fecha_creacion: cot.fecha_creacion || new Date().toISOString(),
-          estado: cot.estado || 'pendiente',
-          moneda: cot.moneda || 'MXN',
-          total: cot.total || 0,
-          total_mxn: cot.total_mxn || 0,
-          cliente: cot.cliente ? {
-            cliente_id: cot.cliente.cliente_id || 0,
-            nombre: cot.cliente.nombre || 'Cliente sin nombre',
-            celular: cot.cliente.celular || ''
+          cotizacion_id: cot.cotizacion_id ?? 0,
+          folio: cot.folio ?? 'Sin folio',
+          fecha_creacion: cot.fecha_creacion ?? new Date().toISOString(),
+          estado: cot.estado ?? 'pendiente',
+          moneda: cot.moneda ?? 'MXN',
+          total: cot.total ?? 0,
+          total_mxn: cot.total_mxn ?? 0,
+          cliente: clienteData ? {
+            cliente_id: clienteData.cliente_id ?? 0, 
+            nombre: clienteData.nombre ?? 'Cliente sin nombre',
+            celular: clienteData.celular ?? ''
           } : {
             cliente_id: 0,
             nombre: 'Cliente no encontrado',
@@ -176,30 +215,27 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json();
-    
-    // Extract data from the request
+    const plannerService = new ProductionPlannerService(supabase); // Instantiate planner (using imported supabase)
+
+    // Extract data from the request (add isPremium)
     const { 
       cliente, 
       create_client_if_needed,
       productos, 
       moneda, 
-      // Remove display values, add MXN base values
-      // subtotal, 
       subtotal_mxn, 
       descuento_global, 
       iva, 
-      // monto_iva, // Calculate this later
-      // incluye_envio, // Determine this later
-      // costo_envio, 
       costo_envio_mxn,
-      // total,
       total_mxn,
       tipo_cambio,
-      tiempo_estimado,
-      tiempo_estimado_max
+      tiempo_estimado, // This might be replaced/informed by planner ETA
+      tiempo_estimado_max, // This might be replaced/informed by planner ETA
+      isPremium = false // Default premium to false if not provided
     } = data;
 
     console.log("==== QUOTATION DATA RECEIVED (MXN Basis) ====");
+    console.log(`Client ID: ${cliente?.cliente_id}, CreateIfNeeded: ${create_client_if_needed}, isPremium: ${isPremium}`);
     console.log(`Currency: ${moneda}`);
     console.log(`Subtotal MXN: ${subtotal_mxn}`);
     console.log(`Shipping MXN: ${costo_envio_mxn}`);
@@ -207,6 +243,7 @@ export async function POST(req: NextRequest) {
     console.log(`Exchange Rate: ${tipo_cambio}`);
     console.log(`Has IVA: ${iva}`);
     console.log(`Global Discount: ${descuento_global}%`);
+    console.log(`Received ${productos?.length} products`);
     console.log("===============================");
 
     // Validate required fields
@@ -395,7 +432,8 @@ export async function POST(req: NextRequest) {
         tiempo_estimado: tiempo_estimado || 6,
         tiempo_estimado_max: tiempo_estimado_max || 8,
         estado: 'pendiente',
-        fecha_expiracion: fechaExpiracion.toISOString()
+        fecha_expiracion: fechaExpiracion.toISOString(),
+        is_premium: isPremium // <<< ADDED: Save the isPremium flag from request body
       })
       .select('cotizacion_id') // Select the ID of the newly inserted row
       .single(); // Expect only one row
@@ -439,7 +477,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Error al verificar productos existentes' }, { status: 500 });
     }
 
-    const existingProductIds = new Set(existingDbProducts?.map(p => p.producto_id) || []);
+    const existingProductIds = new Set(existingDbProducts?.map((p: { producto_id: number }) => p.producto_id) || []); // Added type annotation for p
     console.log("Existing product IDs found in DB:", Array.from(existingProductIds));
 
     // --- Fetch Max cotizacion_producto_id to generate new IDs --- 
@@ -533,21 +571,6 @@ export async function POST(req: NextRequest) {
     console.log("Products inserted successfully for cotizacion ID:", cotizacionId);
     
     // --- End Database Transaction --- 
-    
-    /* Remove RPC call result extraction
-    const { data: cotizacionResult, error: cotizacionError } = await supabase.rpc('crear_cotizacion_con_productos', { ... });
-
-    if (cotizacionError) {
-      console.error('Error calling Supabase function crear_cotizacion_con_productos:', cotizacionError);
-      return NextResponse.json(
-        { error: `Error al guardar en base de datos: ${cotizacionError.message}` },
-        { status: 500 }
-      );
-    }
-
-    // Extract results from the function call
-    const { nueva_cotizacion_id, nuevo_folio } = cotizacionResult;
-    */
 
     // Use the ID and folio obtained from the direct insert
     const nueva_cotizacion_id = cotizacionId;
@@ -562,7 +585,7 @@ export async function POST(req: NextRequest) {
       folio: nuevo_folio,
       cliente_creado: cliente_creado
     });
-    
+
   } catch (error) {
     console.error('Unexpected error saving quotation:', error);
     return NextResponse.json(

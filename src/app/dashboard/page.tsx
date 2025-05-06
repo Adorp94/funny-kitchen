@@ -303,7 +303,7 @@ function DashboardPageContent() {
                 </CardFooter>
               </Card>
               
-              <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
+              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
                 <CardHeader className="flex flex-col items-center p-0 pb-3">
                   <div className="bg-purple-100 dark:bg-purple-900/30 rounded-lg p-2 mb-2">
                     <ClipboardList className="h-6 w-6 text-purple-600 dark:text-purple-400" />
@@ -313,7 +313,7 @@ function DashboardPageContent() {
                 </CardHeader>
                 <CardContent className="flex-1 p-0 mb-4">
                   <p className="text-xs text-muted-foreground text-center">
-                    Visualiza y gestiona el estado de las órdenes de producción. (Próximamente)
+                    Visualiza y gestiona el estado de las órdenes en la cola de producción.
                   </p>
                 </CardContent>
                 <CardFooter className="p-0">
@@ -321,8 +321,7 @@ function DashboardPageContent() {
                     variant="outline"
                     size="sm" 
                     className="w-full"
-                    disabled
-                    title="Módulo en desarrollo"
+                    onClick={() => handleNavigate('/produccion')}
                   >
                     Ir a Producción
                   </Button>

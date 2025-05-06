@@ -1,0 +1,22 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Quotation Feature Components
+
+This rule highlights the core components involved in creating a new quotation.
+
+## Main Entry Point
+
+- **`[nueva-cotizacion/page.tsx](mdc:src/app/nueva-cotizacion/page.tsx)`**: The main page component for the new quotation form.
+
+## Key Components
+
+- **`[cliente-form.tsx](mdc:src/components/cotizacion/cliente-form.tsx)`**: Form for capturing and validating client information.
+- **`[producto-simplificado.tsx](mdc:src/components/cotizacion/producto-simplificado.tsx)`**: Form used to add individual products/items to the quote.
+- **`[lista-productos.tsx](mdc:src/components/cotizacion/lista-productos.tsx)`**: Table component that displays the list of added products, allowing management (e.g., removal).
+
+## State Management
+
+- **`[productos-context.tsx](mdc:src/contexts/productos-context.tsx)`**: Manages the state of the products added to the current quotation, likely providing functions to add, remove, and update products.

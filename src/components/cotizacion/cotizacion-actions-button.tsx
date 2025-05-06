@@ -22,10 +22,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CotizacionStatusModal } from './cotizacion-status-modal';
 import { toast } from "sonner";
-import { updateCotizacionStatus, getCotizacionDetails } from '@/app/actions/cotizacion-actions';
+import { getCotizacionDetails } from '@/app/actions/cotizacion-actions';
 import { useRouter } from 'next/navigation';
 import { PDFService } from '@/services/pdf-service';
 import { supabase } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils';
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -64,80 +65,6 @@ interface CotizacionActionsButtonProps {
 // Function to determine if status can be changed
 const canChangeStatus = (currentStatus: string): boolean => {
   return currentStatus?.toLowerCase() === 'pendiente';
-};
-
-// Helper function to handle status change (RPC call)
-const handleStatusChange = async (
-  cotizacion: Cotizacion, // Pass the full cotizacion object
-  newStatus: string,
-  fecha: Date, 
-  paymentData?: PaymentFormData
-) => {
-  const fechaISO = fecha.toISOString().split('T')[0];
-  const cotizacionId = cotizacion.cotizacion_id; 
-
-  try {
-    let rpcResult;
-    let rpcName = ''; // Define variables to hold RPC details
-    let rpcParams: any = {};
-
-    if (newStatus === 'producción') {
-      if (!paymentData) throw new Error("Datos de anticipo requeridos para producción.");
-      rpcName = 'aprobar_cotizacion_a_produccion';
-      rpcParams = {
-        p_cotizacion_id: cotizacionId,
-        p_monto_anticipo: paymentData.monto,
-        p_metodo_pago: paymentData.metodo_pago,
-        p_moneda: cotizacion.moneda, 
-        p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null,
-        p_fecha_cambio: fechaISO
-      };
-    } else if (newStatus === 'enviar_inventario') { // ADDED Handling for enviar_inventario
-      if (!paymentData) throw new Error("Datos de anticipo requeridos para enviar de inventario.");
-      rpcName = 'enviar_cotizacion_de_inventario'; // Use the correct RPC function name
-      rpcParams = {
-        p_cotizacion_id: cotizacionId,
-        p_monto_anticipo: paymentData.monto,
-        p_metodo_pago: paymentData.metodo_pago,
-        p_moneda: cotizacion.moneda, 
-        p_tipo_cambio: cotizacion.moneda === 'USD' ? cotizacion.tipo_cambio : null, 
-        p_fecha_cambio: fechaISO
-      };
-    } else if (newStatus === 'rechazada') {
-      rpcName = 'rechazar_cotizacion';
-      rpcParams = {
-        p_cotizacion_id: cotizacionId,
-        p_fecha_cambio: fechaISO
-      };
-    } else {
-      // This error was being thrown because 'enviar_inventario' wasn't handled
-      throw new Error(`Estado "${newStatus}" no manejado.`); 
-    }
-
-    // Execute the determined RPC call
-    console.log(`[ActionBtn] Calling ${rpcName} with params:`, rpcParams);
-    const { data, error } = await supabase.rpc(rpcName, rpcParams);
-    if (error) throw error;
-    rpcResult = data;
-
-    if (rpcResult === true) {
-      return true;
-    } else {
-      throw new Error("La operación falló en la base de datos (RPC devolvió false).");
-    }
-
-  } catch (error: any) {
-    // This catch block logs the raw error and re-throws a new error with the message
-    console.error("Error during status change process (raw error object):", error);
-    // const messageFromServer = error?.message || JSON.stringify(error);
-    //  const errorMessage = messageFromServer.includes(':')
-    //    ? messageFromServer.split(':').pop().trim()
-    //    : messageFromServer;
-    // Re-throwing just the message might be causing the strange "\"rechazada\"" error if the original error object was unusual
-    // Let's try re-throwing the original error object to preserve its structure
-    // throw new Error(errorMessage); // Original re-throw
-    throw error; // Re-throw the original error
-  }
 };
 
 export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSize = "sm" }: CotizacionActionsButtonProps) {
@@ -221,30 +148,60 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
   const handleModalSubmit = async (
     cotizacionId: number,
     newStatus: string,
-    fecha: Date,
+    _fecha: Date,
     paymentData?: PaymentFormData
   ) => {
+    const toastId = toast.loading(`Actualizando estado a "${newStatus}"...`);
     try {
-      const success = await handleStatusChange(cotizacion, newStatus, fecha, paymentData);
-      if (success) {
-        toast.success(`Estado de ${cotizacion.folio} actualizado.`);
-        onStatusChanged();
+      // Prepare the request body
+      const requestBody: { newStatus: string; paymentData?: PaymentFormData } = {
+        newStatus: newStatus,
+      };
+      if (paymentData) {
+        requestBody.paymentData = paymentData;
       }
-      return success;
-    } catch (error: any) {
-      console.error("CotizacionActionsButton: Error updating status:", error.message);
-      toast.error(`Error al actualizar estado: "${error.message}"`);
-      return false;
-    }
-  };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setDetailedCotizacion(null);
-    if (onStatusChanged) {
-      setTimeout(() => {
-        onStatusChanged();
-      }, 300);
+      console.log(`[ActionBtn] Calling API POST /api/cotizaciones/${cotizacionId}/status with body:`, requestBody);
+
+      // Call the API endpoint instead of RPC
+      const response = await fetch(`/api/cotizaciones/${cotizacionId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Use error message from API response if available
+        throw new Error(result.error || `Error del servidor: ${response.status}`);
+      }
+
+      // Handle successful response
+      toast.success(`Estado de ${cotizacion.folio} actualizado a "${newStatus}".`, { 
+          id: toastId,
+          description: result.estimatedDeliveryDate 
+            ? `Fecha estimada de entrega: ${formatDate(result.estimatedDeliveryDate)}` 
+            : result.message // Show other messages from API if no ETA
+      });
+      
+      // Close modal and refresh data via callback
+      setIsStatusModalOpen(false); // Close the modal on success
+      if (onStatusChanged) {
+        onStatusChanged(); // Trigger data refresh
+      }
+      
+      return true; // Indicate success
+
+    } catch (error: any) {
+      console.error("CotizacionActionsButton: Error updating status via API:", error);
+      toast.error(`Error al actualizar estado`, { 
+          id: toastId, 
+          description: error.message || "Ocurrió un error inesperado."
+      });
+      return false; // Indicate failure
     }
   };
 

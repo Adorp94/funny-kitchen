@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Header } from "@/components/layout/header";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ProductosProvider } from "@/contexts/productos-context";
 
@@ -21,6 +21,8 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  console.log(`[ClientLayout] Mounted, pathname: ${pathname}`);
 
   return (
     <ProductosProvider>
@@ -65,17 +67,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         </footer>
         
         {/* Toast notifications */}
-        <Toaster 
-          position="top-center"
-          toastOptions={{
-            className: 'rounded-md shadow-md px-3 py-3 bg-white border border-gray-100',
-            duration: 3000,
-            style: {
-              fontWeight: 500,
-              fontSize: '14px',
-            }
-          }}
-        />
+        <Toaster richColors position="top-right" />
       </div>
     </ProductosProvider>
   );

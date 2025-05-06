@@ -1,27 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Check, AlertTriangle, CalendarClock, Crown } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
 import ProductoFormTabs from "@/components/cotizacion/producto-form-tabs";
-import { ListaProductos } from "@/components/cotizacion/lista-productos";
 import { ListaProductosConDescuento, ProductoConDescuento } from "@/components/cotizacion/lista-productos-con-descuento";
 import { ResumenCotizacion } from "@/components/cotizacion/resumen-cotizacion";
 import { useProductos, ProductosProvider } from "@/contexts/productos-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Cliente } from "@/lib/supabase";
 import { Producto as ProductoBase } from '@/components/cotizacion/producto-simplificado';
-import { PDFService } from "@/services/pdf-service";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { generateQuotationPDF } from "@/app/actions/pdf-actions";
-import { generateUniqueId } from "@/lib/utils/misc";
 import { formatCurrency } from '@/lib/utils';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -68,7 +66,20 @@ interface ExtendedProducto extends ProductoBase {
   acabado: string;
 }
 
-// Create a client component that uses the context
+// Define type for ETA Result based on API response
+interface ETAResult {
+    dias_espera_moldes: number;
+    dias_vaciado: number;
+    dias_post_vaciado: number;
+    dias_envio: number;
+    dias_totales: number;
+    semanas_min: number;
+    semanas_max: number;
+    fecha_inicio_vaciado: string | null; // Dates might come as strings
+    fecha_fin_vaciado: string | null;
+    fecha_entrega_estimada: string | null; 
+}
+
 function NuevaCotizacionClient() {
   const router = useRouter();
   const [activeStep, setActiveStep] = useState<number>(1);
@@ -78,37 +89,42 @@ function NuevaCotizacionClient() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // --- Local state now primarily forTiempo Estimado ---
-  // Other financial states (discount, iva, shipping, moneda) are managed by context
-  const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
-  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number | string>(8); // Allow string for empty input
-  // -----------------------------------------------------
+  // State for Tiempo Estimado inputs (user override)
+  const [tiempoEstimadoInput, setTiempoEstimadoInput] = useState<string>("6"); 
+  const [tiempoEstimadoMaxInput, setTiempoEstimadoMaxInput] = useState<string>("8");
+
+  // *** NEW State for Production/ETA ***
+  const [isPremium, setIsPremium] = useState<boolean>(false); // Premium client flag
+  const [etaResult, setEtaResult] = useState<ETAResult | null>(null); // Stores calculated ETA
+  const [etaLoading, setEtaLoading] = useState<boolean>(false); // Loading state for ETA calculation
+  const [etaError, setEtaError] = useState<string | null>(null); // Error state for ETA calculation
+  // *** END NEW State ***
 
   // Add state for ClienteForm mode
   const [clienteFormMode, setClienteFormMode] = useState<'search' | 'create'>('search');
 
-  // Get productos from context
+  // Get products & financials from context
   const {
-    productos, // This is now displayProductos
+    productos, 
     addProducto,
     removeProducto,
     updateProductoDiscount: handleUpdateProductDiscount,
     clearProductos, 
-    financials, // Contains all calculated values (display and MXN)
+    financials, 
     exchangeRate,
-    globalDiscount, // Get directly from context
-    setGlobalDiscount, // Use context setter directly
-    hasIva, // Get directly from context
-    setHasIva, // Use context setter directly
-    shippingCost, // Get input value directly from context
-    setShippingCost, // Use context setter directly
-    moneda, // Get directly from context
-    setMoneda, // Use context setter directly
+    globalDiscount,
+    setGlobalDiscount,
+    hasIva, 
+    setHasIva, 
+    shippingCost, 
+    setShippingCost, 
+    moneda, 
+    setMoneda,
     convertMXNtoUSD,
     convertUSDtoMXN
   } = useProductos();
 
-  // Add formData state
+  // Add formData state (Seems unused currently? Review if needed)
   const [formData, setFormData] = useState<ProductoFormData>({ tipo: 'nuevo' });
 
   // Debug logging for financial values (Updated to use financials object)
@@ -167,7 +183,102 @@ function NuevaCotizacionClient() {
     // No need to call clearProductos here anymore on initial load
   }, []); // Removed clearProductos dependency
   
-  // Navigate to next step (remains the same)
+  // *** NEW: useEffect to fetch ETA when relevant data changes ***
+  useEffect(() => {
+    const fetchETA = async () => {
+      // Only fetch if in Step 3 (Resumen) and there are products
+      if (activeStep !== 3 || productos.length === 0) {
+        setEtaResult(null); // Clear ETA if not on Step 3 or no products
+        setEtaError(null);
+        return;
+      }
+
+      // Filter products that have a valid ID (not custom ones like 'new-...')
+      const productsForETA = productos.filter(p => 
+          p.producto_id && 
+          !isNaN(Number(p.producto_id)) && 
+          p.producto_id > 0 // Ensure it's a positive ID
+      );
+      
+      if (productsForETA.length === 0) {
+          setEtaResult(null); // No valid products for ETA calculation
+          setEtaError("No hay productos con ID válido para calcular el tiempo de producción.");
+          return;
+      }
+
+      setEtaLoading(true);
+      setEtaError(null);
+      setEtaResult(null);
+
+      let latestOverallETA: ETAResult | null = null;
+      let fetchErrors: string[] = [];
+
+      try {
+        // Fetch ETA for each valid product individually
+        const etaPromises = productsForETA.map(p => {
+            const url = `/api/production/eta?productId=${p.producto_id}&qty=${p.cantidad}&premium=${isPremium}`;
+            console.log(`Fetching ETA from: ${url}`);
+            return fetch(url).then(async res => {
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({ error: `Error HTTP ${res.status}` }));
+                    console.error(`Error fetching ETA for ${p.nombre}:`, errData);
+                    fetchErrors.push(`ETA ${p.nombre}: ${errData.error || res.statusText}`);
+                    return null; // Return null on error for this product
+                }
+                return res.json() as Promise<ETAResult>; 
+            });
+        });
+
+        const results = await Promise.all(etaPromises);
+        console.log("Individual ETA results:", results);
+        
+        // Find the latest ETA among successful results
+        results.forEach(result => {
+           if (result && result.fecha_entrega_estimada) {
+               try {
+                  const resultDate = new Date(result.fecha_entrega_estimada);
+                  if (!isNaN(resultDate.getTime())) { // Check if date is valid
+                     if (!latestOverallETA || resultDate > new Date(latestOverallETA.fecha_entrega_estimada!)) {
+                         latestOverallETA = result;
+                     }
+                  } else {
+                     console.warn("Received invalid date format for fecha_entrega_estimada:", result.fecha_entrega_estimada);
+                  }
+               } catch (dateError) {
+                   console.warn("Error parsing date for fecha_entrega_estimada:", result.fecha_entrega_estimada, dateError);
+               }
+           }
+        });
+
+        if (latestOverallETA) {
+            setEtaResult(latestOverallETA);
+            console.log("Calculated Overall ETA:", latestOverallETA);
+            if (fetchErrors.length > 0) {
+                 // Show partial success/error
+                 setEtaError(`Calculado, pero con errores: ${fetchErrors.join('; ')}`);
+            }
+        } else if (fetchErrors.length > 0) {
+            // Only errors occurred
+            setEtaError(fetchErrors.join('; '));
+        } else {
+            // No results and no specific errors (might happen if all products finish instantly?)
+            setEtaError("No se pudo determinar una fecha de entrega estimada."); 
+        }
+
+      } catch (error: any) {
+        console.error("Generic Error fetching ETA:", error);
+        setEtaError(error.message || "Error al calcular tiempo de entrega.");
+      } finally {
+        setEtaLoading(false);
+      }
+    };
+
+    fetchETA();
+    // Dependencies: Recalculate if products change, premium status changes, or user reaches step 3
+  }, [productos, isPremium, activeStep]); 
+  // --- End NEW useEffect ---
+
+  // Navigate to next/prev steps (Keep existing logic)
   const nextStep = () => {
     if (activeStep === 1 && !cliente) {
       toast.error("Por favor, ingresa la información del cliente");
@@ -180,16 +291,14 @@ function NuevaCotizacionClient() {
     setActiveStep(prev => Math.min(prev + 1, 3));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  
-  // Navigate to previous step (remains the same)
   const prevStep = () => {
     setActiveStep(prev => Math.max(prev - 1, 1));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle generating the quotation (Updated to use context financials correctly)
+  // Handle generating the quotation (Updated to include isPremium)
   const handleGenerateCotizacion = async () => {
-    if (!cliente || !financials) { // Check financials exist
+    if (!cliente || !financials) { 
       toast.error("Error: Faltan datos del cliente o financieros.");
       return;
     }
@@ -202,178 +311,124 @@ function NuevaCotizacionClient() {
 
     try {
       console.log("Client: Preparing quotation data for API & PDF...");
-      console.log("Context Financials:", financials);
-      console.log(`Client State Tiempo Estimado: ${tiempoEstimado}-${tiempoEstimadoMax}`);
+      
+      // Use user input override for tiempo_estimado if available
+      const finalTiempoEstimado = parseInt(tiempoEstimadoInput) || 6;
+      const finalTiempoEstimadoMax = parseInt(tiempoEstimadoMaxInput) || finalTiempoEstimado + 2;
 
       // Prepare data for API call (Use MXN values from financials)
       const quotationData = {
         cliente: cliente,
         create_client_if_needed: !cliente.cliente_id || cliente.cliente_id === 0,
-        // Map DISPLAY products from context, but extract MXN values for API
         productos: productos.map(p => ({
           nombre: p.nombre,
           cantidad: p.cantidad,
-          // --- Get MXN values which MUST exist on the display product object now --- 
-          precio_unitario_mxn: p.precioMXN, // Assuming display product retains MXN price
-          subtotal_mxn: p.subtotalMXN,     // Assuming display product retains MXN subtotal
-          // --------------------------------------------------------------------------
+          precio_unitario_mxn: p.precioMXN, // Assumes context provides this
+          subtotal_mxn: p.subtotalMXN,     // Assumes context provides this
           descuento: p.descuento,
-          producto_id: p.producto_id || undefined,
+          producto_id: p.producto_id || null, // Send null for custom items (IDs like 'new-...')
           sku: p.sku,
           descripcion: p.descripcion,
           colores: p.colores,
           acabado: p.acabado,
         })),
         moneda: moneda,
-        subtotal_mxn: financials.baseSubtotalMXN, // Use BASE subtotal before global discount
+        subtotal_mxn: financials.baseSubtotalMXN, 
         costo_envio_mxn: financials.shippingCostMXN,
         total_mxn: financials.totalMXN,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: financials.ivaAmountMXN,
+        monto_iva: financials.ivaAmountMXN, // Send calculated MXN IVA
         incluye_envio: financials.shippingCostMXN > 0,
         tipo_cambio: exchangeRate,
-        tiempo_estimado: tiempoEstimado,
-        tiempo_estimado_max: tiempoEstimadoMax
+        tiempo_estimado: finalTiempoEstimado, // Send user input for now
+        tiempo_estimado_max: finalTiempoEstimadoMax, // Send user input for now
+        isPremium: isPremium // *** Pass the premium flag ***
       };
       console.log("Data being sent to API:", quotationData);
       
-      // Call API (remains similar)
+      // Call API 
       const response = await fetch('/api/cotizaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(quotationData),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Error al guardar la cotización');
-      
-      // Update client state if created (remains similar)
-      if (result.cliente_creado) {
-        console.log("Client was created during quotation:", result.cliente_creado);
-        setClienteData(result.cliente_creado);
-        setCliente(result.cliente_creado);
-        sessionStorage.setItem('cotizacion_cliente', JSON.stringify(result.cliente_creado));
+      if (!response.ok) {
+          console.error("API Error response:", result);
+          throw new Error(result.error || 'Error al guardar la cotización');
       }
       
-      // Now handle PDF Generation using the result (contains cotizacion_id)
+      // --- Handle response, PDF generation etc. --- 
       const cotizacionId = result.cotizacion_id;
       if (!cotizacionId) {
         throw new Error("API did not return a cotizacion_id after saving.");
       }
-      console.log(`Cotización ${cotizacionId} guardada, generando PDF...`);
 
-      // --- Prepare data specifically for PDF generation (using DISPLAY values) ---
-      const pdfData = {
-        cliente: cliente,
-        productos: productos.map(p => ({ // Use display products directly
-          ...p,
-          colores: Array.isArray(p.colores) ? p.colores.join(', ') : p.colores,
-          // Ensure precio and subtotal are numbers for PDF
-          precio: Number(p.precio || 0),
-          subtotal: Number(p.subtotal || 0),
-        })),
-        folio: result.folio || `TEMP-${generateUniqueId()}`, // Use folio from API result
-        moneda: moneda,
-        subtotal: financials.displaySubtotal, // Use display subtotal
-        costo_envio: financials.displayShippingCost, // Use display shipping cost
-        total: financials.displayTotal,
-        descuento_global: globalDiscount,
-        iva: hasIva,
-        monto_iva: financials.displayIvaAmount, // Use display IVA amount
-        incluye_envio: true, // Use state variable
-        tipo_cambio: exchangeRate,
-        tiempo_estimado: tiempoEstimado,
-        tiempo_estimado_max: tiempoEstimadoMax === '' ? null : Number(tiempoEstimadoMax), // Handle empty string
-        fecha_creacion: new Date().toLocaleDateString('es-MX'), // Use current date
-        cotizacion_id: cotizacionId
-      };
-      console.log("Data being sent for PDF generation:", pdfData);
-      
-      // Generate PDF (remains similar)
-      try {
-        await PDFService.generateReactPDF(
-          cliente,
-          result.folio,
-          pdfData,
-          { download: true, filename: `${result.folio}-${cliente.nombre.replace(/\s+/g, '-')}.pdf` }
-        );
-        toast.success(`Cotización ${result.folio} generada exitosamente`);
-      } catch (pdfError) {
-        console.error("Error generating PDF:", pdfError);
-        toast.error("La cotización fue guardada pero hubo un error al generar el PDF");
+      // Update client state if created
+      if (result.cliente_creado) {
+        console.log("Client was created during quotation save:", result.cliente_creado);
+        setClienteData(result.cliente_creado);
+        setCliente(result.cliente_creado);
+        sessionStorage.setItem('cotizacion_cliente', JSON.stringify(result.cliente_creado));
       }
+
+      toast.success(`Cotización ${result.folio} creada exitosamente!`);
+      console.log(`Cotización ${cotizacionId} guardada, PDF generation can proceed if needed...`);
+      // Maybe trigger PDF generation here if required immediately
       
-      // Clear context and local state (only tiempo estimado now)
-      clearProductos(); // This now also resets context discount/iva/shipping
-      setTiempoEstimado(6);
-      setTiempoEstimadoMax(8);
-      // No need to reset local discount/iva/shipping anymore
+      // Clear context and session storage on success
+      clearProductos();
+      sessionStorage.removeItem('cotizacion_cliente'); 
+      setIsPremium(false); // Reset premium flag
+      // Reset manual time inputs
+      setTiempoEstimadoInput("6");
+      setTiempoEstimadoMaxInput("8");
       
-      router.push('/dashboard/cotizaciones');
-      
-    } catch (error) {
-      console.error('Error generating quotation:', error);
+      // Redirect to dashboard or quote view
+      router.push('/dashboard/cotizaciones'); 
+      // --- End existing success logic ---
+
+    } catch (error: any) {
       setIsLoading(false);
-      toast.error(error instanceof Error ? error.message : "Error al generar la cotización");
-    } finally {
-      setIsLoading(false);
-    }
+      console.error("Error generating quotation:", error);
+      toast.error(error.message || 'Error al generar la cotización');
+    } 
   };
-  
-  // Handle currency change (Simplified: just calls context setter)
+
+  // Handle currency change (Keep existing)
   const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
-    console.log(`Client: Setting currency to ${newCurrency}`);
     setMoneda(newCurrency);
   };
 
-  // Handle adding a product to the cart (Remains mostly the same, sends MXN price to context)
+  // Handle adding product (Keep existing, ensures MXN price sent to context)
   const handleAddProduct = (producto: Producto) => {
-    console.log(`[NuevaCotizacionClient] handleAddProduct called with producto: ${JSON.stringify(producto)}`);
-
-    // Price from form is already in the selected display currency (moneda)
-    // --- FIX: Read price from 'precio_unitario' field --- 
-    const precioEnMonedaActual = producto.precio_unitario || 0;
-    // ----------------------------------------------------
-    console.log(`[NuevaCotizacionClient]   - Extracted precioEnMonedaActual: ${precioEnMonedaActual} (${moneda})`);
-
-    // --- FIX: Convert price back to MXN before sending to context ---
-    let precioEnMXN: number;
-    if (moneda === 'USD' && exchangeRate) {
-      precioEnMXN = convertUSDtoMXN(precioEnMonedaActual);
-      console.log(`[NuevaCotizacionClient]   - Converted precio to MXN: ${precioEnMXN}`);
-    } else {
-      // If moneda is MXN, the price is already in MXN
-      precioEnMXN = precioEnMonedaActual;
-      console.log(`[NuevaCotizacionClient]   - Precio is already MXN: ${precioEnMXN}`);
-    }
-    // ------------------------------------------------------------------
-    
-    // Create the object conforming to ProductoBase for addProducto context function
-    const productoBase: ProductoBase = {
-      // Map relevant fields from the form 'producto' to ProductoBase
-      id: producto.id || producto.producto_id?.toString() || generateUniqueId(),
-      nombre: producto.nombre,
-      precio: precioEnMXN, // Pass the calculated MXN price
-      cantidad: Number(producto.cantidad) || 1,
-      // Add other optional fields if they exist on the form 'producto' object
-      sku: producto.sku,
-      descripcion: producto.descripcion,
-      colores: Array.isArray(producto.colores) ? producto.colores : 
-              typeof producto.colores === 'string' ? producto.colores.split(',') : [],
-      acabado: producto.acabado,
-      descuento: producto.descuento || 0,
-      producto_id: producto.producto_id,
-      // Ensure required fields like 'subtotal' aren't strictly needed if context calculates them
-    };
-    console.log(`[NuevaCotizacionClient]   - Prepared productoBase for context (with MXN price): ${JSON.stringify(productoBase)}`);
-
-    addProducto(productoBase); // Pass the object with MXN price
-    
-    toast.success('Producto agregado al carrito');
-    setFormData({ tipo: 'nuevo' }); // Reset form
+     console.log(`[NuevaCotizacionClient] handleAddProduct called with producto: ${JSON.stringify(producto)}`);
+     const precioEnMonedaActual = producto.precio_unitario || 0; 
+     let precioEnMXN: number;
+     if (moneda === 'USD' && exchangeRate) {
+       precioEnMXN = convertUSDtoMXN(precioEnMonedaActual);
+     } else {
+       precioEnMXN = precioEnMonedaActual;
+     }
+     const productoBase: ProductoBase = {
+       id: producto.id || producto.producto_id?.toString() || `new_${Date.now()}`,
+       nombre: producto.nombre,
+       precio: precioEnMXN, // Pass the calculated MXN price
+       cantidad: Number(producto.cantidad) || 1,
+       sku: producto.sku,
+       descripcion: producto.descripcion,
+       colores: Array.isArray(producto.colores) ? producto.colores : [],
+       acabado: producto.acabado,
+       descuento: producto.descuento || 0,
+       producto_id: producto.producto_id,
+     };
+     console.log(`[NuevaCotizacionClient] Prepared productoBase for context (with MXN price): ${JSON.stringify(productoBase)}`);
+     addProducto(productoBase); 
+     toast.success("Producto agregado");
   };
 
-  // Client select/mode handlers remain the same
+  // Client select/mode handlers (Keep existing)
   const handleClientSelect = useCallback((selected: Cliente | null, needsCreation?: boolean) => {
      console.log("Cliente selected/created:", selected);
      setClienteData(selected);
@@ -383,267 +438,291 @@ function NuevaCotizacionClient() {
   }, []);
   const clienteInitialData = useMemo(() => clienteData || {}, [clienteData]);
 
-  // Step Indicator Component
+  // Step indicator component (Keep existing)
   const StepIndicator = ({ currentStep }: { currentStep: number }) => {
-    const steps = ['Cliente', 'Productos', 'Finalizar'];
+    const steps = ['Cliente', 'Productos', 'Resumen']; 
+    // Revert StepIndicator styling to previous state if changed, 
+    // focusing on removing extra centering/padding added recently
     return (
-      <nav aria-label="Progress">
-        <ol role="list" className="flex items-center space-x-8 sm:space-x-16">
-          {steps.map((name, stepIdx) => {
-            const stepNumber = stepIdx + 1;
-            const isCompleted = stepNumber < currentStep;
-            const isCurrent = stepNumber === currentStep;
-            const canNavigate = stepNumber < currentStep ||
-                                (stepNumber === 2 && cliente) ||
-                                (stepNumber === 3 && cliente && productos.length > 0);
+      <nav aria-label="Progress" className="w-full max-w-xl"> {/* Ensure this max-width is intended */} 
+         {/* ... StepIndicator JSX, ensure it matches previous correct layout ... */}
+         {/* Example structure based on previous context, adjust if needed */}
+         <ol role="list" className="flex items-center space-x-8 sm:space-x-16">
+           {steps.map((name, stepIdx) => {
+             const stepNumber = stepIdx + 1;
+             const isCompleted = stepNumber < currentStep;
+             const isCurrent = stepNumber === currentStep;
+             // Original Navigation logic (allowing going back, step 3 requires products)
+             const canNavigate = stepNumber < currentStep || 
+                                (stepNumber === 3 && currentStep === 2 && productos.length > 0 && cliente) || 
+                                (stepNumber === 2 && currentStep === 1 && cliente);
 
-            return (
-              <li key={name} className={`relative flex-1 ${stepIdx === steps.length - 1 ? 'flex-grow-0' : ''}`}>
-                {stepIdx < steps.length - 1 ? (
-                  <div className="absolute left-4 top-4 -ml-px h-0.5 w-full bg-muted" aria-hidden="true" />
-                ) : null}
-                {isCompleted && stepIdx < steps.length - 1 ? (
-                  <div
-                    className="absolute left-4 top-4 -ml-px h-0.5 w-full bg-primary"
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <button
-                  onClick={() => {
-                    if (canNavigate) {
-                      setActiveStep(stepNumber);
-                    }
-                  }}
-                  disabled={!canNavigate}
-                  className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium z-10 ${
-                    isCompleted
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : isCurrent
-                      ? 'border-2 border-primary bg-background text-primary'
-                      : 'border-2 border-muted bg-background text-muted-foreground hover:border-muted-foreground'
-                  } ${!canNavigate && !isCurrent ? 'cursor-not-allowed opacity-50' : ''}`}
-                  aria-current={isCurrent ? 'step' : undefined}
-                >
-                  {isCompleted ? <Check className="h-5 w-5" /> : stepNumber}
-                </button>
-                <span className="absolute top-full mt-2 text-xs text-center w-full font-medium text-muted-foreground whitespace-nowrap">{name}</span>
-              </li>
-            );
-          })}
-        </ol>
+             return (
+               <li key={name} className={`relative flex-1 ${stepIdx === steps.length - 1 ? 'flex-grow-0' : ''}`}>
+                 {stepIdx < steps.length - 1 ? (
+                   <div className={`absolute left-4 top-4 -ml-px h-0.5 w-full ${isCompleted ? 'bg-primary' : 'bg-muted'}`} aria-hidden="true" />
+                 ) : null}
+                 <button
+                   onClick={() => {
+                     if (canNavigate) {
+                       setActiveStep(stepNumber);
+                       window.scrollTo({ top: 0, behavior: 'smooth' });
+                     }
+                   }}
+                   disabled={!canNavigate && !isCurrent}
+                   className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium z-10 transition-colors duration-200 ease-in-out ${isCompleted
+                         ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                         : isCurrent
+                         ? 'border-2 border-primary bg-background text-primary scale-110'
+                         : 'border-2 border-muted bg-background text-muted-foreground hover:border-muted-foreground'
+                     } ${!canNavigate && !isCurrent ? 'cursor-not-allowed opacity-60' : (canNavigate ? 'cursor-pointer' : '' )}`}
+                   aria-current={isCurrent ? 'step' : undefined}
+                 >
+                   {isCompleted ? <Check className="h-5 w-5" /> : <span className="font-bold">{stepNumber}</span>}
+                 </button>
+                 <span className={`absolute top-full mt-2 text-xs font-medium text-center w-full whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>{name}</span>
+               </li>
+             );
+           })}
+         </ol>
       </nav>
     );
   };
 
-  // Handler for Tiempo Estimado Min
+  // Input change handlers (Keep existing)
   const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setTiempoEstimado(value === '' ? 0 : parseInt(value, 10) || 0);
+    setTiempoEstimadoInput(e.target.value);
   };
-
-  // Handler for Tiempo Estimado Max
   const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setTiempoEstimadoMax(value); // Store as string to allow empty input
+    setTiempoEstimadoMaxInput(e.target.value);
   };
-
-  // Handler for Global Discount change
   const handleGlobalDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Allow empty input, parse to 0 if empty or NaN
-    setGlobalDiscount(value === '' ? 0 : parseFloat(value) || 0);
+      const value = parseFloat(e.target.value);
+      setGlobalDiscount(isNaN(value) || value < 0 ? 0 : value);
   };
-
-  // Handler for Shipping Cost change
   const handleShippingCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Allow empty input, parse to 0 if empty or NaN
-    setShippingCost(value === '' ? 0 : parseFloat(value) || 0);
+      const value = parseFloat(e.target.value);
+      setShippingCost(isNaN(value) || value < 0 ? 0 : value);
+  };
+  const handleIvaChange = (checked: boolean) => {
+    setHasIva(checked);
   };
 
+  // --- Render Logic --- 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Page Header - Wrapped for centering */}
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center">
+      {/* Page Header - Revert alignment if changed */}
+      <div className="max-w-6xl mx-auto"> {/* Use original max-width if needed */} 
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Nueva Cotización
           </h1>
-        </div>
       </div>
-
-      {/* Step Indicator - Increase padding below */}
-      <div className="flex justify-center pb-12"> 
+      {/* Step Indicator - Revert alignment if changed */} 
+      <div className="flex justify-center pb-12">
          <StepIndicator currentStep={activeStep} />
       </div>
 
-      {/* Step Content */}
-      <div className="max-w-3xl mx-auto">
+      {/* Step Content - Revert alignment/width changes */} 
+      <div className="max-w-4xl mx-auto"> 
+        {/* Step 1: Cliente */} 
         {activeStep === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <User className="h-5 w-5 text-primary" />
-                Información del Cliente
-              </CardTitle>
+              <CardTitle className="flex items-center"><User className="mr-2" /> Información del Cliente</CardTitle>
             </CardHeader>
             <CardContent>
+               {/* Pass mode and onModeChange to ClienteForm */}
               <ClienteForm 
-                onClientSelect={handleClientSelect} 
-                initialData={clienteInitialData}
+                onClientSelect={handleClientSelect} // Use the specific handler
+                initialData={clienteInitialData} // Pass memoized initial data
                 mode={clienteFormMode}
-                onModeChange={handleModeChange}
+                onModeChange={handleModeChange} // Use the specific handler
               />
+              {/* *** NEW: Premium Checkbox *** */} 
+              <div className="mt-6 flex items-center space-x-2 bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-md border border-yellow-200 dark:border-yellow-800">
+                  <Checkbox 
+                      id="premium-cliente"
+                      checked={isPremium}
+                      onCheckedChange={(checked) => setIsPremium(checked as boolean)}
+                      className="border-yellow-400 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-yellow-foreground"
+                  />
+                  <Label htmlFor="premium-cliente" className="flex items-center font-medium text-yellow-800 dark:text-yellow-200">
+                      <Crown className="h-4 w-4 mr-1.5 text-yellow-600 dark:text-yellow-400" /> Cliente Premium (Prioridad en Producción)
+                  </Label>
+                   <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-yellow-500 dark:text-yellow-600">
+                            <AlertTriangle className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-sm">
+                          <p>Marcar esta opción indica que el pedido de este cliente puede adelantarse en la cola de producción si es necesario, afectando los tiempos estimados de otros pedidos.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+              </div>
+              {/* *** END NEW *** */} 
             </CardContent>
-            <CardFooter className="flex justify-between border-t pt-4">
-                <Button variant="outline" onClick={() => router.push('/dashboard/cotizaciones')} disabled={isLoading}>
-                  Cancelar
-                </Button>
-                <Button onClick={nextStep} disabled={!cliente || isLoading}> 
-                  Continuar <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+            <CardFooter className="justify-end">
+              <Button onClick={nextStep} disabled={!cliente}><ArrowRight className="mr-2 h-4 w-4" /> Siguiente: Productos</Button>
             </CardFooter>
           </Card>
         )}
-        
+
+        {/* Step 2: Productos */} 
         {activeStep === 2 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Package className="h-5 w-5 text-primary" />
-                      Agregar Productos
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ProductoFormTabs onProductoChange={handleAddProduct} /> 
-                </CardContent>
-              </Card>
-              
-              {cliente && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-base font-medium">Cliente</CardTitle>
-                    <Button variant="link" className="h-auto p-0 text-sm" onClick={() => setActiveStep(1)}>Cambiar</Button>
-                  </CardHeader>
-                  <CardContent className="text-sm">
-                    <p className="font-semibold text-foreground">{cliente.nombre}</p>
-                    <p className="text-muted-foreground">{cliente.celular}</p>
-                    {cliente.correo && <p className="text-muted-foreground">{cliente.correo}</p>}
-                  </CardContent>
-                </Card>
-              )}
-              
-              {productos.length > 0 && (
-                <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <FileText className="h-5 w-5 text-primary" />
-                        Productos Seleccionados
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ListaProductos 
-                        productos={productos}
-                        onRemoveProduct={removeProducto}
-                        moneda={moneda}
-                      />
-                    </CardContent>
-                </Card>
-              )}
-              
-              <div className="flex justify-between items-center pt-2">
-                <Button variant="outline" onClick={prevStep} disabled={isLoading}> 
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
-                </Button>
-                <Button onClick={nextStep} disabled={productos.length === 0 || isLoading}> 
-                  Continuar <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center"><Package className="mr-2" /> Agregar Productos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <ProductoFormTabs 
+                  onProductoChange={handleAddProduct} 
+              />
+              <h3 className="text-lg font-semibold pt-4 border-t">Productos en la Cotización</h3>
+              <ListaProductosConDescuento
+                productos={productos} 
+                onRemoveProduct={removeProducto} 
+                onUpdateProductDiscount={handleUpdateProductDiscount}
+                moneda={moneda}
+              />
+              {/* REMOVED Financial Inputs: Global Discount, IVA, Shipping from here */}
+            </CardContent>
+            <CardFooter className="justify-between">
+              <Button variant="outline" onClick={prevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior: Cliente</Button>
+              <Button onClick={nextStep} disabled={productos.length === 0}><ArrowRight className="mr-2 h-4 w-4" /> Siguiente: Resumen</Button>
+            </CardFooter>
+          </Card>
         )}
-        
+
+        {/* Step 3: Resumen */} 
         {activeStep === 3 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Resumen y Opciones Finales
-                  </CardTitle>
-                  <div className="flex items-center space-x-2">
-                      <span className="text-sm text-muted-foreground">Moneda:</span>
-                      <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
-                        <SelectTrigger className="w-[100px] h-9">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center"><Receipt className="mr-2" /> Resumen de Cotización</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Display Selected Client */} 
+              {cliente && (
+                  <div className="p-4 border rounded-md bg-muted/30">
+                      <h3 className="text-lg font-semibold mb-2">Cliente</h3>
+                      <p>{cliente.nombre}</p>
+                      <p className="text-sm text-muted-foreground">{cliente.correo}</p>
+                      <p className="text-sm text-muted-foreground">{cliente.celular}</p>
+                      {isPremium && <Badge variant="warning" className="mt-2"><Crown className="h-3 w-3 mr-1"/> Premium</Badge>}
+                  </div>
+              )}
+               {/* Production ETA Display */} 
+               <div className="p-4 border rounded-md">
+                  <h3 className="text-lg font-semibold mb-2 flex items-center">
+                      <CalendarClock className="mr-2 h-5 w-5 text-blue-600"/>
+                      Tiempo Estimado de Entrega (Automático)
+                  </h3>
+                  {etaLoading && (
+                      <div className="flex items-center text-muted-foreground">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculando...
+                      </div>
+                  )}
+                  {etaError && (
+                       <div className="text-red-600 flex items-center text-sm">
+                           <AlertTriangle className="mr-2 h-4 w-4 flex-shrink-0" /> <span>{etaError}</span>
+                       </div>
+                  )}
+                  {etaResult && !etaLoading && !etaError && (
+                      <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                          <p className="text-blue-800 dark:text-blue-200 font-medium">
+                              Estimado: {etaResult.semanas_min} - {etaResult.semanas_max} semanas 
+                              <span className="text-sm text-muted-foreground ml-1">({etaResult.dias_totales} días hábiles aprox.)</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                              Fecha estimada de entrega: {etaResult.fecha_entrega_estimada ? new Date(etaResult.fecha_entrega_estimada).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' }) : 'N/D'}
+                          </p>
+                      </div>
+                  )}
+                   {/* Allow user override */} 
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+                       <div>
+                          <Label htmlFor="tiempoEstimado">Tiempo Estimado Manual (Semanas - Mín)</Label>
+                          <Input 
+                              id="tiempoEstimado"
+                              type="number"
+                              value={tiempoEstimadoInput}
+                              onChange={handleTiempoEstimadoChange}
+                              placeholder="Ej: 6"
+                              min={0}
+                          />
+                       </div>
+                      <div>
+                          <Label htmlFor="tiempoEstimadoMax">Tiempo Estimado Manual (Semanas - Máx)</Label>
+                          <Input 
+                              id="tiempoEstimadoMax"
+                              type="number"
+                              value={tiempoEstimadoMaxInput}
+                              onChange={handleTiempoEstimadoMaxChange}
+                              placeholder="Ej: 8"
+                              min={0}
+                          />
+                       </div>
+                   </div>
+              </div>
+              {/* End Production ETA Display */} 
+              
+              <ResumenCotizacion 
+                  productos={productos}
+                  moneda={moneda}
+                  subtotal={financials?.displaySubtotal ?? 0}
+                  ivaAmount={financials?.displayIvaAmount ?? 0}
+                  globalDiscount={globalDiscount} 
+                  hasIva={hasIva}
+                  shippingCost={shippingCost}
+                  total={financials?.displayTotal ?? 0}
+                  // Pass setters if ResumenCotizacion needs to modify these in context
+                  setGlobalDiscount={setGlobalDiscount} 
+                  setHasIva={setHasIva} 
+                  setShippingCost={setShippingCost}
+                  // Pass manual time inputs if ResumenCotizacion shows them
+                  tiempoEstimado={tiempoEstimadoInput}
+                  setTiempoEstimado={setTiempoEstimadoInput}
+                  tiempoEstimadoMax={tiempoEstimadoMaxInput}
+                  setTiempoEstimadoMax={setTiempoEstimadoMaxInput}
+              />
+               {/* Currency Selector */} 
+               <div className="flex justify-end items-center space-x-2 pt-4 border-t">
+                   <Label>Moneda de Visualización:</Label>
+                  <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                      <SelectTrigger className="w-[100px]">
                           <SelectValue placeholder="Moneda" />
-                        </SelectTrigger>
-                        <SelectContent>
+                      </SelectTrigger>
+                      <SelectContent>
                           <SelectItem value="MXN">MXN</SelectItem>
                           <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                  <div>
-                    <h3 className="text-base font-medium text-foreground mb-3">Productos</h3>
-                    <ListaProductosConDescuento 
-                      productos={productos}
-                      onRemoveProduct={removeProducto}
-                      onUpdateProductDiscount={handleUpdateProductDiscount}
-                      moneda={moneda}
-                    />
-                  </div>
-                  
-                  <div>
-                      <h3 className="text-base font-medium text-foreground mb-3">Totales y Opciones</h3>
-                      <ResumenCotizacion 
-                        cliente={cliente}
-                        productos={productos}
-                        moneda={moneda}
-                        subtotal={financials?.displaySubtotal ?? 0}
-                        ivaAmount={financials?.displayIvaAmount ?? 0}
-                        globalDiscount={globalDiscount}
-                        setGlobalDiscount={setGlobalDiscount}
-                        hasIva={hasIva}
-                        setHasIva={setHasIva}
-                        shippingCost={shippingCost}
-                        setShippingCost={setShippingCost}
-                        total={financials?.displayTotal ?? 0}
-                        tiempoEstimado={tiempoEstimado}
-                        setTiempoEstimado={setTiempoEstimado}
-                        tiempoEstimadoMax={tiempoEstimadoMax}
-                        setTiempoEstimadoMax={setTiempoEstimadoMax}
-                      />
-                  </div>
-              </CardContent>
-            </Card>
-            
-            <div className="flex justify-between items-center pt-2">
-              <Button variant="outline" onClick={prevStep} disabled={isLoading}> 
-                <ArrowLeft className="mr-2 h-4 w-4" /> Regresar
-              </Button>
+                      </SelectContent>
+                  </Select>
+               </div>
+            </CardContent>
+            <CardFooter className="justify-between">
+              <Button variant="outline" onClick={prevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior: Productos</Button>
               <Button 
-                onClick={handleGenerateCotizacion}
-                disabled={isLoading || productos.length === 0 || !cliente}
+                  onClick={handleGenerateCotizacion}
+                  disabled={isLoading || !cliente || productos.length === 0}
               >
-                {isLoading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generando...</>
-                ) : (
-                  <><FileText className="mr-2 h-4 w-4" /> Generar Cotización y PDF</>
-                )}
+                  {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                      <Save className="mr-2 h-4 w-4" /> // Reverted Icon
+                  )}
+                  {isLoading ? 'Guardando...' : 'Guardar Cotización'} {/* Reverted Text */} 
               </Button>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
         )}
-      </div>
+      </div> 
     </div>
   );
 }
 
-// Main export with Provider
+// Wrap the client component with the provider
 export default function NuevaCotizacionPage() {
   return (
     <ProductosProvider>

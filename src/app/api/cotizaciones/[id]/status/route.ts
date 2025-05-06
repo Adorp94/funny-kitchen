@@ -1,121 +1,333 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { updateCotizacionStatus } from '@/app/actions/cotizacion-actions';
+import { createServerClient } from '@supabase/ssr' // Use ssr client for route handlers
+import { cookies } from 'next/headers' // Import cookies
+import { ProductionPlannerService } from '@/services/productionPlannerService';
+import { Database } from '@/lib/supabase/types';
+import { revalidatePath } from 'next/cache'; // Need revalidatePath here now
+
+// --- Helper function (copied) ---
+function addBusinessDays(startDate: Date, days: number): Date {
+    const date = new Date(startDate.valueOf());
+    let addedDays = 0;
+    while (addedDays < days) {
+        date.setDate(date.getDate() + 1);
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            addedDays++;
+        }
+    }
+    return date;
+}
+// --- End Helper Function ---
+
+interface PaymentFormData {
+  monto: number;
+  metodo_pago: string;
+  porcentaje?: number;
+  notas?: string;
+}
 
 interface RequestBody {
   newStatus: string;
-  paymentData?: {
-    monto: number;
-    metodo_pago: string;
-    porcentaje: number;
-    notas: string;
-  };
+  paymentData?: PaymentFormData;
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const cotizacionId = parseInt(params.id);
-    if (isNaN(cotizacionId)) {
-      return NextResponse.json(
-        { error: 'ID de cotización inválido' },
-        { status: 400 }
-      );
+  const cotizacionIdStr = params.id;
+  const cotizacionId = parseInt(cotizacionIdStr, 10);
+
+  // Create authenticated Supabase client
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        // Optional: set/remove if needed for auth state changes within the handler
+        // set(name: string, value: string, options: CookieOptions) { ... }, 
+        // remove(name: string, options: CookieOptions) { ... },
+      },
     }
+  );
 
+  if (isNaN(cotizacionId)) {
+    return NextResponse.json({ error: 'ID de cotización inválido' }, { status: 400 });
+  }
+
+  let newStatus: string;
+  let paymentData: PaymentFormData | undefined;
+
+  try {
     const body: RequestBody = await request.json();
-    const { newStatus, paymentData } = body;
-
-    console.log('API status change request:', { cotizacionId, newStatus, paymentData });
+    newStatus = body.newStatus;
+    paymentData = body.paymentData; // Store payment data
+    console.log('[API /cotizaciones/[id]/status POST] Request received:', { cotizacionId, newStatus, paymentData });
 
     // Validate the new status
     const validStatus = ['pendiente', 'producción', 'cancelada', 'enviada'];
     if (!validStatus.includes(newStatus)) {
-      return NextResponse.json(
-        { error: 'Estado inválido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
     }
 
-    // If new status is 'producción', payment data is required
-    if (newStatus === 'producción') {
-      if (!paymentData || typeof paymentData !== 'object') {
-        return NextResponse.json(
-          { error: `Se requieren datos de pago para mandar a producción` },
-          { status: 400 }
-        );
-      }
-      
-      // Validate payment data fields
+    // Validate payment data if provided and status is producción
+    if (newStatus === 'producción' && paymentData) {
       if (!paymentData.monto || typeof paymentData.monto !== 'number' || paymentData.monto <= 0) {
-        return NextResponse.json(
-          { error: 'El monto del pago debe ser mayor a 0' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'El monto del pago debe ser mayor a 0' }, { status: 400 });
       }
-      
       if (!paymentData.metodo_pago || typeof paymentData.metodo_pago !== 'string') {
-        return NextResponse.json(
-          { error: 'El método de pago es requerido' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'El método de pago es requerido' }, { status: 400 });
       }
-      
-      // Process the paymentData to ensure types are correct
-      const processedPaymentData = {
-        monto: Number(paymentData.monto),
-        metodo_pago: paymentData.metodo_pago,
-        porcentaje: paymentData.porcentaje ? Number(paymentData.porcentaje) : 0,
-        notas: paymentData.notas || '',
-      };
-      
-      // Update status via server action
-      console.log('Calling updateCotizacionStatus with:', { cotizacionId, newStatus, paymentData: processedPaymentData });
-      const result = await updateCotizacionStatus(cotizacionId, newStatus, processedPaymentData);
-      console.log('Status update result:', result);
-      
-      if (result.success) {
-        return NextResponse.json({ 
-          success: true,
-          message: `Estado actualizado correctamente a "${newStatus}"`,
-          cotizacion: result.cotizacion
-        });
-      } else {
-        // Log detailed error information
-        console.error('Error updating status:', result.error);
-        return NextResponse.json(
-          { error: result.error || 'No se pudo actualizar el estado' },
-          { status: 500 }
-        );
+      // Ensure percentage is number if provided
+      if (paymentData.porcentaje && typeof paymentData.porcentaje !== 'number') {
+          paymentData.porcentaje = parseFloat(paymentData.porcentaje as any);
+          if(isNaN(paymentData.porcentaje)) {
+              return NextResponse.json({ error: 'Porcentaje inválido' }, { status: 400 });
+          }
       }
-    } else {
-      // For statuses that don't require payment
-      console.log('Calling updateCotizacionStatus with:', { cotizacionId, newStatus, paymentData: undefined });
-      const result = await updateCotizacionStatus(cotizacionId, newStatus, undefined);
-      console.log('Status update result:', result);
-      
-      if (result.success) {
-        return NextResponse.json({ 
-          success: true,
-          message: `Estado actualizado correctamente a "${newStatus}"`,
-          cotizacion: result.cotizacion
-        });
-      } else {
-        // Log detailed error information
-        console.error('Error updating status:', result.error);
-        return NextResponse.json(
-          { error: result.error || 'No se pudo actualizar el estado' },
-          { status: 500 }
-        );
-      }
+    } else if (newStatus === 'producción' && !paymentData) {
+      console.warn(`[API /cotizaciones/[id]/status POST] Moving cotizacion ${cotizacionId} to 'producción' without payment data.`);
     }
+
   } catch (error) {
-    console.error('Error updating cotizacion status:', error);
+     console.error('[API /cotizaciones/[id]/status POST] Error parsing request body:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error desconocido' },
+      { error: error instanceof Error ? error.message : 'Cuerpo de solicitud inválido' },
+      { status: 400 }
+    );
+  }
+
+  // --- Logic moved from server action starts here --- 
+  let finalDeliveryDateStr: string | null = null;
+  let planningWarnings: string[] = [];
+
+  try {
+      // 1. REMOVE Authentication Check
+      /*
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('[API /cotizaciones/[id]/status POST] Error fetching user or user not authenticated:', userError);
+        return NextResponse.json({ error: 'Usuario no autenticado.' }, { status: 401 }); // Use 401 for unauthorized
+      }
+      const userId = user.id;
+      console.log('[API /cotizaciones/[id]/status POST] User authenticated:', userId);
+      */
+      // Assume no user ID is available
+      const userId = null; // Set userId to null
+
+      // 2. Fetch existing cotizacion
+      const { data: existingCotizacion, error: getError } = await supabase
+        .from('cotizaciones')
+        .select('*, is_premium') 
+        .eq('cotizacion_id', cotizacionId)
+        .single();
+      
+      if (getError) {
+        console.error('[API /cotizaciones/[id]/status POST] Error fetching cotizacion:', getError);
+        const errorMsg = getError.code === 'PGRST116' ? 'No se encontró la cotización' : `Error al obtener cotización: ${getError.message}`;
+        const status = getError.code === 'PGRST116' ? 404 : 500;
+        return NextResponse.json({ error: errorMsg }, { status: status }); 
+      }
+      console.log('[API /cotizaciones/[id]/status POST] Fetched existing cotizacion');
+      const isPremium = existingCotizacion.is_premium ?? false;
+
+      // 3. Prepare and Update Cotizacion Status/Payment Info
+      const updateData: Partial<Database['public']['Tables']['cotizaciones']['Update']> = {
+        estado: newStatus,
+      };
+      if (newStatus === 'producción') {
+        updateData.estatus_pago = paymentData ? 'anticipo' : 'pendiente'; 
+        updateData.fecha_aprobacion = new Date().toISOString();
+      }
+      // Add other status specific updates if needed
+
+      console.log('[API /cotizaciones/[id]/status POST] Updating cotizacion with data:', updateData);
+      const { data: updatedCotizacionData, error: updateError } = await supabase
+        .from('cotizaciones')
+        .update(updateData)
+        .eq('cotizacion_id', cotizacionId)
+        .select('*') // Select all needed fields
+        .single();
+      
+      if (updateError) {
+        console.error('[API /cotizaciones/[id]/status POST] Error updating cotizacion:', updateError);
+        return NextResponse.json({ error: `Error al actualizar estado: ${updateError.message}` }, { status: 500 });
+      }
+      if (!updatedCotizacionData) {
+        console.error('[API /cotizaciones/[id]/status POST] No cotizacion found after update attempt for ID:', cotizacionId);
+        return NextResponse.json({ error: 'No se encontró la cotización después de intentar actualizar' }, { status: 404 });
+      }
+      console.log('[API /cotizaciones/[id]/status POST] Cotizacion updated successfully');
+      // Use updatedCotizacionData for subsequent logic
+      const updatedCotizacion = updatedCotizacionData;
+      
+      // 4. Production Planning Logic (if status is 'producción')
+      if (newStatus === 'producción') {
+          console.log(`[API /cotizaciones/[id]/status POST] Status is 'producción'. Initiating production planning...`);
+          const { data: cotizacionProductos, error: fetchProductsError } = await supabase
+            .from('cotizacion_productos')
+            .select('cotizacion_producto_id, producto_id, cantidad')
+            .eq('cotizacion_id', cotizacionId);
+
+          if (fetchProductsError) {
+            planningWarnings.push(`Error fetching products: ${fetchProductsError.message}`); 
+          } else if (!cotizacionProductos || cotizacionProductos.length === 0) {
+            planningWarnings.push(`No products found.`);
+          } else {
+              console.log(`[API /cotizaciones/[id]/status POST] Found ${cotizacionProductos.length} products to plan.`);
+              const plannerService = new ProductionPlannerService(supabase); // Use the authenticated client
+              let latestEtaEndDate: Date | null = null;
+
+              for (const item of cotizacionProductos) {
+                if (!item.producto_id || isNaN(Number(item.producto_id))) {
+                  planningWarnings.push(`Invalid producto_id in item: ${JSON.stringify(item)}`); continue;
+                }
+                const currentProductId = Number(item.producto_id);
+                const { data: productDetails, error: productFetchError } = await supabase
+                  .from('productos')
+                  .select('vueltas_max_dia').eq('producto_id', currentProductId).single();
+
+                if (productFetchError || !productDetails) {
+                  planningWarnings.push(`Error fetching product details for ID ${currentProductId}: ${productFetchError?.message || 'Not found'}`); continue;
+                }
+                const vueltasMaxDia = productDetails.vueltas_max_dia ?? 1;
+                try {
+                  const queueResult = await plannerService.addToQueueAndCalculateDates(
+                    item.cotizacion_producto_id, currentProductId, item.cantidad, isPremium, vueltasMaxDia
+                  );
+                  if (queueResult.eta_end_date) {
+                    const currentEndDate = new Date(queueResult.eta_end_date);
+                    if (!latestEtaEndDate || currentEndDate > latestEtaEndDate) latestEtaEndDate = currentEndDate;
+                  }
+                } catch (queueError: any) {
+                  planningWarnings.push(`Error adding item ${item.cotizacion_producto_id} to queue: ${queueError.message}`);
+                }
+              } // End product loop
+
+              if (latestEtaEndDate) {
+                  const POST_PROCESSING_DAYS = 3;
+                  const SHIPPING_DAYS = 3;
+                  let deliveryDate = addBusinessDays(latestEtaEndDate, POST_PROCESSING_DAYS);
+                  deliveryDate = addBusinessDays(deliveryDate, SHIPPING_DAYS);
+                  finalDeliveryDateStr = deliveryDate.toISOString().split('T')[0];
+                  console.log(`[API /cotizaciones/[id]/status POST] Calculated finalDeliveryDate: ${finalDeliveryDateStr}`);
+                  const { error: updateDateError } = await supabase
+                    .from('cotizaciones').update({ estimated_delivery_date: finalDeliveryDateStr })
+                    .eq('cotizacion_id', cotizacionId);
+                  if (updateDateError) {
+                    planningWarnings.push(`Error updating final delivery date: ${updateDateError.message}`);
+                    finalDeliveryDateStr = null;
+                  } else {
+                    console.log(`[API /cotizaciones/[id]/status POST] Successfully updated cotizacion with ETA.`);
+                  }
+              } else {
+                   if (cotizacionProductos.length > 0 && !planningWarnings.some(w => w.includes('Error'))) { 
+                       planningWarnings.push("No se pudo calcular la fecha estimada de entrega.");
+                   }
+              }
+          } // End planning block
+      } // End if newStatus == producción
+
+      // 5. Record History
+      try {
+          const historyNotes = `${paymentData?.notas || ''}${planningWarnings.length > 0 ? '\nPlanning Warnings: ' + planningWarnings.join('; ') : ''}`.trim() || null;
+          const { error: historyError } = await supabase.from('cotizacion_historial')
+            .insert({ 
+                cotizacion_id: cotizacionId, 
+                estado_anterior: existingCotizacion.estado, 
+                estado_nuevo: newStatus, 
+                usuario_id: userId, // Will insert null now 
+                notas: historyNotes 
+            });
+          if (historyError) console.error('[API /cotizaciones/[id]/status POST] Error recording history:', historyError); // Log but don't fail
+          else console.log('[API /cotizaciones/[id]/status POST] History recorded (without user ID)');
+      } catch (historyErr) { console.error('[API /cotizaciones/[id]/status POST] Failed to record history:', historyErr); }
+
+      // 6. Record Payment (if provided)
+      if (paymentData) {
+          try {
+            const tipoCambio = existingCotizacion.tipo_cambio || 1;
+            const moneda = existingCotizacion.moneda || 'MXN';
+            const montoMXN = moneda === 'USD' ? paymentData.monto * tipoCambio : paymentData.monto;
+            // Use total from the *updated* cotizacion record fetched after status change
+            const totalCotizacionForPercentage = updatedCotizacion.total ?? paymentData.monto; 
+            const percentage = paymentData.porcentaje ?? Math.round((paymentData.monto / totalCotizacionForPercentage) * 100);
+            
+            // <<< CHANGE TABLE NAME and field name >>>
+            const { error: paymentInsertError } = await supabase.from('pagos') // Target 'pagos' table
+              .insert({
+                  cotizacion_id: cotizacionId, 
+                  monto: paymentData.monto, 
+                  monto_mxn: moneda === 'USD' ? montoMXN : null,
+                  tipo_cambio: moneda === 'USD' ? tipoCambio : null, 
+                  moneda: moneda, 
+                  metodo_pago: paymentData.metodo_pago,
+                  notas: paymentData.notas || null, 
+                  usuario_id: userId, // Will insert null now
+                  porcentaje_aplicado: percentage, // Use correct column name
+                  tipo_pago: 'anticipo', // Explicitly set tipo_pago (though it defaults)
+                  estado: 'completado' // Explicitly set estado (though it defaults)
+              });
+              
+            if (paymentInsertError) console.error('[API /cotizaciones/[id]/status POST] Error recording payment into PAGOS table:', paymentInsertError); // Log but don't fail
+            else {
+                console.log('[API /cotizaciones/[id]/status POST] Payment recorded into PAGOS table (without user ID)');
+                // Update aggregate payment info on cotizacion
+                try {
+                    // Use values from the updatedCotizacion record
+                    const currentPaid = updatedCotizacion.monto_pagado || 0;
+                    const currentPaidMxn = updatedCotizacion.monto_pagado_mxn || 0;
+                    const newTotalPaid = currentPaid + paymentData.monto;
+                    const newTotalPaidMxn = currentPaidMxn + montoMXN;
+                    const totalCotizacion = updatedCotizacion.total || newTotalPaid; // Use updated total
+                    const percentagePaid = totalCotizacion > 0 ? Math.round((newTotalPaid / totalCotizacion) * 100) : 100;
+                    
+                    const { error: updatePaidAmountError } = await supabase.from('cotizaciones').update({
+                        monto_pagado: newTotalPaid, 
+                        monto_pagado_mxn: newTotalPaidMxn,
+                        porcentaje_completado: percentagePaid,
+                        fecha_pago_inicial: updatedCotizacion.fecha_pago_inicial || new Date().toISOString(),
+                        // Also update estatus_pago here to ensure consistency after payment
+                        estatus_pago: 'anticipo' 
+                    }).eq('cotizacion_id', cotizacionId);
+                    
+                    if (updatePaidAmountError) console.error('[API /cotizaciones/[id]/status POST] Error updating paid amount on COTIZACIONES:', updatePaidAmountError);
+                    else console.log('[API /cotizaciones/[id]/status POST] Paid amount updated on COTIZACIONES');
+                } catch (updateErr) { console.error('[API /cotizaciones/[id]/status POST] Failed to update paid amount on COTIZACIONES:', updateErr); }
+            }
+          } catch (paymentErr) { console.error('[API /cotizaciones/[id]/status POST] Failed to record payment overall:', paymentErr); }
+      }
+
+      // 7. Revalidate Paths
+      try {
+          revalidatePath('/dashboard/cotizaciones');
+          revalidatePath('/dashboard/finanzas');
+          revalidatePath(`/dashboard/cotizaciones/${cotizacionId}`);
+          revalidatePath('/produccion');
+          console.log('[API /cotizaciones/[id]/status POST] Paths revalidated');
+      } catch (revalError) {
+           console.error('[API /cotizaciones/[id]/status POST] Failed to revalidate paths:', revalError);
+      }
+
+      // 8. Return Success Response
+      const successMessage = `Estado actualizado a "${newStatus}". ${planningWarnings.length > 0 ? 'Planning Warnings: ' + planningWarnings.join('; ') : ''}`;
+      console.log(`[API /cotizaciones/[id]/status POST] Action finished successfully for cotizacion ${cotizacionId}. ETA: ${finalDeliveryDateStr}`);
+      return NextResponse.json({ 
+        success: true,
+        message: successMessage,
+        cotizacion: updatedCotizacion, // Return updated cotizacion data
+        estimatedDeliveryDate: finalDeliveryDateStr
+      }, { status: 200 });
+
+  } catch (error) {
+    console.error('[API /cotizaciones/[id]/status POST] Unexpected error in handler:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error inesperado en el servidor' },
       { status: 500 }
     );
   }
