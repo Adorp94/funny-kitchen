@@ -138,6 +138,27 @@ export function ResumenCotizacion({
     }
   };
 
+  // Helper function to calculate manual delivery date
+  const getManualDeliveryDate = (maxWeeksStr: string | undefined): string | null => {
+    if (maxWeeksStr) {
+      const maxWeeks = parseInt(maxWeeksStr, 10);
+      // Ensure maxWeeks is a non-negative number for a meaningful date
+      if (!isNaN(maxWeeks) && maxWeeks >= 0) { 
+        const currentDate = new Date();
+        // Create a new date object to avoid modifying the original 'currentDate'
+        const deliveryDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + maxWeeks * 7);
+        return deliveryDate.toLocaleDateString('es-MX', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+    }
+    return null;
+  };
+
+  const manualDate = getManualDeliveryDate(tiempoEstimadoMax);
+
   return (
     <div className="space-y-6">
       {/* Client Info Card */}
@@ -281,30 +302,30 @@ export function ResumenCotizacion({
                 min={0}
               />
             </div>
-            {/* Display ETA Date Legend Below Inputs */}
-            {etaLoading && (
-                <div className="flex items-center text-muted-foreground text-sm mt-2">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculando fecha estimada...
-                </div>
-            )}
-            {etaError && !etaLoading && (
-                 <div className="text-red-600 flex items-center text-sm mt-2">
-                     <AlertTriangle className="mr-2 h-4 w-4 flex-shrink-0" /> <span>Error calculando fecha: {etaError.includes("ID válido") ? "No hay productos para estimar automáticamente." : etaError}</span>
-                 </div>
-            )}
-            {etaResult && !etaLoading && !etaError && etaResult.fecha_entrega_estimada && (
+            {/* Display ETA Date Legend Below Inputs - Updated Logic */}
+            {manualDate ? (
                 <p className="text-xs text-muted-foreground mt-2">
-                    Fecha estimada de entrega: {new Date(etaResult.fecha_entrega_estimada).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' })}
+                    Fecha estimada de entrega: {manualDate}
                 </p>
-            )}
-            {etaResult && !etaLoading && !etaError && !etaResult.fecha_entrega_estimada && (
-                 <p className="text-xs text-muted-foreground mt-2">
-                    Fecha estimada de entrega: N/D (Automático no disponible)
+            ) : etaLoading ? (
+                <div className="flex items-center text-muted-foreground text-sm mt-2">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculando fecha automática...
+                </div>
+            ) : etaError ? (
+                 <div className="text-red-600 flex items-center text-sm mt-2">
+                     <AlertTriangle className="mr-2 h-4 w-4 flex-shrink-0" /> <span>Error cálculo automático: {etaError.includes("ID válido") ? "No hay productos para estimar." : etaError.includes("tiempo de producción") ? "No hay productos para estimar." : etaError}</span>
+                 </div>
+            ) : etaResult && etaResult.fecha_entrega_estimada ? (
+                <p className="text-xs text-muted-foreground mt-2">
+                    Fecha estimada de entrega (automática): {new Date(etaResult.fecha_entrega_estimada).toLocaleDateString('es-MX', { year:'numeric', month:'long', day:'numeric' })}
                 </p>
-            )}
-            {!etaResult && !etaLoading && !etaError && (
+            ) : etaResult ? (
                  <p className="text-xs text-muted-foreground mt-2">
-                    Fecha estimada de entrega: (Se calculará al guardar o con productos válidos)
+                    Fecha estimada de entrega (automática): N/D
+                </p>
+            ) : (
+                 <p className="text-xs text-muted-foreground mt-2">
+                    Fecha estimada de entrega: Ingrese semanas o agregue productos para cálculo automático.
                 </p>
             )}
           </div>
