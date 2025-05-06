@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Truck, Receipt, Percent, User, Clock, Loader2, AlertTriangle } from 'lucide-react';
+import { DollarSign, Truck, Receipt, Percent, User, Clock, Loader2, AlertTriangle, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from '@/lib/utils';
@@ -51,6 +51,14 @@ interface ResumenCotizacionProps {
   etaResult?: ETAResult | null;
   etaLoading?: boolean;
   etaError?: string | null;
+}
+
+// Define a simple interface for Producto within ResumenCotizacion
+interface ProductoResumen {
+  id: string | number;
+  nombre: string;
+  cantidad: number;
+  // Add other relevant fields if needed for display, e.g., precio unitario, subtotal
 }
 
 export function ResumenCotizacion({
@@ -188,6 +196,27 @@ export function ResumenCotizacion({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+
+          {/* Products Summary Section - NEW */}
+          {productos && productos.length > 0 && (
+            <div className="py-3">
+              <Label className="text-sm flex items-center gap-1.5 text-muted-foreground mb-2">
+                <PackagePlus className="h-4 w-4" />
+                Productos en la Cotización
+              </Label>
+              <ul className="list-none pl-0 space-y-1">
+                {(productos as ProductoResumen[]).map((producto) => (
+                  <li key={producto.id} className="text-xs flex justify-between items-center">
+                    <span>{producto.nombre}</span>
+                    <span className="text-muted-foreground">Cantidad: {producto.cantidad}</span>
+                  </li>
+                ))}
+              </ul>
+              <Separator className="my-3" /> {/* Separator after product list */}
+            </div>
+          )}
+          {/* End Products Summary Section */}
+
           {/* Subtotal Display */}
           <div className="flex justify-between items-center py-1">
             <span className="text-sm text-muted-foreground">Subtotal Productos</span>
