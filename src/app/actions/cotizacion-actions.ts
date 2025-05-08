@@ -367,11 +367,15 @@ export async function getCotizacionDetails(cotizacionId: number) {
     
     const formattedProductos = productos.map(item => ({
       id: item.cotizacion_producto_id.toString(),
-      nombre: item.producto?.nombre || 'Producto personalizado',
+      descripcion: item.descripcion || item.producto?.nombre || 'Producto personalizado',
       cantidad: item.cantidad,
-      precio: item.precio_unitario,
-      subtotal: item.subtotal,
-      descuento: item.descuento_producto
+      precio_unitario: item.precio_unitario,
+      precio_total: item.subtotal,
+      descuento: item.descuento_producto,
+      ...(item.colores && { colores: item.colores }),
+      ...(item.acabado && { acabado: item.acabado }),
+      producto_nombre: item.producto?.nombre,
+      tipo_producto: item.producto?.tipo_producto
     }));
     
     const { data: pagos, error: pagosError } = await supabase

@@ -194,9 +194,9 @@ export default function CotizacionDetailPage() {
     );
   }
   
-  const subtotal = (cotizacion.subtotal || cotizacion.precio_total || 0) -
-                 (cotizacion.monto_iva || cotizacion.iva || 0) -
-                 (cotizacion.costo_envio || cotizacion.envio || 0);
+  const subtotal = cotizacion.productos && Array.isArray(cotizacion.productos)
+    ? cotizacion.productos.reduce((acc: number, item: any) => acc + (Number(item.precio_total) || 0), 0)
+    : 0;
   const descuento = cotizacion.descuento_global || cotizacion.descuento_total || 0;
   const envio = cotizacion.costo_envio || cotizacion.envio || 0;
   const iva = cotizacion.monto_iva || cotizacion.iva || 0;
