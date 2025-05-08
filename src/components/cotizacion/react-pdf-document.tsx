@@ -126,6 +126,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#6b7280',
   },
+  tableHeaderTextCenter: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  tableHeaderTextRight: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#6b7280',
+    textAlign: 'right',
+  },
   tableRowText: {
     fontSize: 7.5,
     color: '#374151',
@@ -294,15 +306,15 @@ interface Cliente {
 
 interface Producto {
   id: string;
-  nombre: string;
+  descripcion: string;
+  producto_nombre?: string;
   cantidad: number;
-  precio: number;
+  precio_unitario: number;
   precio_mxn?: number;
   descuento: number;
-  subtotal: number;
+  precio_total: number;
   subtotal_mxn?: number;
   sku?: string;
-  descripcion?: string;
   colores?: string[];
 }
 
@@ -387,7 +399,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Calculate total product discounts
   const totalProductDiscounts = productos.reduce((sum, producto) => {
     if (producto.descuento && producto.descuento > 0) {
-      const discountAmount = producto.precio * producto.cantidad * (producto.descuento / 100);
+      const discountAmount = producto.precio_unitario * producto.cantidad * (producto.descuento / 100);
       return sum + discountAmount;
     }
     return sum;
@@ -463,53 +475,39 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                 <Text style={styles.tableHeaderText}>Descripción</Text>
               </View>
               <View style={styles.tableCol2}>
-                <Text style={styles.tableHeaderText}>Cant.</Text>
+                <Text style={styles.tableHeaderTextCenter}>Cant.</Text>
               </View>
               <View style={styles.tableCol3}>
-                <Text style={styles.tableHeaderText}>P. Unitario</Text>
+                <Text style={styles.tableHeaderTextRight}>P. Unitario</Text>
               </View>
               {productos.some(p => p.descuento && p.descuento > 0) && (
                 <View style={styles.tableCol4}>
-                  <Text style={styles.tableHeaderText}>Desc.</Text>
+                  <Text style={styles.tableHeaderTextRight}>Desc.</Text>
                 </View>
               )}
               <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
-                <Text style={styles.tableHeaderText}>Subtotal</Text>
+                <Text style={styles.tableHeaderTextRight}>Subtotal</Text>
               </View>
             </View>
             
             {/* Table Rows - Limited to fit single page */}
-            {displayProductos.map((producto) => (
-              <View key={producto.id} style={styles.tableRow}>
+            {displayProductos.map((item, index) => (
+              <View style={styles.tableRow} key={item.id || index} wrap={false}>
                 <View style={styles.tableCol1}>
-                  <Text style={styles.tableRowText}>{producto.nombre}</Text>
+                  <Text style={styles.tableRowText}>{item.descripcion || item.producto_nombre || 'N/A'}</Text>
                 </View>
-                <View style={styles.tableCol2}>
-                  <Text style={styles.tableRowText}>{producto.cantidad}</Text>
-                </View>
-                <View style={styles.tableCol3}>
-                  {/* Use Number.isFinite to check if precio is a valid number */}
-                  <Text style={styles.tableRowText}>{Number.isFinite(producto.precio) ? formatCurrency(producto.precio, moneda) : '$0.00'}</Text>
-                </View>
+                <Text style={[styles.tableCol2, styles.tableRowText]}>{item.cantidad}</Text>
+                <Text style={[styles.tableCol3, styles.tableRowText]}>
+                  {formatCurrency(item.precio_unitario, moneda)}
+                </Text>
                 {productos.some(p => p.descuento && p.descuento > 0) && (
-                  <View style={styles.tableCol4}>
-                    <Text style={styles.tableRowText}>
-                      {producto.descuento ? `${producto.descuento}%` : '-'}
-                    </Text>
-                  </View>
-                )}
-                <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
-                  <Text style={styles.tableRowText}>
-                    {/* Add check here as well */}
-                    {Number.isFinite(producto.precio) ? 
-                      (producto.descuento && producto.descuento > 0 
-                        ? formatCurrency(producto.cantidad * producto.precio * (1 - producto.descuento/100), moneda)
-                        : formatCurrency(producto.cantidad * producto.precio, moneda)
-                      )
-                      : '$0.00'
-                    }
+                  <Text style={[styles.tableCol4, styles.tableRowText]}>
+                    {item.descuento > 0 ? `${item.descuento}%` : '-'}
                   </Text>
-                </View>
+                )}
+                <Text style={[styles.tableCol5, styles.tableRowText]}>
+                  {formatCurrency(item.precio_total, moneda)}
+                </Text>
               </View>
             ))}
             
