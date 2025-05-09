@@ -505,7 +505,12 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                     {item.descuento > 0 ? `${item.descuento}%` : '-'}
                   </Text>
                 )}
-                <Text style={[styles.tableCol5, styles.tableRowText]}>
+                <Text style={[
+                  productos.some(p => p.descuento && p.descuento > 0)
+                    ? styles.tableCol5 // Has width: '15%', textAlign: 'right'
+                    : { ...styles.tableCol4, width: '20%' }, // Ensures width: '20%', inherits textAlign: 'right' from tableCol4
+                  styles.tableRowText
+                ]}>
                   {formatCurrency(item.precio_total, moneda)}
                 </Text>
               </View>
