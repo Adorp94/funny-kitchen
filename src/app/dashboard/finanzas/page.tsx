@@ -578,9 +578,10 @@ export default function FinanzasPage() {
                      )}
                      Descargar CSV
                    </Button>
-                   <EgresoModal 
-                       isOpen={isEgresoModalOpen} 
-                       setIsOpen={setIsEgresoModalOpen}
+                   <EgresoModal
+                       isOpen={isEgresoModalOpen}
+                       onClose={() => setIsEgresoModalOpen(false)}
+                       onSubmit={handleEgresoSubmit}
                    />
                  </div>
              </div>
