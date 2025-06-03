@@ -727,8 +727,7 @@ export async function createEgreso(data: any): Promise<{ success: boolean; error
         tipo_cambio: tipoCambio,
         metodo_pago: data.metodo_pago,
         comprobante_url: data.comprobante_url,
-        notas: data.notas,
-        usuario_id: data.usuario_id
+        notas: data.notas
       });
     
     if (error) {

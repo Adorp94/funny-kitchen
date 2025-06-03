@@ -264,16 +264,21 @@ export default function FinanzasPage() {
 
   const handleEgresoSubmit = async (data: any) => {
     try {
+      console.log('[handleEgresoSubmit] Submitting egreso data:', data);
       const result = await createEgreso(data);
+      console.log('[handleEgresoSubmit] Create egreso result:', result);
+      
       if (result.success) {
         // Pass filters to fetchMetrics
         fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
         fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined); 
         return true;
+      } else {
+        console.error('[handleEgresoSubmit] Failed to create egreso:', result.error);
+        return false;
       }
-      return false;
     } catch (error) {
-      console.error("Error creating egreso:", error);
+      console.error('[handleEgresoSubmit] Error creating egreso:', error);
       return false;
     }
   };
@@ -578,11 +583,6 @@ export default function FinanzasPage() {
                      )}
                      Descargar CSV
                    </Button>
-                   <EgresoModal
-                       isOpen={isEgresoModalOpen}
-                       onClose={() => setIsEgresoModalOpen(false)}
-                       onSubmit={handleEgresoSubmit}
-                   />
                  </div>
              </div>
              <EgresosTable 

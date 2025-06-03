@@ -97,6 +97,8 @@ export function EgresoModal({ isOpen, onClose, onSubmit }: EgresoModalProps) {
         toast.success("Egreso registrado exitosamente.");
         form.reset();
         onClose();
+      } else {
+        toast.error("No se pudo registrar el egreso. Por favor, intenta de nuevo.");
       }
     } catch (error) {
       console.error("Error submitting egreso:", error);
