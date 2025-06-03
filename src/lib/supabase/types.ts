@@ -278,6 +278,55 @@ export interface Database {
           telefono?: string
         }
       }
+      mesas_moldes: {
+        Row: {
+          id: number
+          nombre: string
+          numero: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          nombre: string
+          numero: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          nombre?: string
+          numero?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      productos_en_mesa: {
+        Row: {
+          id: number
+          mesa_id: number
+          producto_id: number
+          cantidad_moldes: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          mesa_id: number
+          producto_id: number
+          cantidad_moldes: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          mesa_id?: number
+          producto_id?: number
+          cantidad_moldes?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }

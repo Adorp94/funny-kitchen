@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getColumns, ProductionQueueItem } from "@/components/produccion/columns";
 import { DataTable } from "@/components/produccion/data-table";
+import { MoldesActivos } from "@/components/produccion/moldes-activos";
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RefreshCw, Calculator, ClipboardList, Wrench } from 'lucide-react';
 import { toast } from "sonner";
 
 // Mock API call - replace with actual fetch
@@ -34,6 +36,7 @@ export default function ProduccionPage() {
   const [data, setData] = useState<ProductionQueueItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState<boolean>(false);
 
   const fetchData = useCallback(async () => {
     console.log("ProduccionPage: fetchData triggered");
@@ -53,6 +56,44 @@ export default function ProduccionPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleRecalculate = useCallback(async () => {
+    console.log("ProduccionPage: handleRecalculate triggered");
+    setRecalculating(true);
+    try {
+      const response = await fetch('/api/production/queue/recalculate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`Recalculate API Error Response: ${response.status}`, errorData);
+        throw new Error(errorData.error || 'Error al recalcular la cola de producción');
+      }
+
+      const result = await response.json();
+      console.log("Recalculation successful:", result);
+      
+      toast.success("Éxito", {
+        description: "Cola de producción recalculada correctamente. Las fechas estimadas han sido actualizadas.",
+      });
+
+      // Refresh data after successful recalculation
+      await fetchData();
+
+    } catch (err: any) {
+      console.error("Failed to recalculate queue:", err);
+      const errorMsg = err.message || "No se pudo recalcular la cola de producción.";
+      toast.error("Error al recalcular", {
+        description: errorMsg,
+      });
+    } finally {
+      setRecalculating(false);
+    }
+  }, [fetchData]);
 
   const handleStatusUpdate = useCallback(async (queueId: number, newStatus: string) => {
       console.log(`ProduccionPage: handleStatusUpdate called for ${queueId} to ${newStatus}`);
@@ -156,20 +197,53 @@ export default function ProduccionPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Gestión de Producción</h1>
-        <Button onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-        </Button>
       </div>
-      {loading && <p className="text-center py-4">Cargando datos...</p>}
-      {error && <p className="text-red-500 text-center py-4">{error}</p>}
-      {!loading && !error && (
-        <div className="overflow-x-auto">
-           <DataTable columns={columns} data={data} />
-        </div>
-      )}
+
+      <Tabs defaultValue="gestion" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="gestion" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Gestión de Producción
+          </TabsTrigger>
+          <TabsTrigger value="moldes" className="flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            Moldes Activos
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="gestion" className="mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Cola de Producción</h2>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleRecalculate} 
+                disabled={recalculating || loading}
+                variant="outline"
+              >
+                <Calculator className={`mr-2 h-4 w-4 ${recalculating ? 'animate-spin' : ''}`} />
+                {recalculating ? 'Recalculando...' : 'Recalcular Cola'}
+              </Button>
+              <Button onClick={fetchData} disabled={loading}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Actualizar
+              </Button>
+            </div>
+          </div>
+          {loading && <p className="text-center py-4">Cargando datos...</p>}
+          {error && <p className="text-red-500 text-center py-4">{error}</p>}
+          {!loading && !error && (
+            <div className="overflow-x-auto">
+               <DataTable columns={columns} data={data} />
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="moldes" className="mt-6">
+          <MoldesActivos />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 

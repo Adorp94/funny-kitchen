@@ -28,7 +28,7 @@ type QueueApiResponseItem = {
 };
 
 export async function GET(request: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -59,77 +59,115 @@ export async function GET(request: NextRequest) {
     // const sortOrder = searchParams.get('sortOrder') === 'desc' ? false : true;
     // const filterStatus = searchParams.get('status');
 
-    const { data, error, count } = await supabase
-      .from('production_queue')
-      .select(`
-        queue_id,
-        status,
-        premium,
-        created_at,
-        eta_start_date,
-        eta_end_date,
-        qty_total,
-        qty_pendiente,
-        vaciado_duration_days,
-        assigned_molds,
-        cotizacion_productos!inner (
-            cotizacion_id,
-            producto_id,
-            cotizaciones!cotizacion_productos_cotizacion_id_fkey!inner (
-                folio,
-                cliente_id,
-                clientes!inner (
-                    nombre
-                )
-            ),
-            productos!inner (
-                nombre,
-                vueltas_max_dia,
-                moldes_disponibles
-            )
-        )
-      `,
-       { count: 'exact' } // Request count for pagination metadata
-      )
-      // Add filters based on query params here, e.g.:
-      // .eq(filterStatus ? 'status' : 'queue_id', filterStatus || undefined)
-      .order('premium', { ascending: false }) // Default sort
-      .order('created_at', { ascending: true }) // Default sort
-      // .range(offset, offset + limit - 1); // Apply pagination range
+    // Get all production queue data with a direct SQL query for better performance
+    const { data, error, count } = await supabase.rpc('get_production_queue_with_details');
 
     if (error) {
       console.error("[API /production/queue GET] Error fetching queue:", error);
-      return NextResponse.json({ error: 'Error al obtener la cola de producción' }, { status: 500 });
+      
+      // Fallback to multiple queries approach
+      const { data: queueData, error: queueError } = await supabase
+        .from('production_queue')
+        .select(`
+          queue_id,
+          status,
+          premium,
+          created_at,
+          eta_start_date,
+          eta_end_date,
+          qty_total,
+          qty_pendiente,
+          vaciado_duration_days,
+          assigned_molds,
+          cotizacion_producto_id,
+          producto_id
+        `)
+        .order('premium', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (queueError) {
+        return NextResponse.json({ error: 'Error al obtener la cola de producción' }, { status: 500 });
+      }
+
+      // Transform data using individual queries
+      const transformedData: QueueApiResponseItem[] = [];
+      
+      for (const item of queueData) {
+        // Get cotizacion and cliente info
+        const { data: cotizacionData } = await supabase
+          .from('cotizacion_productos')
+          .select(`
+            cotizacion_id,
+            cotizaciones (
+              folio,
+              cliente_id,
+              clientes (
+                nombre
+              )
+            )
+          `)
+          .eq('cotizacion_producto_id', item.cotizacion_producto_id)
+          .single();
+
+        // Get product info
+        const { data: productData } = await supabase
+          .from('productos')
+          .select('nombre, vueltas_max_dia, moldes_disponibles')
+          .eq('producto_id', item.producto_id)
+          .single();
+
+        const cotizacion = cotizacionData?.cotizaciones;
+        const cliente = cotizacion?.clientes;
+
+        transformedData.push({
+          queue_id: item.queue_id,
+          status: item.status,
+          premium: item.premium,
+          created_at: item.created_at,
+          eta_start_date: item.eta_start_date,
+          eta_end_date: item.eta_end_date,
+          qty_total: item.qty_total,
+          qty_pendiente: item.qty_pendiente,
+          cotizacion_id: cotizacion?.cotizacion_id ?? null,
+          cotizacion_folio: cotizacion?.folio ?? null,
+          cliente_id: cliente?.cliente_id ?? null,
+          cliente_nombre: cliente?.nombre ?? null,
+          producto_id: item.producto_id,
+          producto_nombre: productData?.nombre ?? null,
+          vueltas_max_dia: productData?.vueltas_max_dia ?? 1,
+          moldes_disponibles: productData?.moldes_disponibles ?? 1,
+          assigned_molds: item.assigned_molds ?? 1,
+          vaciado_duration_days: item.vaciado_duration_days,
+        });
+      }
+
+      console.log(`[API /production/queue GET] Fetched ${transformedData.length} items using fallback method.`);
+      return NextResponse.json({
+        queueItems: transformedData,
+      });
     }
 
-    // Transform the data to the desired flat structure
-    const transformedData: QueueApiResponseItem[] = data.map((item: any) => {
-       const cotizacionProducto = item.cotizacion_productos;
-       const cotizacion = cotizacionProducto?.['cotizaciones!cotizacion_productos_cotizacion_id_fkey'];
-       const cliente = cotizacion?.clientes;
-       const producto = cotizacionProducto?.productos;
-      
-      return {
-        queue_id: item.queue_id,
-        status: item.status,
-        premium: item.premium,
-        created_at: item.created_at,
-        eta_start_date: item.eta_start_date,
-        eta_end_date: item.eta_end_date,
-        qty_total: item.qty_total,
-        qty_pendiente: item.qty_pendiente,
-        cotizacion_id: cotizacion?.cotizacion_id ?? null,
-        cotizacion_folio: cotizacion?.folio ?? null,
-        cliente_id: cliente?.cliente_id ?? null,
-        cliente_nombre: cliente?.nombre ?? null,
-        producto_id: producto?.producto_id ?? null,
-        producto_nombre: producto?.nombre ?? null,
-        vueltas_max_dia: producto?.vueltas_max_dia ?? 1,
-        moldes_disponibles: producto?.moldes_disponibles ?? 1,
-        assigned_molds: item.assigned_molds ?? 1,
-        vaciado_duration_days: item.vaciado_duration_days,
-      };
-    });
+    // If RPC worked, use that data
+    const transformedData: QueueApiResponseItem[] = data.map((item: any) => ({
+      queue_id: item.queue_id,
+      status: item.status,
+      premium: item.premium,
+      created_at: item.created_at,
+      eta_start_date: item.eta_start_date,
+      eta_end_date: item.eta_end_date,
+      qty_total: item.qty_total,
+      qty_pendiente: item.qty_pendiente,
+      cotizacion_id: item.cotizacion_id,
+      cotizacion_folio: item.folio,
+      cliente_id: item.cliente_id,
+      cliente_nombre: item.cliente_nombre,
+      producto_id: item.producto_id,
+      producto_nombre: item.producto_nombre,
+      vueltas_max_dia: item.vueltas_max_dia ?? 1,
+      moldes_disponibles: item.moldes_disponibles ?? 1,
+      assigned_molds: item.assigned_molds ?? 1,
+      vaciado_duration_days: item.vaciado_duration_days,
+    }));
 
     console.log(`[API /production/queue GET] Fetched ${transformedData.length} items (Total Count: ${count}).`);
 
@@ -163,7 +201,7 @@ export async function PATCH(request: NextRequest) {
          let needsRecalculation = false;
 
          // Get current Supabase client
-         const cookieStore = cookies();
+         const cookieStore = await cookies();
          const supabase = createServerClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
