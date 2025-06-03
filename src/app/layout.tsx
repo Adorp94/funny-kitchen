@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "Sistema de gestión de cotizaciones para Funny Kitchen",
 };
 
-import ClientLayout from "./client-layout";
+import { ClientLayout } from "@/components/layout/client-layout";
 
 export default function RootLayout({
   children,

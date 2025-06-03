@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Header } from "@/components/layout/header";
+import Header from "@/components/header";
 import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ProductosProvider } from "@/contexts/productos-context";

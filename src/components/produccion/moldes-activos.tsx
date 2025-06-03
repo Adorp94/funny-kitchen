@@ -234,17 +234,30 @@ export function MoldesActivos() {
   };
 
   // Handle Enter key press to save quantity
-  const handleQuantityKeyPress = async (
+  const handleQuantityKeyDown = async (
     e: React.KeyboardEvent<HTMLInputElement>, 
     mesaId: string, 
     productoId: string, 
     currentValue: string
   ) => {
+    console.log('Key pressed:', e.key, 'for product:', productoId);
+    
     if (e.key === 'Enter') {
+      console.log('Enter key detected! Processing...', 'Product:', productoId, 'Value:', currentValue);
+      
       const newQuantity = parseInt(currentValue) || 0;
       if (newQuantity < 0) return;
 
+      // Get product name BEFORE the API call to ensure we have it
+      const mesa = mesas.find(m => m.id === mesaId);
+      const producto = mesa?.productos.find(p => p.id === productoId);
+      const productName = producto?.nombre || 'Producto';
+      
+      console.log('Found product for notification:', productName);
+
       try {
+        console.log('Making PATCH request to update quantity...');
+        
         const response = await fetch('/api/moldes-activos/productos', {
           method: 'PATCH',
           headers: {
@@ -260,6 +273,9 @@ export function MoldesActivos() {
           const errorData = await response.json();
           throw new Error(errorData.error || 'Failed to update cantidad');
         }
+
+        const result = await response.json();
+        console.log('API response:', result);
 
         // Update the actual data
         setMesas(prev => prev.map(mesa => 
@@ -282,15 +298,14 @@ export function MoldesActivos() {
           return newState;
         });
 
-        // Get product name for better notification
-        const mesa = mesas.find(m => m.id === mesaId);
-        const producto = mesa?.productos.find(p => p.id === productoId);
-        const productName = producto?.nombre || 'Producto';
+        console.log('About to show toast notification...');
 
-        toast.success(`Cantidad actualizada`, {
+        toast.success('Cantidad actualizada', {
           description: `${productName}: ${newQuantity} moldes`,
           duration: 3000,
         });
+        
+        console.log('Toast notification should be visible now');
         
       } catch (error) {
         console.error('Error updating cantidad:', error);
@@ -527,7 +542,7 @@ export function MoldesActivos() {
                               type="number"
                               value={displayValue}
                               onChange={(e) => handleQuantityInputChange(producto.id, e.target.value)}
-                              onKeyPress={(e) => handleQuantityKeyPress(e, mesa.id, producto.id, displayValue)}
+                              onKeyDown={(e) => handleQuantityKeyDown(e, mesa.id, producto.id, displayValue)}
                               onBlur={() => handleQuantityBlur(producto.id, producto.cantidad_moldes)}
                               className="w-16 h-8 text-center"
                               min="0"
@@ -570,4 +585,4 @@ export function MoldesActivos() {
       )}
     </div>
   );
-} 
+}
