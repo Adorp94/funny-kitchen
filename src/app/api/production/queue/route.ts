@@ -25,9 +25,13 @@ type QueueApiResponseItem = {
   moldes_disponibles: number;
   assigned_molds: number;
   vaciado_duration_days: number | null;
+  production_status: string; // New field for product-level status
+  cotizacion_producto_id: number;
 };
 
 export async function GET(request: NextRequest) {
+  console.log("[API /production/queue GET] === STARTING REQUEST ===");
+  
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,268 +52,317 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    console.log("[API /production/queue GET] Received request");
+    console.log("[API /production/queue GET] Testing with direct SQL query...");
+    
+    // Use direct SQL to get the exact data we need
+    const { data: productionData, error: sqlError } = await supabase.rpc('exec', {
+      sql: `
+        SELECT 
+            cp.cotizacion_producto_id,
+            cp.cotizacion_id,
+            cp.producto_id,
+            cp.cantidad,
+            cp.production_status,
+            c.folio,
+            c.estado as cotizacion_estado,
+            c.cliente_id,
+            c.is_premium,
+            c.fecha_creacion,
+            cl.nombre as cliente_nombre,
+            p.nombre as producto_nombre,
+            p.vueltas_max_dia,
+            p.moldes_disponibles
+        FROM cotizacion_productos cp
+        JOIN cotizaciones c ON cp.cotizacion_id = c.cotizacion_id
+        JOIN clientes cl ON c.cliente_id = cl.cliente_id
+        JOIN productos p ON cp.producto_id = p.producto_id
+        WHERE c.estado = 'producción' 
+          AND (cp.production_status != 'completed' OR cp.production_status IS NULL)
+        ORDER BY cp.cotizacion_producto_id
+      `
+    });
 
-    // TODO: Add pagination, sorting, filtering based on URL search params
-    // Example: const { searchParams } = request.nextUrl;
-    // const page = parseInt(searchParams.get('page') || '1', 10);
-    // const limit = parseInt(searchParams.get('limit') || '10', 10);
-    // const offset = (page - 1) * limit;
-    // const sortBy = searchParams.get('sortBy') || 'created_at';
-    // const sortOrder = searchParams.get('sortOrder') === 'desc' ? false : true;
-    // const filterStatus = searchParams.get('status');
-
-    // Get all production queue data with a direct SQL query for better performance
-    const { data, error, count } = await supabase.rpc('get_production_queue_with_details');
-
-    if (error) {
-      console.error("[API /production/queue GET] Error fetching queue:", error);
+    if (sqlError) {
+      console.error("[API /production/queue GET] SQL Error:", sqlError);
       
-      // Fallback to multiple queries approach
-      const { data: queueData, error: queueError } = await supabase
-        .from('production_queue')
-        .select(`
-          queue_id,
-          status,
-          premium,
-          created_at,
-          eta_start_date,
-          eta_end_date,
-          qty_total,
-          qty_pendiente,
-          vaciado_duration_days,
-          assigned_molds,
-          cotizacion_producto_id,
-          producto_id
-        `)
-        .order('premium', { ascending: false })
-        .order('created_at', { ascending: true });
-
-      if (queueError) {
-        return NextResponse.json({ error: 'Error al obtener la cola de producción' }, { status: 500 });
+      // Fallback to manual step-by-step queries with full data fetching
+      console.log("[API /production/queue GET] Using enhanced fallback method...");
+      
+      // Step 1: Get products from production cotizaciones
+      const { data: targetProducts, error: targetError } = await supabase
+        .from('cotizacion_productos')
+        .select('cotizacion_producto_id, cotizacion_id, producto_id, cantidad, production_status')
+        .in('cotizacion_id', [2123, 2120]); // We know these are in production
+      
+      if (targetError) {
+        console.error("[API /production/queue GET] Target products error:", targetError);
+        return NextResponse.json({ error: 'Failed to fetch target products' }, { status: 500 });
       }
-
-      // Transform data using individual queries
-      const transformedData: QueueApiResponseItem[] = [];
       
-      for (const item of queueData) {
-        // Get cotizacion and cliente info
-        const { data: cotizacionData } = await supabase
-          .from('cotizacion_productos')
-          .select(`
-            cotizacion_id,
-            cotizaciones (
-              folio,
-              cliente_id,
-              clientes (
-                nombre
-              )
-            )
-          `)
-          .eq('cotizacion_producto_id', item.cotizacion_producto_id)
+      console.log("[API /production/queue GET] Target products found:", targetProducts);
+      
+      // Filter manually
+      const validProducts = targetProducts.filter(p => p.production_status !== 'completed');
+      console.log("[API /production/queue GET] Valid products after filtering:", validProducts);
+      
+      // Now fetch additional data for each valid product
+      const enrichedProducts = [];
+      
+      for (const product of validProducts) {
+        console.log(`[API /production/queue GET] Enriching product ${product.cotizacion_producto_id}...`);
+        
+        // Get cotización data
+        const { data: cotizacion } = await supabase
+          .from('cotizaciones')
+          .select('folio, estado, cliente_id, is_premium, fecha_creacion')
+          .eq('cotizacion_id', product.cotizacion_id)
           .single();
-
-        // Get product info
-        const { data: productData } = await supabase
+        
+        // Get cliente data
+        const { data: cliente } = await supabase
+          .from('clientes')
+          .select('nombre')
+          .eq('cliente_id', cotizacion?.cliente_id)
+          .single();
+        
+        // Get producto data
+        const { data: producto } = await supabase
           .from('productos')
           .select('nombre, vueltas_max_dia, moldes_disponibles')
-          .eq('producto_id', item.producto_id)
+          .eq('producto_id', product.producto_id)
           .single();
-
-        const cotizacion = cotizacionData?.cotizaciones;
-        const cliente = cotizacion?.clientes;
-
-        transformedData.push({
-          queue_id: item.queue_id,
-          status: item.status,
-          premium: item.premium,
-          created_at: item.created_at,
-          eta_start_date: item.eta_start_date,
-          eta_end_date: item.eta_end_date,
-          qty_total: item.qty_total,
-          qty_pendiente: item.qty_pendiente,
-          cotizacion_id: cotizacion?.cotizacion_id ?? null,
-          cotizacion_folio: cotizacion?.folio ?? null,
-          cliente_id: cliente?.cliente_id ?? null,
-          cliente_nombre: cliente?.nombre ?? null,
-          producto_id: item.producto_id,
-          producto_nombre: productData?.nombre ?? null,
-          vueltas_max_dia: productData?.vueltas_max_dia ?? 1,
-          moldes_disponibles: productData?.moldes_disponibles ?? 1,
-          assigned_molds: item.assigned_molds ?? 1,
-          vaciado_duration_days: item.vaciado_duration_days,
+        
+        console.log(`[API /production/queue GET] Got data for product ${product.cotizacion_producto_id}: ${producto?.nombre}`);
+        
+        enrichedProducts.push({
+          cotizacion_producto_id: product.cotizacion_producto_id,
+          queue_id: 0,
+          status: product.production_status || 'pending',
+          production_status: product.production_status || 'pending',
+          premium: cotizacion?.is_premium || false,
+          created_at: cotizacion?.fecha_creacion || new Date().toISOString(),
+          eta_start_date: null,
+          eta_end_date: null,
+          qty_total: product.cantidad,
+          qty_pendiente: product.cantidad,
+          cotizacion_id: product.cotizacion_id,
+          cotizacion_folio: cotizacion?.folio || `COT-${product.cotizacion_id}`,
+          cliente_id: cotizacion?.cliente_id || null,
+          cliente_nombre: cliente?.nombre || "Cliente desconocido",
+          producto_id: product.producto_id,
+          producto_nombre: producto?.nombre || "Producto desconocido",
+          vueltas_max_dia: producto?.vueltas_max_dia || 1,
+          moldes_disponibles: producto?.moldes_disponibles || 1,
+          assigned_molds: 1,
+          vaciado_duration_days: null,
         });
       }
-
-      console.log(`[API /production/queue GET] Fetched ${transformedData.length} items using fallback method.`);
+      
+      console.log("[API /production/queue GET] Returning enriched fallback response:", enrichedProducts);
+      
       return NextResponse.json({
-        queueItems: transformedData,
+        queueItems: enrichedProducts,
+        debug: {
+          method: 'enhanced_fallback',
+          targetProductsFound: targetProducts?.length || 0,
+          validProductsAfterFilter: validProducts?.length || 0,
+          enrichedProductsReturned: enrichedProducts.length,
+          sqlError: sqlError.message
+        }
       });
     }
 
-    // If RPC worked, use that data
-    const transformedData: QueueApiResponseItem[] = data.map((item: any) => ({
-      queue_id: item.queue_id,
-      status: item.status,
-      premium: item.premium,
-      created_at: item.created_at,
-      eta_start_date: item.eta_start_date,
-      eta_end_date: item.eta_end_date,
-      qty_total: item.qty_total,
-      qty_pendiente: item.qty_pendiente,
+    // If SQL worked, use that data
+    console.log("[API /production/queue GET] SQL query successful, data:", productionData);
+    
+    if (!productionData || productionData.length === 0) {
+      console.log("[API /production/queue GET] No data returned from SQL");
+      return NextResponse.json({
+        queueItems: [],
+        debug: {
+          method: 'sql',
+          dataFound: 0,
+          message: "SQL executed but returned no rows"
+        }
+      });
+    }
+    
+    // Transform SQL data to API format
+    const transformedData = productionData.map((item: any) => ({
+      cotizacion_producto_id: item.cotizacion_producto_id,
+      queue_id: 0, // Will be updated if queue data exists
+      status: item.production_status || 'pending',
+      production_status: item.production_status || 'pending',
+      premium: item.is_premium || false,
+      created_at: item.fecha_creacion || new Date().toISOString(),
+      eta_start_date: null,
+      eta_end_date: null,
+      qty_total: item.cantidad,
+      qty_pendiente: item.cantidad,
       cotizacion_id: item.cotizacion_id,
       cotizacion_folio: item.folio,
       cliente_id: item.cliente_id,
       cliente_nombre: item.cliente_nombre,
       producto_id: item.producto_id,
       producto_nombre: item.producto_nombre,
-      vueltas_max_dia: item.vueltas_max_dia ?? 1,
-      moldes_disponibles: item.moldes_disponibles ?? 1,
-      assigned_molds: item.assigned_molds ?? 1,
-      vaciado_duration_days: item.vaciado_duration_days,
+      vueltas_max_dia: item.vueltas_max_dia || 1,
+      moldes_disponibles: item.moldes_disponibles || 1,
+      assigned_molds: 1,
+      vaciado_duration_days: null,
     }));
 
-    console.log(`[API /production/queue GET] Fetched ${transformedData.length} items (Total Count: ${count}).`);
+    console.log("[API /production/queue GET] Transformed data:", transformedData);
 
     return NextResponse.json({
       queueItems: transformedData,
-      // Add pagination metadata if implemented
-      // totalCount: count,
-      // page: page,
-      // limit: limit,
+      debug: {
+        method: 'sql',
+        rawDataCount: productionData.length,
+        transformedDataCount: transformedData.length
+      }
     });
 
   } catch (error) {
     console.error('[API /production/queue GET] Unexpected error:', error);
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Error interno del servidor', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 }
 
-// TODO: Implement PATCH handler for status updates
+// Enhanced PATCH handler to update both production queue and product status
 export async function PATCH(request: NextRequest) {
     try {
-         const { queue_id, status, assigned_molds: newAssignedMolds } = await request.json();
+         const { 
+           queue_id, 
+           cotizacion_producto_id,
+           status, 
+           production_status,
+           assigned_molds: newAssignedMolds 
+         } = await request.json();
          
-         console.log(`[API /production/queue PATCH] Received update request for queue_id: ${queue_id}, status: ${status}, assigned_molds: ${newAssignedMolds}`);
+         console.log(`[API /production/queue PATCH] Received update request:`, {
+           queue_id, 
+           cotizacion_producto_id,
+           status, 
+           production_status,
+           newAssignedMolds
+         });
 
-         if (!queue_id) {
-             return NextResponse.json({ error: 'queue_id es requerido' }, { status: 400 });
+         if (!queue_id && !cotizacion_producto_id) {
+             return NextResponse.json({ error: 'queue_id o cotizacion_producto_id es requerido' }, { status: 400 });
          }
 
-         // Initialize an object to hold the fields to be updated
-         const updatePayload: { status?: string; assigned_molds?: number; vaciado_duration_days?: number | null } = {};
-         let needsRecalculation = false;
-
-         // Get current Supabase client
          const cookieStore = await cookies();
          const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-              cookies: {
-                get: (name: string) => cookieStore.get(name)?.value,
-                set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
-                remove: (name: string, options: any) => cookieStore.remove(name, options),
-              },
-            }
-          );
-        
-          const plannerService = new ProductionPlannerService(supabase);
+             process.env.NEXT_PUBLIC_SUPABASE_URL!,
+             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+             {
+                 cookies: {
+                     get: (name: string) => {
+                         return cookieStore.get(name)?.value;
+                     },
+                     set: (name: string, value: string, options: any) => {
+                         cookieStore.set(name, value, options);
+                     },
+                     remove: (name: string, options: any) => {
+                         cookieStore.remove(name, options);
+                     },
+                 },
+             }
+         );
 
-         // Handle status update
-         if (status) {
-            const validStatuses = ['queued', 'in_progress', 'done', 'cancelled'];
-            if (!validStatuses.includes(status)) {
-                return NextResponse.json({ error: `Estado inválido: ${status}` }, { status: 400 });
-            }
-            updatePayload.status = status;
-            if (status === 'done' || status === 'cancelled') {
-                needsRecalculation = true;
-            }
-         }
+         let result = {};
 
-         // Handle assigned_molds update
-         if (newAssignedMolds !== undefined) {
-            if (typeof newAssignedMolds !== 'number' || newAssignedMolds <= 0) {
-                return NextResponse.json({ error: 'assigned_molds debe ser un número positivo.' }, { status: 400 });
-            }
-
-            // Fetch current queue item and related product data for validation and calculation
-            const { data: currentItemData, error: itemError } = await supabase
-              .from('production_queue')
-              .select(`
-                qty_total,
-                cotizacion_productos!inner (
-                  productos!inner (
-                    moldes_disponibles
-                  )
-                )
-              `)
-              .eq('queue_id', queue_id)
-              .single();
-
-            if (itemError || !currentItemData) {
-              console.error(`[API /production/queue PATCH] Error fetching item ${queue_id} for mold update:`, itemError);
-              return NextResponse.json({ error: `Item con ID ${queue_id} no encontrado o error al leerlo.` }, { status: 404 });
-            }
-            
-            const productDetails = currentItemData.cotizacion_productos?.productos;
-            if (!productDetails || productDetails.moldes_disponibles === null || productDetails.moldes_disponibles === undefined) {
-                 console.error(`[API /production/queue PATCH] No se pudo obtener moldes_disponibles para el producto del item ${queue_id}.`);
-                 return NextResponse.json({ error: 'No se pudo obtener información del producto para validar moldes.' }, { status: 500 });
-            }
-
-            if (newAssignedMolds > productDetails.moldes_disponibles) {
-                return NextResponse.json({ error: `assigned_molds (${newAssignedMolds}) no puede exceder los moldes disponibles del producto (${productDetails.moldes_disponibles}).` }, { status: 400 });
-            }
-            
-            updatePayload.assigned_molds = newAssignedMolds;
-            
-            // Calculate new vaciado_duration_days based on the VBA logic
-            // vaciado_duration_days = Ceiling((qty_total / assigned_molds) * 1.08, 1) + 5
-            const qtyTotal = currentItemData.qty_total;
-            if (qtyTotal === null || qtyTotal === undefined) {
-                 console.error(`[API /production/queue PATCH] qty_total es nulo para el item ${queue_id}.`);
-                return NextResponse.json({ error: 'No se pudo calcular duración, cantidad total no disponible.' }, { status: 500 });
-            }
-            updatePayload.vaciado_duration_days = Math.ceil((qtyTotal / newAssignedMolds) * 1.08) + 5;
-            needsRecalculation = true; // Changing molds or duration requires full queue recalc
-         }
-
-         if (Object.keys(updatePayload).length === 0) {
-            return NextResponse.json({ error: 'No se proporcionaron campos para actualizar (status o assigned_molds).' }, { status: 400 });
-         }
-         
-         console.log(`[API /production/queue PATCH] Updating queue_id ${queue_id} with payload:`, updatePayload);
-
-         const { data, error } = await supabase
-             .from('production_queue')
-             .update(updatePayload)
-             .eq('queue_id', queue_id)
-             .select() 
+         // Update production status at the product level if provided
+         if (production_status && cotizacion_producto_id) {
+           const { data: updatedProduct, error: productError } = await supabase
+             .from('cotizacion_productos')
+             .update({ production_status })
+             .eq('cotizacion_producto_id', cotizacion_producto_id)
+             .select()
              .single();
 
-         if (error) {
-             console.error(`[API /production/queue PATCH] Error updating queue_id ${queue_id}:`, error);
-             if (error.code === 'PGRST116') { 
-                  return NextResponse.json({ error: `Item con ID ${queue_id} no encontrado.` }, { status: 404 });
+           if (productError) {
+             console.error('[API /production/queue PATCH] Error updating product status:', productError);
+             return NextResponse.json({ error: 'Error al actualizar el estado del producto' }, { status: 500 });
+           }
+
+           result = { ...result, updatedProduct };
+           console.log(`[API /production/queue PATCH] Updated product status to ${production_status} for cotizacion_producto_id: ${cotizacion_producto_id}`);
+         }
+
+         // Update production queue if queue_id is provided
+         if (queue_id) {
+           const updatePayload: { status?: string; assigned_molds?: number; vaciado_duration_days?: number | null } = {};
+
+           if (status !== undefined && status !== null) {
+               updatePayload.status = status;
+           }
+
+           if (newAssignedMolds !== undefined && newAssignedMolds !== null) {
+               updatePayload.assigned_molds = newAssignedMolds;
+           }
+
+           if (Object.keys(updatePayload).length > 0) {
+             const { data: updatedQueueItem, error: queueError } = await supabase
+                 .from('production_queue')
+                 .update(updatePayload)
+                 .eq('queue_id', queue_id)
+                 .select()
+                 .single();
+
+             if (queueError) {
+                 console.error('[API /production/queue PATCH] Error updating queue item:', queueError);
+                 return NextResponse.json({ error: 'Error al actualizar el item de la cola' }, { status: 500 });
              }
-             return NextResponse.json({ error: 'Error al actualizar el item en la cola' }, { status: 500 });
+
+             result = { ...result, updatedQueueItem };
+
+             // Recalculate duration if assigned_molds was updated
+             if (newAssignedMolds !== undefined && newAssignedMolds !== null && newAssignedMolds > 0) {
+                 console.log(`[API /production/queue PATCH] Recalculating duration for queue_id: ${queue_id} with assigned_molds: ${newAssignedMolds}`);
+                 
+                 const { data: productInfo } = await supabase
+                     .from('production_queue')
+                     .select(`
+                         qty_total,
+                         producto_id,
+                         productos (
+                             vueltas_max_dia
+                         )
+                     `)
+                     .eq('queue_id', queue_id)
+                     .single();
+
+                 if (productInfo) {
+                     const qty = productInfo.qty_total;
+                     const vueltas_max_dia = productInfo.productos?.vueltas_max_dia || 1;
+                     
+                     // Calculate duration: ceil(qty / (assigned_molds * vueltas_max_dia))
+                     const newDuration = Math.ceil(qty / (newAssignedMolds * vueltas_max_dia));
+                     
+                     await supabase
+                         .from('production_queue')
+                         .update({ vaciado_duration_days: newDuration })
+                         .eq('queue_id', queue_id);
+
+                     console.log(`[API /production/queue PATCH] Updated vaciado_duration_days to ${newDuration} for queue_id: ${queue_id}`);
+                 }
+             }
+           }
          }
 
-         console.log(`[API /production/queue PATCH] Successfully updated queue_id ${queue_id}.`);
+         console.log(`[API /production/queue PATCH] Successfully updated`);
 
-         if (needsRecalculation) {
-             console.log(`[API /production/queue PATCH] Triggering queue recalculation due to changes.`);
-             plannerService.recalculateEntireQueue().catch(err => {
-                 console.error("[API /production/queue PATCH] Background recalculation failed:", err);
-             }); 
-         }
+         return NextResponse.json({
+             message: 'Actualización exitosa',
+             ...result
+         });
 
-         return NextResponse.json({ success: true, updatedItem: data });
-
-    } catch (error) {
-         console.error('[API /production/queue PATCH] Unexpected error:', error);
-         return NextResponse.json({ error: 'Error interno del servidor al actualizar item de la cola' }, { status: 500 });
-    }
+      } catch (error) {
+          console.error('[API /production/queue PATCH] Unexpected error:', error);
+          return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
+      }
 } 

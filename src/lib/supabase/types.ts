@@ -327,6 +327,60 @@ export interface Database {
           updated_at?: string
         }
       }
+      cotizacion_productos: {
+        Row: {
+          cantidad: number
+          cotizacion_id: number
+          cotizacion_producto_id: number
+          created_at: string
+          precio_unitario: number | null
+          producto_id: number
+          production_status: Database["public"]["Enums"]["product_production_status"] | null
+          production_status_updated_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          cantidad: number
+          cotizacion_id: number
+          cotizacion_producto_id?: number
+          created_at?: string
+          precio_unitario?: number | null
+          producto_id: number
+          production_status?: Database["public"]["Enums"]["product_production_status"] | null
+          production_status_updated_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cantidad?: number
+          cotizacion_id?: number
+          cotizacion_producto_id?: number
+          created_at?: string
+          precio_unitario?: number | null
+          producto_id?: number
+          production_status?: Database["public"]["Enums"]["product_production_status"] | null
+          production_status_updated_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_productos_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["cotizacion_id"]
+          },
+          {
+            foreignKeyName: "cotizacion_productos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["producto_id"]
+          },
+        ]
+      }
+    }
+    Enums: {
+      product_production_status: "pending" | "queued" | "in_progress" | "completed"
     }
   }
 }
