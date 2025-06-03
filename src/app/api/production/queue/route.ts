@@ -10,6 +10,7 @@ type QueueApiResponseItem = {
   queue_id: number;
   status: string;
   premium: boolean;
+  prioridad: boolean;
   created_at: string;
   eta_start_date: string | null;
   eta_end_date: string | null;
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
       // Get cotización data
       const { data: cotizacion } = await supabase
         .from('cotizaciones')
-        .select('folio, estado, cliente_id, is_premium, fecha_creacion')
+        .select('folio, estado, cliente_id, is_premium, prioridad, fecha_creacion')
         .eq('cotizacion_id', product.cotizacion_id)
         .single();
       
@@ -121,7 +122,8 @@ export async function GET(request: NextRequest) {
           cotizacion_producto_ids: [],
           production_statuses: [],
           most_recent_date: cotizacion?.fecha_creacion || new Date().toISOString(),
-          is_premium: cotizacion?.is_premium || false
+          is_premium: cotizacion?.is_premium || false,
+          has_priority: cotizacion?.prioridad || false
         });
       }
       
@@ -136,6 +138,11 @@ export async function GET(request: NextRequest) {
       // Update date to most recent
       if (cotizacion?.fecha_creacion && cotizacion.fecha_creacion > group.most_recent_date) {
         group.most_recent_date = cotizacion.fecha_creacion;
+      }
+
+      // Update priority - if any cotización has priority, the group has priority
+      if (cotizacion?.prioridad) {
+        group.has_priority = true;
       }
     }
     
@@ -162,6 +169,7 @@ export async function GET(request: NextRequest) {
         status: overallStatus,
         production_status: overallStatus,
         premium: group.is_premium,
+        prioridad: group.has_priority,
         created_at: group.most_recent_date,
         eta_start_date: null,
         eta_end_date: null,
@@ -184,6 +192,15 @@ export async function GET(request: NextRequest) {
         cotizacion_producto_ids: group.cotizacion_producto_ids,
       });
     }
+    
+    // Sort by priority first, then by creation date
+    groupedProducts.sort((a, b) => {
+      // Priority items first
+      if (a.prioridad && !b.prioridad) return -1;
+      if (!a.prioridad && b.prioridad) return 1;
+      // Then by creation date (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
     
     console.log("[API /production/queue GET] Returning grouped products:", groupedProducts);
     

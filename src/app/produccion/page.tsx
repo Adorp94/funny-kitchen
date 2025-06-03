@@ -4,9 +4,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getColumns, ProductionQueueItem } from "@/components/produccion/columns";
 import { DataTable } from "@/components/produccion/data-table";
 import { MoldesActivos } from "@/components/produccion/moldes-activos";
+import { ProductionListing } from "@/components/produccion/production-listing";
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Calculator, ClipboardList, Wrench } from 'lucide-react';
+import { RefreshCw, Calculator, ClipboardList, Wrench, FileText } from 'lucide-react';
 import { toast } from "sonner";
 
 // Mock API call - replace with actual fetch
@@ -202,10 +203,14 @@ export default function ProduccionPage() {
       </div>
 
       <Tabs defaultValue="gestion" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="gestion" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
             Gestión de Producción
+          </TabsTrigger>
+          <TabsTrigger value="listado" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Listado de Producción
           </TabsTrigger>
           <TabsTrigger value="moldes" className="flex items-center gap-2">
             <Wrench className="h-4 w-4" />
@@ -238,6 +243,10 @@ export default function ProduccionPage() {
                <DataTable columns={columns} data={data} />
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="listado" className="mt-6">
+          <ProductionListing />
         </TabsContent>
 
         <TabsContent value="moldes" className="mt-6">
