@@ -16,12 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // Type definition for production listing items
 type ProductionListingItem = {
@@ -243,147 +237,129 @@ export function ProductionListing() {
         </div>
       ) : (
         <div className="border rounded-lg">
-          <TooltipProvider>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">Folio</TableHead>
-                  <TableHead className="w-[150px]">Cliente</TableHead>
-                  <TableHead className="w-[200px]">Productos</TableHead>
-                  <TableHead className="w-[120px]">Fecha Prod.</TableHead>
-                  <TableHead className="w-[120px]">Total</TableHead>
-                  <TableHead className="w-[140px]">Anticipo</TableHead>
-                  <TableHead className="w-[150px]">Estado Productos</TableHead>
-                  <TableHead className="w-[100px]">ETA</TableHead>
-                  <TableHead className="w-[80px] text-center">Prioridad</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => {
-                  const statusSummary = summarizeProductStatuses(item.productos);
-                  const hasCompleted = statusSummary.completed > 0;
-                  const hasInProgress = statusSummary.in_progress > 0;
-                  const hasQueued = statusSummary.queued > 0;
-                  const hasPending = statusSummary.pending > 0;
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[120px]">Folio</TableHead>
+                <TableHead className="w-[150px]">Cliente</TableHead>
+                <TableHead className="w-[280px]">Productos</TableHead>
+                <TableHead className="w-[120px]">Fecha Prod.</TableHead>
+                <TableHead className="w-[120px]">Total</TableHead>
+                <TableHead className="w-[140px]">Anticipo</TableHead>
+                <TableHead className="w-[150px]">Estado Productos</TableHead>
+                <TableHead className="w-[100px]">ETA</TableHead>
+                <TableHead className="w-[80px] text-center">Prioridad</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => {
+                const statusSummary = summarizeProductStatuses(item.productos);
+                const hasCompleted = statusSummary.completed > 0;
+                const hasInProgress = statusSummary.in_progress > 0;
+                const hasQueued = statusSummary.queued > 0;
+                const hasPending = statusSummary.pending > 0;
 
-                  return (
-                    <TableRow key={item.cotizacion_id} className={item.prioridad ? "bg-yellow-50 border-l-4 border-l-yellow-400" : ""}>
-                      {/* Folio with priority indicator */}
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{item.cotizacion_folio}</span>
-                          {item.prioridad && (
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Star className="h-4 w-4 text-yellow-500 fill-current" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Prioridad alta</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                return (
+                  <TableRow key={item.cotizacion_id} className={item.prioridad ? "bg-yellow-50 border-l-4 border-l-yellow-400" : ""}>
+                    {/* Folio with priority indicator */}
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">{item.cotizacion_folio}</span>
+                        {item.prioridad && (
+                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Cliente */}
+                    <TableCell>
+                      <div className="max-w-[140px] truncate" title={item.cliente_nombre}>
+                        {item.cliente_nombre}
+                      </div>
+                    </TableCell>
+
+                    {/* Productos */}
+                    <TableCell>
+                      <div>
+                        <div className="flex items-center space-x-1 mb-1">
+                          <Package className="h-3 w-3" />
+                          <span className="text-sm font-medium">{item.productos.length} productos</span>
                         </div>
-                      </TableCell>
-
-                      {/* Cliente */}
-                      <TableCell>
-                        <div className="max-w-[140px] truncate" title={item.cliente_nombre}>
-                          {item.cliente_nombre}
-                        </div>
-                      </TableCell>
-
-                      {/* Productos */}
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="cursor-help">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <Package className="h-3 w-3" />
-                                <span className="text-sm font-medium">{item.productos.length} productos</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground max-w-[180px] truncate">
-                                {item.productos.map(p => `${p.producto_nombre} (${p.cantidad})`).join(', ')}
-                              </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {item.productos.map((producto, index) => (
+                            <div key={index} className="flex justify-between">
+                              <span>{producto.producto_nombre}</span>
+                              <span className="ml-2 font-medium">Cant: {producto.cantidad}</span>
                             </div>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="space-y-1">
-                              {item.productos.map((producto, index) => (
-                                <div key={index} className="flex justify-between">
-                                  <span>{producto.producto_nombre}</span>
-                                  <span className="ml-2">Cant: {producto.cantidad}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-
-                      {/* Fecha */}
-                      <TableCell className="text-sm">
-                        {formatDate(item.fecha_movido_produccion)}
-                      </TableCell>
-
-                      {/* Total */}
-                      <TableCell className="text-sm font-medium">
-                        {formatCurrency(item.total_cotizacion)}
-                      </TableCell>
-
-                      {/* Anticipo */}
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">{formatCurrency(item.anticipo_monto)}</div>
-                          <div className="text-xs text-muted-foreground">({item.anticipo_porcentaje}%)</div>
+                          ))}
                         </div>
-                      </TableCell>
+                      </div>
+                    </TableCell>
 
-                      {/* Estado Productos */}
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {hasPending && (
-                            <Badge variant="outline" className="text-xs">
-                              {statusSummary.pending} Pend.
-                            </Badge>
-                          )}
-                          {hasQueued && (
-                            <Badge variant="secondary" className="text-xs">
-                              {statusSummary.queued} Cola
-                            </Badge>
-                          )}
-                          {hasInProgress && (
-                            <Badge variant="default" className="text-xs">
-                              {statusSummary.in_progress} Prog.
-                            </Badge>
-                          )}
-                          {hasCompleted && (
-                            <Badge variant="destructive" className="text-xs">
-                              {statusSummary.completed} Comp.
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
+                    {/* Fecha */}
+                    <TableCell className="text-sm">
+                      {formatDate(item.fecha_movido_produccion)}
+                    </TableCell>
 
-                      {/* ETA */}
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {item.eta || "Por calc."}
-                        </Badge>
-                      </TableCell>
+                    {/* Total */}
+                    <TableCell className="text-sm font-medium">
+                      {formatCurrency(item.total_cotizacion)}
+                    </TableCell>
 
-                      {/* Priority Toggle */}
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={item.prioridad}
-                          onCheckedChange={() => handlePriorityToggle(item.cotizacion_id, item.prioridad)}
-                          aria-label={`Toggle priority for ${item.cotizacion_folio}`}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TooltipProvider>
+                    {/* Anticipo */}
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{formatCurrency(item.anticipo_monto)}</div>
+                        <div className="text-xs text-muted-foreground">({item.anticipo_porcentaje}%)</div>
+                      </div>
+                    </TableCell>
+
+                    {/* Estado Productos */}
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {hasPending && (
+                          <Badge variant="outline" className="text-xs">
+                            {statusSummary.pending} Pend.
+                          </Badge>
+                        )}
+                        {hasQueued && (
+                          <Badge variant="secondary" className="text-xs">
+                            {statusSummary.queued} Cola
+                          </Badge>
+                        )}
+                        {hasInProgress && (
+                          <Badge variant="default" className="text-xs">
+                            {statusSummary.in_progress} Prog.
+                          </Badge>
+                        )}
+                        {hasCompleted && (
+                          <Badge variant="destructive" className="text-xs">
+                            {statusSummary.completed} Comp.
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* ETA */}
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {item.eta || "Por calc."}
+                      </Badge>
+                    </TableCell>
+
+                    {/* Priority Toggle */}
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={item.prioridad}
+                        onCheckedChange={() => handlePriorityToggle(item.cotizacion_id, item.prioridad)}
+                        aria-label={`Toggle priority for ${item.cotizacion_folio}`}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

@@ -202,21 +202,25 @@ export default function ProduccionPage() {
         <h1 className="text-3xl font-bold">Gestión de Producción</h1>
       </div>
 
-      <Tabs defaultValue="gestion" className="w-full">
+      <Tabs defaultValue="listado" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="gestion" className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Gestión de Producción
-          </TabsTrigger>
           <TabsTrigger value="listado" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Listado de Producción
+          </TabsTrigger>
+          <TabsTrigger value="gestion" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
+            Gestión de Producción
           </TabsTrigger>
           <TabsTrigger value="moldes" className="flex items-center gap-2">
             <Wrench className="h-4 w-4" />
             Moldes Activos
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="listado" className="mt-6">
+          <ProductionListing />
+        </TabsContent>
 
         <TabsContent value="gestion" className="mt-6">
           <div className="flex justify-between items-center mb-4">
@@ -243,10 +247,6 @@ export default function ProduccionPage() {
                <DataTable columns={columns} data={data} />
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="listado" className="mt-6">
-          <ProductionListing />
         </TabsContent>
 
         <TabsContent value="moldes" className="mt-6">
