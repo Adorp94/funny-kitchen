@@ -66,7 +66,10 @@ export function MoldesActivos() {
       setMesas(data);
     } catch (error) {
       console.error('Error fetching mesas:', error);
-      toast.error('Error al cargar las mesas');
+      toast.error('Error al cargar las mesas', {
+        description: 'No se pudieron cargar las mesas de producción',
+        duration: 4000,
+      });
     }
   }, []);
 
@@ -85,7 +88,10 @@ export function MoldesActivos() {
       })));
     } catch (error) {
       console.error('Error fetching productos:', error);
-      toast.error('Error al cargar los productos');
+      toast.error('Error al cargar los productos', {
+        description: 'No se pudieron cargar los productos disponibles',
+        duration: 4000,
+      });
     }
   }, []);
 
@@ -142,7 +148,10 @@ export function MoldesActivos() {
   // Add producto to mesa
   const handleAddProducto = async () => {
     if (!selectedMesaId || !selectedProductoId || !cantidadMoldes) {
-      toast.error('Por favor complete todos los campos');
+      toast.error('Campos requeridos', {
+        description: 'Por favor complete todos los campos',
+        duration: 3000,
+      });
       return;
     }
 
@@ -165,6 +174,8 @@ export function MoldesActivos() {
       }
 
       const result = await response.json();
+      const productName = result.producto.nombre;
+      const mesaName = mesas.find(m => m.id === selectedMesaId)?.nombre || 'la mesa';
       
       if (result.action === 'updated') {
         // Product already existed, quantity was updated
@@ -181,7 +192,10 @@ export function MoldesActivos() {
             : mesa
         ));
         
-        toast.success(`Cantidad actualizada: ${result.previousQuantity} + ${result.addedQuantity} = ${result.producto.cantidad_moldes} moldes`);
+        toast.success('Cantidad actualizada', {
+          description: `${productName} en ${mesaName}: ${result.previousQuantity} + ${result.addedQuantity} = ${result.producto.cantidad_moldes} moldes`,
+          duration: 4000,
+        });
       } else {
         // New product was added
         setMesas(prev => prev.map(mesa => 
@@ -190,7 +204,10 @@ export function MoldesActivos() {
             : mesa
         ));
         
-        toast.success('Producto agregado a la mesa');
+        toast.success('Producto agregado', {
+          description: `${productName} agregado a ${mesaName} con ${result.producto.cantidad_moldes} moldes`,
+          duration: 3000,
+        });
       }
       
       // Reset form
@@ -201,7 +218,10 @@ export function MoldesActivos() {
       setComboboxOpen(false);
     } catch (error) {
       console.error('Error adding producto:', error);
-      toast.error(`Error al agregar el producto: ${error.message}`);
+      toast.error('Error al agregar producto', {
+        description: error.message,
+        duration: 4000,
+      });
     }
   };
 
@@ -262,11 +282,22 @@ export function MoldesActivos() {
           return newState;
         });
 
-        toast.success(`Cantidad actualizada a ${newQuantity} moldes`);
+        // Get product name for better notification
+        const mesa = mesas.find(m => m.id === mesaId);
+        const producto = mesa?.productos.find(p => p.id === productoId);
+        const productName = producto?.nombre || 'Producto';
+
+        toast.success(`Cantidad actualizada`, {
+          description: `${productName}: ${newQuantity} moldes`,
+          duration: 3000,
+        });
         
       } catch (error) {
         console.error('Error updating cantidad:', error);
-        toast.error(`Error al actualizar la cantidad: ${error.message}`);
+        toast.error('Error al actualizar cantidad', {
+          description: error.message,
+          duration: 4000,
+        });
         
         // Revert the editing state
         setEditingQuantities(prev => {
@@ -290,6 +321,12 @@ export function MoldesActivos() {
   // Remove producto from mesa
   const handleRemoveProducto = async (mesaId: string, productoId: string) => {
     try {
+      // Get product and mesa names before removal for better notification
+      const mesa = mesas.find(m => m.id === mesaId);
+      const producto = mesa?.productos.find(p => p.id === productoId);
+      const productName = producto?.nombre || 'Producto';
+      const mesaName = mesa?.nombre || 'la mesa';
+
       const response = await fetch(`/api/moldes-activos/productos?id=${productoId}`, {
         method: 'DELETE'
       });
@@ -304,10 +341,17 @@ export function MoldesActivos() {
           ? { ...mesa, productos: mesa.productos.filter(p => p.id !== productoId) }
           : mesa
       ));
-      toast.success('Producto removido de la mesa');
+      
+      toast.success('Producto removido', {
+        description: `${productName} removido de ${mesaName}`,
+        duration: 3000,
+      });
     } catch (error) {
       console.error('Error removing producto:', error);
-      toast.error(`Error al remover el producto: ${error.message}`);
+      toast.error('Error al remover producto', {
+        description: error.message,
+        duration: 4000,
+      });
     }
   };
 
