@@ -371,24 +371,39 @@ export function MoldesActivos() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
+      {/* Compact Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Moldes Activos</h2>
-        <p className="text-muted-foreground">9 mesas de producción disponibles</p>
+        <span className="text-xs text-muted-foreground">
+          {mesas.length} mesas de trabajo
+        </span>
+        <Button 
+          onClick={fetchData} 
+          disabled={loading} 
+          variant="outline" 
+          size="sm"
+          className="h-7 px-2 text-xs"
+        >
+          <Package className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          Actualizar
+        </Button>
       </div>
 
       {loading ? (
-        <div className="text-center py-8">
-          <p>Cargando mesas...</p>
+        <div className="text-center py-4">
+          <div className="flex justify-center items-center space-x-2">
+            <Package className="h-3 w-3 animate-spin" />
+            <span className="text-xs text-muted-foreground">Cargando mesas...</span>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {mesas.map((mesa) => (
-            <Card key={mesa.id} className="relative">
-              <CardHeader className="pb-3">
+            <Card key={mesa.id} className="border">
+              <CardHeader className="p-2">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-2">
-                    <TableIcon className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-1 text-sm">
+                    <TableIcon className="h-3 w-3" />
                     {mesa.nombre}
                   </CardTitle>
                   <Dialog 
@@ -406,29 +421,29 @@ export function MoldesActivos() {
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button size="sm" variant="outline">
+                      <Button size="sm" variant="outline" className="h-6 w-6 p-0">
                         <Plus className="h-3 w-3" />
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Agregar Producto a {mesa.nombre}</DialogTitle>
+                        <DialogTitle className="text-sm">Agregar Producto a {mesa.nombre}</DialogTitle>
                       </DialogHeader>
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div>
-                          <label className="text-sm font-medium mb-2 block">Producto</label>
+                          <label className="text-xs font-medium mb-1 block">Producto</label>
                           <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
                                 role="combobox"
                                 aria-expanded={comboboxOpen}
-                                className="w-full justify-between"
+                                className="w-full justify-between h-8 text-xs"
                               >
                                 {selectedProduct
                                   ? `${selectedProduct.nombre}${selectedProduct.sku ? ` (${selectedProduct.sku})` : ''}`
                                   : "Buscar producto..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
@@ -437,16 +452,17 @@ export function MoldesActivos() {
                                   placeholder="Buscar por nombre o SKU..." 
                                   value={searchTerm}
                                   onValueChange={handleSearchInputChange}
+                                  className="text-xs"
                                 />
                                 <CommandList>
                                   {isSearching && (
-                                    <div className="p-4 py-6 text-center text-sm flex items-center justify-center text-muted-foreground">
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <div className="p-2 text-center text-xs flex items-center justify-center text-muted-foreground">
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                                       Buscando...
                                     </div>
                                   )}
                                   {!isSearching && searchResults.length === 0 && (
-                                    <CommandEmpty>No se encontraron productos.</CommandEmpty>
+                                    <CommandEmpty className="text-xs">No se encontraron productos.</CommandEmpty>
                                   )}
                                   {!isSearching && searchResults.length > 0 && (
                                     <CommandGroup>
@@ -462,15 +478,15 @@ export function MoldesActivos() {
                                               setSearchTerm(selected.nombre);
                                             }
                                           }}
-                                          className="text-sm"
+                                          className="text-xs"
                                         >
                                           <Check
                                             className={cn(
-                                              "mr-2 h-4 w-4",
+                                              "mr-1 h-3 w-3",
                                               selectedProductoId === producto.producto_id.toString() ? "opacity-100" : "opacity-0"
                                             )}
                                           />
-                                          <Package className="mr-2 h-4 w-4 text-muted-foreground" />
+                                          <Package className="mr-1 h-3 w-3 text-muted-foreground" />
                                           <div className="flex-1">
                                             <div className="font-medium">
                                               {producto.nombre}
@@ -491,21 +507,22 @@ export function MoldesActivos() {
                           </Popover>
                         </div>
                         <div>
-                          <label className="text-sm font-medium mb-2 block">Cantidad de Moldes</label>
+                          <label className="text-xs font-medium mb-1 block">Cantidad de Moldes</label>
                           <Input 
                             type="number"
                             value={cantidadMoldes}
                             onChange={(e) => setCantidadMoldes(e.target.value)}
                             placeholder="ej: 10"
                             min="1"
+                            className="h-8 text-xs"
                           />
                         </div>
                         <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setShowAddProductoDialog(false)}>
+                          <Button variant="outline" onClick={() => setShowAddProductoDialog(false)} size="sm" className="h-7 px-2 text-xs">
                             Cancelar
                           </Button>
-                          <Button onClick={handleAddProducto} disabled={!selectedProductoId || !cantidadMoldes}>
-                            Agregar Producto
+                          <Button onClick={handleAddProducto} disabled={!selectedProductoId || !cantidadMoldes} size="sm" className="h-7 px-2 text-xs">
+                            Agregar
                           </Button>
                         </div>
                       </div>
@@ -513,11 +530,11 @@ export function MoldesActivos() {
                   </Dialog>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="p-2">
+                <div className="space-y-1">
                   {mesa.productos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No hay productos en esta mesa
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Sin productos
                     </p>
                   ) : (
                     mesa.productos.map((producto) => {
@@ -527,32 +544,31 @@ export function MoldesActivos() {
                         : producto.cantidad_moldes.toString();
                       
                       return (
-                        <div key={producto.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Package className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium text-sm">{producto.nombre}</span>
+                        <div key={producto.id} className="flex items-center justify-between p-1 bg-muted rounded text-xs">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span className="font-medium truncate">{producto.nombre}</span>
                             </div>
                             {producto.sku && (
-                              <p className="text-xs text-muted-foreground mt-1">{producto.sku}</p>
+                              <p className="text-xs text-muted-foreground truncate">{producto.sku}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                             <Input 
                               type="number"
                               value={displayValue}
                               onChange={(e) => handleQuantityInputChange(producto.id, e.target.value)}
                               onKeyDown={(e) => handleQuantityKeyDown(e, mesa.id, producto.id, displayValue)}
                               onBlur={() => handleQuantityBlur(producto.id, producto.cantidad_moldes)}
-                              className="w-16 h-8 text-center"
+                              className="w-12 h-6 text-center text-xs border-0 bg-background"
                               min="0"
-                              placeholder="Presiona Enter para guardar"
-                              title="Presiona Enter para guardar los cambios"
                             />
                             <Button 
                               size="sm" 
                               variant="ghost"
                               onClick={() => handleRemoveProducto(mesa.id, producto.id)}
+                              className="h-6 w-6 p-0"
                             >
                               <Trash2 className="h-3 w-3 text-red-500" />
                             </Button>
@@ -563,9 +579,9 @@ export function MoldesActivos() {
                   )}
                 </div>
                 {mesa.productos.length > 0 && (
-                  <div className="mt-4 pt-3 border-t">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">Total Moldes:</span>
+                  <div className="mt-2 pt-1 border-t">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-medium">Total:</span>
                       <span className="font-bold">
                         {mesa.productos.reduce((sum, p) => {
                           // Use editing value if currently editing, otherwise use actual value
@@ -573,7 +589,7 @@ export function MoldesActivos() {
                             ? parseInt(editingQuantities[p.id]) || 0
                             : p.cantidad_moldes;
                           return sum + value;
-                        }, 0)}
+                        }, 0)} moldes
                       </span>
                     </div>
                   </div>

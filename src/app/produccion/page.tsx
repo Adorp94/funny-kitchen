@@ -197,51 +197,53 @@ export default function ProduccionPage() {
   }, [fetchData]);
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gestión de Producción</h1>
-      </div>
-
-      <Tabs defaultValue="listado" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="listado" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Listado de Producción
+    <div className="container mx-auto py-2">
+      <Tabs defaultValue="gestion" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 h-8 text-xs">
+          <TabsTrigger value="listado" className="flex items-center gap-1 text-xs py-1">
+            <FileText className="h-3 w-3" />
+            Listado
           </TabsTrigger>
-          <TabsTrigger value="gestion" className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            Gestión de Producción
+          <TabsTrigger value="gestion" className="flex items-center gap-1 text-xs py-1">
+            <ClipboardList className="h-3 w-3" />
+            Cola Producción
           </TabsTrigger>
-          <TabsTrigger value="moldes" className="flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
+          <TabsTrigger value="moldes" className="flex items-center gap-1 text-xs py-1">
+            <Wrench className="h-3 w-3" />
             Moldes Activos
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="listado" className="mt-6">
+        <TabsContent value="listado" className="mt-2">
           <ProductionListing />
         </TabsContent>
 
-        <TabsContent value="gestion" className="mt-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Cola de Producción</h2>
-            <div className="flex gap-2">
+        <TabsContent value="gestion" className="mt-2">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex gap-1">
               <Button 
                 onClick={handleRecalculate} 
                 disabled={recalculating || loading}
                 variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
               >
-                <Calculator className={`mr-2 h-4 w-4 ${recalculating ? 'animate-spin' : ''}`} />
-                {recalculating ? 'Recalculando...' : 'Recalcular Cola'}
+                <Calculator className={`mr-1 h-3 w-3 ${recalculating ? 'animate-spin' : ''}`} />
+                {recalculating ? 'Recalculando...' : 'Recalcular'}
               </Button>
-              <Button onClick={fetchData} disabled={loading}>
-                  <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <Button 
+                onClick={fetchData} 
+                disabled={loading}
+                size="sm"
+                className="h-7 px-2 text-xs"
+              >
+                  <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
                   Actualizar
               </Button>
             </div>
           </div>
-          {loading && <p className="text-center py-4">Cargando datos...</p>}
-          {error && <p className="text-red-500 text-center py-4">{error}</p>}
+          {loading && <p className="text-center py-2 text-xs text-muted-foreground">Cargando...</p>}
+          {error && <p className="text-red-500 text-center py-2 text-xs">{error}</p>}
           {!loading && !error && (
             <div className="overflow-x-auto">
                <DataTable columns={columns} data={data} />
@@ -249,7 +251,7 @@ export default function ProduccionPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="moldes" className="mt-6">
+        <TabsContent value="moldes" className="mt-2">
           <MoldesActivos />
         </TabsContent>
       </Tabs>

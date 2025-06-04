@@ -75,18 +75,18 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="px-1">
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-1 gap-2">
          <Input
-           placeholder="Filtrar por nombre de producto..."
+           placeholder="Filtrar productos..."
            value={(table.getColumn("producto_nombre")?.getFilterValue() as string) ?? ""}
            onChange={(event) =>
              table.getColumn("producto_nombre")?.setFilterValue(event.target.value)
            }
-           className="max-w-sm"
+           className="h-7 text-xs max-w-sm"
          />
          <DropdownMenu>
            <DropdownMenuTrigger asChild>
-             <Button variant="outline" className="ml-auto">
+             <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
                Columnas
              </Button>
            </DropdownMenuTrigger>
@@ -100,7 +100,7 @@ export function DataTable<TData, TValue>({
                  return (
                    <DropdownMenuCheckboxItem
                      key={column.id}
-                     className="capitalize"
+                     className="capitalize text-xs"
                      checked={column.getIsVisible()}
                      onCheckedChange={(value) =>
                        column.toggleVisibility(!!value)
@@ -113,14 +113,14 @@ export function DataTable<TData, TValue>({
            </DropdownMenuContent>
          </DropdownMenu>
        </div>
-      <div className="rounded-md border">
+      <div className="rounded border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="h-8">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="p-1 text-xs font-medium">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -139,9 +139,10 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="h-6 hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="p-1 text-xs">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -149,32 +150,14 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No hay resultados.
+                <TableCell colSpan={columns.length} className="h-12 text-center text-xs text-muted-foreground">
+                  No hay datos de producción.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-       <div className="flex items-center justify-end space-x-2 py-4">
-         <Button
-           variant="outline"
-           size="sm"
-           onClick={() => table.previousPage()}
-           disabled={!table.getCanPreviousPage()}
-         >
-           Anterior
-         </Button>
-         <Button
-           variant="outline"
-           size="sm"
-           onClick={() => table.nextPage()}
-           disabled={!table.getCanNextPage()}
-         >
-           Siguiente
-         </Button>
-       </div>
     </div>
   )
 } 

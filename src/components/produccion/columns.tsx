@@ -80,6 +80,7 @@ export const getColumns = (
             }
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
+            className="h-3 w-3"
           />
         ),
         cell: ({ row }) => (
@@ -87,6 +88,7 @@ export const getColumns = (
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             aria-label="Select row"
+            className="h-3 w-3"
           />
         ),
         enableSorting: false,
@@ -95,25 +97,25 @@ export const getColumns = (
   {
     accessorKey: "queue_id",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="ID Cola" />
+      <DataTableColumnHeader column={column} title="ID" />
     ),
-    cell: ({ row }) => <div className="text-right font-mono text-sm">{row.getValue("queue_id")}</div>,
+    cell: ({ row }) => <div className="text-right font-mono">{row.getValue("queue_id")}</div>,
     enableSorting: true,
     enableHiding: true,
   },
   {
     accessorKey: "folio",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Folio Cot." />
+      <DataTableColumnHeader column={column} title="Folio" />
     ),
-    cell: ({ row }) => <div className="min-w-[100px]">{row.getValue("folio")}</div>,
+    cell: ({ row }) => <div className="min-w-[80px] truncate">{row.getValue("folio")}</div>,
   },
   {
     accessorKey: "cliente_nombre",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Cliente" />
     ),
-    cell: ({ row }) => <div className="min-w-[120px]">{row.getValue("cliente_nombre")}</div>,
+    cell: ({ row }) => <div className="min-w-[100px] truncate">{row.getValue("cliente_nombre")}</div>,
   },
   {
     accessorKey: "producto_nombre",
@@ -124,7 +126,7 @@ export const getColumns = (
       const item = row.original;
       const productoNombre = item.producto_nombre ?? 'N/A';
       return (
-        <div className="min-w-[150px] font-medium">
+        <div className="min-w-[120px] font-medium truncate">
           {productoNombre}
         </div>
       );
@@ -149,7 +151,7 @@ export const getColumns = (
   {
     accessorKey: "assigned_molds",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Moldes Asig." />
+      <DataTableColumnHeader column={column} title="Moldes" />
     ),
     cell: ({ row }) => {
       const item = row.original;
@@ -192,7 +194,7 @@ export const getColumns = (
           onChange={handleMoldsInputChange}
           onBlur={handleMoldsSave} // Save on blur
           onKeyDown={(e) => { if (e.key === 'Enter') handleMoldsSave(); }} // Save on Enter
-          className="w-20 text-right p-1 border rounded-md focus:ring-2 focus:ring-blue-500"
+          className="w-14 text-right border-0 bg-transparent focus:ring-1 focus:ring-primary focus:bg-background"
           min="1"
           disabled={isLoading}
           // Max validation against product.moldes_disponibles should ideally be handled
@@ -209,15 +211,13 @@ export const getColumns = (
     ),
     cell: ({ row }) => {
       const status = row.getValue("status") as string;
-       let variant: "default" | "secondary" | "outline" | "destructive" = "default";
-       if (status === 'in_progress') variant = 'secondary';
-       else if (status === 'done') variant = 'default'; // Or success if you add it
-       else if (status === 'cancelled') variant = 'destructive';
-       else if (status === 'queued') variant = 'outline';
-
+      const statusConfig = statusMap[status] || { text: status, className: "bg-gray-200 text-gray-800" };
+      
       return (
         <div className="flex justify-center">
-          <Badge variant={variant}>{status}</Badge>
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${statusConfig.className}`}>
+            {statusConfig.text}
+          </span>
         </div>
       )
     },
@@ -232,7 +232,7 @@ export const getColumns = (
     ),
     cell: ({ row }) => (
       <div className="text-center">
-        {row.getValue("premium") ? <Badge variant="outline">Sí</Badge> : 'No'}
+        {row.getValue("premium") ? <span className="text-xs bg-yellow-100 text-yellow-800 px-1 py-0.5 rounded">Sí</span> : 'No'}
       </div>
     ),
     filterFn: (row, id, value) => {
@@ -242,7 +242,7 @@ export const getColumns = (
   {
     accessorKey: "vaciado_duration_days",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Días Prod. (Calc)" />
+      <DataTableColumnHeader column={column} title="Días" />
     ),
     cell: ({ row }) => {
       const days = row.getValue("vaciado_duration_days") as number | null;
@@ -253,7 +253,7 @@ export const getColumns = (
   {
     accessorKey: "eta_start_date",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="ETA Inicio" />
+      <DataTableColumnHeader column={column} title="Inicio" />
     ),
     cell: ({ row }) => <div className="text-center">{formatDateCell(row.getValue("eta_start_date"))}</div>,
     enableSorting: true,
@@ -261,7 +261,7 @@ export const getColumns = (
   {
     accessorKey: "eta_end_date",
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="ETA Fin Vac." />
+      <DataTableColumnHeader column={column} title="Fin" />
     ),
     cell: ({ row }) => <div className="text-center">{formatDateCell(row.getValue("eta_end_date"))}</div>,
     enableSorting: true,

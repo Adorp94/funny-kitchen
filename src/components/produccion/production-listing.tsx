@@ -170,20 +170,10 @@ export function ProductionListing() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Listado de Producción</h2>
-            <p className="text-muted-foreground">
-              Vista detallada de cotizaciones en producción con información de clientes y pagos
-            </p>
-          </div>
-        </div>
-        <div className="text-center py-8">
-          <div className="flex justify-center items-center space-x-2">
-            <RefreshCw className="h-4 w-4 animate-spin" />
-            <span>Cargando listado de producción...</span>
-          </div>
+      <div className="text-center py-2">
+        <div className="flex justify-center items-center space-x-2">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          <span className="text-xs text-muted-foreground">Cargando...</span>
         </div>
       </div>
     );
@@ -191,64 +181,47 @@ export function ProductionListing() {
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Listado de Producción</h2>
-            <p className="text-muted-foreground">
-              Vista detallada de cotizaciones en producción con información de clientes y pagos
-            </p>
-          </div>
-        </div>
-        <div className="text-center py-8">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={fetchData} variant="outline">
-            Reintentar
-          </Button>
-        </div>
+      <div className="text-center py-2">
+        <p className="text-red-500 mb-2 text-xs">{error}</p>
+        <Button onClick={fetchData} variant="outline" size="sm" className="h-7 px-2 text-xs">
+          Reintentar
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-2">
+      {/* Compact Header */}
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Listado de Producción</h2>
-          <p className="text-muted-foreground">
-            Vista detallada de cotizaciones en producción ({items.length} {items.length === 1 ? 'registro' : 'registros'})
-          </p>
-        </div>
-        <Button onClick={fetchData} disabled={loading} variant="outline">
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        <span className="text-xs text-muted-foreground">
+          {items.length} cotizaciones en producción
+        </span>
+        <Button onClick={fetchData} disabled={loading} variant="outline" size="sm" className="h-7 px-2 text-xs">
+          <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
       </div>
 
       {/* Data Table */}
       {items.length === 0 ? (
-        <div className="text-center py-8 border rounded-lg">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No hay cotizaciones en producción</h3>
-          <p className="text-muted-foreground">
-            Actualmente no hay cotizaciones en estado de producción.
-          </p>
+        <div className="text-center py-4 border rounded text-xs text-muted-foreground">
+          No hay cotizaciones en producción
         </div>
       ) : (
-        <div className="border rounded-lg">
+        <div className="border rounded">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Folio</TableHead>
-                <TableHead className="w-[150px]">Cliente</TableHead>
-                <TableHead className="w-[280px]">Productos</TableHead>
-                <TableHead className="w-[120px]">Fecha Prod.</TableHead>
-                <TableHead className="w-[120px]">Total</TableHead>
-                <TableHead className="w-[140px]">Anticipo</TableHead>
-                <TableHead className="w-[150px]">Estado Productos</TableHead>
-                <TableHead className="w-[100px]">ETA</TableHead>
-                <TableHead className="w-[80px] text-center">Prioridad</TableHead>
+              <TableRow className="h-8">
+                <TableHead className="p-1 text-xs font-medium w-20">Folio</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-24">Cliente</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-40">Productos</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-20">Fecha</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-24">Total</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-24">Anticipo</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-20">Estado</TableHead>
+                <TableHead className="p-1 text-xs font-medium w-16">ETA</TableHead>
+                <TableHead className="p-1 text-xs font-medium text-center w-12">Prior.</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -260,36 +233,39 @@ export function ProductionListing() {
                 const hasPending = statusSummary.pending > 0;
 
                 return (
-                  <TableRow key={item.cotizacion_id} className={item.prioridad ? "bg-yellow-50 border-l-4 border-l-yellow-400" : ""}>
+                  <TableRow 
+                    key={item.cotizacion_id} 
+                    className={`h-6 hover:bg-muted/50 ${item.prioridad ? "bg-yellow-50 border-l-2 border-l-yellow-400" : ""}`}
+                  >
                     {/* Folio with priority indicator */}
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
+                    <TableCell className="p-1 text-xs">
+                      <div className="flex items-center space-x-1">
                         <span className="font-medium">{item.cotizacion_folio}</span>
                         {item.prioridad && (
-                          <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                          <Star className="h-3 w-3 text-yellow-500 fill-current" />
                         )}
                       </div>
                     </TableCell>
 
                     {/* Cliente */}
-                    <TableCell>
-                      <div className="max-w-[140px] truncate" title={item.cliente_nombre}>
+                    <TableCell className="p-1 text-xs">
+                      <div className="max-w-[100px] break-words" title={item.cliente_nombre}>
                         {item.cliente_nombre}
                       </div>
                     </TableCell>
 
                     {/* Productos */}
-                    <TableCell>
+                    <TableCell className="p-1 text-xs">
                       <div>
                         <div className="flex items-center space-x-1 mb-1">
                           <Package className="h-3 w-3" />
-                          <span className="text-sm font-medium">{item.productos.length} productos</span>
+                          <span className="font-medium">{item.productos.length}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="text-xs text-muted-foreground space-y-0.5">
                           {item.productos.map((producto, index) => (
                             <div key={index} className="flex justify-between">
-                              <span>{producto.producto_nombre}</span>
-                              <span className="ml-2 font-medium">Cant: {producto.cantidad}</span>
+                              <span className="break-words max-w-[120px]">{producto.producto_nombre}</span>
+                              <span className="ml-1 font-medium flex-shrink-0">{producto.cantidad}</span>
                             </div>
                           ))}
                         </div>
@@ -297,62 +273,63 @@ export function ProductionListing() {
                     </TableCell>
 
                     {/* Fecha */}
-                    <TableCell className="text-sm">
+                    <TableCell className="p-1 text-xs">
                       {formatDate(item.fecha_movido_produccion)}
                     </TableCell>
 
                     {/* Total */}
-                    <TableCell className="text-sm font-medium">
+                    <TableCell className="p-1 text-xs font-medium">
                       {formatCurrency(item.total_cotizacion)}
                     </TableCell>
 
                     {/* Anticipo */}
-                    <TableCell>
-                      <div className="text-sm">
+                    <TableCell className="p-1 text-xs">
+                      <div>
                         <div className="font-medium">{formatCurrency(item.anticipo_monto)}</div>
                         <div className="text-xs text-muted-foreground">({item.anticipo_porcentaje}%)</div>
                       </div>
                     </TableCell>
 
                     {/* Estado Productos */}
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
+                    <TableCell className="p-1 text-xs">
+                      <div className="flex flex-wrap gap-0.5">
                         {hasPending && (
-                          <Badge variant="outline" className="text-xs">
-                            {statusSummary.pending} Pend.
-                          </Badge>
+                          <span className="inline-flex items-center px-1 py-0.5 rounded bg-gray-100 text-gray-800 text-xs">
+                            {statusSummary.pending}P
+                          </span>
                         )}
                         {hasQueued && (
-                          <Badge variant="secondary" className="text-xs">
-                            {statusSummary.queued} Cola
-                          </Badge>
+                          <span className="inline-flex items-center px-1 py-0.5 rounded bg-blue-100 text-blue-800 text-xs">
+                            {statusSummary.queued}C
+                          </span>
                         )}
                         {hasInProgress && (
-                          <Badge variant="default" className="text-xs">
-                            {statusSummary.in_progress} Prog.
-                          </Badge>
+                          <span className="inline-flex items-center px-1 py-0.5 rounded bg-green-100 text-green-800 text-xs">
+                            {statusSummary.in_progress}PR
+                          </span>
                         )}
                         {hasCompleted && (
-                          <Badge variant="destructive" className="text-xs">
-                            {statusSummary.completed} Comp.
-                          </Badge>
+                          <span className="inline-flex items-center px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs">
+                            {statusSummary.completed}OK
+                          </span>
                         )}
                       </div>
                     </TableCell>
 
                     {/* ETA */}
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {item.eta || "Por calc."}
-                      </Badge>
+                    <TableCell className="p-1 text-xs">
+                      <span className="inline-flex items-center px-1 py-0.5 rounded bg-gray-100 text-gray-800 text-xs">
+                        {item.eta || "TBD"}
+                      </span>
                     </TableCell>
 
                     {/* Priority Toggle */}
-                    <TableCell className="text-center">
+                    <TableCell className="p-1 text-center">
                       <Checkbox
                         checked={item.prioridad}
                         onCheckedChange={() => handlePriorityToggle(item.cotizacion_id, item.prioridad)}
                         aria-label={`Toggle priority for ${item.cotizacion_folio}`}
+                        className="h-3 w-3"
                       />
                     </TableCell>
                   </TableRow>
