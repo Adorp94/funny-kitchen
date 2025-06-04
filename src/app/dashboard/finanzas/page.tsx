@@ -34,7 +34,9 @@ import {
   getAllEgresos,
   getFinancialMetrics,
   getAllIngresosForCSV,
-  getAllEgresosForCSV
+  getAllEgresosForCSV,
+  deleteIngreso,
+  deleteEgreso
 } from '@/app/actions/finanzas-actions';
 import { formatCurrency, convertToCSV } from '@/lib/utils';
 import { 
@@ -45,6 +47,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import { toast } from "sonner";
 
 // Define types for our components
 interface Ingreso {
@@ -378,6 +381,43 @@ export default function FinanzasPage() {
     }
   };
 
+  // --- Delete Handlers ---
+  const handleDeleteIngreso = async (pagoId: number) => {
+    try {
+      const result = await deleteIngreso(pagoId);
+      if (result.success) {
+        // Refresh data after successful deletion
+        await Promise.all([
+          fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
+          fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined)
+        ]);
+      } else {
+        throw new Error(result.error || "Error al eliminar el ingreso");
+      }
+    } catch (error) {
+      console.error("Error deleting ingreso:", error);
+      throw error; // Re-throw to let toast.promise handle it
+    }
+  };
+
+  const handleDeleteEgreso = async (egresoId: number) => {
+    try {
+      const result = await deleteEgreso(egresoId);
+      if (result.success) {
+        // Refresh data after successful deletion
+        await Promise.all([
+          fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
+          fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined)
+        ]);
+      } else {
+        throw new Error(result.error || "Error al eliminar el egreso");
+      }
+    } catch (error) {
+      console.error("Error deleting egreso:", error);
+      throw error; // Re-throw to let toast.promise handle it
+    }
+  };
+
   return (
     <>
       {/* Modals remain the same */}
@@ -564,6 +604,7 @@ export default function FinanzasPage() {
                totalPages={ingresosPagination.totalPages}
                onPageChange={handleIngresoPageChange}
                isLoading={loadingIngresos}
+               onDelete={handleDeleteIngreso}
              />
            </TabsContent>
            <TabsContent value="egresos" className="space-y-4">
@@ -591,6 +632,7 @@ export default function FinanzasPage() {
               totalPages={egresosPagination.totalPages}
               onPageChange={handleEgresoPageChange}
               isLoading={loadingEgresos}
+              onDelete={handleDeleteEgreso}
             />
            </TabsContent>
          </Tabs>

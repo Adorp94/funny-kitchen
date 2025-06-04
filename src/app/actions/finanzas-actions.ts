@@ -931,4 +931,138 @@ export async function getAllEgresosForCSV(
       error: error instanceof Error ? error.message : 'An unexpected error occurred while generating Egresos CSV'
     };
   }
+}
+
+// Delete ingreso (payment) function
+export async function deleteIngreso(pagoId: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if the payment exists and get its cotizacion_id to update totals
+    const { data: pagoData, error: fetchError } = await supabase
+      .from('pagos')
+      .select('pago_id, cotizacion_id, monto, monto_mxn')
+      .eq('pago_id', pagoId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching payment to delete:', fetchError);
+      return { success: false, error: 'Payment not found' };
+    }
+
+    if (!pagoData) {
+      return { success: false, error: 'Payment not found' };
+    }
+
+    // Delete the payment
+    const { error: deleteError } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('pago_id', pagoId);
+
+    if (deleteError) {
+      console.error('Error deleting payment:', deleteError);
+      return { success: false, error: 'Failed to delete payment' };
+    }
+
+    // If this payment was associated with a cotizacion, update the cotizacion totals
+    if (pagoData.cotizacion_id) {
+      // Get all remaining payments for this cotizacion
+      const { data: remainingPayments, error: paymentsError } = await supabase
+        .from('pagos')
+        .select('monto, monto_mxn')
+        .eq('cotizacion_id', pagoData.cotizacion_id);
+
+      if (paymentsError) {
+        console.warn('Error fetching remaining payments for cotizacion update:', paymentsError);
+        // Don't fail the delete operation, just log the warning
+      } else {
+        // Calculate new totals
+        const newMontoPagado = remainingPayments?.reduce((sum, p) => sum + (Number(p.monto) || 0), 0) || 0;
+        const newMontoPagadoMxn = remainingPayments?.reduce((sum, p) => sum + (Number(p.monto_mxn) || 0), 0) || 0;
+
+        // Get the cotizacion total to calculate percentage
+        const { data: cotizacionData, error: cotizacionError } = await supabase
+          .from('cotizaciones')
+          .select('total, total_mxn')
+          .eq('cotizacion_id', pagoData.cotizacion_id)
+          .single();
+
+        if (!cotizacionError && cotizacionData) {
+          const total = Number(cotizacionData.total_mxn || cotizacionData.total) || 0;
+          const newPorcentaje = total > 0 ? Math.round((newMontoPagadoMxn / total) * 100) : 0;
+
+          // Determine new payment status
+          let newEstatusPago = 'pendiente';
+          if (newPorcentaje >= 100) {
+            newEstatusPago = 'pagado';
+          } else if (newPorcentaje > 0) {
+            newEstatusPago = 'parcial';
+          }
+
+          // Update the cotizacion
+          const { error: updateError } = await supabase
+            .from('cotizaciones')
+            .update({
+              monto_pagado: newMontoPagado,
+              monto_pagado_mxn: newMontoPagadoMxn,
+              porcentaje_completado: newPorcentaje,
+              estatus_pago: newEstatusPago
+            })
+            .eq('cotizacion_id', pagoData.cotizacion_id);
+
+          if (updateError) {
+            console.warn('Error updating cotizacion after payment deletion:', updateError);
+            // Don't fail the delete operation, just log the warning
+          }
+        }
+      }
+    }
+
+    // Revalidate the finance page
+    revalidatePath('/dashboard/finanzas');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    return { success: false, error: 'Failed to delete payment' };
+  }
+}
+
+// Delete egreso function
+export async function deleteEgreso(egresoId: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if the egreso exists
+    const { data: egresoData, error: fetchError } = await supabase
+      .from('egresos')
+      .select('egreso_id')
+      .eq('egreso_id', egresoId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching egreso to delete:', fetchError);
+      return { success: false, error: 'Expense not found' };
+    }
+
+    if (!egresoData) {
+      return { success: false, error: 'Expense not found' };
+    }
+
+    // Delete the egreso
+    const { error: deleteError } = await supabase
+      .from('egresos')
+      .delete()
+      .eq('egreso_id', egresoId);
+
+    if (deleteError) {
+      console.error('Error deleting egreso:', deleteError);
+      return { success: false, error: 'Failed to delete expense' };
+    }
+
+    // Revalidate the finance page
+    revalidatePath('/dashboard/finanzas');
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting egreso:', error);
+    return { success: false, error: 'Failed to delete expense' };
+  }
 } 

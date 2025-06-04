@@ -9,10 +9,11 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Eye, Download, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { Eye, Download, ArrowLeft, ArrowRight, Loader2, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 interface Egreso {
   egreso_id: number;
@@ -33,6 +34,7 @@ interface EgresosTableProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onDelete?: (egresoId: number) => Promise<void>;
 }
 
 export function EgresosTable({ 
@@ -40,7 +42,8 @@ export function EgresosTable({
   isLoading = false, 
   page, 
   totalPages, 
-  onPageChange 
+  onPageChange,
+  onDelete
 }: EgresosTableProps) {
   
   // Translate payment method to Spanish
@@ -105,6 +108,54 @@ export function EgresosTable({
       "deposito": "bg-indigo-100 text-indigo-800 border-indigo-200"
     };
     return styleMap[metodo] || "bg-gray-100 text-gray-800 border-gray-200";
+  };
+
+  const handleDelete = async (egresoId: number, descripcion: string) => {
+    if (!onDelete) return;
+    
+    // Create a confirmation toast
+    toast.custom((t) => (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-md">
+        <div className="flex items-start space-x-3">
+          <div className="flex-shrink-0">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-600" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-gray-900">
+              Confirmar eliminación
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              ¿Estás seguro de que quieres eliminar "{descripcion}"? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex space-x-2 mt-3">
+              <button
+                onClick={() => {
+                  toast.dismiss(t);
+                  toast.promise(onDelete(egresoId), {
+                    loading: 'Eliminando egreso...',
+                    success: 'Egreso eliminado correctamente',
+                    error: 'Error al eliminar el egreso'
+                  });
+                }}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+              >
+                Eliminar
+              </button>
+              <button
+                onClick={() => toast.dismiss(t)}
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ), {
+      duration: Infinity,
+    });
   };
 
   return (
@@ -174,12 +225,13 @@ export function EgresosTable({
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex justify-end gap-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                          className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                           title="Ver detalles"
+                          disabled
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -187,11 +239,22 @@ export function EgresosTable({
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                            className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                             title="Descargar comprobante"
                             onClick={() => window.open(egreso.comprobante_url!, '_blank')}
                           >
                             <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar egreso"
+                            onClick={() => handleDelete(egreso.egreso_id, egreso.descripcion)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>

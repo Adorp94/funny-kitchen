@@ -9,11 +9,12 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Eye, Download, ArrowLeft, ArrowRight, Loader2, FileText, FileInput } from "lucide-react";
+import { Eye, Download, ArrowLeft, ArrowRight, Loader2, FileText, FileInput, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
+import { toast } from "sonner";
 
 interface Ingreso {
   pago_id: number;
@@ -38,6 +39,7 @@ interface IngresoTableProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onDelete?: (pagoId: number) => Promise<void>;
 }
 
 export function IngresosTable({ 
@@ -45,7 +47,8 @@ export function IngresosTable({
   isLoading = false, 
   page, 
   totalPages, 
-  onPageChange 
+  onPageChange,
+  onDelete
 }: IngresoTableProps) {
   
   // Translate payment method to Spanish
@@ -72,6 +75,54 @@ export function IngresosTable({
     return styleMap[metodo] || "bg-gray-100 text-gray-800 border-gray-200";
   };
 
+  const handleDelete = async (pagoId: number, descripcion?: string) => {
+    if (!onDelete) return;
+    
+    // Create a confirmation toast
+    toast.custom((t) => (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-md">
+        <div className="flex items-start space-x-3">
+          <div className="flex-shrink-0">
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-600" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-gray-900">
+              Confirmar eliminación
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              ¿Estás seguro de que quieres eliminar {descripcion ? `"${descripcion}"` : 'este ingreso'}? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex space-x-2 mt-3">
+              <button
+                onClick={() => {
+                  toast.dismiss(t);
+                  toast.promise(onDelete(pagoId), {
+                    loading: 'Eliminando ingreso...',
+                    success: 'Ingreso eliminado correctamente',
+                    error: 'Error al eliminar el ingreso'
+                  });
+                }}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+              >
+                Eliminar
+              </button>
+              <button
+                onClick={() => toast.dismiss(t)}
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-medium rounded hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    ), {
+      duration: Infinity,
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -83,7 +134,7 @@ export function IngresosTable({
               <TableHead className="h-10 text-xs font-medium text-slate-500 w-[120px]">Fecha</TableHead>
               <TableHead className="h-10 text-xs font-medium text-slate-500 w-[150px] text-right">Monto</TableHead>
               <TableHead className="h-10 text-xs font-medium text-slate-500 w-[140px]">Método</TableHead>
-              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[100px] text-right">Acciones</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[120px] text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -182,6 +233,17 @@ export function IngresosTable({
                             <a href={ingreso.comprobante_url} target="_blank" rel="noopener noreferrer">
                               <Download className="h-4 w-4" />
                             </a>
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar ingreso"
+                            onClick={() => handleDelete(ingreso.pago_id, ingreso.descripcion)}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
