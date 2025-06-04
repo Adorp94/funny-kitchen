@@ -38,15 +38,15 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
         
         {/* Main content with padding for fixed header */}
         <main className="flex-1 pt-16 bg-white">
-          {/* Page container with nice max-width constraint */}
-          <div className="mx-auto w-full max-w-[1440px]">
+          {/* Page container with nice max-width constraint and proper padding */}
+          <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8">
             {children}
           </div>
         </main>
 
         {/* Footer - Simple and elegant */}
-        <footer className="py-6 px-4 sm:px-6 border-t border-gray-100">
-          <div className="mx-auto w-full max-w-[1440px]">
+        <footer className="py-6 border-t border-gray-100">
+          <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="flex items-center mb-4 md:mb-0">
                 <Image

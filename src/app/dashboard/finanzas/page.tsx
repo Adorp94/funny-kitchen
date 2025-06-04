@@ -432,7 +432,7 @@ export default function FinanzasPage() {
         onSubmit={handleEgresoSubmit}
       />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8 md:space-y-10">
+      <div className="py-8 md:py-12 space-y-8 md:space-y-10">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-6">
            <div>

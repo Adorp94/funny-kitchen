@@ -502,7 +502,7 @@ function EditCotizacionClient() {
 
   if (initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-20 flex justify-center items-center min-h-[400px]">
+      <div className="py-20 flex justify-center items-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-3 text-muted-foreground">Cargando cotización...</span>
       </div>
@@ -511,7 +511,7 @@ function EditCotizacionClient() {
 
   if (error && !initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <Card className="border-destructive/50 bg-destructive/10">
           <CardHeader>
             <CardTitle className="text-destructive">Error al Cargar</CardTitle>
@@ -527,7 +527,7 @@ function EditCotizacionClient() {
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="py-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Editar Cotización</h1>

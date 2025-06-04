@@ -119,12 +119,12 @@ function DashboardPageContent() {
   );
 
   return (
-    <div className="flex flex-col flex-1 py-6 md:py-8 gap-y-6 md:gap-y-8">
+    <div className="flex flex-col flex-1 py-8 md:py-10 gap-y-6 md:gap-y-8">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-1"> 
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 mb-2"> 
           Dashboard Principal
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm md:text-base text-muted-foreground">
           Un resumen de la actividad reciente de Funny Kitchen.
         </p>
       </header>
@@ -368,10 +368,10 @@ const DashboardSkeleton = () => {
   );
 
   return (
-    <div className="flex flex-col flex-1 py-6 md:py-8 gap-y-6 md:gap-y-8">
+    <div className="flex flex-col flex-1 py-8 md:py-10 gap-y-6 md:gap-y-8">
       <header>
-        <Skeleton className="h-7 w-1/2 mb-2" /> 
-        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-7 md:h-8 w-1/2 mb-2" /> 
+        <Skeleton className="h-4 md:h-5 w-3/4" />
       </header>
       <section>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
