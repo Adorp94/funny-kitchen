@@ -156,22 +156,35 @@ export async function PATCH(request: NextRequest) {
   }
   
   try {
+    // Ensure moldes_disponibles has a default value to prevent null errors
+    const updateData: any = {
+      nombre: body.nombre,
+      tipo_ceramica: body.tipo_ceramica,
+      precio: body.precio,
+      sku: body.sku,
+      capacidad: body.capacidad,
+      unidad: body.unidad,
+      tipo_producto: body.tipo_producto,
+      descripcion: body.descripcion,
+      colores: body.colores,
+      tiempo_produccion: body.tiempo_produccion,
+      cantidad_inventario: body.cantidad_inventario,
+      inventario: body.inventario
+    };
+
+    // Handle moldes_disponibles specifically with default value
+    if (body.moldes_disponibles !== undefined) {
+      updateData.moldes_disponibles = body.moldes_disponibles || 0;
+    }
+
+    // Handle vueltas_max_dia if provided
+    if (body.vueltas_max_dia !== undefined) {
+      updateData.vueltas_max_dia = body.vueltas_max_dia || 1;
+    }
+
     const { data, error } = await supabase
       .from('productos')
-      .update({
-        nombre: body.nombre,
-        tipo_ceramica: body.tipo_ceramica,
-        precio: body.precio,
-        sku: body.sku,
-        capacidad: body.capacidad,
-        unidad: body.unidad,
-        tipo_producto: body.tipo_producto,
-        descripcion: body.descripcion,
-        colores: body.colores,
-        tiempo_produccion: body.tiempo_produccion,
-        cantidad_inventario: body.cantidad_inventario,
-        inventario: body.inventario
-      })
+      .update(updateData)
       .eq('producto_id', body.producto_id)
       .select()
       .single();

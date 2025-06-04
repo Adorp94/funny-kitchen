@@ -302,17 +302,17 @@ function DashboardPageContent() {
                 </CardFooter>
               </Card>
 
-              <Card className="group flex flex-col h-full shadow-sm p-5 opacity-60 cursor-not-allowed">
+              <Card className="group flex flex-col h-full shadow-sm transition-shadow hover:shadow-md p-5">
                 <CardHeader className="flex flex-col items-center p-0 pb-3">
                   <div className="bg-yellow-100 dark:bg-yellow-900/30 rounded-lg p-2 mb-2">
                     <ShoppingBag className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                   </div>
-                  <CardTitle className="text-base font-semibold text-center">Inventario</CardTitle> 
-                  <CardDescription className="text-center text-xs mt-1">Controla tu stock</CardDescription>
+                  <CardTitle className="text-base font-semibold text-center">Inventario Moldes</CardTitle> 
+                  <CardDescription className="text-center text-xs mt-1">Gestiona tus moldes</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 p-0 mb-4">
                   <p className="text-xs text-muted-foreground text-center">
-                    Gestiona productos, materiales y niveles de stock para una mejor planificación.
+                    Gestiona la cantidad de moldes físicos disponibles para cada producto.
                   </p>
                 </CardContent>
                 <CardFooter className="p-0">
@@ -320,10 +320,9 @@ function DashboardPageContent() {
                     variant="outline"
                     size="sm" 
                     className="w-full"
-                    disabled
-                    title="Módulo en desarrollo"
+                    onClick={() => handleNavigate('/dashboard/inventario')}
                   >
-                    Ir a Inventario
+                    Ir a Inventario Moldes
                   </Button>
                 </CardFooter>
               </Card>

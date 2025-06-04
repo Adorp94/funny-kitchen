@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Menu, FileText, ShoppingBag, Users, DollarSign, Factory } from "lucide-react";
+import { LayoutDashboard, Menu, FileText, ShoppingBag, Users, DollarSign, Factory, Package } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -31,6 +31,11 @@ const navigation = [
     name: "Producción",
     href: "/produccion",
     icon: Factory,
+  },
+  {
+    name: "Inventario Moldes",
+    href: "/dashboard/inventario",
+    icon: Package,
   },
   {
     name: "Finanzas",
