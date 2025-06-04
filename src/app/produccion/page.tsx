@@ -39,6 +39,64 @@ export default function ProduccionPage() {
   const [error, setError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState<boolean>(false);
 
+  // Production capacity constants
+  const DAILY_CAPACITY = 340; // pieces per day
+  const WORK_DAYS_PER_WEEK = 6; // Monday to Saturday
+
+  // Calculate production metrics
+  const productionMetrics = React.useMemo(() => {
+    if (!data.length) {
+      return {
+        totalPiecesNeeded: 0,
+        workDaysRequired: 0,
+        estimatedCompletionDate: null,
+        formattedCompletionDate: 'N/A'
+      };
+    }
+
+    // Calculate total pieces needed from all pending queue items
+    const totalPiecesNeeded = data.reduce((total, item) => total + item.qty_pendiente, 0);
+    
+    // Calculate work days required
+    const workDaysRequired = Math.ceil(totalPiecesNeeded / DAILY_CAPACITY);
+    
+    // Calculate estimated completion date (considering only Mon-Sat as work days)
+    const calculateCompletionDate = (workDays: number): Date => {
+      const today = new Date();
+      let currentDate = new Date(today);
+      let remainingWorkDays = workDays;
+      
+      while (remainingWorkDays > 0) {
+        currentDate.setDate(currentDate.getDate() + 1);
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        
+        // Count only Monday (1) to Saturday (6) as work days
+        if (dayOfWeek >= 1 && dayOfWeek <= 6) {
+          remainingWorkDays--;
+        }
+      }
+      
+      return currentDate;
+    };
+
+    const estimatedCompletionDate = workDaysRequired > 0 ? calculateCompletionDate(workDaysRequired) : null;
+    const formattedCompletionDate = estimatedCompletionDate 
+      ? estimatedCompletionDate.toLocaleDateString('es-MX', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })
+      : 'N/A';
+
+    return {
+      totalPiecesNeeded,
+      workDaysRequired,
+      estimatedCompletionDate,
+      formattedCompletionDate
+    };
+  }, [data]);
+
   const fetchData = useCallback(async () => {
     console.log("ProduccionPage: fetchData triggered");
     setLoading(true);
@@ -242,6 +300,31 @@ export default function ProduccionPage() {
               </Button>
             </div>
           </div>
+
+          {/* Production Capacity Summary */}
+          {!loading && !error && data.length > 0 && (
+            <div className="mb-2 p-2 bg-muted/30 rounded border">
+              <div className="grid grid-cols-4 gap-4 text-xs">
+                <div className="text-center">
+                  <div className="font-medium text-blue-600">{productionMetrics.totalPiecesNeeded}</div>
+                  <div className="text-muted-foreground">Piezas Pendientes</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-orange-600">{DAILY_CAPACITY}</div>
+                  <div className="text-muted-foreground">Capacidad/Día</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-green-600">{productionMetrics.workDaysRequired}</div>
+                  <div className="text-muted-foreground">Días Laborales</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-medium text-purple-600 text-xs leading-tight">{productionMetrics.formattedCompletionDate}</div>
+                  <div className="text-muted-foreground">Fecha Estimada</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {loading && <p className="text-center py-2 text-xs text-muted-foreground">Cargando...</p>}
           {error && <p className="text-red-500 text-center py-2 text-xs">{error}</p>}
           {!loading && !error && (

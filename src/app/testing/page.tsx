@@ -1,105 +1,48 @@
 "use client";
 
-import { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, Loader2, Trash2 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import React, { useState, useEffect, useCallback } from 'react';
+import { TestingListing } from "@/components/testing/testing-listing";
+import { Button } from '@/components/ui/button';
+import { RefreshCw, Plus, Upload } from 'lucide-react';
+import { toast } from "sonner";
 
-export default function TestingDeletePage() {
-  const [cotizacionId, setCotizacionId] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+export default function TestingPage() {
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleDelete = async () => {
-    setMessage(null);
-    const id = parseInt(cotizacionId, 10);
-
-    if (isNaN(id) || id <= 0) {
-      setMessage({ type: 'error', text: 'Por favor, ingresa un ID de Cotización válido.' });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/testing/delete-cotizacion', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ cotizacion_id: id }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Ocurrió un error desconocido');
-      }
-
-      setMessage({ type: 'success', text: result.message });
-      setCotizacionId(''); // Clear input on success
-
-    } catch (error: any) {
-      console.error("Deletion error:", error);
-      setMessage({ type: 'error', text: error.message });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleRefresh = useCallback(() => {
+    setLoading(true);
+    // This will trigger a refresh in the child component
+    setTimeout(() => setLoading(false), 1000);
+  }, []);
 
   return (
-    <div className="container mx-auto px-4 py-8 flex justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-             <Trash2 className="h-5 w-5 text-destructive" />
-             Borrar Cotización (Modo Seguro)
-          </CardTitle>
-          <CardDescription>
-            Ingresa el ID de la cotización que deseas eliminar permanentemente.
-            Esto eliminará la cotización, sus productos asociados y reseteará las secuencias de IDs.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="cotizacionId">ID de Cotización a Eliminar</Label>
-            <Input
-              id="cotizacionId"
-              type="number"
-              placeholder="Ej: 123"
-              value={cotizacionId}
-              onChange={(e) => setCotizacionId(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-
-          {message && (
-             <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
-               {message.type === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-               <AlertTitle>{message.type === 'error' ? 'Error' : 'Éxito'}</AlertTitle>
-               <AlertDescription>{message.text}</AlertDescription>
-             </Alert>
-           )}
-
-        </CardContent>
-        <CardFooter>
-          <Button
-            onClick={handleDelete}
-            disabled={isLoading || !cotizacionId}
-            className="w-full"
-            variant="destructive"
+    <div className="container mx-auto py-2">
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-lg font-semibold">Testing - Datos de Prueba</h1>
+        <div className="flex gap-1">
+          <Button 
+            onClick={handleRefresh} 
+            disabled={loading}
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
           >
-            {isLoading ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Eliminando...</>
-            ) : (
-              <><Trash2 className="mr-2 h-4 w-4" /> Confirmar Eliminación</>
-            )}
+            <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
           </Button>
-        </CardFooter>
-      </Card>
+          <Button 
+            variant="default"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => toast.info("Función de subida por implementar")}
+          >
+            <Upload className="mr-1 h-3 w-3" />
+            Subir Datos
+          </Button>
+        </div>
+      </div>
+
+      <TestingListing key={loading ? Date.now() : 'stable'} />
     </div>
   );
 } 
