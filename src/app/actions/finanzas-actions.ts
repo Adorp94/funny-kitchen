@@ -59,12 +59,12 @@ export async function getFinancialMetrics(
   try {
     // Base queries
     let ingresosMXNQuery = supabase
-      .from('cotizacion_pagos_view')
+      .from('pagos')
       .select('monto_mxn, monto')
       .eq('moneda', 'MXN');
       
     let ingresosUSDQuery = supabase
-      .from('cotizacion_pagos_view')
+      .from('pagos')
       .select('monto')
       .eq('moneda', 'USD');
       
