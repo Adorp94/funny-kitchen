@@ -60,7 +60,7 @@ export async function getFinancialMetrics(
     // Base queries
     let ingresosMXNQuery = supabase
       .from('cotizacion_pagos_view')
-      .select('monto_mxn')
+      .select('monto_mxn, monto')
       .eq('moneda', 'MXN');
       
     let ingresosUSDQuery = supabase
@@ -153,7 +153,7 @@ export async function getFinancialMetrics(
     
     // Calculate totals (same logic as before, now on potentially filtered data)
     const ingresosMXNTotal = Array.isArray(ingresosMXN) 
-      ? ingresosMXN.reduce((acc, curr) => acc + Number(curr?.monto_mxn || 0), 0) 
+      ? ingresosMXN.reduce((acc, curr) => acc + Number(curr?.monto_mxn || curr?.monto || 0), 0) 
       : 0;
     
     const ingresosUSDTotal = Array.isArray(ingresosUSD) 
