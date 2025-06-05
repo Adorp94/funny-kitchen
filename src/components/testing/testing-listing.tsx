@@ -36,14 +36,22 @@ interface GroupedTestingData {
 interface ProductionScheduleItem {
   producto: string;
   totalCantidad: number;
+  totalCantidadConMerma: number;
+  moldesDisponibles: number;
+  moldesNecesarios: number;
+  limitadoPorMoldes: boolean;
   earliestDate: string;
   clientes: Array<{
     cliente: string;
     fecha: string;
     cantidad: number;
+    cantidadConMerma: number;
+    cumulativeCantidad: number;
+    diasProduccion: number;
+    order: number;
   }>;
-  startDay: number;
-  daysRequired: number;
+  totalDiasProduccion: number;
+  totalSemanasProduccion: number;
   completionDate: string;
   formattedCompletionDate: string;
 }
@@ -58,8 +66,9 @@ export const TestingListing: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Production constants
-  const DAILY_CAPACITY = 340; // pieces per day
-  const WORK_DAYS_PER_WEEK = 6; // Monday to Saturday
+  const DAILY_CAPACITY = 340; // pieces per day production capacity
+  const WORK_DAYS_PER_WEEK = 6; // working days per week
+  const MERMA_PERCENTAGE = 0.25; // 25% waste/buffer
 
   // Calculate work days and completion date from today
   const calculateCompletionDate = useCallback((startDay: number, daysRequired: number): { date: Date; formatted: string } => {
@@ -87,12 +96,11 @@ export const TestingListing: React.FC = () => {
     return { date: currentDate, formatted };
   }, []);
 
-  // Create production schedule starting from today
+  // Create production schedule with new cumulative logic
   const createProductionSchedule = useCallback((rawData: TestingDataItem[]): ProductionScheduleItem[] => {
     // Group by product name
     const productGroups = new Map<string, {
       totalCantidad: number;
-      earliestDate: string;
       clientes: Array<{ cliente: string; fecha: string; cantidad: number; }>;
     }>();
 
@@ -105,15 +113,9 @@ export const TestingListing: React.FC = () => {
           fecha: item.fecha,
           cantidad: item.cantidad
         });
-        
-        // Update earliest date if this one is older
-        if (new Date(item.fecha) < new Date(group.earliestDate)) {
-          group.earliestDate = item.fecha;
-        }
       } else {
         productGroups.set(item.producto, {
           totalCantidad: item.cantidad,
-          earliestDate: item.fecha,
           clientes: [{
             cliente: item.cliente,
             fecha: item.fecha,
@@ -123,37 +125,90 @@ export const TestingListing: React.FC = () => {
       }
     });
 
-    // Convert to array and sort by earliest date (priority)
-    const sortedProducts = Array.from(productGroups.entries())
-      .map(([producto, group]) => ({
-        producto,
-        ...group
-      }))
-      .sort((a, b) => new Date(a.earliestDate).getTime() - new Date(b.earliestDate).getTime());
-
-    // Calculate production schedule starting from today
-    let currentDay = 1;
+    // Convert to array and process each product
     const schedule: ProductionScheduleItem[] = [];
 
-    sortedProducts.forEach(product => {
-      const daysRequired = Math.ceil(product.totalCantidad / DAILY_CAPACITY);
-      const { date, formatted } = calculateCompletionDate(currentDay, daysRequired);
+    productGroups.forEach((group, producto) => {
+      // Sort clients by date (priority order)
+      const sortedClientes = group.clientes.sort((a, b) => 
+        new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+      );
 
-      schedule.push({
-        producto: product.producto,
-        totalCantidad: product.totalCantidad,
-        earliestDate: product.earliestDate,
-        clientes: product.clientes.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
-        startDay: currentDay,
-        daysRequired,
-        completionDate: date.toISOString().split('T')[0],
-        formattedCompletionDate: formatted
-      });
+                    // Calculate total production for the entire product
+       // Step 1: Calculate total pieces across all clients
+       const totalCantidadOriginal = group.totalCantidad;
+       
+       // Step 2: Add 25% merma to the TOTAL
+       const totalCantidadConMerma = Math.ceil(totalCantidadOriginal * (1 + MERMA_PERCENTAGE));
+       
+       // Step 3: Get available molds for this product (test values)
+       const moldesDisponibles = producto === "Juan Gabriel" ? 6 : 10;
+       
+       // Step 4: Calculate effective daily production capacity
+       // If molds are the limiting factor: daily_capacity = min(moldes_disponibles, DAILY_CAPACITY)
+       const effectiveDailyCapacity = Math.min(moldesDisponibles, DAILY_CAPACITY);
+       
+       // Step 5: Check if limited by molds
+       const limitadoPorMoldes = moldesDisponibles < DAILY_CAPACITY;
+       
+       // Step 6: Calculate molds theoretically needed if no mold constraint
+       const moldesNecesarios = limitadoPorMoldes ? moldesDisponibles : Math.ceil(totalCantidadConMerma / DAILY_CAPACITY);
+       
+       // Step 7: Calculate production days using effective capacity
+       const totalDiasProduccion = Math.ceil(totalCantidadConMerma / effectiveDailyCapacity);
 
-      currentDay += daysRequired;
+       // For individual client display, calculate their merma quantities but use total days for all
+       const clientesWithProduction = sortedClientes.map((cliente, index) => {
+         const cantidadConMerma = Math.ceil(cliente.cantidad * (1 + MERMA_PERCENTAGE));
+
+         // Debug logging for Juan Gabriel
+         if (producto === "Juan Gabriel") {
+           console.log(`${producto} - Cliente ${index + 1}: ${cliente.cliente}`);
+           console.log(`  Original: ${cliente.cantidad}, Con Merma: ${cantidadConMerma}`);
+           console.log(`  Total Original: ${totalCantidadOriginal}, Total Con Merma: ${totalCantidadConMerma}`);
+           console.log(`  Moldes Disponibles: ${moldesDisponibles}, Effective Daily Capacity: ${effectiveDailyCapacity}`);
+           console.log(`  Limitado por Moldes: ${limitadoPorMoldes}`);
+           console.log(`  Calculation: ${totalCantidadConMerma} ÷ ${effectiveDailyCapacity} = ${totalDiasProduccion} days`);
+           console.log(`  Weeks: ${totalDiasProduccion} ÷ ${WORK_DAYS_PER_WEEK} = ${Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK)} weeks`);
+         }
+
+         return {
+           ...cliente,
+           cantidadConMerma,
+           cumulativeCantidad: totalCantidadConMerma, // Show total for all
+           diasProduccion: totalDiasProduccion, // Same total days for all clients
+           order: index + 1
+         };
+       });
+      
+              const totalSemanasProduccion = Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK);
+
+      // Calculate completion date based on total production days
+      const { date, formatted } = calculateCompletionDate(1, totalDiasProduccion);
+      
+      // Get earliest date for sorting
+      const earliestDate = sortedClientes.length > 0 ? sortedClientes[0].fecha : new Date().toISOString();
+
+             schedule.push({
+         producto,
+         totalCantidad: group.totalCantidad,
+         totalCantidadConMerma,
+         moldesDisponibles,
+         moldesNecesarios,
+         limitadoPorMoldes,
+         earliestDate,
+         clientes: clientesWithProduction,
+         totalDiasProduccion,
+         totalSemanasProduccion,
+         completionDate: date.toISOString().split('T')[0],
+         formattedCompletionDate: formatted
+       });
     });
 
-    return schedule;
+    // Sort products by earliest date (priority)
+    return schedule.sort((a, b) => 
+      new Date(a.earliestDate).getTime() - new Date(b.earliestDate).getTime()
+    );
   }, [calculateCompletionDate]);
 
   // Calculate delivery dates for client groups based on production schedule
@@ -353,7 +408,10 @@ export const TestingListing: React.FC = () => {
 
   // Production schedule metrics
   const totalScheduledPieces = productionSchedule.reduce((sum, item) => sum + item.totalCantidad, 0);
-  const totalWorkDays = productionSchedule.reduce((sum, item) => sum + item.daysRequired, 0);
+  const totalScheduledPiecesConMerma = productionSchedule.reduce((sum, item) => sum + item.totalCantidadConMerma, 0);
+  const totalWorkDays = productionSchedule.reduce((sum, item) => sum + item.totalDiasProduccion, 0);
+  const totalWorkWeeks = Math.ceil(totalWorkDays / WORK_DAYS_PER_WEEK);
+  const productosLimitadosPorMoldes = productionSchedule.filter(item => item.limitadoPorMoldes).length;
   const lastCompletionDate = productionSchedule.length > 0 ? 
     productionSchedule[productionSchedule.length - 1].formattedCompletionDate : 'N/A';
 
@@ -513,23 +571,35 @@ export const TestingListing: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="produccion" className="mt-2">
-          {/* Production Summary */}
+                    {/* Production Summary */}
           <div className="mb-2 p-2 bg-muted/30 rounded border">
-            <div className="grid grid-cols-4 gap-4 text-xs">
+            <div className="grid grid-cols-7 gap-2 text-xs">
               <div className="text-center">
                 <div className="font-medium text-blue-600">{totalScheduledPieces}</div>
-                <div className="text-muted-foreground">Piezas Totales</div>
+                <div className="text-muted-foreground">Piezas Originales</div>
               </div>
               <div className="text-center">
-                <div className="font-medium text-orange-600">{DAILY_CAPACITY}</div>
+                <div className="font-medium text-orange-600">{totalScheduledPiecesConMerma}</div>
+                <div className="text-muted-foreground">Con Merma (25%)</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium text-purple-600">{DAILY_CAPACITY}</div>
                 <div className="text-muted-foreground">Capacidad/Día</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium text-red-600">{productosLimitadosPorMoldes}</div>
+                <div className="text-muted-foreground">Limitados por Moldes</div>
               </div>
               <div className="text-center">
                 <div className="font-medium text-green-600">{totalWorkDays}</div>
                 <div className="text-muted-foreground">Días Totales</div>
               </div>
               <div className="text-center">
-                <div className="font-medium text-purple-600 text-xs leading-tight">{lastCompletionDate}</div>
+                <div className="font-medium text-indigo-600">{totalWorkWeeks}</div>
+                <div className="text-muted-foreground">Semanas Totales</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium text-gray-600 text-xs leading-tight">{lastCompletionDate}</div>
                 <div className="text-muted-foreground">Última Entrega</div>
               </div>
             </div>
@@ -540,56 +610,82 @@ export const TestingListing: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="h-8">
-                  <TableHead className="p-1 text-xs font-medium w-32">Producto</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-20">Cantidad</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-24">Fecha Más Antigua</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-20">Días Req.</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-32">Fecha Entrega</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-40">Clientes</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-24">Producto</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-16">Cantidad</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-16">Con Merma</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-20">Moldes</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-14">Días</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-14">Semanas</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-24">Fecha Entrega</TableHead>
+                  <TableHead className="p-1 text-xs font-medium w-48">Clientes (Total para Producto)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {productionSchedule.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-xs text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-4 text-xs text-muted-foreground">
                       No hay productos programados
                     </TableCell>
                   </TableRow>
-                ) : (
-                  productionSchedule.map((item, index) => (
-                    <TableRow key={`${item.producto}-${index}`} className="h-6">
-                      {/* Producto */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="max-w-[120px] break-words font-medium" title={item.producto}>
-                          {item.producto}
-                        </div>
-                      </TableCell>
+                                  ) : (
+                    productionSchedule.map((item, index) => (
+                      <TableRow key={`${item.producto}-${index}`} className="h-auto">
+                        {/* Producto */}
+                        <TableCell className="p-1 text-xs">
+                          <div className="max-w-[100px] break-words font-medium" title={item.producto}>
+                            {item.producto}
+                          </div>
+                        </TableCell>
 
-                      {/* Cantidad */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="flex items-center space-x-1">
-                          <Package className="h-3 w-3" />
-                          <span className="font-bold text-blue-600">{item.totalCantidad}</span>
-                        </div>
-                      </TableCell>
+                        {/* Cantidad Original */}
+                        <TableCell className="p-1 text-xs">
+                          <div className="flex items-center space-x-1">
+                            <Package className="h-3 w-3" />
+                            <span className="font-bold text-blue-600">{item.totalCantidad}</span>
+                          </div>
+                        </TableCell>
 
-                      {/* Fecha Más Antigua */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="text-muted-foreground">
-                          {new Date(item.earliestDate).toLocaleDateString('es-MX', { 
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </TableCell>
+                        {/* Cantidad Con Merma */}
+                        <TableCell className="p-1 text-xs">
+                          <div className="flex items-center space-x-1">
+                            <span className="font-bold text-orange-600">{item.totalCantidadConMerma}</span>
+                          </div>
+                        </TableCell>
 
-                      {/* Días Requeridos */}
-                      <TableCell className="p-1 text-xs">
-                        <Badge variant="secondary" className="text-xs">
-                          {item.daysRequired}
-                        </Badge>
-                      </TableCell>
+                        {/* Moldes */}
+                        <TableCell className="p-1 text-xs">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-muted-foreground">Disp:</span>
+                              <span className="font-medium text-green-600">{item.moldesDisponibles}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-xs text-muted-foreground">Nec:</span>
+                              <span className={`font-medium ${item.limitadoPorMoldes ? 'text-red-600' : 'text-gray-600'}`}>
+                                {item.moldesNecesarios}
+                              </span>
+                            </div>
+                            {item.limitadoPorMoldes && (
+                              <Badge variant="destructive" className="text-xs px-1 py-0">
+                                Limitado
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Días Totales */}
+                        <TableCell className="p-1 text-xs">
+                          <Badge variant={item.limitadoPorMoldes ? "destructive" : "secondary"} className="text-xs">
+                            {item.totalDiasProduccion}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Semanas */}
+                        <TableCell className="p-1 text-xs">
+                          <Badge variant="outline" className="text-xs">
+                            {item.totalSemanasProduccion}
+                          </Badge>
+                        </TableCell>
 
                       {/* Fecha Entrega */}
                       <TableCell className="p-1 text-xs">
@@ -602,22 +698,48 @@ export const TestingListing: React.FC = () => {
                         </div>
                       </TableCell>
 
-                      {/* Clientes */}
+                      {/* Clientes (Total para Producto) */}
                       <TableCell className="p-1 text-xs">
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          {item.clientes.slice(0, 2).map((cliente, cIndex) => (
-                            <div key={cIndex} className="flex justify-between">
-                              <span className="break-words max-w-[100px]" title={cliente.cliente}>
-                                {cliente.cliente.length > 15 ? `${cliente.cliente.substring(0, 15)}...` : cliente.cliente}
-                              </span>
-                              <span className="ml-1 font-medium text-blue-600">{cliente.cantidad}</span>
+                        <div className="space-y-1">
+                          <div className="bg-blue-50 p-1 rounded text-xs border-l-2 border-blue-400 mb-1">
+                            <div className="font-medium text-blue-800">Total del Producto:</div>
+                            <div className="grid grid-cols-3 gap-1 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Original:</span> 
+                                <span className="font-medium text-blue-600 ml-1">{item.totalCantidad}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Con Merma:</span> 
+                                <span className="font-medium text-orange-600 ml-1">{item.totalCantidadConMerma}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Días:</span> 
+                                <span className="font-bold text-green-600 ml-1">{item.totalDiasProduccion}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {item.clientes.map((cliente, cIndex) => (
+                            <div key={cIndex} className="bg-muted/20 p-1 rounded text-xs border-l-2 border-gray-200">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-medium text-xs" title={cliente.cliente}>
+                                  {cIndex + 1}. {cliente.cliente.length > 12 ? `${cliente.cliente.substring(0, 12)}...` : cliente.cliente}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(cliente.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' })}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">Cantidad:</span> 
+                                  <span className="font-medium text-blue-600 ml-1">{cliente.cantidad}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Con Merma:</span> 
+                                  <span className="font-medium text-orange-600 ml-1">{cliente.cantidadConMerma}</span>
+                                </div>
+                              </div>
                             </div>
                           ))}
-                          {item.clientes.length > 2 && (
-                            <div className="text-muted-foreground">
-                              +{item.clientes.length - 2} más
-                            </div>
-                          )}
                         </div>
                       </TableCell>
                     </TableRow>
