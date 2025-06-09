@@ -70,7 +70,7 @@ export async function POST(
     console.log('[API /cotizaciones/[id]/status POST] Request received:', { cotizacionId, newStatus, paymentData });
 
     // Validate the new status
-    const validStatus = ['pendiente', 'producción', 'cancelada', 'enviada'];
+    const validStatus = ['pendiente', 'producción', 'cancelada', 'enviada', 'rechazada'];
     if (!validStatus.includes(newStatus)) {
       return NextResponse.json({ error: 'Estado inválido' }, { status: 400 });
     }
