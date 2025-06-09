@@ -279,6 +279,14 @@ export function ResumenCotizacion({
             </div>
           )}
 
+          {/* Subtotal After Discount Display */}
+          {globalDiscount > 0 && (
+            <div className="flex justify-between items-center py-1">
+              <span className="text-sm font-medium text-muted-foreground">Subtotal Después de Descuento</span>
+              <span className="text-sm font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100), moneda)}</span>
+            </div>
+          )}
+
           <Separator />
 
           {/* IVA Toggle & Amount */}
