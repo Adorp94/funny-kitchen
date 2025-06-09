@@ -57,7 +57,7 @@ export default function CotizacionesPage() {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [filteredCotizaciones, setFilteredCotizaciones] = useState<Cotizacion[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterEstado, setFilterEstado] = useState("todos");
+  const [filterEstado, setFilterEstado] = useState("pendiente");
   const [sortBy, setSortBy] = useState<{field: string, direction: 'asc' | 'desc'}>({
     field: 'fecha_creacion',
     direction: 'desc'
