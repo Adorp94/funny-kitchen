@@ -1065,4 +1065,284 @@ export async function deleteEgreso(egresoId: number): Promise<{ success: boolean
     console.error('Error deleting egreso:', error);
     return { success: false, error: 'Failed to delete expense' };
   }
+}
+
+export async function getCashFlowMetrics(
+  month?: number, 
+  year?: number
+): Promise<{
+  success: boolean;
+  data?: {
+    totalSales: { mxn: number; usd: number };
+    actualPayments: { mxn: number; usd: number };
+    pendingCollections: { mxn: number; usd: number };
+    collectionRate: number;
+    cotizacionesWithPayments: number;
+    totalCotizaciones: number;
+  };
+  error?: string;
+}> {
+  try {
+    // Build date filters
+    let dateFilter = '';
+    if (year) {
+      if (month) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        let nextMonthYear = year;
+        let nextMonth = month + 1;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          nextMonthYear += 1;
+        }
+        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        dateFilter = `fecha_creacion.gte.${monthStart},fecha_creacion.lt.${monthEnd}`;
+      } else {
+        const yearStart = `${year}-01-01T00:00:00Z`;
+        const yearEnd = `${year}-12-31T23:59:59Z`;
+        dateFilter = `fecha_creacion.gte.${yearStart},fecha_creacion.lte.${yearEnd}`;
+      }
+    }
+
+    // Get all cotizaciones for the period
+    let cotizacionesQuery = supabase
+      .from('cotizaciones')
+      .select('cotizacion_id, total, total_mxn, moneda, monto_pagado, monto_pagado_mxn, estado');
+
+    if (dateFilter) {
+      const filters = dateFilter.split(',');
+      for (const filter of filters) {
+        const [field, operator, value] = filter.split('.');
+        if (operator === 'gte') {
+          cotizacionesQuery = cotizacionesQuery.gte(field, value);
+        } else if (operator === 'lt') {
+          cotizacionesQuery = cotizacionesQuery.lt(field, value);
+        } else if (operator === 'lte') {
+          cotizacionesQuery = cotizacionesQuery.lte(field, value);
+        }
+      }
+    }
+
+    const { data: cotizaciones, error: cotizacionesError } = await cotizacionesQuery;
+
+    if (cotizacionesError) {
+      console.error('Error fetching cotizaciones for cash flow:', cotizacionesError);
+      return { success: false, error: cotizacionesError.message };
+    }
+
+    // Get actual payments from pagos table for the same period
+    let pagosQuery = supabase
+      .from('pagos')
+      .select('monto, monto_mxn, moneda, cotizacion_id, tipo_ingreso')
+      .eq('tipo_ingreso', 'cotizacion');
+
+    if (year) {
+      if (month) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        let nextMonthYear = year;
+        let nextMonth = month + 1;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          nextMonthYear += 1;
+        }
+        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        pagosQuery = pagosQuery.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
+      } else {
+        const yearStart = `${year}-01-01T00:00:00Z`;
+        const yearEnd = `${year}-12-31T23:59:59Z`;
+        pagosQuery = pagosQuery.gte('fecha_pago', yearStart).lte('fecha_pago', yearEnd);
+      }
+    }
+
+    const { data: pagos, error: pagosError } = await pagosQuery;
+
+    if (pagosError) {
+      console.error('Error fetching payments for cash flow:', pagosError);
+      return { success: false, error: pagosError.message };
+    }
+
+    // Calculate metrics
+    let totalSalesMXN = 0;
+    let totalSalesUSD = 0;
+    let actualPaymentsMXN = 0;
+    let actualPaymentsUSD = 0;
+    let cotizacionesWithPayments = 0;
+
+    // Calculate total sales from cotizaciones
+    cotizaciones?.forEach(cot => {
+      const totalMXN = Number(cot.total_mxn || 0);
+      const total = Number(cot.total || 0);
+      
+      if (cot.moneda === 'MXN') {
+        totalSalesMXN += totalMXN || total;
+      } else {
+        totalSalesUSD += total;
+        totalSalesMXN += totalMXN; // Also add MXN equivalent
+      }
+    });
+
+    // Calculate actual payments
+    pagos?.forEach(pago => {
+      const monto = Number(pago.monto || 0);
+      const montoMXN = Number(pago.monto_mxn || 0);
+      
+      if (pago.moneda === 'MXN') {
+        actualPaymentsMXN += monto;
+      } else {
+        actualPaymentsUSD += monto;
+        actualPaymentsMXN += montoMXN; // Add MXN equivalent
+      }
+    });
+
+    // Count cotizaciones with payments
+    const cotizacionesWithPaymentsSet = new Set(
+      pagos?.map(p => p.cotizacion_id).filter(Boolean)
+    );
+    cotizacionesWithPayments = cotizacionesWithPaymentsSet.size;
+
+    // Calculate collection rate
+    const collectionRate = totalSalesMXN > 0 ? (actualPaymentsMXN / totalSalesMXN) * 100 : 0;
+
+    // Calculate pending collections
+    const pendingCollectionsMXN = totalSalesMXN - actualPaymentsMXN;
+    const pendingCollectionsUSD = totalSalesUSD - actualPaymentsUSD;
+
+    return {
+      success: true,
+      data: {
+        totalSales: { mxn: totalSalesMXN, usd: totalSalesUSD },
+        actualPayments: { mxn: actualPaymentsMXN, usd: actualPaymentsUSD },
+        pendingCollections: { 
+          mxn: Math.max(0, pendingCollectionsMXN), 
+          usd: Math.max(0, pendingCollectionsUSD) 
+        },
+        collectionRate: Math.round(collectionRate * 100) / 100,
+        cotizacionesWithPayments,
+        totalCotizaciones: cotizaciones?.length || 0
+      }
+    };
+
+  } catch (error) {
+    console.error('Error calculating cash flow metrics:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
+}
+
+export async function getCotizacionPayments(
+  page = 1, 
+  pageSize = 10,
+  month?: number,
+  year?: number
+): Promise<{
+  success: boolean;
+  data?: any[];
+  pagination?: PaginationResult;
+  error?: string;
+}> {
+  try {
+    const offset = (page - 1) * pageSize;
+
+    // Build the query for payments related to cotizaciones
+    let query = supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        cotizacion_id,
+        monto,
+        monto_mxn,
+        moneda,
+        metodo_pago,
+        fecha_pago,
+        notas,
+        porcentaje_aplicado,
+        cotizaciones!inner (
+          cotizacion_id,
+          folio,
+          total,
+          total_mxn,
+          moneda,
+          cliente_id,
+          fecha_creacion,
+          estado
+        )
+      `, { count: 'exact' })
+      .eq('tipo_ingreso', 'cotizacion')
+      .not('cotizacion_id', 'is', null);
+
+    // Apply date filters
+    if (year) {
+      if (month) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        let nextMonthYear = year;
+        let nextMonth = month + 1;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          nextMonthYear += 1;
+        }
+        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        query = query.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
+      } else {
+        const yearStart = `${year}-01-01T00:00:00Z`;
+        const yearEnd = `${year}-12-31T23:59:59Z`;
+        query = query.gte('fecha_pago', yearStart).lte('fecha_pago', yearEnd);
+      }
+    }
+
+    const { data: payments, error: paymentsError, count } = await query
+      .order('fecha_pago', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (paymentsError) {
+      console.error('Error fetching cotizacion payments:', paymentsError);
+      return { success: false, error: paymentsError.message };
+    }
+
+    // Get client names for the cotizaciones
+    const clienteIds = [...new Set(
+      payments?.map(p => p.cotizaciones?.cliente_id).filter(Boolean)
+    )];
+
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('cliente_id, nombre')
+      .in('cliente_id', clienteIds);
+
+    if (clientesError) {
+      console.warn('Error fetching client names:', clientesError);
+    }
+
+    const clienteMap = clientes?.reduce((acc: { [key: number]: string }, cliente) => {
+      acc[cliente.cliente_id] = cliente.nombre;
+      return acc;
+    }, {}) || {};
+
+    // Format the data
+    const formattedPayments = payments?.map(payment => ({
+      ...payment,
+      cliente_nombre: clienteMap[payment.cotizaciones?.cliente_id as number] || 'Cliente desconocido',
+      folio: payment.cotizaciones?.folio,
+      cotizacion_total: payment.cotizaciones?.total,
+      cotizacion_estado: payment.cotizaciones?.estado
+    })) || [];
+
+    return {
+      success: true,
+      data: formattedPayments,
+      pagination: {
+        page,
+        totalPages: Math.ceil((count || 0) / pageSize),
+        totalItems: count || 0,
+        itemsPerPage: pageSize
+      }
+    };
+
+  } catch (error) {
+    console.error('Error fetching cotizacion payments:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
+  }
 } 

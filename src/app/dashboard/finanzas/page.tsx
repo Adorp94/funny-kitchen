@@ -27,6 +27,7 @@ import { IngresoResponsiveWrapper } from '@/components/finanzas/ingreso-modal';
 import { EgresoModal } from '@/components/finanzas/egreso-modal';
 import { IngresosTable } from '@/components/finanzas/ingresos-table';
 import { EgresosTable } from '@/components/finanzas/egresos-table';
+import { CashFlowSection } from '@/components/finanzas/cash-flow-section';
 import { 
   createIngreso, 
   createEgreso, 
@@ -102,7 +103,7 @@ const months = [
 // ---
 
 export default function FinanzasPage() {
-  const [activeTab, setActiveTab] = useState("ingresos");
+  const [activeTab, setActiveTab] = useState("cashflow");
   const [isIngresoModalOpen, setIsIngresoModalOpen] = useState(false);
   const [isEgresoModalOpen, setIsEgresoModalOpen] = useState(false);
   
@@ -491,7 +492,7 @@ export default function FinanzasPage() {
 
            {/* Action Buttons */}
            <div className="flex flex-shrink-0 items-center space-x-3 mt-4 md:mt-0">
-              {activeTab === "ingresos" ? (
+              {activeTab === "ingresos" && (
                 <Button 
                   size="sm"
                   onClick={() => setIsIngresoModalOpen(true)}
@@ -500,7 +501,8 @@ export default function FinanzasPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Ingreso
                 </Button>
-              ) : (
+              )}
+              {activeTab === "egresos" && (
                 <Button 
                   variant="destructive"
                   size="sm"
@@ -510,6 +512,11 @@ export default function FinanzasPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Egreso
                 </Button>
+              )}
+              {activeTab === "cashflow" && (
+                <div className="text-sm text-muted-foreground">
+                  Análisis de flujo de efectivo real vs. ventas
+                </div>
               )}
             </div>
         </div>
@@ -576,9 +583,16 @@ export default function FinanzasPage() {
         {/* Data Tables Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
            <TabsList>
+             <TabsTrigger value="cashflow">Flujo de Efectivo</TabsTrigger>
              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
              <TabsTrigger value="egresos">Egresos</TabsTrigger>
            </TabsList>
+           <TabsContent value="cashflow" className="space-y-4">
+             <CashFlowSection 
+               selectedMonth={selectedMonth || undefined}
+               selectedYear={selectedYear || undefined}
+             />
+           </TabsContent>
            <TabsContent value="ingresos" className="space-y-4">
              <div className="flex items-center justify-between">
                <h3 className="text-xl font-semibold tracking-tight">Ingresos Recientes</h3>
