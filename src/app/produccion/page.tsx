@@ -1,51 +1,40 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { TestingListing } from "@/components/testing/testing-listing";
-import { Button } from '@/components/ui/button';
-import { RefreshCw, Upload, Factory } from 'lucide-react';
-import { toast } from "sonner";
+import { MoldesActivos } from "@/components/produccion/moldes-activos";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Factory, Wrench, BarChart3 } from 'lucide-react';
 
 export default function ProduccionPage() {
-  const [loading, setLoading] = useState<boolean>(false);
-
-  const handleRefresh = useCallback(() => {
-    setLoading(true);
-    // This will trigger a refresh in the child component
-    setTimeout(() => setLoading(false), 1000);
-  }, []);
 
   return (
     <div className="container mx-auto py-2">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex items-center space-x-2">
-          <Factory className="h-5 w-5 text-gray-600" />
-          <h1 className="text-lg font-semibold">Producción - Gestión Integral</h1>
-        </div>
-        <div className="flex gap-1">
-          <Button 
-            onClick={handleRefresh} 
-            disabled={loading}
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-          >
-            <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </Button>
-          <Button 
-            variant="default"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => toast.info("Función de subida por implementar")}
-          >
-            <Upload className="mr-1 h-3 w-3" />
-            Subir Datos
-          </Button>
-        </div>
+      <div className="flex items-center space-x-2 mb-2">
+        <Factory className="h-5 w-5 text-gray-600" />
+        <h1 className="text-lg font-semibold">Producción - Gestión Integral</h1>
       </div>
 
-      <TestingListing key={loading ? Date.now() : 'stable'} />
+      <Tabs defaultValue="planificacion" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-8 text-xs">
+          <TabsTrigger value="planificacion" className="flex items-center gap-1 text-xs py-1">
+            <BarChart3 className="h-3 w-3" />
+            Planificación
+          </TabsTrigger>
+          <TabsTrigger value="moldes" className="flex items-center gap-1 text-xs py-1">
+            <Wrench className="h-3 w-3" />
+            Moldes Activos
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="planificacion" className="mt-2">
+          <TestingListing />
+        </TabsContent>
+
+        <TabsContent value="moldes" className="mt-2">
+          <MoldesActivos />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 
