@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Package, Search, Trash2, Calendar, Factory } from 'lucide-react';
+import { RefreshCw, Package, Search, Trash2, Calendar, Factory, Activity, BarChart3 } from 'lucide-react';
 import { toast } from "sonner";
+import { ProductionActiveListing } from './production-active-listing';
+import { ProductionInsights } from './production-insights';
 
 interface TestingDataItem {
   id: number;
@@ -418,7 +420,7 @@ export const TestingListing: React.FC = () => {
   return (
     <div className="space-y-2">
       <Tabs defaultValue="clientes" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-8 text-xs">
+        <TabsList className="grid w-full grid-cols-4 h-8 text-xs">
           <TabsTrigger value="clientes" className="flex items-center gap-1 text-xs py-1">
             <Package className="h-3 w-3" />
             Por Cliente
@@ -426,6 +428,14 @@ export const TestingListing: React.FC = () => {
           <TabsTrigger value="produccion" className="flex items-center gap-1 text-xs py-1">
             <Factory className="h-3 w-3" />
             Cronograma Producción
+          </TabsTrigger>
+          <TabsTrigger value="production-active" className="flex items-center gap-1 text-xs py-1">
+            <Activity className="h-3 w-3" />
+            Producción Activa
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="flex items-center gap-1 text-xs py-1">
+            <BarChart3 className="h-3 w-3" />
+            Insights
           </TabsTrigger>
         </TabsList>
 
@@ -748,6 +758,14 @@ export const TestingListing: React.FC = () => {
               </TableBody>
             </Table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="production-active" className="mt-2">
+          <ProductionActiveListing />
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-2">
+          <ProductionInsights />
         </TabsContent>
       </Tabs>
     </div>
