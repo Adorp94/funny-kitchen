@@ -48,6 +48,9 @@ interface Cotizacion {
   moneda: string;
   total: number;
   total_mxn?: number;
+  fecha_pago_inicial?: string;
+  tiempo_estimado?: number;
+  tiempo_estimado_max?: number;
 }
 
 export default function CotizacionesPage() {
@@ -57,7 +60,7 @@ export default function CotizacionesPage() {
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [filteredCotizaciones, setFilteredCotizaciones] = useState<Cotizacion[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterEstado, setFilterEstado] = useState("pendiente");
+  const [filterEstado, setFilterEstado] = useState("todos");
   const [sortBy, setSortBy] = useState<{field: string, direction: 'asc' | 'desc'}>({
     field: 'fecha_creacion',
     direction: 'desc'
@@ -106,17 +109,6 @@ export default function CotizacionesPage() {
       const data = await response.json();
       console.log("Cotizaciones received:", data);
       
-      // Debug log to examine the first record in detail (if it exists)
-      if (data.cotizaciones && data.cotizaciones.length > 0) {
-        console.log("Sample cotización data:", {
-          first_record: data.cotizaciones[0],
-          has_total_mxn: data.cotizaciones[0].hasOwnProperty('total_mxn'),
-          total_mxn_value: data.cotizaciones[0].total_mxn,
-          moneda: data.cotizaciones[0].moneda,
-          total: data.cotizaciones[0].total
-        });
-      }
-      
       if (!data.cotizaciones || !Array.isArray(data.cotizaciones)) {
         const errorDetail = "Invalid data structure received from API";
         console.error(errorDetail, data);
@@ -133,7 +125,10 @@ export default function CotizacionesPage() {
         cliente: cot.cliente,
         moneda: cot.moneda,
         total: cot.total,
-        total_mxn: cot.total_mxn
+        total_mxn: cot.total_mxn,
+        fecha_pago_inicial: cot.fecha_pago_inicial,
+        tiempo_estimado: cot.tiempo_estimado,
+        tiempo_estimado_max: cot.tiempo_estimado_max
       }));
       
       setCotizaciones(formattedCotizaciones);
@@ -237,18 +232,41 @@ export default function CotizacionesPage() {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return 'Fecha inválida';
-      }
-      return date.toLocaleDateString('es-MX', { 
-        day: '2-digit', 
-        month: 'short', // Use short month name
-        year: 'numeric' 
-      });
-    } catch (e) {
-      console.error("Error formatting date:", dateString, e);
+      return new Intl.DateTimeFormat('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date(dateString));
+    } catch (error) {
+      console.error("Error formatting date:", dateString, error);
+      return 'Fecha inválida';
+    }
+  };
+
+  // Add function to calculate delivery deadline
+  const calculateDeliveryDeadline = (fechaPagoInicial: string | undefined, tiempoEstimado: number | undefined, tiempoEstimadoMax: number | undefined) => {
+    if (!fechaPagoInicial) return null;
+    
+    // Use the maximum estimated time or tiempo_estimado_max if available, or tiempo_estimado
+    const weeksToAdd = tiempoEstimadoMax || tiempoEstimado || 8;
+    
+    const startDate = new Date(fechaPagoInicial);
+    const deliveryDate = new Date(startDate);
+    deliveryDate.setDate(deliveryDate.getDate() + (weeksToAdd * 7)); // Add weeks converted to days
+    
+    return deliveryDate;
+  };
+
+  const formatDeliveryDate = (deadline: Date | null) => {
+    if (!deadline) return '—';
+    try {
+      return new Intl.DateTimeFormat('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(deadline);
+    } catch (error) {
+      console.error("Error formatting delivery date:", deadline, error);
       return 'Fecha inválida';
     }
   };
@@ -368,7 +386,7 @@ export default function CotizacionesPage() {
   const TableSkeletonLoader = () => {
     return (
       <TableRow>
-        <TableCell colSpan={6} className="h-24 text-center">
+        <TableCell colSpan={8} className="h-24 text-center">
           <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
         </TableCell>
       </TableRow>
@@ -501,6 +519,8 @@ export default function CotizacionesPage() {
                       </div>
                     </TableHead>
                     <TableHead className="hidden lg:table-cell w-[120px]">Estado</TableHead>
+                    <TableHead className="hidden xl:table-cell w-[100px]">Fecha Anticipo</TableHead>
+                    <TableHead className="hidden xl:table-cell w-[100px]">Entrega Est.</TableHead>
                     <TableHead onClick={() => handleSort('total')} className="cursor-pointer text-right w-[120px]">
                       <div className="flex items-center justify-end gap-1">
                         Total
@@ -515,12 +535,19 @@ export default function CotizacionesPage() {
                     <TableSkeletonLoader />
                   ) : getCurrentPageItems().length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                         No se encontraron cotizaciones.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    getCurrentPageItems().map((cotizacion) => (
+                    getCurrentPageItems().map((cotizacion) => {
+                      const deliveryDeadline = calculateDeliveryDeadline(
+                        cotizacion.fecha_pago_inicial, 
+                        cotizacion.tiempo_estimado, 
+                        cotizacion.tiempo_estimado_max
+                      );
+                      
+                      return (
                       <TableRow key={cotizacion.cotizacion_id} className="hover:bg-slate-50">
                         <TableCell className="py-2.5 px-3">
                           <div 
@@ -539,6 +566,27 @@ export default function CotizacionesPage() {
                           <div className="text-xs text-muted-foreground truncate">{cotizacion.cliente.celular || '—'}</div>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">{getStatusBadge(cotizacion.estado)}</TableCell>
+                        <TableCell className="hidden xl:table-cell text-sm">
+                          {cotizacion.estado === 'producción' && cotizacion.fecha_pago_inicial ? (
+                            <div className="text-xs">
+                              <div className="font-medium">{formatDate(cotizacion.fecha_pago_inicial)}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-sm">
+                          {cotizacion.estado === 'producción' && deliveryDeadline ? (
+                            <div className="text-xs">
+                              <div className="font-medium">{formatDeliveryDate(deliveryDeadline)}</div>
+                              <div className="text-muted-foreground">
+                                ({cotizacion.tiempo_estimado_max || cotizacion.tiempo_estimado || 8} sem)
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="font-medium">{formatCurrency(cotizacion.total, cotizacion.moneda as 'MXN' | 'USD')}</div>
                           <div className="text-xs text-muted-foreground">{cotizacion.moneda}</div>
@@ -551,7 +599,8 @@ export default function CotizacionesPage() {
                           />
                         </TableCell>
                       </TableRow>
-                    ))
+                    )
+                    })
                   )}
                 </TableBody>
               </Table>

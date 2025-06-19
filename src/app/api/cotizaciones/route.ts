@@ -139,6 +139,9 @@ export async function GET(request: NextRequest) {
           moneda,
           total,
           total_mxn,
+          fecha_pago_inicial,
+          tiempo_estimado,
+          tiempo_estimado_max,
           cliente:cliente_id (
             cliente_id,
             nombre,
@@ -172,6 +175,9 @@ export async function GET(request: NextRequest) {
         moneda: string | null;
         total: number | null;
         total_mxn: number | null;
+        fecha_pago_inicial: string | null;
+        tiempo_estimado: number | null;
+        tiempo_estimado_max: number | null;
         cliente: ClienteSummary | null; // Use the specific ClienteSummary type
       };
 
@@ -189,6 +195,9 @@ export async function GET(request: NextRequest) {
           moneda: cot.moneda ?? 'MXN',
           total: cot.total ?? 0,
           total_mxn: cot.total_mxn ?? 0,
+          fecha_pago_inicial: cot.fecha_pago_inicial ?? null,
+          tiempo_estimado: cot.tiempo_estimado ?? null,
+          tiempo_estimado_max: cot.tiempo_estimado_max ?? null,
           cliente: clienteData ? {
             cliente_id: clienteData.cliente_id ?? 0, 
             nombre: clienteData.nombre ?? 'Cliente sin nombre',
