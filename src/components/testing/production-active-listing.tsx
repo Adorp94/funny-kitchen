@@ -64,7 +64,7 @@ export const ProductionActiveListing: React.FC = () => {
       
       const productionItems = result.data || [];
       setData(productionItems);
-      setFilteredData(productionItems);
+      // Don't set filteredData here - let applyFilters handle it
       
     } catch (err: any) {
       console.error("Error in fetchData:", err);
@@ -115,6 +115,7 @@ export const ProductionActiveListing: React.FC = () => {
       numeric: true 
     }));
 
+    console.log('✅ Final sorted product names:', filtered.slice(0, 10).map(item => item.producto_nombre));
     setFilteredData(filtered);
   }, [data]);
 
