@@ -3,26 +3,95 @@ import { supabase } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    console.log('Testing API: Starting GET request');
+    console.log('Testing API: Starting GET request - fetching ONLY real cotizaciones in production');
     
-    const { data, error } = await supabase
-      .from('testing_datos')
-      .select('*')
-      .order('fecha', { ascending: false });
+    // Fetch ONLY real cotizaciones in production status
+    const { data: cotizacionesProduccion, error: cotizacionesError } = await supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        cliente_id,
+        estado,
+        estatus_pago,
+        fecha_creacion
+      `)
+      .eq('estado', 'producción')
+      .order('fecha_creacion', { ascending: false });
 
-    console.log('Supabase response - data:', data);
-    console.log('Supabase response - error:', error);
-
-    if (error) {
-      console.error('Error fetching testing data:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (cotizacionesError) {
+      console.error('Error fetching cotizaciones in production:', cotizacionesError);
+      return NextResponse.json({ 
+        error: 'Error al obtener cotizaciones en producción',
+        details: cotizacionesError.message 
+      }, { status: 500 });
     }
 
-    console.log('Returning successful response with', data?.length || 0, 'items');
-    return NextResponse.json({ data: data || [] });
+    console.log('Real cotizaciones in production found:', cotizacionesProduccion?.length || 0);
+
+    // Transform real cotizaciones to match expected format
+    const realProductionData = [];
+    if (cotizacionesProduccion && cotizacionesProduccion.length > 0) {
+      for (const cotizacion of cotizacionesProduccion) {
+        // Get client info
+        const { data: cliente } = await supabase
+          .from('clientes')
+          .select('nombre')
+          .eq('cliente_id', cotizacion.cliente_id)
+          .single();
+
+        // Get products for this cotización
+        const { data: productos } = await supabase
+          .from('cotizacion_productos')
+          .select(`
+            producto_id,
+            cantidad,
+            productos (
+              nombre
+            )
+          `)
+          .eq('cotizacion_id', cotizacion.cotizacion_id);
+
+        const clienteName = cliente?.nombre || 'Cliente Desconocido';
+        const cotizacionLabel = `COT-${cotizacion.folio} ${clienteName}`;
+        const fecha = cotizacion.fecha_creacion?.split('T')[0] || new Date().toISOString().split('T')[0];
+        
+        for (const producto of (productos || [])) {
+          realProductionData.push({
+            id: `real_${cotizacion.cotizacion_id}_${producto.producto_id}`,
+            cliente: cotizacionLabel,
+            producto: producto.productos?.nombre || 'Producto Desconocido',
+            cantidad: producto.cantidad,
+            fecha: fecha,
+            created_at: cotizacion.fecha_creacion,
+            updated_at: cotizacion.fecha_creacion,
+            // Flag to identify real cotizacion data
+            is_real_cotizacion: true,
+            cotizacion_id: cotizacion.cotizacion_id
+          });
+        }
+      }
+    }
+
+    console.log('Supabase response - real cotizaciones:', cotizacionesProduccion?.length || 0, 'cotizaciones');
+    console.log('Transformed real production data:', realProductionData.length, 'items');
+
+    return NextResponse.json({
+      data: realProductionData,
+      debug: {
+        realCotizaciones: cotizacionesProduccion?.length || 0,
+        transformedRealItems: realProductionData.length,
+        totalItems: realProductionData.length,
+        dataSource: 'real_cotizaciones_only'
+      }
+    });
+
   } catch (error) {
-    console.error('Unexpected error in GET:', error);
-    return NextResponse.json({ error: 'Error interno del servidor', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    console.error('Testing API Error:', error);
+    return NextResponse.json({ 
+      error: 'Error interno del servidor',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
