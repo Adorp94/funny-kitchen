@@ -70,8 +70,8 @@ function EditCotizacionClient() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [cotizacionOriginal, setCotizacionOriginal] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tiempoEstimado, setTiempoEstimado] = useState<number>(6);
-  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<number>(8);
+  const [tiempoEstimado, setTiempoEstimado] = useState<string>("6");
+  const [tiempoEstimadoMax, setTiempoEstimadoMax] = useState<string>("8");
 
   const {
     productos,
@@ -231,10 +231,10 @@ function EditCotizacionClient() {
         setShippingCost(cotizacionData.costo_envio ? Number(cotizacionData.costo_envio) : 0);
 
         if (cotizacionData.tiempo_estimado) {
-          setTiempoEstimado(cotizacionData.tiempo_estimado);
+          setTiempoEstimado(cotizacionData.tiempo_estimado.toString());
         }
         if (cotizacionData.tiempo_estimado_max) {
-          setTiempoEstimadoMax(cotizacionData.tiempo_estimado_max);
+          setTiempoEstimadoMax(cotizacionData.tiempo_estimado_max.toString());
         }
 
       } catch (error: any) {
@@ -323,8 +323,8 @@ function EditCotizacionClient() {
         costo_envio: shippingCost,
         total: financials.totalMXN,
         tipo_cambio: exchangeRate,
-        tiempo_estimado: tiempoEstimado,
-        tiempo_estimado_max: tiempoEstimadoMax,
+        tiempo_estimado: parseInt(tiempoEstimado) || 6,
+        tiempo_estimado_max: parseInt(tiempoEstimadoMax) || 8,
         estado: 'pendiente',
         productos: productosPayload,
       };
@@ -365,6 +365,14 @@ function EditCotizacionClient() {
 
   const handleCurrencyChange = (newCurrency: 'MXN' | 'USD') => {
     setMoneda(newCurrency);
+  };
+
+  const handleTiempoEstimadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTiempoEstimado(e.target.value);
+  };
+
+  const handleTiempoEstimadoMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTiempoEstimadoMax(e.target.value);
   };
 
   const handleAddProduct = (productoFromForm: any | null) => {
@@ -707,9 +715,9 @@ function EditCotizacionClient() {
                     setShippingCost={setShippingCost}
                     total={financials.displayTotal}
                     tiempoEstimado={tiempoEstimado}
-                    setTiempoEstimado={setTiempoEstimado}
+                    setTiempoEstimado={handleTiempoEstimadoChange}
                     tiempoEstimadoMax={tiempoEstimadoMax}
-                    setTiempoEstimadoMax={setTiempoEstimadoMax}
+                    setTiempoEstimadoMax={handleTiempoEstimadoMaxChange}
                   />
                    {cliente && (
                      <div className="mt-4 pt-4 border-t">
