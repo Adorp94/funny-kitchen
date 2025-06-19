@@ -20,15 +20,12 @@ import {
 } from "@/components/ui/table";
 import { 
   TrendingUp, 
-  TrendingDown, 
   DollarSign, 
   ReceiptIcon, 
-  ArrowRight, 
-  AlertCircle,
-  CheckCircle2,
   Clock,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  ArrowRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
@@ -131,14 +128,16 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
 
   const getCollectionRateColor = (rate: number) => {
     if (rate >= 80) return "text-emerald-600";
-    if (rate >= 60) return "text-yellow-600";
+    if (rate >= 60) return "text-blue-600";
+    if (rate >= 40) return "text-orange-600";
     return "text-red-600";
   };
 
   const getCollectionRateIcon = (rate: number) => {
-    if (rate >= 80) return <CheckCircle2 className="h-4 w-4" />;
-    if (rate >= 60) return <Clock className="h-4 w-4" />;
-    return <AlertCircle className="h-4 w-4" />;
+    if (rate >= 80) return <TrendingUp className="h-4 w-4 text-emerald-500" />;
+    if (rate >= 60) return <TrendingUp className="h-4 w-4 text-blue-500" />;
+    if (rate >= 40) return <TrendingUp className="h-4 w-4 text-orange-500" />;
+    return <TrendingUp className="h-4 w-4 text-red-500" />;
   };
 
   const getMetodoPagoLabel = (metodo: string) => {
@@ -153,17 +152,17 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
   };
 
   const getEstadoBadge = (estado: string) => {
-    const estadoMap: Record<string, { label: string; style: string }> = {
-      "pendiente": { label: "Pendiente", style: "bg-yellow-100 text-yellow-800" },
-      "aprobada": { label: "Aprobada", style: "bg-blue-100 text-blue-800" },
-      "producción": { label: "En Producción", style: "bg-purple-100 text-purple-800" },
-      "enviada": { label: "Enviada", style: "bg-green-100 text-green-800" },
-      "completada": { label: "Completada", style: "bg-emerald-100 text-emerald-800" },
-      "cancelada": { label: "Cancelada", style: "bg-red-100 text-red-800" }
+    const estadoMap: Record<string, { label: string; className: string }> = {
+      "pendiente": { label: "Pendiente", className: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+      "aprobada": { label: "Aprobada", className: "bg-blue-50 text-blue-700 border-blue-200" },
+      "producción": { label: "En Producción", className: "bg-purple-50 text-purple-700 border-purple-200" },
+      "enviada": { label: "Enviada", className: "bg-green-50 text-green-700 border-green-200" },
+      "completada": { label: "Completada", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+      "cancelada": { label: "Cancelada", className: "bg-red-50 text-red-700 border-red-200" }
     };
-    const estadoInfo = estadoMap[estado] || { label: estado, style: "bg-gray-100 text-gray-800" };
+    const estadoInfo = estadoMap[estado] || { label: estado, className: "bg-gray-50 text-gray-700 border-gray-200" };
     return (
-      <Badge variant="outline" className={estadoInfo.style}>
+      <Badge variant="outline" className={`text-xs font-medium ${estadoInfo.className}`}>
         {estadoInfo.label}
       </Badge>
     );
@@ -171,8 +170,8 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
       </div>
     );
   }
@@ -181,209 +180,225 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
     <div className="space-y-6">
       {/* Cash Flow Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <ReceiptIcon className="h-4 w-4 mr-2 text-purple-500" />
-              Cotizaciones Activas
-            </CardTitle>
-            <CardDescription className="text-xs">
-              En producción o con anticipo
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {formatCurrency(metrics.totalActiveQuotes.mxn, "MXN")}
-            </div>
-            {metrics.totalActiveQuotes.usd > 0 && (
-              <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.totalActiveQuotes.usd, "USD")}
+        {/* Cotizaciones Vendidas */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-1.5 bg-gray-100 rounded-md">
+                <ReceiptIcon className="h-4 w-4 text-gray-600" />
               </div>
-            )}
-            <div className="text-xs text-muted-foreground mt-1">
-              {metrics.activeCotizaciones} de {metrics.totalCotizaciones} cotizaciones
+              <div className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                {metrics.activeCotizaciones}/{metrics.totalCotizaciones}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Cotizaciones Vendidas</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {formatCurrency(metrics.totalActiveQuotes.mxn, "MXN")}
+              </p>
+              <p className="text-xs text-gray-500">
+                En producción o con anticipo
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-              Pagos Recibidos
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Dinero real cobrado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(metrics.actualPayments.mxn, "MXN")}
-            </div>
-            {metrics.actualPayments.usd > 0 && (
-              <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.actualPayments.usd, "USD")}
+        {/* Pagos Recibidos */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-1.5 bg-emerald-100 rounded-md">
+                <DollarSign className="h-4 w-4 text-emerald-600" />
               </div>
-            )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Pagos Recibidos</p>
+              <p className="text-lg font-semibold text-emerald-700">
+                {formatCurrency(metrics.actualPayments.mxn, "MXN")}
+              </p>
+              <p className="text-xs text-gray-500">
+                Dinero real cobrado
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <Clock className="h-4 w-4 mr-2 text-orange-500" />
-              Pendiente por Cobrar
-            </CardTitle>
-            <CardDescription className="text-xs">
-              De cotizaciones activas
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(metrics.pendingCollections.mxn, "MXN")}
-            </div>
-            {metrics.pendingCollections.usd > 0 && (
-              <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.pendingCollections.usd, "USD")}
+        {/* Pendiente por Cobrar */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-1.5 bg-orange-100 rounded-md">
+                <Clock className="h-4 w-4 text-orange-600" />
               </div>
-            )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Pendiente por Cobrar</p>
+              <p className="text-lg font-semibold text-orange-700">
+                {formatCurrency(metrics.pendingCollections.mxn, "MXN")}
+              </p>
+              <p className="text-xs text-gray-500">
+                De cotizaciones vendidas
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              {getCollectionRateIcon(metrics.collectionRate)}
-              <span className="ml-2">Tasa de Cobranza</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              % de dinero ya cobrado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${getCollectionRateColor(metrics.collectionRate)}`}>
-              {metrics.collectionRate.toFixed(1)}%
+        {/* Tasa de Cobranza */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-1.5 bg-blue-100 rounded-md">
+                {getCollectionRateIcon(metrics.collectionRate)}
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              de cotizaciones activas
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Tasa de Cobranza</p>
+              <p className={`text-lg font-semibold ${getCollectionRateColor(metrics.collectionRate)}`}>
+                {metrics.collectionRate.toFixed(1)}%
+              </p>
+              <p className="text-xs text-gray-500">
+                % de dinero ya cobrado
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Active Quotations Payments Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-purple-500" />
-            Pagos de Cotizaciones Activas
-          </CardTitle>
-          <CardDescription>
-            Pagos recibidos de cotizaciones en producción o con anticipo (flujo de efectivo real)
-          </CardDescription>
+      {/* Payments Table */}
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader className="border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-gray-100 rounded-md">
+              <TrendingUp className="h-4 w-4 text-gray-600" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-semibold text-gray-900">
+                Pagos de Cotizaciones Vendidas
+              </CardTitle>
+              <CardDescription className="text-xs text-gray-500 mt-0.5">
+                Pagos recibidos de cotizaciones en producción o con anticipo
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {paymentsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
           ) : payments.length > 0 ? (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cotización</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>% del Total</TableHead>
-                    <TableHead>Método</TableHead>
-                    <TableHead>Notas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments.map((payment) => (
-                    <TableRow key={payment.pago_id}>
-                      <TableCell>
-                        {formatDate(payment.fecha_pago)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{payment.folio}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Total: {formatCurrency(payment.cotizacion_total, payment.moneda)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{payment.cliente_nombre}</div>
-                      </TableCell>
-                      <TableCell>
-                        {getEstadoBadge(payment.cotizacion_estado)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-semibold text-emerald-600">
-                          {formatCurrency(payment.monto, payment.moneda)}
-                        </div>
-                        {payment.moneda === 'USD' && payment.monto_mxn && (
-                          <div className="text-sm text-muted-foreground">
-                            {formatCurrency(payment.monto_mxn, 'MXN')}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {payment.porcentaje_aplicado ? (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                            {payment.porcentaje_aplicado.toFixed(1)}%
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {getMetodoPagoLabel(payment.metodo_pago)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground max-w-[200px] truncate">
-                          {payment.notas || '-'}
-                        </div>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-gray-200">
+                      <TableHead className="font-medium text-gray-600 py-2 text-xs">Fecha</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Cotización</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Cliente</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Estado</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Monto</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">% del Total</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Método</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">Notas</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.pago_id} className="border-gray-200 hover:bg-gray-50/50">
+                        <TableCell className="py-2">
+                          <span className="text-xs font-medium text-gray-900">
+                            {formatDate(payment.fecha_pago)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-medium text-gray-900">{payment.folio}</div>
+                            <div className="text-xs text-gray-500">
+                              Total: {formatCurrency(payment.cotizacion_total, payment.moneda)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs font-medium text-gray-900">{payment.cliente_nombre}</span>
+                        </TableCell>
+                        <TableCell>
+                          {getEstadoBadge(payment.cotizacion_estado)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-semibold text-emerald-600">
+                              {formatCurrency(payment.monto, payment.moneda)}
+                            </div>
+                            {payment.moneda === 'USD' && payment.monto_mxn && (
+                              <div className="text-xs text-gray-500">
+                                {formatCurrency(payment.monto_mxn, 'MXN')}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {payment.porcentaje_aplicado ? (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                              {payment.porcentaje_aplicado.toFixed(1)}%
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-gray-100 text-gray-700 text-xs">
+                            {getMetodoPagoLabel(payment.metodo_pago)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-xs text-gray-500 max-w-[200px] truncate">
+                            {payment.notas || '-'}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               {/* Pagination */}
               {paymentsTotalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                  <div className="text-xs text-gray-500">
                     Página {paymentsPage} de {paymentsTotalPages}
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setPaymentsPage(Math.max(1, paymentsPage - 1))}
                       disabled={paymentsPage <= 1 || paymentsLoading}
+                      className="h-7 w-7 p-0 border-gray-200 hover:bg-gray-100"
                     >
-                      <ArrowLeft className="h-4 w-4" />
+                      <ArrowLeft className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setPaymentsPage(Math.min(paymentsTotalPages, paymentsPage + 1))}
                       disabled={paymentsPage >= paymentsTotalPages || paymentsLoading}
+                      className="h-7 w-7 p-0 border-gray-200 hover:bg-gray-100"
                     >
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No se encontraron pagos de cotizaciones para el período seleccionado
+            <div className="text-center py-8">
+              <div className="mx-auto w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center mb-3">
+                <ReceiptIcon className="h-4 w-4 text-gray-400" />
+              </div>
+              <p className="text-xs font-medium text-gray-900 mb-1">No hay pagos</p>
+              <p className="text-xs text-gray-500">
+                No se encontraron pagos para el período seleccionado
+              </p>
             </div>
           )}
         </CardContent>

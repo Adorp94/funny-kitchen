@@ -1275,7 +1275,33 @@ export async function getCotizacionPayments(
   try {
     const offset = (page - 1) * pageSize;
 
-    // Build the query for payments related to ACTIVE cotizaciones (in production OR with anticipo)
+    // First get all active cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
+    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
+      .from('cotizaciones')
+      .select('cotizacion_id')
+      .or('estado.eq.producción,estatus_pago.eq.anticipo');
+
+    if (activeCotizacionError) {
+      console.error('Error fetching active cotizaciones:', activeCotizacionError);
+      return { success: false, error: activeCotizacionError.message };
+    }
+
+    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
+
+    if (activeCotizacionIdsList.length === 0) {
+      return {
+        success: true,
+        data: [],
+        pagination: {
+          page,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: pageSize
+        }
+      };
+    }
+
+    // Build the query for payments related to ACTIVE cotizaciones
     let query = supabase
       .from('pagos')
       .select(`
@@ -1302,9 +1328,7 @@ export async function getCotizacionPayments(
       `, { count: 'exact' })
       .eq('tipo_ingreso', 'cotizacion')
       .not('cotizacion_id', 'is', null)
-      .or('cotizaciones.estado.eq.producción,cotizaciones.estatus_pago.eq.anticipo', { 
-        foreignTable: 'cotizaciones' 
-      });
+      .in('cotizacion_id', activeCotizacionIdsList);
 
     // Apply date filters
     if (year) {
