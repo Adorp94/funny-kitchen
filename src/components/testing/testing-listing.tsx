@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Package, Search, Trash2, Calendar, Factory, Activity, BarChart3 } from 'lucide-react';
+import { RefreshCw, Search, Trash2, Calendar, Factory, Activity, BarChart3, Users } from 'lucide-react';
 import { toast } from "sonner";
 import { ProductionActiveListing } from './production-active-listing';
 import { ProductionInsights } from './production-insights';
@@ -422,7 +422,7 @@ export const TestingListing: React.FC = () => {
       <Tabs defaultValue="clientes" className="w-full">
         <TabsList className="grid w-full grid-cols-4 h-8 text-xs">
           <TabsTrigger value="clientes" className="flex items-center gap-1 text-xs py-1">
-            <Package className="h-3 w-3" />
+            <Users className="h-3 w-3" />
             Por Cliente
           </TabsTrigger>
           <TabsTrigger value="produccion" className="flex items-center gap-1 text-xs py-1">
@@ -440,316 +440,285 @@ export const TestingListing: React.FC = () => {
         </TabsList>
 
         <TabsContent value="clientes" className="mt-2">
-          {/* Search and Summary */}
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center space-x-2">
-              <Search className="h-3 w-3 text-muted-foreground" />
-              <Input
-                placeholder="Buscar cliente o producto..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="h-7 text-xs max-w-xs"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="text-xs">
-                {filteredData.length} grupos
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {totalRecords} registros
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {totalPieces} piezas total
-              </Badge>
+          {/* Compact Summary Bar */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+            <div className="grid grid-cols-5 gap-4 text-center">
+              <div>
+                <div className="text-sm font-medium text-gray-900">{filteredData.length}</div>
+                <div className="text-xs text-gray-500">Grupos</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{uniqueClientes}</div>
+                <div className="text-xs text-gray-500">Clientes</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalRecords}</div>
+                <div className="text-xs text-gray-500">Registros</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalPieces.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">Piezas Total</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{Math.round(totalPieces / Math.max(filteredData.length, 1))}</div>
+                <div className="text-xs text-gray-500">Promedio/Grupo</div>
+              </div>
             </div>
           </div>
 
-          {/* Client Groups Table with Delivery Dates */}
-          <div className="border rounded">
+          {/* Compact Search */}
+          <div className="flex justify-between items-center bg-white border border-gray-200 rounded-lg p-2 mb-3">
+            <Input
+              placeholder="Buscar cliente o producto..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="h-7 text-xs max-w-xs border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400"
+            />
+          </div>
+
+          {/* Client Groups Table */}
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="h-8">
-                  <TableHead className="p-1 text-xs font-medium w-28">Cliente</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-32">Productos</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-16">Total Piezas</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-20">Fecha Pedido</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-28">Fecha Entrega</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-16">Acciones</TableHead>
+                <TableRow className="bg-gray-50 border-b border-gray-200 h-8">
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 w-32">Cliente</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 w-40">Productos</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-20">Total</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-24">Fecha Pedido</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-24">Fecha Entrega</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-16">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-xs text-muted-foreground">
-                      {searchTerm ? 'No se encontraron resultados' : 'No hay datos disponibles'}
+                                  <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-xs text-gray-500">
+                    {searchTerm ? 'No se encontraron resultados' : 'No hay datos disponibles'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredData.map((group, index) => (
+                  <TableRow key={`${group.cliente}-${group.fecha}-${index}`} className={`h-10 border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                    {/* Cliente */}
+                    <TableCell className="px-3 py-2 text-xs">
+                      <div className="font-medium text-xs text-gray-900 max-w-[120px] truncate" title={group.cliente}>
+                        {group.cliente}
+                      </div>
+                    </TableCell>
+
+                    {/* Productos */}
+                    <TableCell className="px-3 py-2 text-xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1 text-gray-600">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                          <span className="font-medium">{group.productos.length} productos</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {group.productos.slice(0, 2).map((producto, pIndex) => (
+                            <div key={pIndex} className="flex justify-between text-xs">
+                              <span className="text-gray-700 max-w-[120px] truncate" title={producto.producto}>
+                                {producto.producto}
+                              </span>
+                              <span className="font-medium text-gray-900">{producto.cantidad}</span>
+                            </div>
+                          ))}
+                          {group.productos.length > 2 && (
+                            <div className="text-xs text-gray-400">+{group.productos.length - 2} más</div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    {/* Total Cantidad */}
+                    <TableCell className="px-3 py-2 text-xs text-center">
+                      <span className="font-medium text-gray-900">{group.totalCantidad}</span>
+                    </TableCell>
+
+                    {/* Fecha Pedido */}
+                    <TableCell className="px-3 py-2 text-xs text-center">
+                      <span className="text-gray-600">
+                        {new Date(group.fecha).toLocaleDateString('es-MX', { 
+                          day: '2-digit',
+                          month: '2-digit'
+                        })}
+                      </span>
+                    </TableCell>
+
+                    {/* Fecha Entrega */}
+                    <TableCell className="px-3 py-2 text-xs text-center">
+                      {group.deliveryDate ? (
+                        <span className="text-gray-900 font-medium">
+                          {new Date(group.deliveryDate).toLocaleDateString('es-MX', { 
+                            day: '2-digit',
+                            month: '2-digit'
+                          })}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">N/A</span>
+                      )}
+                    </TableCell>
+
+                    {/* Acciones */}
+                    <TableCell className="px-3 py-2 text-xs text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-600"
+                        onClick={() => handleDeleteGroup(group.ids)}
+                        title={`Eliminar ${group.productos.length} registros`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredData.map((group, index) => (
-                    <TableRow key={`${group.cliente}-${group.fecha}-${index}`} className="h-6">
-                      {/* Cliente */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="max-w-[110px] break-words" title={group.cliente}>
-                          {group.cliente}
-                        </div>
-                      </TableCell>
-
-                      {/* Productos */}
-                      <TableCell className="p-1 text-xs">
-                        <div>
-                          <div className="flex items-center space-x-1 mb-1">
-                            <Package className="h-3 w-3" />
-                            <span className="font-medium">{group.productos.length}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground space-y-0.5">
-                            {group.productos.map((producto, pIndex) => (
-                              <div key={pIndex} className="flex justify-between">
-                                <span className="break-words max-w-[100px]">{producto.producto}</span>
-                                <span className="ml-1 font-medium text-blue-600">{producto.cantidad}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      {/* Total Cantidad */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="flex items-center space-x-1">
-                          <Package className="h-3 w-3" />
-                          <span className="font-bold text-green-600">{group.totalCantidad}</span>
-                        </div>
-                      </TableCell>
-
-                      {/* Fecha Pedido */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="text-muted-foreground">
-                          {new Date(group.fecha).toLocaleDateString('es-MX', { 
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </TableCell>
-
-                      {/* Fecha Entrega */}
-                      <TableCell className="p-1 text-xs">
-                        {group.deliveryDate ? (
-                          <div className="text-green-600 font-medium text-xs leading-tight">
-                            {new Date(group.deliveryDate).toLocaleDateString('es-MX', { 
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric'
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-muted-foreground text-xs">N/A</div>
-                        )}
-                      </TableCell>
-
-                      {/* Acciones */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="flex items-center space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 w-5 p-0"
-                            onClick={() => handleDeleteGroup(group.ids)}
-                            title={`Eliminar ${group.productos.length} registros`}
-                          >
-                            <Trash2 className="h-3 w-3 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                ))
                 )}
               </TableBody>
             </Table>
           </div>
 
-          {/* Summary Footer */}
+          {/* Footer Summary */}
           {filteredData.length > 0 && (
-            <div className="flex justify-between items-center text-xs text-muted-foreground p-2 bg-muted/20 rounded">
+            <div className="flex justify-between items-center text-xs text-gray-500 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg mt-3">
               <span>
-                {filteredData.length} grupos • {uniqueClientes} clientes únicos • {totalRecords} registros
+                {filteredData.length} de {data.length} grupos mostrados
               </span>
               <span>
-                Total: {totalPieces} piezas
+                Total: {totalPieces.toLocaleString()} piezas
               </span>
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="produccion" className="mt-2">
-                    {/* Production Summary */}
-          <div className="mb-2 p-2 bg-muted/30 rounded border">
-            <div className="grid grid-cols-7 gap-2 text-xs">
-              <div className="text-center">
-                <div className="font-medium text-blue-600">{totalScheduledPieces}</div>
-                <div className="text-muted-foreground">Piezas Originales</div>
+          {/* Compact Summary Bar */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+            <div className="grid grid-cols-7 gap-4 text-center">
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalScheduledPieces.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">Piezas Orig.</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-orange-600">{totalScheduledPiecesConMerma}</div>
-                <div className="text-muted-foreground">Con Merma (25%)</div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalScheduledPiecesConMerma.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">Con Merma</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-purple-600">{DAILY_CAPACITY}</div>
-                <div className="text-muted-foreground">Capacidad/Día</div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{DAILY_CAPACITY}</div>
+                <div className="text-xs text-gray-500">Cap./Día</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-red-600">{productosLimitadosPorMoldes}</div>
-                <div className="text-muted-foreground">Limitados por Moldes</div>
+              <div>
+                <div className="text-sm font-medium text-red-600">{productosLimitadosPorMoldes}</div>
+                <div className="text-xs text-gray-500">Limitados</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-green-600">{totalWorkDays}</div>
-                <div className="text-muted-foreground">Días Totales</div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalWorkDays}</div>
+                <div className="text-xs text-gray-500">Días Total</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-indigo-600">{totalWorkWeeks}</div>
-                <div className="text-muted-foreground">Semanas Totales</div>
+              <div>
+                <div className="text-sm font-medium text-gray-900">{totalWorkWeeks}</div>
+                <div className="text-xs text-gray-500">Semanas</div>
               </div>
-              <div className="text-center">
-                <div className="font-medium text-gray-600 text-xs leading-tight">{lastCompletionDate}</div>
-                <div className="text-muted-foreground">Última Entrega</div>
+              <div>
+                <div className="text-sm font-medium text-gray-900 leading-tight">{lastCompletionDate}</div>
+                <div className="text-xs text-gray-500">Última Entrega</div>
               </div>
             </div>
           </div>
 
           {/* Production Schedule Table */}
-          <div className="border rounded">
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="h-8">
-                  <TableHead className="p-1 text-xs font-medium w-24">Producto</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-16">Cantidad</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-16">Con Merma</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-20">Moldes</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-14">Días</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-14">Semanas</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-24">Fecha Entrega</TableHead>
-                  <TableHead className="p-1 text-xs font-medium w-48">Clientes (Total para Producto)</TableHead>
+                <TableRow className="bg-gray-50 border-b border-gray-200 h-8">
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 w-32">Producto</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-20">Cantidad</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-20">Con Merma</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-20">Moldes</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-16">Días</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-16">Semanas</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-24">Entrega</TableHead>
+                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 w-40">Clientes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {productionSchedule.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-4 text-xs text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-xs text-gray-500">
                       No hay productos programados
                     </TableCell>
                   </TableRow>
-                                  ) : (
-                    productionSchedule.map((item, index) => (
-                      <TableRow key={`${item.producto}-${index}`} className="h-auto">
-                        {/* Producto */}
-                        <TableCell className="p-1 text-xs">
-                          <div className="max-w-[100px] break-words font-medium" title={item.producto}>
-                            {item.producto}
-                          </div>
-                        </TableCell>
-
-                        {/* Cantidad Original */}
-                        <TableCell className="p-1 text-xs">
-                          <div className="flex items-center space-x-1">
-                            <Package className="h-3 w-3" />
-                            <span className="font-bold text-blue-600">{item.totalCantidad}</span>
-                          </div>
-                        </TableCell>
-
-                        {/* Cantidad Con Merma */}
-                        <TableCell className="p-1 text-xs">
-                          <div className="flex items-center space-x-1">
-                            <span className="font-bold text-orange-600">{item.totalCantidadConMerma}</span>
-                          </div>
-                        </TableCell>
-
-                        {/* Moldes */}
-                        <TableCell className="p-1 text-xs">
-                          <div className="space-y-0.5">
-                            <div className="flex items-center space-x-1">
-                              <span className="text-xs text-muted-foreground">Disp:</span>
-                              <span className="font-medium text-green-600">{item.moldesDisponibles}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <span className="text-xs text-muted-foreground">Nec:</span>
-                              <span className={`font-medium ${item.limitadoPorMoldes ? 'text-red-600' : 'text-gray-600'}`}>
-                                {item.moldesNecesarios}
-                              </span>
-                            </div>
-                            {item.limitadoPorMoldes && (
-                              <Badge variant="destructive" className="text-xs px-1 py-0">
-                                Limitado
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        {/* Días Totales */}
-                        <TableCell className="p-1 text-xs">
-                          <Badge variant={item.limitadoPorMoldes ? "destructive" : "secondary"} className="text-xs">
-                            {item.totalDiasProduccion}
-                          </Badge>
-                        </TableCell>
-
-                        {/* Semanas */}
-                        <TableCell className="p-1 text-xs">
-                          <Badge variant="outline" className="text-xs">
-                            {item.totalSemanasProduccion}
-                          </Badge>
-                        </TableCell>
-
-                      {/* Fecha Entrega */}
-                      <TableCell className="p-1 text-xs">
-                        <div className="text-green-600 font-medium text-xs leading-tight">
-                          {new Date(item.completionDate).toLocaleDateString('es-MX', { 
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
+                ) : (
+                  productionSchedule.map((item, index) => (
+                    <TableRow key={`${item.producto}-${index}`} className={`h-10 border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                      {/* Producto */}
+                      <TableCell className="px-3 py-2 text-xs">
+                        <div className="font-medium text-xs text-gray-900 max-w-[120px] truncate" title={item.producto}>
+                          {item.producto}
                         </div>
                       </TableCell>
 
-                      {/* Clientes (Total para Producto) */}
-                      <TableCell className="p-1 text-xs">
+                      {/* Cantidad Original */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className="font-medium text-gray-900">{item.totalCantidad}</span>
+                      </TableCell>
+
+                      {/* Cantidad Con Merma */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className="font-medium text-gray-900">{item.totalCantidadConMerma}</span>
+                      </TableCell>
+
+                      {/* Moldes */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <div className="flex items-center justify-center space-x-1">
+                          <span className="text-gray-600">{item.moldesDisponibles}</span>
+                          {item.limitadoPorMoldes && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400" title="Limitado por moldes" />
+                          )}
+                        </div>
+                      </TableCell>
+
+                      {/* Días Totales */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className={`font-medium ${item.limitadoPorMoldes ? 'text-red-600' : 'text-gray-900'}`}>
+                          {item.totalDiasProduccion}
+                        </span>
+                      </TableCell>
+
+                      {/* Semanas */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className="text-gray-900">{item.totalSemanasProduccion}</span>
+                      </TableCell>
+
+                      {/* Fecha Entrega */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className="text-gray-900 font-medium">
+                          {new Date(item.completionDate).toLocaleDateString('es-MX', { 
+                            day: '2-digit',
+                            month: '2-digit'
+                          })}
+                        </span>
+                      </TableCell>
+
+                      {/* Clientes */}
+                      <TableCell className="px-3 py-2 text-xs">
                         <div className="space-y-1">
-                          <div className="bg-blue-50 p-1 rounded text-xs border-l-2 border-blue-400 mb-1">
-                            <div className="font-medium text-blue-800">Total del Producto:</div>
-                            <div className="grid grid-cols-3 gap-1 text-xs">
-                              <div>
-                                <span className="text-muted-foreground">Original:</span> 
-                                <span className="font-medium text-blue-600 ml-1">{item.totalCantidad}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Con Merma:</span> 
-                                <span className="font-medium text-orange-600 ml-1">{item.totalCantidadConMerma}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Días:</span> 
-                                <span className="font-bold text-green-600 ml-1">{item.totalDiasProduccion}</span>
-                              </div>
-                            </div>
+                          <div className="flex items-center space-x-1 text-gray-600">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                            <span className="font-medium">{item.clientes.length} clientes</span>
                           </div>
-                          {item.clientes.map((cliente, cIndex) => (
-                            <div key={cIndex} className="bg-muted/20 p-1 rounded text-xs border-l-2 border-gray-200">
-                              <div className="flex justify-between items-center mb-1">
-                                <span className="font-medium text-xs" title={cliente.cliente}>
-                                  {cIndex + 1}. {cliente.cliente.length > 12 ? `${cliente.cliente.substring(0, 12)}...` : cliente.cliente}
+                          <div className="space-y-0.5">
+                            {item.clientes.slice(0, 2).map((cliente, cIndex) => (
+                              <div key={cIndex} className="flex justify-between text-xs">
+                                <span className="text-gray-700 max-w-[100px] truncate" title={cliente.cliente}>
+                                  {cliente.cliente}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(cliente.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' })}
-                                </span>
+                                <span className="font-medium text-gray-900">{cliente.cantidad}</span>
                               </div>
-                              <div className="grid grid-cols-2 gap-1 text-xs">
-                                <div>
-                                  <span className="text-muted-foreground">Cantidad:</span> 
-                                  <span className="font-medium text-blue-600 ml-1">{cliente.cantidad}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Con Merma:</span> 
-                                  <span className="font-medium text-orange-600 ml-1">{cliente.cantidadConMerma}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                            {item.clientes.length > 2 && (
+                              <div className="text-xs text-gray-400">+{item.clientes.length - 2} más</div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus, DollarSign, Factory, Package, TestTube } from "lucide-react";
+import { LayoutDashboard, ClipboardList, ChefHat, Users, Settings, Plus, DollarSign, Factory, Package } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 
 const navigation = [
@@ -32,11 +32,7 @@ const navigation = [
     href: "/dashboard/finanzas",
     icon: DollarSign,
   },
-  {
-    name: "Testing",
-    href: "/testing",
-    icon: TestTube,
-  },
+
   // Productos and Clientes modules temporarily disabled
   // {
   //   name: "Productos",

@@ -183,10 +183,10 @@ export const ProductionInsights: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      {/* Key Metrics */}
+      {/* Compact Metrics Bar */}
       {metrics && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <div className="grid grid-cols-4 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-6 text-center">
             <div>
               <div className="text-sm font-medium text-gray-900">{metrics.capacityUtilization.toFixed(1)}%</div>
               <div className="text-xs text-gray-500">Utilización</div>
