@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RefreshCw, Search, Trash2, Calendar, Factory, Activity, BarChart3, Users } from 'lucide-react';
+import { RefreshCw, Search, Calendar, Factory, Activity, BarChart3, Users } from 'lucide-react';
 import { toast } from "sonner";
 import { ProductionActiveListing } from './production-active-listing';
 import { ProductionInsights } from './production-insights';
@@ -344,35 +344,6 @@ export const TestingListing: React.FC = () => {
     }
   }, [groupData, createProductionSchedule, calculateClientDeliveryDates]);
 
-  const handleDeleteGroup = useCallback(async (ids: number[]) => {
-    try {
-      // Delete all records in the group
-      const deletePromises = ids.map(id => 
-        fetch(`/api/testing-datos?id=${id}`, { method: 'DELETE' })
-      );
-      
-      const responses = await Promise.all(deletePromises);
-      const failed = responses.filter(r => !r.ok);
-      
-      if (failed.length > 0) {
-        throw new Error(`Failed to delete ${failed.length} records`);
-      }
-
-      toast.success("Eliminado", {
-        description: `${ids.length} registros eliminados correctamente`,
-      });
-
-      // Refresh data
-      await fetchData();
-
-    } catch (err: any) {
-      console.error("Error deleting group:", err);
-      toast.error("Error al eliminar", {
-        description: err.message,
-      });
-    }
-  }, [fetchData]);
-
   const handleSearch = useCallback((term: string) => {
     setSearchTerm(term);
     if (!term.trim()) {
@@ -551,92 +522,110 @@ export const TestingListing: React.FC = () => {
                   <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-20">Total</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-24">Fecha Pedido</TableHead>
                   <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-24">Fecha Entrega</TableHead>
-                  <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center w-16">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredData.length === 0 ? (
-                                  <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-xs text-gray-500">
-                    {searchTerm ? 'No se encontraron resultados' : 'No hay datos disponibles'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredData.map((group, index) => (
-                  <TableRow key={`${group.cliente}-${group.fecha}-${index}`} className={`h-10 border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                    {/* Cliente */}
-                    <TableCell className="px-3 py-2 text-xs">
-                      <div className="font-medium text-xs text-gray-900 max-w-[120px] truncate" title={group.cliente}>
-                        {group.cliente}
-                      </div>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-xs text-gray-500">
+                      {searchTerm ? 'No se encontraron resultados' : 'No hay datos disponibles'}
                     </TableCell>
-
-                    {/* Productos */}
-                    <TableCell className="px-3 py-2 text-xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1 text-gray-600">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                          <span className="font-medium">{group.productos.length} productos</span>
+                  </TableRow>
+                ) : (
+                  filteredData.map((group, index) => (
+                    <TableRow key={`${group.cliente}-${group.fecha}-${index}`} className={`h-auto border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                      {/* Cliente - Separate cotización number and client name */}
+                      <TableCell className="px-3 py-2 text-xs">
+                        <div className="space-y-1">
+                          {(() => {
+                            // Parse the cliente field to separate cotización and client name
+                            const clienteText = group.cliente;
+                            const parts = clienteText.split(' ');
+                            
+                            // Find the cotización part (starts with COT-)
+                            const cotizacionIndex = parts.findIndex(part => part.startsWith('COT-'));
+                            if (cotizacionIndex !== -1) {
+                              const cotizacion = parts[cotizacionIndex];
+                              const clientName = parts.slice(cotizacionIndex + 1).join(' ');
+                              
+                              return (
+                                <>
+                                  <div className="font-medium text-xs text-gray-900" title={cotizacion}>
+                                    {cotizacion}
+                                  </div>
+                                  <div className="text-xs text-gray-600 max-w-[120px] truncate" title={clientName}>
+                                    {clientName}
+                                  </div>
+                                </>
+                              );
+                            } else {
+                              // Fallback for unexpected format
+                              return (
+                                <div className="font-medium text-xs text-gray-900 max-w-[120px] truncate" title={clienteText}>
+                                  {clienteText}
+                                </div>
+                              );
+                            }
+                          })()}
                         </div>
-                        <div className="space-y-0.5">
-                          {group.productos.slice(0, 2).map((producto, pIndex) => (
-                            <div key={pIndex} className="flex justify-between text-xs">
-                              <span className="text-gray-700 max-w-[120px] truncate" title={producto.producto}>
-                                {producto.producto}
-                              </span>
-                              <span className="font-medium text-gray-900">{producto.cantidad}</span>
+                      </TableCell>
+
+                      {/* Productos - Show ALL products, not just first 2 */}
+                      <TableCell className="px-3 py-2 text-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-gray-600 mb-1">
+                            <div className="flex items-center space-x-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                              <span className="font-medium">{group.productos.length} productos</span>
                             </div>
-                          ))}
-                          {group.productos.length > 2 && (
-                            <div className="text-xs text-gray-400">+{group.productos.length - 2} más</div>
-                          )}
+                            <span className="font-medium text-gray-900">{group.totalCantidad}</span>
+                          </div>
+                          <div className="space-y-0.5">
+                            {/* Show ALL products */}
+                            {group.productos.map((producto, pIndex) => (
+                              <div key={pIndex} className="flex justify-between text-xs">
+                                <span className="text-gray-700 max-w-[160px] truncate" title={producto.producto}>
+                                  {producto.producto}
+                                </span>
+                                <span className="font-medium text-gray-900 ml-2">{producto.cantidad}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
 
-                    {/* Total Cantidad */}
-                    <TableCell className="px-3 py-2 text-xs text-center">
-                      <span className="font-medium text-gray-900">{group.totalCantidad}</span>
-                    </TableCell>
+                      {/* Total Cantidad - Better aligned */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <div className="bg-gray-100 rounded px-2 py-1 inline-block">
+                          <span className="font-bold text-gray-900">{group.totalCantidad}</span>
+                        </div>
+                      </TableCell>
 
-                    {/* Fecha Pedido */}
-                    <TableCell className="px-3 py-2 text-xs text-center">
-                      <span className="text-gray-600">
-                        {new Date(group.fecha).toLocaleDateString('es-MX', { 
-                          day: '2-digit',
-                          month: '2-digit'
-                        })}
-                      </span>
-                    </TableCell>
-
-                    {/* Fecha Entrega */}
-                    <TableCell className="px-3 py-2 text-xs text-center">
-                      {group.deliveryDate ? (
-                        <span className="text-gray-900 font-medium">
-                          {new Date(group.deliveryDate).toLocaleDateString('es-MX', { 
+                      {/* Fecha Pedido */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        <span className="text-gray-600">
+                          {new Date(group.fecha).toLocaleDateString('es-MX', { 
                             day: '2-digit',
                             month: '2-digit'
                           })}
                         </span>
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </TableCell>
+                      </TableCell>
 
-                    {/* Acciones */}
-                    <TableCell className="px-3 py-2 text-xs text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-600"
-                        onClick={() => handleDeleteGroup(group.ids)}
-                        title={`Eliminar ${group.productos.length} registros`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      {/* Fecha Entrega */}
+                      <TableCell className="px-3 py-2 text-xs text-center">
+                        {group.deliveryDate ? (
+                          <span className="text-gray-900 font-medium">
+                            {new Date(group.deliveryDate).toLocaleDateString('es-MX', { 
+                              day: '2-digit',
+                              month: '2-digit'
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">N/A</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -767,22 +756,23 @@ export const TestingListing: React.FC = () => {
                       {/* Clientes */}
                       <TableCell className="px-3 py-2 text-xs">
                         <div className="space-y-1">
-                          <div className="flex items-center space-x-1 text-gray-600">
-                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                            <span className="font-medium">{item.clientes.length} clientes</span>
+                          <div className="flex items-center justify-between text-gray-600 mb-1">
+                            <div className="flex items-center space-x-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                              <span className="font-medium">{item.clientes.length} clientes</span>
+                            </div>
+                            <span className="font-medium text-gray-900">{item.totalCantidad}</span>
                           </div>
                           <div className="space-y-0.5">
-                            {item.clientes.slice(0, 2).map((cliente, cIndex) => (
+                            {/* Show ALL clients */}
+                            {item.clientes.map((cliente, cIndex) => (
                               <div key={cIndex} className="flex justify-between text-xs">
-                                <span className="text-gray-700 max-w-[100px] truncate" title={cliente.cliente}>
+                                <span className="text-gray-700 max-w-[120px] truncate" title={cliente.cliente}>
                                   {cliente.cliente}
                                 </span>
                                 <span className="font-medium text-gray-900">{cliente.cantidad}</span>
                               </div>
                             ))}
-                            {item.clientes.length > 2 && (
-                              <div className="text-xs text-gray-400">+{item.clientes.length - 2} más</div>
-                            )}
                           </div>
                         </div>
                       </TableCell>

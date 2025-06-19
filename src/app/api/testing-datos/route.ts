@@ -53,7 +53,7 @@ export async function GET() {
           .eq('cotizacion_id', cotizacion.cotizacion_id);
 
         const clienteName = cliente?.nombre || 'Cliente Desconocido';
-        const cotizacionLabel = `COT-${cotizacion.folio} ${clienteName}`;
+        const cotizacionLabel = `${cotizacion.folio} ${clienteName}`;
         const fecha = cotizacion.fecha_creacion?.split('T')[0] || new Date().toISOString().split('T')[0];
         
         for (const producto of (productos || [])) {
