@@ -21,21 +21,62 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Get raw database data for verification
-    const { data: rawCotizaciones, error: rawError } = await supabase
+    // Get active cotizaciones first
+    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
       .from('cotizaciones')
-      .select('cotizacion_id, folio, estado, estatus_pago, total_mxn, monto_pagado_mxn, porcentaje_completado, fecha_creacion')
-      .gte('fecha_creacion', '2025-06-01T00:00:00Z')
-      .lt('fecha_creacion', '2025-07-01T00:00:00Z')
+      .select('cotizacion_id')
       .or('estado.eq.producción,estatus_pago.eq.anticipo');
-    
-    if (rawError) {
+
+    if (activeCotizacionError) {
       return NextResponse.json({
         success: false,
-        error: 'Failed to get raw data for verification',
-        details: rawError.message
+        error: 'Failed to get active cotizaciones',
+        details: activeCotizacionError.message
       });
     }
+
+    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
+
+    // Get raw database data for verification - cotizaciones with PAYMENTS in June 2025
+    const { data: paymentsInJune, error: paymentsError } = await supabase
+      .from('pagos')
+      .select(`
+        cotizacion_id,
+        cotizaciones!inner (
+          cotizacion_id,
+          folio,
+          estado,
+          estatus_pago,
+          total_mxn,
+          monto_pagado_mxn,
+          porcentaje_completado,
+          fecha_creacion
+        )
+      `)
+      .eq('tipo_ingreso', 'cotizacion')
+      .not('cotizacion_id', 'is', null)
+      .gte('fecha_pago', '2025-06-01T00:00:00Z')
+      .lt('fecha_pago', '2025-07-01T00:00:00Z')
+      .in('cotizacion_id', activeCotizacionIdsList);
+    
+    if (paymentsError) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to get payments data for verification',
+        details: paymentsError.message
+      });
+    }
+
+    // Extract unique cotizaciones (since one cotizacion can have multiple payments)
+    const uniqueCotizaciones = new Map();
+    paymentsInJune?.forEach(payment => {
+      const cot = payment.cotizaciones;
+      if (cot && !uniqueCotizaciones.has(cot.cotizacion_id)) {
+        uniqueCotizaciones.set(cot.cotizacion_id, cot);
+      }
+    });
+
+    const rawCotizaciones = Array.from(uniqueCotizaciones.values());
     
     // Manual calculations for verification
     const totalActiveMXN = rawCotizaciones?.reduce((sum, cot) => sum + Number(cot.total_mxn || 0), 0) || 0;
