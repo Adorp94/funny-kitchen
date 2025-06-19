@@ -1073,11 +1073,11 @@ export async function getCashFlowMetrics(
 ): Promise<{
   success: boolean;
   data?: {
-    totalSales: { mxn: number; usd: number };
-    actualPayments: { mxn: number; usd: number };
-    pendingCollections: { mxn: number; usd: number };
-    collectionRate: number;
-    cotizacionesWithPayments: number;
+    totalQuotes: { mxn: number; usd: number };
+    soldQuotes: { mxn: number; usd: number };
+    pendingSales: { mxn: number; usd: number };
+    salesRate: number;
+    cotizacionesSold: number;
     totalCotizaciones: number;
   };
   error?: string;
@@ -1160,63 +1160,66 @@ export async function getCashFlowMetrics(
       return { success: false, error: pagosError.message };
     }
 
-    // Calculate metrics
-    let totalSalesMXN = 0;
-    let totalSalesUSD = 0;
-    let actualPaymentsMXN = 0;
-    let actualPaymentsUSD = 0;
-    let cotizacionesWithPayments = 0;
+    // Calculate metrics - New logic: a cotización is "sold" when it receives any payment
+    let totalQuotesMXN = 0;
+    let totalQuotesUSD = 0;
+    let soldQuotesMXN = 0;
+    let soldQuotesUSD = 0;
+    let cotizacionesSold = 0;
 
-    // Calculate total sales from cotizaciones
+    // Calculate total quotes (all cotizaciones)
     cotizaciones?.forEach(cot => {
       const totalMXN = Number(cot.total_mxn || 0);
       const total = Number(cot.total || 0);
       
       if (cot.moneda === 'MXN') {
-        totalSalesMXN += totalMXN || total;
+        totalQuotesMXN += totalMXN || total;
       } else {
-        totalSalesUSD += total;
-        totalSalesMXN += totalMXN; // Also add MXN equivalent
+        totalQuotesUSD += total;
+        totalQuotesMXN += totalMXN; // Also add MXN equivalent
       }
     });
 
-    // Calculate actual payments
-    pagos?.forEach(pago => {
-      const monto = Number(pago.monto || 0);
-      const montoMXN = Number(pago.monto_mxn || 0);
-      
-      if (pago.moneda === 'MXN') {
-        actualPaymentsMXN += monto;
-      } else {
-        actualPaymentsUSD += monto;
-        actualPaymentsMXN += montoMXN; // Add MXN equivalent
-      }
-    });
-
-    // Count cotizaciones with payments
+    // Identify cotizaciones that have received payments (sold quotes)
     const cotizacionesWithPaymentsSet = new Set(
       pagos?.map(p => p.cotizacion_id).filter(Boolean)
     );
-    cotizacionesWithPayments = cotizacionesWithPaymentsSet.size;
+    cotizacionesSold = cotizacionesWithPaymentsSet.size;
 
-    // Calculate collection rate
-    const collectionRate = totalSalesMXN > 0 ? (actualPaymentsMXN / totalSalesMXN) * 100 : 0;
+    // Calculate total value of sold quotes (quotes that received any payment)
+    cotizaciones?.forEach(cot => {
+      if (cotizacionesWithPaymentsSet.has(cot.cotizacion_id)) {
+        const totalMXN = Number(cot.total_mxn || 0);
+        const total = Number(cot.total || 0);
+        
+        if (cot.moneda === 'MXN') {
+          soldQuotesMXN += totalMXN || total;
+        } else {
+          soldQuotesUSD += total;
+          soldQuotesMXN += totalMXN; // Also add MXN equivalent
+        }
+      }
+    });
 
-    // Calculate pending collections
-    const pendingCollectionsMXN = totalSalesMXN - actualPaymentsMXN;
-    const pendingCollectionsUSD = totalSalesUSD - actualPaymentsUSD;
+    // Calculate sales rate (% of quotes that were sold)
+    const salesRate = cotizaciones && cotizaciones.length > 0 ? 
+      (cotizacionesSold / cotizaciones.length) * 100 : 0;
+
+    // Calculate pending sales (quotes not yet sold)
+    const pendingSalesMXN = totalQuotesMXN - soldQuotesMXN;
+    const pendingSalesUSD = totalQuotesUSD - soldQuotesUSD;
 
     return {
       success: true,
       data: {
-        totalSales: { mxn: totalSalesMXN, usd: totalSalesUSD },
-        actualPayments: { mxn: actualPaymentsMXN, usd: actualPaymentsUSD },
-        pendingCollections: { 
-          mxn: Math.max(0, pendingCollectionsMXN), 
-          usd: Math.max(0, pendingCollectionsUSD) 
+        totalQuotes: { mxn: totalQuotesMXN, usd: totalQuotesUSD },
+        soldQuotes: { mxn: soldQuotesMXN, usd: soldQuotesUSD },
+        pendingSales: { 
+          mxn: Math.max(0, pendingSalesMXN), 
+          usd: Math.max(0, pendingSalesUSD) 
         },
-        collectionRate: Math.round(collectionRate * 100) / 100,
-        cotizacionesWithPayments,
+        salesRate: Math.round(salesRate * 100) / 100,
+        cotizacionesSold,
         totalCotizaciones: cotizaciones?.length || 0
       }
     };

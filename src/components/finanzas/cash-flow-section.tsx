@@ -38,11 +38,11 @@ import {
 } from "@/app/actions/finanzas-actions";
 
 interface CashFlowMetrics {
-  totalSales: { mxn: number; usd: number };
-  actualPayments: { mxn: number; usd: number };
-  pendingCollections: { mxn: number; usd: number };
-  collectionRate: number;
-  cotizacionesWithPayments: number;
+  totalQuotes: { mxn: number; usd: number };
+  soldQuotes: { mxn: number; usd: number };
+  pendingSales: { mxn: number; usd: number };
+  salesRate: number;
+  cotizacionesSold: number;
   totalCotizaciones: number;
 }
 
@@ -69,11 +69,11 @@ interface CashFlowSectionProps {
 
 export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSectionProps) {
   const [metrics, setMetrics] = useState<CashFlowMetrics>({
-    totalSales: { mxn: 0, usd: 0 },
-    actualPayments: { mxn: 0, usd: 0 },
-    pendingCollections: { mxn: 0, usd: 0 },
-    collectionRate: 0,
-    cotizacionesWithPayments: 0,
+    totalQuotes: { mxn: 0, usd: 0 },
+    soldQuotes: { mxn: 0, usd: 0 },
+    pendingSales: { mxn: 0, usd: 0 },
+    salesRate: 0,
+    cotizacionesSold: 0,
     totalCotizaciones: 0
   });
   const [payments, setPayments] = useState<CotizacionPayment[]>([]);
@@ -129,13 +129,13 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
     }
   };
 
-  const getCollectionRateColor = (rate: number) => {
+  const getSalesRateColor = (rate: number) => {
     if (rate >= 80) return "text-emerald-600";
     if (rate >= 60) return "text-yellow-600";
     return "text-red-600";
   };
 
-  const getCollectionRateIcon = (rate: number) => {
+  const getSalesRateIcon = (rate: number) => {
     if (rate >= 80) return <CheckCircle2 className="h-4 w-4" />;
     if (rate >= 60) return <Clock className="h-4 w-4" />;
     return <AlertCircle className="h-4 w-4" />;
@@ -185,16 +185,16 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
               <ReceiptIcon className="h-4 w-4 mr-2 text-blue-500" />
-              Ventas Totales
+              Cotizaciones Totales
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {formatCurrency(metrics.totalSales.mxn, "MXN")}
+              {formatCurrency(metrics.totalQuotes.mxn, "MXN")}
             </div>
-            {metrics.totalSales.usd > 0 && (
+            {metrics.totalQuotes.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.totalSales.usd, "USD")}
+                + {formatCurrency(metrics.totalQuotes.usd, "USD")}
               </div>
             )}
           </CardContent>
@@ -204,16 +204,16 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
               <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-              Pagos Recibidos
+              Ventas Realizadas
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(metrics.actualPayments.mxn, "MXN")}
+              {formatCurrency(metrics.soldQuotes.mxn, "MXN")}
             </div>
-            {metrics.actualPayments.usd > 0 && (
+            {metrics.soldQuotes.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.actualPayments.usd, "USD")}
+                + {formatCurrency(metrics.soldQuotes.usd, "USD")}
               </div>
             )}
           </CardContent>
@@ -223,16 +223,16 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
               <Clock className="h-4 w-4 mr-2 text-orange-500" />
-              Por Cobrar
+              Ventas Pendientes
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(metrics.pendingCollections.mxn, "MXN")}
+              {formatCurrency(metrics.pendingSales.mxn, "MXN")}
             </div>
-            {metrics.pendingCollections.usd > 0 && (
+            {metrics.pendingSales.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.pendingCollections.usd, "USD")}
+                + {formatCurrency(metrics.pendingSales.usd, "USD")}
               </div>
             )}
           </CardContent>
@@ -241,16 +241,16 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              {getCollectionRateIcon(metrics.collectionRate)}
-              <span className="ml-2">Tasa de Cobro</span>
+              {getSalesRateIcon(metrics.salesRate)}
+              <span className="ml-2">Tasa de Conversión</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getCollectionRateColor(metrics.collectionRate)}`}>
-              {metrics.collectionRate.toFixed(1)}%
+            <div className={`text-2xl font-bold ${getSalesRateColor(metrics.salesRate)}`}>
+              {metrics.salesRate.toFixed(1)}%
             </div>
             <div className="text-sm text-muted-foreground">
-              {metrics.cotizacionesWithPayments} de {metrics.totalCotizaciones} cotizaciones
+              {metrics.cotizacionesSold} de {metrics.totalCotizaciones} vendidas
             </div>
           </CardContent>
         </Card>
@@ -261,10 +261,10 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-emerald-500" />
-            Flujo de Efectivo Real - Pagos de Cotizaciones
+            Ventas Realizadas - Anticipos y Pagos
           </CardTitle>
           <CardDescription>
-            Pagos reales recibidos de cotizaciones (anticipos y pagos completos)
+            Anticipos y pagos recibidos que confirman las ventas de cotizaciones
           </CardDescription>
         </CardHeader>
         <CardContent>
