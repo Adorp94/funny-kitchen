@@ -44,6 +44,11 @@ export const ProductionActiveListing: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'deficit' | 'surplus' | 'balanced'>('all');
+  
+  // Editable fields state
+  const [editingCell, setEditingCell] = useState<{productId: number, field: string} | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
+  const [updating, setUpdating] = useState<Set<number>>(new Set());
 
   const fetchData = useCallback(async () => {
     console.log("ProductionActiveListing: fetchData triggered");
@@ -115,9 +120,14 @@ export const ProductionActiveListing: React.FC = () => {
       numeric: true 
     }));
 
-    console.log('✅ Final sorted product names:', filtered.slice(0, 10).map(item => item.producto_nombre));
     setFilteredData(filtered);
   }, [data]);
+
+  const getProductionStatus = (item: ProductionActiveItem): 'deficit' | 'surplus' | 'balanced' => {
+    if (item.faltan_sobran < 0) return 'deficit';
+    if (item.faltan_sobran > 0) return 'surplus';
+    return 'balanced';
+  };
 
   const calculateSummary = useCallback((): ProductionSummary => {
     return {
@@ -162,6 +172,138 @@ export const ProductionActiveListing: React.FC = () => {
       default:
         return null;
     }
+  };
+
+  // Handle editing production stages
+  const handleCellEdit = (productId: number, field: string, currentValue: number) => {
+    setEditingCell({ productId, field });
+    setEditingValue(currentValue.toString());
+  };
+
+  const handleCellSave = async (productId: number, field: string) => {
+    const newValue = parseInt(editingValue);
+    
+    // Validate input
+    if (isNaN(newValue) || newValue < 0) {
+      toast.error('Valor inválido', { description: 'El valor debe ser un número entero positivo' });
+      setEditingCell(null);
+      return;
+    }
+
+    // Show loading state
+    setUpdating(prev => new Set([...prev, productId]));
+    
+    try {
+      const response = await fetch('/api/production-active', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          producto_id: productId,
+          [field]: newValue
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+      }
+
+      // Update local data with recalculated totals
+      const updatedData = data.map(item => {
+        if (item.producto_id === productId) {
+          const updatedItem = { ...item, [field]: newValue };
+          // Recalculate total pieces in process
+          updatedItem.piezas_en_proceso = updatedItem.por_detallar + updatedItem.detallado + updatedItem.sancocho + updatedItem.terminado;
+          // Recalculate balance (remaining/surplus)
+          updatedItem.faltan_sobran = updatedItem.piezas_en_proceso - updatedItem.pedidos;
+          return updatedItem;
+        }
+        return item;
+      });
+      setData(updatedData);
+      
+      // Better field names for toast
+      const fieldNames: Record<string, string> = {
+        'por_detallar': 'Por Detallar',
+        'detallado': 'Detallado',
+        'sancocho': 'Sancocho',
+        'terminado': 'Terminado'
+      };
+      
+      toast.success('Actualizado', { description: `${fieldNames[field]} actualizado correctamente` });
+    } catch (err: any) {
+      console.error('Error updating field:', err);
+      toast.error('Error al actualizar', { description: err.message });
+    } finally {
+      setUpdating(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(productId);
+        return newSet;
+      });
+      setEditingCell(null);
+    }
+  };
+
+  const handleCellCancel = () => {
+    setEditingCell(null);
+    setEditingValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, productId: number, field: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCellSave(productId, field);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCellCancel();
+    }
+  };
+
+  // Render editable cell
+  const renderEditableCell = (item: ProductionActiveItem, field: 'por_detallar' | 'detallado' | 'sancocho' | 'terminado') => {
+    const isEditing = editingCell?.productId === item.producto_id && editingCell?.field === field;
+    const isUpdating = updating.has(item.producto_id);
+    const value = item[field];
+    
+    if (isEditing) {
+      return (
+        <div className="flex items-center justify-center">
+          <input
+            type="number"
+            min="0"
+            value={editingValue}
+            onChange={(e) => setEditingValue(e.target.value)}
+            onBlur={() => handleCellSave(item.producto_id, field)}
+            onKeyDown={(e) => handleKeyDown(e, item.producto_id, field)}
+            className="w-12 h-6 text-xs text-center border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-blue-50"
+            autoFocus
+          />
+        </div>
+      );
+    }
+
+    const getFieldColor = (field: string) => {
+      switch (field) {
+        case 'por_detallar': return 'bg-orange-400';
+        case 'detallado': return 'bg-blue-400';
+        case 'sancocho': return 'bg-red-400';
+        case 'terminado': return 'bg-green-400';
+        default: return 'bg-gray-200';
+      }
+    };
+
+    return (
+      <div 
+        className="flex items-center justify-center space-x-1 cursor-pointer hover:bg-gray-100 rounded px-1 py-1 transition-colors"
+        onClick={() => !isUpdating && handleCellEdit(item.producto_id, field, value)}
+        title={`Click para editar ${field}`}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full ${value > 0 ? getFieldColor(field) : 'bg-gray-200'}`} />
+        <span className={`${value > 0 ? 'text-gray-900' : 'text-gray-400'} ${isUpdating ? 'opacity-50' : ''}`}>
+          {isUpdating ? '...' : value}
+        </span>
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -331,42 +473,22 @@ export const ProductionActiveListing: React.FC = () => {
 
                   {/* Por Detallar */}
                   <TableCell className="px-3 py-2 text-xs text-center">
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${item.por_detallar > 0 ? 'bg-orange-400' : 'bg-gray-200'}`} />
-                      <span className={item.por_detallar > 0 ? 'text-gray-900' : 'text-gray-400'}>
-                        {item.por_detallar}
-                      </span>
-                    </div>
+                    {renderEditableCell(item, 'por_detallar')}
                   </TableCell>
 
                   {/* Detallado */}
                   <TableCell className="px-3 py-2 text-xs text-center">
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${item.detallado > 0 ? 'bg-blue-400' : 'bg-gray-200'}`} />
-                      <span className={item.detallado > 0 ? 'text-gray-900' : 'text-gray-400'}>
-                        {item.detallado}
-                      </span>
-                    </div>
+                    {renderEditableCell(item, 'detallado')}
                   </TableCell>
 
                   {/* Sancocho */}
                   <TableCell className="px-3 py-2 text-xs text-center">
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${item.sancocho > 0 ? 'bg-red-400' : 'bg-gray-200'}`} />
-                      <span className={item.sancocho > 0 ? 'text-gray-900' : 'text-gray-400'}>
-                        {item.sancocho}
-                      </span>
-                    </div>
+                    {renderEditableCell(item, 'sancocho')}
                   </TableCell>
 
                   {/* Terminado */}
                   <TableCell className="px-3 py-2 text-xs text-center">
-                    <div className="flex items-center justify-center space-x-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${item.terminado > 0 ? 'bg-green-400' : 'bg-gray-200'}`} />
-                      <span className={item.terminado > 0 ? 'text-gray-900' : 'text-gray-400'}>
-                        {item.terminado}
-                      </span>
-                    </div>
+                    {renderEditableCell(item, 'terminado')}
                   </TableCell>
 
                   {/* Total en Proceso */}
