@@ -38,11 +38,11 @@ import {
 } from "@/app/actions/finanzas-actions";
 
 interface CashFlowMetrics {
-  totalQuotes: { mxn: number; usd: number };
-  soldQuotes: { mxn: number; usd: number };
-  pendingSales: { mxn: number; usd: number };
-  salesRate: number;
-  cotizacionesSold: number;
+  totalActiveQuotes: { mxn: number; usd: number };
+  actualPayments: { mxn: number; usd: number };
+  pendingCollections: { mxn: number; usd: number };
+  collectionRate: number;
+  activeCotizaciones: number;
   totalCotizaciones: number;
 }
 
@@ -69,11 +69,11 @@ interface CashFlowSectionProps {
 
 export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSectionProps) {
   const [metrics, setMetrics] = useState<CashFlowMetrics>({
-    totalQuotes: { mxn: 0, usd: 0 },
-    soldQuotes: { mxn: 0, usd: 0 },
-    pendingSales: { mxn: 0, usd: 0 },
-    salesRate: 0,
-    cotizacionesSold: 0,
+    totalActiveQuotes: { mxn: 0, usd: 0 },
+    actualPayments: { mxn: 0, usd: 0 },
+    pendingCollections: { mxn: 0, usd: 0 },
+    collectionRate: 0,
+    activeCotizaciones: 0,
     totalCotizaciones: 0
   });
   const [payments, setPayments] = useState<CotizacionPayment[]>([]);
@@ -129,13 +129,13 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
     }
   };
 
-  const getSalesRateColor = (rate: number) => {
+  const getCollectionRateColor = (rate: number) => {
     if (rate >= 80) return "text-emerald-600";
     if (rate >= 60) return "text-yellow-600";
     return "text-red-600";
   };
 
-  const getSalesRateIcon = (rate: number) => {
+  const getCollectionRateIcon = (rate: number) => {
     if (rate >= 80) return <CheckCircle2 className="h-4 w-4" />;
     if (rate >= 60) return <Clock className="h-4 w-4" />;
     return <AlertCircle className="h-4 w-4" />;
@@ -184,19 +184,25 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              <ReceiptIcon className="h-4 w-4 mr-2 text-blue-500" />
-              Cotizaciones Totales
+              <ReceiptIcon className="h-4 w-4 mr-2 text-purple-500" />
+              Cotizaciones Activas
             </CardTitle>
+            <CardDescription className="text-xs">
+              En producción o con anticipo
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              {formatCurrency(metrics.totalQuotes.mxn, "MXN")}
+              {formatCurrency(metrics.totalActiveQuotes.mxn, "MXN")}
             </div>
-            {metrics.totalQuotes.usd > 0 && (
+            {metrics.totalActiveQuotes.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.totalQuotes.usd, "USD")}
+                + {formatCurrency(metrics.totalActiveQuotes.usd, "USD")}
               </div>
             )}
+            <div className="text-xs text-muted-foreground mt-1">
+              {metrics.activeCotizaciones} de {metrics.totalCotizaciones} cotizaciones
+            </div>
           </CardContent>
         </Card>
 
@@ -204,16 +210,19 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
               <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-              Ventas Realizadas
+              Pagos Recibidos
             </CardTitle>
+            <CardDescription className="text-xs">
+              Dinero real cobrado
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(metrics.soldQuotes.mxn, "MXN")}
+              {formatCurrency(metrics.actualPayments.mxn, "MXN")}
             </div>
-            {metrics.soldQuotes.usd > 0 && (
+            {metrics.actualPayments.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.soldQuotes.usd, "USD")}
+                + {formatCurrency(metrics.actualPayments.usd, "USD")}
               </div>
             )}
           </CardContent>
@@ -223,16 +232,19 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
               <Clock className="h-4 w-4 mr-2 text-orange-500" />
-              Ventas Pendientes
+              Pendiente por Cobrar
             </CardTitle>
+            <CardDescription className="text-xs">
+              De cotizaciones activas
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(metrics.pendingSales.mxn, "MXN")}
+              {formatCurrency(metrics.pendingCollections.mxn, "MXN")}
             </div>
-            {metrics.pendingSales.usd > 0 && (
+            {metrics.pendingCollections.usd > 0 && (
               <div className="text-sm text-muted-foreground">
-                + {formatCurrency(metrics.pendingSales.usd, "USD")}
+                + {formatCurrency(metrics.pendingCollections.usd, "USD")}
               </div>
             )}
           </CardContent>
@@ -241,30 +253,33 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-              {getSalesRateIcon(metrics.salesRate)}
-              <span className="ml-2">Tasa de Conversión</span>
+              {getCollectionRateIcon(metrics.collectionRate)}
+              <span className="ml-2">Tasa de Cobranza</span>
             </CardTitle>
+            <CardDescription className="text-xs">
+              % de dinero ya cobrado
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getSalesRateColor(metrics.salesRate)}`}>
-              {metrics.salesRate.toFixed(1)}%
+            <div className={`text-2xl font-bold ${getCollectionRateColor(metrics.collectionRate)}`}>
+              {metrics.collectionRate.toFixed(1)}%
             </div>
             <div className="text-sm text-muted-foreground">
-              {metrics.cotizacionesSold} de {metrics.totalCotizaciones} vendidas
+              de cotizaciones activas
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Real Payments Table */}
+      {/* Active Quotations Payments Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-emerald-500" />
-            Ventas Realizadas - Anticipos y Pagos
+            <TrendingUp className="h-5 w-5 text-purple-500" />
+            Pagos de Cotizaciones Activas
           </CardTitle>
           <CardDescription>
-            Anticipos y pagos recibidos que confirman las ventas de cotizaciones
+            Pagos recibidos de cotizaciones en producción o con anticipo (flujo de efectivo real)
           </CardDescription>
         </CardHeader>
         <CardContent>

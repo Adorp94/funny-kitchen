@@ -1073,11 +1073,11 @@ export async function getCashFlowMetrics(
 ): Promise<{
   success: boolean;
   data?: {
-    totalQuotes: { mxn: number; usd: number };
-    soldQuotes: { mxn: number; usd: number };
-    pendingSales: { mxn: number; usd: number };
-    salesRate: number;
-    cotizacionesSold: number;
+    totalActiveQuotes: { mxn: number; usd: number };
+    actualPayments: { mxn: number; usd: number };
+    pendingCollections: { mxn: number; usd: number };
+    collectionRate: number;
+    activeCotizaciones: number;
     totalCotizaciones: number;
   };
   error?: string;
@@ -1103,124 +1103,115 @@ export async function getCashFlowMetrics(
       }
     }
 
-    // Get all cotizaciones for the period
-    let cotizacionesQuery = supabase
+    // Get all cotizaciones for the period (for context)
+    let allCotizacionesQuery = supabase
       .from('cotizaciones')
-      .select('cotizacion_id, total, total_mxn, moneda, monto_pagado, monto_pagado_mxn, estado');
+      .select('cotizacion_id');
 
     if (dateFilter) {
       const filters = dateFilter.split(',');
       for (const filter of filters) {
         const [field, operator, value] = filter.split('.');
         if (operator === 'gte') {
-          cotizacionesQuery = cotizacionesQuery.gte(field, value);
+          allCotizacionesQuery = allCotizacionesQuery.gte(field, value);
         } else if (operator === 'lt') {
-          cotizacionesQuery = cotizacionesQuery.lt(field, value);
+          allCotizacionesQuery = allCotizacionesQuery.lt(field, value);
         } else if (operator === 'lte') {
-          cotizacionesQuery = cotizacionesQuery.lte(field, value);
+          allCotizacionesQuery = allCotizacionesQuery.lte(field, value);
         }
       }
     }
 
-    const { data: cotizaciones, error: cotizacionesError } = await cotizacionesQuery;
+    // Get ACTIVE cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
+    let activeCotizacionesQuery = supabase
+      .from('cotizaciones')
+      .select('cotizacion_id, total, total_mxn, moneda, monto_pagado, monto_pagado_mxn, estado, estatus_pago')
+      .or('estado.eq.producción,estatus_pago.eq.anticipo');
 
-    if (cotizacionesError) {
-      console.error('Error fetching cotizaciones for cash flow:', cotizacionesError);
-      return { success: false, error: cotizacionesError.message };
-    }
-
-    // Get actual payments from pagos table for the same period
-    let pagosQuery = supabase
-      .from('pagos')
-      .select('monto, monto_mxn, moneda, cotizacion_id, tipo_ingreso')
-      .eq('tipo_ingreso', 'cotizacion');
-
-    if (year) {
-      if (month) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
-        let nextMonthYear = year;
-        let nextMonth = month + 1;
-        if (nextMonth > 12) {
-          nextMonth = 1;
-          nextMonthYear += 1;
+    if (dateFilter) {
+      const filters = dateFilter.split(',');
+      for (const filter of filters) {
+        const [field, operator, value] = filter.split('.');
+        if (operator === 'gte') {
+          activeCotizacionesQuery = activeCotizacionesQuery.gte(field, value);
+        } else if (operator === 'lt') {
+          activeCotizacionesQuery = activeCotizacionesQuery.lt(field, value);
+        } else if (operator === 'lte') {
+          activeCotizacionesQuery = activeCotizacionesQuery.lte(field, value);
         }
-        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
-        pagosQuery = pagosQuery.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
-      } else {
-        const yearStart = `${year}-01-01T00:00:00Z`;
-        const yearEnd = `${year}-12-31T23:59:59Z`;
-        pagosQuery = pagosQuery.gte('fecha_pago', yearStart).lte('fecha_pago', yearEnd);
       }
     }
 
-    const { data: pagos, error: pagosError } = await pagosQuery;
+    const [
+      { data: allCotizaciones, error: allCotizacionesError },
+      { data: activeCotizaciones, error: activeCotizacionesError }
+    ] = await Promise.all([
+      allCotizacionesQuery,
+      activeCotizacionesQuery
+    ]);
 
-    if (pagosError) {
-      console.error('Error fetching payments for cash flow:', pagosError);
-      return { success: false, error: pagosError.message };
+    if (allCotizacionesError || activeCotizacionesError) {
+      console.error('Error fetching cotizaciones for cash flow:', { 
+        allCotizacionesError, 
+        activeCotizacionesError 
+      });
+      return { 
+        success: false, 
+        error: allCotizacionesError?.message || activeCotizacionesError?.message 
+      };
     }
 
-    // Calculate metrics - New logic: a cotización is "sold" when it receives any payment
-    let totalQuotesMXN = 0;
-    let totalQuotesUSD = 0;
-    let soldQuotesMXN = 0;
-    let soldQuotesUSD = 0;
-    let cotizacionesSold = 0;
+    // Calculate metrics for ACTIVE cotizaciones only
+    let totalActiveQuotesMXN = 0;
+    let totalActiveQuotesUSD = 0;
+    let actualPaymentsMXN = 0;
+    let actualPaymentsUSD = 0;
 
-    // Calculate total quotes (all cotizaciones)
-    cotizaciones?.forEach(cot => {
+    activeCotizaciones?.forEach(cot => {
       const totalMXN = Number(cot.total_mxn || 0);
       const total = Number(cot.total || 0);
+      const paidMXN = Number(cot.monto_pagado_mxn || 0);
+      const paid = Number(cot.monto_pagado || 0);
       
       if (cot.moneda === 'MXN') {
-        totalQuotesMXN += totalMXN || total;
+        totalActiveQuotesMXN += totalMXN || total;
+        // For MXN, only use monto_pagado_mxn (don't double count with monto_pagado)
+        actualPaymentsMXN += paidMXN;
       } else {
-        totalQuotesUSD += total;
-        totalQuotesMXN += totalMXN; // Also add MXN equivalent
+        totalActiveQuotesUSD += total;
+        actualPaymentsUSD += paid;
+        totalActiveQuotesMXN += totalMXN; // Also add MXN equivalent for totals
+        actualPaymentsMXN += paidMXN; // Add converted payments
       }
     });
 
-    // Identify cotizaciones that have received payments (sold quotes)
-    const cotizacionesWithPaymentsSet = new Set(
-      pagos?.map(p => p.cotizacion_id).filter(Boolean)
-    );
-    cotizacionesSold = cotizacionesWithPaymentsSet.size;
+    // Calculate collection rate
+    const totalActiveValue = totalActiveQuotesMXN + (totalActiveQuotesUSD * 20); // Rough conversion for rate
+    const totalPaymentsValue = actualPaymentsMXN + (actualPaymentsUSD * 20);
+    const collectionRate = totalActiveValue > 0 ? (totalPaymentsValue / totalActiveValue) * 100 : 0;
 
-    // Calculate total value of sold quotes (quotes that received any payment)
-    cotizaciones?.forEach(cot => {
-      if (cotizacionesWithPaymentsSet.has(cot.cotizacion_id)) {
-        const totalMXN = Number(cot.total_mxn || 0);
-        const total = Number(cot.total || 0);
-        
-        if (cot.moneda === 'MXN') {
-          soldQuotesMXN += totalMXN || total;
-        } else {
-          soldQuotesUSD += total;
-          soldQuotesMXN += totalMXN; // Also add MXN equivalent
-        }
-      }
-    });
-
-    // Calculate sales rate (% of quotes that were sold)
-    const salesRate = cotizaciones && cotizaciones.length > 0 ? 
-      (cotizacionesSold / cotizaciones.length) * 100 : 0;
-
-    // Calculate pending sales (quotes not yet sold)
-    const pendingSalesMXN = totalQuotesMXN - soldQuotesMXN;
-    const pendingSalesUSD = totalQuotesUSD - soldQuotesUSD;
+    // Calculate pending collections
+    const pendingCollectionsMXN = totalActiveQuotesMXN - actualPaymentsMXN;
+    const pendingCollectionsUSD = totalActiveQuotesUSD - actualPaymentsUSD;
 
     return {
       success: true,
       data: {
-        totalQuotes: { mxn: totalQuotesMXN, usd: totalQuotesUSD },
-        soldQuotes: { mxn: soldQuotesMXN, usd: soldQuotesUSD },
-        pendingSales: { 
-          mxn: Math.max(0, pendingSalesMXN), 
-          usd: Math.max(0, pendingSalesUSD) 
+        totalActiveQuotes: { 
+          mxn: totalActiveQuotesMXN, 
+          usd: totalActiveQuotesUSD 
         },
-        salesRate: Math.round(salesRate * 100) / 100,
-        cotizacionesSold,
-        totalCotizaciones: cotizaciones?.length || 0
+        actualPayments: { 
+          mxn: actualPaymentsMXN, 
+          usd: actualPaymentsUSD 
+        },
+        pendingCollections: { 
+          mxn: Math.max(0, pendingCollectionsMXN), 
+          usd: Math.max(0, pendingCollectionsUSD) 
+        },
+        collectionRate: Math.round(collectionRate * 100) / 100,
+        activeCotizaciones: activeCotizaciones?.length || 0,
+        totalCotizaciones: allCotizaciones?.length || 0
       }
     };
 
@@ -1247,7 +1238,7 @@ export async function getCotizacionPayments(
   try {
     const offset = (page - 1) * pageSize;
 
-    // Build the query for payments related to cotizaciones
+    // Build the query for payments related to ACTIVE cotizaciones (in production OR with anticipo)
     let query = supabase
       .from('pagos')
       .select(`
@@ -1268,11 +1259,15 @@ export async function getCotizacionPayments(
           moneda,
           cliente_id,
           fecha_creacion,
-          estado
+          estado,
+          estatus_pago
         )
       `, { count: 'exact' })
       .eq('tipo_ingreso', 'cotizacion')
-      .not('cotizacion_id', 'is', null);
+      .not('cotizacion_id', 'is', null)
+      .or('cotizaciones.estado.eq.producción,cotizaciones.estatus_pago.eq.anticipo', { 
+        foreignTable: 'cotizaciones' 
+      });
 
     // Apply date filters
     if (year) {
