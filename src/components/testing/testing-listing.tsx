@@ -143,8 +143,20 @@ export const TestingListing: React.FC = () => {
        // Step 2: Add 25% merma to the TOTAL
        const totalCantidadConMerma = Math.ceil(totalCantidadOriginal * (1 + MERMA_PERCENTAGE));
        
-       // Step 3: Get available molds for this product (test values)
-       const moldesDisponibles = producto === "Juan Gabriel" ? 6 : 10;
+       // Step 3: Get available molds for this product (more realistic allocation)
+       // For testing purposes, we'll use a more realistic mold allocation:
+       // - Popular products get more molds, less popular get fewer
+       // - Total molds should not exceed reasonable factory capacity
+       const getProductMoldAllocation = (productName: string, totalQuantity: number) => {
+         // Base allocation: 2-12 molds depending on demand volume
+         if (totalQuantity >= 1000) return 12; // High volume products
+         if (totalQuantity >= 500) return 8;   // Medium volume products  
+         if (totalQuantity >= 200) return 6;   // Low-medium volume products
+         if (totalQuantity >= 100) return 4;   // Low volume products
+         return 2; // Very low volume products
+       };
+       
+       const moldesDisponibles = getProductMoldAllocation(producto, totalCantidadOriginal);
        
        // Step 4: Calculate effective daily production capacity
        // If molds are the limiting factor: daily_capacity = min(moldes_disponibles, DAILY_CAPACITY)
@@ -410,12 +422,65 @@ export const TestingListing: React.FC = () => {
 
   // Production schedule metrics
   const totalScheduledPieces = productionSchedule.reduce((sum, item) => sum + item.totalCantidad, 0);
-  const totalScheduledPiecesConMerma = productionSchedule.reduce((sum, item) => sum + item.totalCantidadConMerma, 0);
-  const totalWorkDays = productionSchedule.reduce((sum, item) => sum + item.totalDiasProduccion, 0);
-  const totalWorkWeeks = Math.ceil(totalWorkDays / WORK_DAYS_PER_WEEK);
+  
+  // Fix: Calculate merma globally for more accurate total
+  const globalMermaTotal = Math.ceil(totalScheduledPieces * (1 + MERMA_PERCENTAGE));
+  // Keep the per-product calculation for individual display but use global total for main metric
+  const totalScheduledPiecesConMerma = globalMermaTotal;
+  
+  // Fix: Calculate parallel production timeline instead of summing sequential days
+  // Find the cumulative production timeline considering parallel capacity
+  const calculateParallelProductionTimeline = () => {
+    if (productionSchedule.length === 0) return { totalDays: 0, totalWeeks: 0, lastCompletionDate: 'N/A' };
+    
+    // Sort products by earliest date to establish priority order
+    const sortedByPriority = [...productionSchedule].sort((a, b) => 
+      new Date(a.earliestDate).getTime() - new Date(b.earliestDate).getTime()
+    );
+    
+    // Simulate day-by-day production with capacity constraints
+    let currentDay = 0;
+    let remainingCapacity = DAILY_CAPACITY;
+    const productionQueue = sortedByPriority.map(item => ({
+      producto: item.producto,
+      remainingPieces: item.totalCantidadConMerma,
+      dailyCapacity: Math.min(item.moldesDisponibles, DAILY_CAPACITY),
+      isLimited: item.limitadoPorMoldes
+    }));
+    
+    // Process production day by day until all products are completed
+    while (productionQueue.some(p => p.remainingPieces > 0)) {
+      currentDay++;
+      remainingCapacity = DAILY_CAPACITY;
+      
+      // Allocate capacity to products in priority order
+      for (const product of productionQueue) {
+        if (product.remainingPieces > 0 && remainingCapacity > 0) {
+          const canProduce = Math.min(
+            product.remainingPieces,
+            product.dailyCapacity,
+            remainingCapacity
+          );
+          product.remainingPieces -= canProduce;
+          remainingCapacity -= canProduce;
+        }
+      }
+    }
+    
+    const totalWeeks = Math.ceil(currentDay / WORK_DAYS_PER_WEEK);
+    
+    // Calculate actual completion date
+    const { formatted: lastDate } = calculateCompletionDate(1, currentDay);
+    
+    return {
+      totalDays: currentDay,
+      totalWeeks: totalWeeks,
+      lastCompletionDate: lastDate
+    };
+  };
+  
+  const { totalDays: totalWorkDays, totalWeeks: totalWorkWeeks, lastCompletionDate } = calculateParallelProductionTimeline();
   const productosLimitadosPorMoldes = productionSchedule.filter(item => item.limitadoPorMoldes).length;
-  const lastCompletionDate = productionSchedule.length > 0 ? 
-    productionSchedule[productionSchedule.length - 1].formattedCompletionDate : 'N/A';
 
   return (
     <div className="space-y-2">
