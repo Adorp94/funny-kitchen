@@ -60,13 +60,16 @@ export default function InventarioMoldesPage() {
   // Filter and sort products
   const filteredAndSortedProductos = useMemo(() => {
     let filtered = productos.filter(producto => {
+      // First filter: Only show products with moldes_disponibles > 0
+      if (producto.moldes_disponibles <= 0) return false;
+      
       const matchesSearch = producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (producto.sku && producto.sku.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const moldesCount = producto.moldes_disponibles || 0;
       const matchesStockFilter = (() => {
         switch (filterStock) {
-          case 'sin-moldes': return moldesCount === 0;
+          case 'sin-moldes': return moldesCount === 0; // This will now never match since we filter out <= 0
           case 'moldes-bajos': return moldesCount > 0 && moldesCount <= 3;
           case 'moldes-suficientes': return moldesCount > 3;
           default: return true;
@@ -98,14 +101,16 @@ export default function InventarioMoldesPage() {
     return filtered;
   }, [productos, searchTerm, filterStock, sortBy, sortOrder]);
 
-  // Split products into multiple tables (like Excel layout)
-  const productsPerTable = 35; // Closer to Excel layout
+  // Split products into multiple tables with 16 records max per table
+  const productsPerTable = 16; // Changed from 35 to 16
   const productTables = useMemo(() => {
     const tables = [];
+    // Only create tables for the actual data we have
     for (let i = 0; i < filteredAndSortedProductos.length; i += productsPerTable) {
       tables.push(filteredAndSortedProductos.slice(i, i + productsPerTable));
     }
-    return tables;
+    // Return empty array if no products to avoid showing empty tables
+    return tables.length > 0 ? tables : [];
   }, [filteredAndSortedProductos]);
 
   // Handle quantity input change
@@ -245,7 +250,7 @@ export default function InventarioMoldesPage() {
       ['SKU', 'NOMBRE', 'MOLDES'].join(','),
       ...dataToExport.map(p => [
         p.sku || '',
-        `"${p.nombre}"`,
+        `"${p.nombre || p.sku || 'Sin nombre'}"`,
         p.moldes_disponibles || 0
       ].join(','))
     ].join('\n');
@@ -279,16 +284,23 @@ export default function InventarioMoldesPage() {
     }
   };
 
-  // Stats
+  // Stats - Updated to reflect new filtering logic
   const stats = useMemo(() => {
-    const total = productos.length;
-    const sin = productos.filter(p => (p.moldes_disponibles || 0) === 0).length;
-    const pocos = productos.filter(p => {
+    const totalProducts = productos.length;
+    const withMoldes = productos.filter(p => (p.moldes_disponibles || 0) > 0).length;
+    const withoutMoldes = productos.filter(p => (p.moldes_disponibles || 0) === 0).length;
+    const lowMoldes = productos.filter(p => {
       const m = p.moldes_disponibles || 0;
       return m > 0 && m <= 3;
     }).length;
-    return { total, sin, pocos };
-  }, [productos]);
+    return { 
+      totalProducts, 
+      withMoldes, 
+      withoutMoldes, 
+      lowMoldes,
+      showing: filteredAndSortedProductos.length 
+    };
+  }, [productos, filteredAndSortedProductos]);
 
   // Render a single table
   const renderTable = (products: Producto[], tableIndex: number) => (
@@ -313,6 +325,9 @@ export default function InventarioMoldesPage() {
                   }
                 }}
               />
+            </TableHead>
+            <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
+              ID
             </TableHead>
             <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
               SKU
@@ -354,12 +369,15 @@ export default function InventarioMoldesPage() {
                     onCheckedChange={() => toggleProductSelection(producto.producto_id)}
                   />
                 </TableCell>
+                <TableCell className="p-1 text-xs text-gray-500 font-mono">
+                  {producto.producto_id}
+                </TableCell>
                 <TableCell className="p-1 text-xs text-gray-600">
                   {producto.sku || '-'}
                 </TableCell>
                 <TableCell className="p-1 text-xs font-medium">
-                  <div className="truncate max-w-48" title={producto.nombre}>
-                    {producto.nombre}
+                  <div className="truncate max-w-48" title={producto.nombre || producto.sku || 'Sin nombre'}>
+                    {producto.nombre || producto.sku || 'Sin nombre'}
                   </div>
                 </TableCell>
                 <TableCell className="p-1 text-center">
@@ -410,9 +428,10 @@ export default function InventarioMoldesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold">INVENTARIO MOLDES</h1>
         <div className="flex items-center gap-2 text-xs text-gray-600">
-          <span>Total: {stats.total}</span>
-          <span className="text-red-600">Sin: {stats.sin}</span>
-          <span className="text-yellow-600">Pocos: {stats.pocos}</span>
+          <span>Total productos: {stats.totalProducts}</span>
+          <span className="text-green-600">Con moldes: {stats.withMoldes}</span>
+          <span className="text-red-600">Sin moldes: {stats.withoutMoldes}</span>
+          <span className="text-yellow-600">Pocos moldes: {stats.lowMoldes}</span>
         </div>
       </div>
 
@@ -432,10 +451,9 @@ export default function InventarioMoldesPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="sin-moldes">Sin moldes</SelectItem>
-            <SelectItem value="moldes-bajos">Pocos</SelectItem>
-            <SelectItem value="moldes-suficientes">Suficientes</SelectItem>
+            <SelectItem value="all">Todos con moldes</SelectItem>
+            <SelectItem value="moldes-bajos">Pocos moldes (1-3)</SelectItem>
+            <SelectItem value="moldes-suficientes">Suficientes (4+)</SelectItem>
           </SelectContent>
         </Select>
         {selectedProducts.size > 0 && (
@@ -452,7 +470,8 @@ export default function InventarioMoldesPage() {
 
       {/* Status */}
       <div className="flex items-center gap-4 text-xs text-gray-600">
-        <span>Mostrando: {filteredAndSortedProductos.length}</span>
+        <span>Mostrando: {stats.showing} productos con moldes disponibles</span>
+        <span>Tablas: {productTables.length} (máx. 16 productos por tabla)</span>
         {pendingUpdates.size > 0 && (
           <span className="text-yellow-600">Pendientes: {pendingUpdates.size}</span>
         )}
@@ -465,7 +484,10 @@ export default function InventarioMoldesPage() {
 
       {filteredAndSortedProductos.length === 0 && (
         <div className="text-center py-8 text-sm text-gray-500">
-          No se encontraron productos
+          {stats.withMoldes === 0 
+            ? "No hay productos con moldes disponibles" 
+            : "No se encontraron productos con moldes que coincidan con la búsqueda"
+          }
         </div>
       )}
     </div>
