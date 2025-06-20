@@ -240,6 +240,24 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const productoId = searchParams.get('id');
+
+    if (!productoId) {
+      return NextResponse.json(
+        { error: 'Producto ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('productos')
+      .delete()
+      .eq('producto_id', productoId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting producto:', error);
     return NextResponse.json(
