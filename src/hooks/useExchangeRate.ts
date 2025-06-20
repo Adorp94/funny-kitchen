@@ -42,6 +42,7 @@ export function useExchangeRate() {
           const data = await response.json();
           
           if (!data.success) {
+            console.log('Banxico API returned unsuccessful response, using fallback rate');
             throw new Error(data.error || 'API returned unsuccessful response');
           }
           
@@ -64,7 +65,7 @@ export function useExchangeRate() {
           console.log('Successfully fetched exchange rate:', parsedRate, 'with markup:', rateWithMarkup);
           console.log('Last updated date:', date);
         } catch (apiError) {
-          console.error('Error fetching exchange rate, using fallback values:', apiError);
+          console.log('Error fetching exchange rate, using fallback values:', apiError);
           setError(apiError instanceof Error ? apiError.message : 'Failed to fetch exchange rate');
           
           // Use fallback values

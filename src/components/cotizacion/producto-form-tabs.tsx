@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Package, FileText, Search, AlertCircle, Save, Check, ChevronsUpDown, Banknote, Box, Layers, Hash, X, User, Loader2, RefreshCw, Plus } from 'lucide-react';
+import { Package, FileText, Search, AlertCircle, Save, Check, ChevronsUpDown, Banknote, Box, Layers, Hash, X, User, Loader2, RefreshCw, Plus, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { FormControl, FormLabel } from '../ui/form';
 import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -11,6 +11,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { searchProductos, insertProducto, Producto as ProductoType } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useProductionBalance } from '@/hooks/useProductionBalance';
+import { Badge } from '../ui/badge';
 
 // Match the database schema exactly
 interface Producto {
@@ -59,6 +61,16 @@ interface ProductoFormProps {
 }
 
 export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormProps) {
+  // Production balance hook
+  const { getProductionBalance, getBalanceDisplay, getBalanceColor, loading: balanceLoading } = useProductionBalance();
+  
+  // Production balance state
+  const [productionBalance, setProductionBalance] = useState<{ 
+    balance: number; 
+    hasInventory: boolean; 
+    loading: boolean;
+  } | null>(null);
+
   const [activeTab, setActiveTab] = useState<string>(() => {
     // Check if we have previously saved form data with a product_id
     const savedForm = sessionStorage.getItem('cotizacion_productoForm');
@@ -507,11 +519,44 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     }
   }, [searchTerm, comboboxOpen, handleSearchTermChange]);
 
+  // Function to fetch production balance for a product
+  const fetchProductionBalance = async (productoId: number) => {
+    setProductionBalance({ balance: 0, hasInventory: false, loading: true });
+    
+    try {
+      const balanceData = await getProductionBalance(productoId);
+      
+      if (balanceData) {
+        setProductionBalance({
+          balance: balanceData.faltan_sobran,
+          hasInventory: true,
+          loading: false
+        });
+      } else {
+        setProductionBalance({
+          balance: 0,
+          hasInventory: false,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.log('Error fetching production balance:', error);
+      setProductionBalance({
+        balance: 0,
+        hasInventory: false,
+        loading: false
+      });
+    }
+  };
+
   // Handle selection of an existing product
   const handleSelectProduct = (productoId: string) => {
     const producto = searchResults.find(p => p.producto_id.toString() === productoId);
     
     if (!producto) return;
+    
+    // Fetch production balance for the selected product
+    fetchProductionBalance(producto.producto_id);
     
     // Completely replace the form data with the selected product
     const updatedFormData = {
@@ -1181,15 +1226,63 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   required
                   readOnly={!formData.producto_id && !comboboxOpen}
                 />
-                {touched.precio && errors.precio && (
-                  <div className="text-red-500 text-xs mt-1 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    {errors.precio}
+                              {touched.precio && errors.precio && (
+                <div className="text-red-500 text-xs mt-1 flex items-center">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  {errors.precio}
+                </div>
+              )}
+            </FormControl>
+            
+            {/* Production Balance Display */}
+            {formData.producto_id && (
+              <div className="md:col-span-2">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="h-4 w-4 text-gray-600" />
+                    <span className="font-medium text-gray-900 text-sm">Estado de Inventario en Producción</span>
                   </div>
-                )}
-              </FormControl>
-              
-              {/* Action buttons */}
+                  
+                  {productionBalance?.loading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Consultando inventario...</span>
+                    </div>
+                  ) : productionBalance?.hasInventory ? (
+                    <div className="flex items-center gap-2">
+                      {productionBalance.balance < 0 ? (
+                        <TrendingDown className="h-4 w-4 text-red-500" />
+                      ) : productionBalance.balance > 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Minus className="h-4 w-4 text-gray-500" />
+                      )}
+                      <Badge 
+                        variant={productionBalance.balance < 0 ? "destructive" : 
+                                productionBalance.balance > 0 ? "default" : "outline"}
+                        className={`text-xs ${
+                          productionBalance.balance > 0 ? 'bg-green-600 hover:bg-green-700' : ''
+                        }`}
+                      >
+                        {getBalanceDisplay(productionBalance.balance)}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        (Balance entre pedidos y producción activa)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      <span className="text-xs text-amber-700">
+                        No hay inventario registrado para este producto en la planificación de producción
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Action buttons */}
               <div className="md:col-span-2 mt-4 flex justify-between">
                 {!formData.producto_id ? (
                   <Button 
