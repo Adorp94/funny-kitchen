@@ -102,6 +102,20 @@ export async function POST(request: NextRequest) {
     // Calculate next ID (if no products exist, start with 1)
     const nextId = maxIdData ? maxIdData.producto_id + 1 : 1;
     
+    // Generate SKU if not provided and tipo_producto is set
+    let sku = body.sku;
+    if ((!sku || sku.trim() === '') && body.tipo_producto) {
+      const { data: skuData, error: skuError } = await supabase
+        .rpc('generate_sku', { p_tipo_producto: body.tipo_producto });
+      
+      if (skuError) {
+        console.error('Error generating SKU:', skuError);
+        throw new Error(`Failed to generate SKU: ${skuError.message}`);
+      }
+      
+      sku = skuData;
+    }
+    
     // Now insert with the explicitly specified ID
     const { data, error } = await supabase
       .from('productos')
@@ -110,7 +124,7 @@ export async function POST(request: NextRequest) {
         nombre: body.nombre.trim(),
         tipo_ceramica: body.tipo_ceramica || null,
         precio: body.precio || 0,
-        sku: body.sku || null,
+        sku: sku || null,
         capacidad: body.capacidad || null,
         unidad: body.unidad || null,
         tipo_producto: body.tipo_producto || null,
