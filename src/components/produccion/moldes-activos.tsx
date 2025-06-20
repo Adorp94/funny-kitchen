@@ -173,60 +173,99 @@ export function MoldesActivos() {
     searchProductos(value);
   }, [searchProductos]);
 
-  // Intersection Observer for infinite scroll
+  // Enhanced scroll detection for Command component
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && !searchTerm.trim() && hasMoreProducts && !isLoadingMore) {
-          console.log('Load more trigger visible, loading more products...');
+    if (!comboboxOpen) return;
+
+    let scrollContainer: HTMLElement | null = null;
+    
+    // Find the scrollable container within the Command component
+    const findScrollContainer = () => {
+      // Try multiple selectors to find the Command's scroll container
+      const selectors = [
+        '[cmdk-list]',
+        '[role="listbox"]',
+        '.cmdk-list',
+        '[data-cmdk-list]'
+      ];
+      
+      for (const selector of selectors) {
+        const element = document.querySelector(selector) as HTMLElement;
+        if (element) {
+          console.log('Found scroll container:', selector);
+          return element;
+        }
+      }
+      return null;
+    };
+
+    // Enhanced scroll handler with debouncing
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = target;
+        const scrollPercentage = (scrollTop / (scrollHeight - clientHeight)) * 100;
+        const isNearBottom = scrollPercentage > 80; // Trigger at 80% scroll
+
+        console.log('Scroll event:', { 
+          scrollTop, 
+          scrollHeight, 
+          clientHeight, 
+          scrollPercentage: Math.round(scrollPercentage),
+          isNearBottom,
+          hasMoreProducts,
+          isLoadingMore,
+          searchTerm: searchTerm.trim()
+        });
+
+        if (isNearBottom && !searchTerm.trim() && hasMoreProducts && !isLoadingMore) {
+          console.log('Triggering load more from scroll...');
           loadMoreProductos();
         }
-      },
-      {
-        threshold: 0.1,
-        rootMargin: '20px'
-      }
-    );
+      }, 100); // 100ms debounce
+    };
 
-    const currentTrigger = loadMoreTriggerRef.current;
-    if (currentTrigger) {
-      observer.observe(currentTrigger);
-    }
-
-    return () => {
-      if (currentTrigger) {
-        observer.unobserve(currentTrigger);
+    // Set up with retry mechanism
+    const setupScrollListener = () => {
+      scrollContainer = findScrollContainer();
+      if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        console.log('Scroll listener attached successfully');
+      } else {
+        console.log('Scroll container not found, retrying...');
+        setTimeout(setupScrollListener, 100); // Retry after 100ms
       }
     };
-  }, [searchTerm, hasMoreProducts, isLoadingMore, loadMoreProductos]);
+
+    setupScrollListener();
+
+    return () => {
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+        console.log('Scroll listener removed');
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [comboboxOpen, searchTerm, hasMoreProducts, isLoadingMore, loadMoreProductos]);
 
   // Load initial products when combobox opens
   useEffect(() => {
     if (comboboxOpen && productos.length > 0) {
-      console.log('Combobox opened. State:', { 
-        productosCount: productos.length, 
-        hasMoreProducts, 
-        currentPage,
-        searchTerm: searchTerm.trim()
-      });
+      console.log('Combobox opened - Products:', productos.length, 'HasMore:', hasMoreProducts);
       searchProductos('');
     }
   }, [comboboxOpen, productos, searchProductos]);
-
-  // Debug state changes
-  useEffect(() => {
-    console.log('Pagination state:', { 
-      currentPage, 
-      hasMoreProducts, 
-      isLoadingMore, 
-      productosCount: productos.length,
-      searchResultsCount: searchResults.length,
-      searchTerm: searchTerm.trim()
-    });
-  }, [currentPage, hasMoreProducts, isLoadingMore, productos.length, searchResults.length, searchTerm]);
 
   // Get selected product for display
   const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId);
