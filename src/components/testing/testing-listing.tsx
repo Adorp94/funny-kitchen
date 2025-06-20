@@ -480,24 +480,24 @@ export const TestingListing: React.FC = () => {
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
             <div className="grid grid-cols-5 gap-4 text-center">
               <div>
-                <div className="text-sm font-medium text-gray-900">{filteredData.length}</div>
-                <div className="text-xs text-gray-500">Grupos</div>
+                <div className="text-sm font-medium text-gray-900">{new Set(filteredData.map(group => group.cliente.split(' ')[0])).size}</div>
+                <div className="text-xs text-gray-500">Cotizaciones</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">{uniqueClientes}</div>
                 <div className="text-xs text-gray-500">Clientes</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-900">{totalRecords}</div>
-                <div className="text-xs text-gray-500">Registros</div>
+                <div className="text-sm font-medium text-gray-900">{new Set(filteredData.flatMap(group => group.productos.map(p => p.producto))).size}</div>
+                <div className="text-xs text-gray-500">Productos Únicos</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">{totalPieces.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">Piezas Total</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-900">{Math.round(totalPieces / Math.max(filteredData.length, 1))}</div>
-                <div className="text-xs text-gray-500">Promedio/Grupo</div>
+                <div className="text-sm font-medium text-gray-900">{Math.round(totalPieces / Math.max(new Set(filteredData.map(group => group.cliente.split(' ')[0])).size, 1))}</div>
+                <div className="text-xs text-gray-500">Piezas/Cotización</div>
               </div>
             </div>
           </div>
@@ -553,7 +553,7 @@ export const TestingListing: React.FC = () => {
                                   <div className="font-medium text-xs text-gray-900" title={cotizacion}>
                                     {cotizacion}
                                   </div>
-                                  <div className="text-xs text-gray-600 max-w-[120px] truncate" title={clientName}>
+                                  <div className="text-xs text-gray-600 leading-tight break-words max-w-[120px]" title={clientName}>
                                     {clientName}
                                   </div>
                                 </>
@@ -561,7 +561,7 @@ export const TestingListing: React.FC = () => {
                             } else {
                               // Fallback for unexpected format
                               return (
-                                <div className="font-medium text-xs text-gray-900 max-w-[120px] truncate" title={clienteText}>
+                                <div className="font-medium text-xs text-gray-900 leading-tight break-words max-w-[120px]" title={clienteText}>
                                   {clienteText}
                                 </div>
                               );
@@ -635,10 +635,10 @@ export const TestingListing: React.FC = () => {
           {filteredData.length > 0 && (
             <div className="flex justify-between items-center text-xs text-gray-500 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg mt-3">
               <span>
-                {filteredData.length} de {data.length} grupos mostrados
+                {new Set(filteredData.map(group => group.cliente.split(' ')[0])).size} cotizaciones en producción
               </span>
               <span>
-                Total: {totalPieces.toLocaleString()} piezas
+                Total: {totalPieces.toLocaleString()} piezas • {new Set(filteredData.flatMap(group => group.productos.map(p => p.producto))).size} productos únicos
               </span>
             </div>
           )}
@@ -767,7 +767,7 @@ export const TestingListing: React.FC = () => {
                             {/* Show ALL clients */}
                             {item.clientes.map((cliente, cIndex) => (
                               <div key={cIndex} className="flex justify-between text-xs">
-                                <span className="text-gray-700 max-w-[120px] truncate" title={cliente.cliente}>
+                                <span className="text-gray-700 leading-tight break-words max-w-[120px]" title={cliente.cliente}>
                                   {cliente.cliente}
                                 </span>
                                 <span className="font-medium text-gray-900">{cliente.cantidad}</span>

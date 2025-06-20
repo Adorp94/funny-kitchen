@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,8 +52,15 @@ export function MoldesActivos() {
   const [searchResults, setSearchResults] = useState<Producto[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Pagination states for infinite scroll
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // State for editing quantities (to avoid constant API calls)
   const [editingQuantities, setEditingQuantities] = useState<Record<string, string>>({});
+
+
 
   // Fetch data from API
   const fetchMesas = useCallback(async () => {
@@ -73,19 +80,32 @@ export function MoldesActivos() {
     }
   }, []);
 
-  const fetchProductos = useCallback(async () => {
+  const fetchProductos = useCallback(async (page = 0, reset = true) => {
     try {
-      const response = await fetch('/api/productos');
+      const pageSize = 20; // Load 20 products per batch
+      const response = await fetch(`/api/productos?page=${page}&pageSize=${pageSize}`);
       if (!response.ok) {
         throw new Error('Failed to fetch productos');
       }
       const result = await response.json();
-      const productos = result.data || result;
-      setProductos(productos.map((p: any) => ({
+      const newProductos = (result.data || result).map((p: any) => ({
         producto_id: p.producto_id,
         nombre: p.nombre,
         sku: p.sku
-      })));
+      }));
+
+      if (reset) {
+        // First load - replace products
+        setProductos(newProductos);
+        setCurrentPage(0);
+      } else {
+        // Infinite scroll - append products
+        setProductos(prev => [...prev, ...newProductos]);
+      }
+
+      // Update pagination state
+      setHasMoreProducts(result.hasMore || false);
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching productos:', error);
       toast.error('Error al cargar los productos', {
@@ -98,7 +118,10 @@ export function MoldesActivos() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchMesas(), fetchProductos()]);
+      // Reset pagination state
+      setCurrentPage(0);
+      setHasMoreProducts(true);
+      await Promise.all([fetchMesas(), fetchProductos(0, true)]);
     } finally {
       setLoading(false);
     }
@@ -108,18 +131,33 @@ export function MoldesActivos() {
     fetchData();
   }, [fetchData]);
 
+  // Load more products for infinite scroll
+  const loadMoreProductos = useCallback(async () => {
+    if (isLoadingMore || !hasMoreProducts) return;
+    
+    setIsLoadingMore(true);
+    try {
+      await fetchProductos(currentPage + 1, false);
+    } catch (error) {
+      console.error('Error loading more productos:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, hasMoreProducts, isLoadingMore, fetchProductos]);
+
   // Search productos with debouncing
   const searchProductos = useCallback(async (searchValue: string) => {
     setIsSearching(true);
     try {
       if (!searchValue.trim()) {
-        setSearchResults(productos.slice(0, 20)); // Show first 20 products when no search
+        // For initial display, show the loaded products (with infinite scroll support)
+        setSearchResults(productos);
       } else {
         const filtered = productos.filter(producto => 
           producto.nombre.toLowerCase().includes(searchValue.toLowerCase()) ||
           (producto.sku && producto.sku.toLowerCase().includes(searchValue.toLowerCase()))
         );
-        setSearchResults(filtered.slice(0, 20)); // Limit to 20 results
+        setSearchResults(filtered);
       }
     } catch (error) {
       console.error('Error searching productos:', error);
@@ -135,12 +173,60 @@ export function MoldesActivos() {
     searchProductos(value);
   }, [searchProductos]);
 
+  // Intersection Observer for infinite scroll
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !searchTerm.trim() && hasMoreProducts && !isLoadingMore) {
+          console.log('Load more trigger visible, loading more products...');
+          loadMoreProductos();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '20px'
+      }
+    );
+
+    const currentTrigger = loadMoreTriggerRef.current;
+    if (currentTrigger) {
+      observer.observe(currentTrigger);
+    }
+
+    return () => {
+      if (currentTrigger) {
+        observer.unobserve(currentTrigger);
+      }
+    };
+  }, [searchTerm, hasMoreProducts, isLoadingMore, loadMoreProductos]);
+
   // Load initial products when combobox opens
   useEffect(() => {
     if (comboboxOpen && productos.length > 0) {
+      console.log('Combobox opened. State:', { 
+        productosCount: productos.length, 
+        hasMoreProducts, 
+        currentPage,
+        searchTerm: searchTerm.trim()
+      });
       searchProductos('');
     }
   }, [comboboxOpen, productos, searchProductos]);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log('Pagination state:', { 
+      currentPage, 
+      hasMoreProducts, 
+      isLoadingMore, 
+      productosCount: productos.length,
+      searchResultsCount: searchResults.length,
+      searchTerm: searchTerm.trim()
+    });
+  }, [currentPage, hasMoreProducts, isLoadingMore, productos.length, searchResults.length, searchTerm]);
 
   // Get selected product for display
   const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId);
@@ -499,6 +585,30 @@ export function MoldesActivos() {
                                           </div>
                                         </CommandItem>
                                       ))}
+                                      {!searchTerm.trim() && hasMoreProducts && (
+                                        <div 
+                                          ref={loadMoreTriggerRef}
+                                          className="p-2 text-center text-xs text-muted-foreground cursor-pointer hover:bg-muted/50"
+                                          onClick={() => {
+                                            console.log('Manual load more clicked');
+                                            if (!isLoadingMore) {
+                                              loadMoreProductos();
+                                            }
+                                          }}
+                                        >
+                                          {isLoadingMore ? (
+                                            <div className="flex items-center justify-center">
+                                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                              Cargando más productos...
+                                            </div>
+                                          ) : (
+                                            <div>
+                                              <div>Desplázate hacia abajo para cargar más...</div>
+                                              <div className="text-xs text-muted-foreground/70 mt-1">O haz clic aquí</div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </CommandGroup>
                                   )}
                                 </CommandList>
