@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Package, TrendingUp, TrendingDown, Minus, Factory, AlertTriangle, CheckCircle, Clock, Settings } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { RefreshCw, Package, TrendingUp, TrendingDown, Minus, Factory, AlertTriangle, CheckCircle, Clock, Settings, Plus, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from "sonner";
 
 interface ProductionActiveItem {
@@ -37,6 +41,13 @@ interface ProductionSummary {
   productosAlDia: number;
 }
 
+interface Producto {
+  producto_id: number;
+  nombre: string;
+  sku?: string;
+  tipo_producto?: string;
+}
+
 export const ProductionActiveListing: React.FC = () => {
   const [data, setData] = useState<ProductionActiveItem[]>([]);
   const [filteredData, setFilteredData] = useState<ProductionActiveItem[]>([]);
@@ -49,6 +60,28 @@ export const ProductionActiveListing: React.FC = () => {
   const [editingCell, setEditingCell] = useState<{productId: number, field: string} | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
   const [updating, setUpdating] = useState<Set<number>>(new Set());
+
+  // Add producto dialog state
+  const [showAddProductoDialog, setShowAddProductoDialog] = useState(false);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [selectedProductoId, setSelectedProductoId] = useState<string>('');
+  const [pedidosQuantity, setPedidosQuantity] = useState<string>('');
+  
+  // Combobox states for producto selection
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [productoSearchTerm, setProductoSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Producto[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isAddingProducto, setIsAddingProducto] = useState(false);
+
+  // Pagination states for producto selection
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // References for infinite scroll
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
   const fetchData = useCallback(async () => {
     console.log("ProductionActiveListing: fetchData triggered");
@@ -83,15 +116,246 @@ export const ProductionActiveListing: React.FC = () => {
     }
   }, []);
 
+  // Fetch productos for selection
+  const fetchProductos = useCallback(async (page = 0, reset = true) => {
+    try {
+      const pageSize = 20;
+      const response = await fetch(`/api/productos?page=${page}&pageSize=${pageSize}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch productos');
+      }
+      const result = await response.json();
+      const newProductos = (result.data || result).map((p: any) => ({
+        producto_id: p.producto_id,
+        nombre: p.nombre,
+        sku: p.sku,
+        tipo_producto: p.tipo_producto
+      }));
+
+      if (reset) {
+        setProductos(newProductos);
+        setCurrentPage(0);
+      } else {
+        setProductos(prev => [...prev, ...newProductos]);
+      }
+
+      setHasMoreProducts(result.hasMore || false);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Error fetching productos:', error);
+      toast.error('Error al cargar productos', {
+        description: 'No se pudieron cargar los productos disponibles',
+        duration: 4000,
+      });
+    }
+  }, []);
+
+  // Load more productos for infinite scroll
+  const loadMoreProductos = useCallback(async () => {
+    if (isLoadingMore || !hasMoreProducts) return;
+    
+    setIsLoadingMore(true);
+    try {
+      await fetchProductos(currentPage + 1, false);
+    } catch (error) {
+      console.error('Error loading more productos:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, hasMoreProducts, isLoadingMore, fetchProductos]);
+
   const handleSearch = useCallback((term: string) => {
     setSearchTerm(term);
     applyFilters(term, statusFilter);
   }, [statusFilter]);
 
+  // Search productos for selection
+  const searchProductos = useCallback(async (searchValue: string) => {
+    setIsSearching(true);
+    try {
+      if (!searchValue.trim()) {
+        setSearchResults(productos);
+      } else {
+        const filtered = productos.filter(producto => 
+          producto.nombre.toLowerCase().includes(searchValue.toLowerCase()) ||
+          (producto.sku && producto.sku.toLowerCase().includes(searchValue.toLowerCase()))
+        );
+        setSearchResults(filtered);
+      }
+    } catch (error) {
+      console.error('Error searching productos:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [productos]);
+
+  // Handle search input change for producto selection
+  const handleProductoSearchChange = useCallback((value: string) => {
+    setProductoSearchTerm(value);
+    searchProductos(value);
+  }, [searchProductos]);
+
+  // Enhanced scroll detection for infinite scroll
+  useEffect(() => {
+    if (!comboboxOpen) return;
+
+    let scrollContainer: HTMLElement | null = null;
+    
+    const findScrollContainer = () => {
+      const selectors = [
+        '[cmdk-list]',
+        '[role="listbox"]',
+        '.cmdk-list',
+        '[data-cmdk-list]'
+      ];
+      
+      for (const selector of selectors) {
+        const element = document.querySelector(selector) as HTMLElement;
+        if (element) {
+          return element;
+        }
+      }
+      return null;
+    };
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
+      scrollTimeoutRef.current = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = target;
+        const scrollPercentage = (scrollTop / (scrollHeight - clientHeight)) * 100;
+        const isNearBottom = scrollPercentage > 80;
+
+                 if (isNearBottom && !productoSearchTerm.trim() && hasMoreProducts && !isLoadingMore) {
+           loadMoreProductos();
+         }
+      }, 100);
+    };
+
+    const setupScrollListener = () => {
+      scrollContainer = findScrollContainer();
+      if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+      } else {
+        setTimeout(setupScrollListener, 100);
+      }
+    };
+
+    setupScrollListener();
+
+    return () => {
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      }
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, [comboboxOpen, productoSearchTerm, hasMoreProducts, isLoadingMore, loadMoreProductos]);
+
   const handleStatusFilter = useCallback((filter: 'all' | 'deficit' | 'surplus' | 'balanced') => {
     setStatusFilter(filter);
     applyFilters(searchTerm, filter);
   }, [searchTerm]);
+
+    // Handle adding producto to production
+  const handleAddProducto = async () => {
+    if (!selectedProductoId || !pedidosQuantity) {
+      toast.error('Campos requeridos', {
+        description: 'Por favor selecciona un producto y especifica la cantidad de pedidos',
+        duration: 3000,
+      });
+      return;
+    }
+
+    const quantity = parseInt(pedidosQuantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error('Cantidad inválida', {
+        description: 'La cantidad debe ser un número entero positivo',
+        duration: 3000,
+      });
+      return;
+    }
+
+    setIsAddingProducto(true);
+    try {
+      // Check if product already exists
+      const existingProduct = data.find(item => item.producto_id === parseInt(selectedProductoId));
+      
+      const response = await fetch('/api/production-active', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          producto_id: parseInt(selectedProductoId),
+          pedidos: existingProduct ? existingProduct.pedidos + quantity : quantity,
+          por_detallar: 0,
+          detallado: 0,
+          sancocho: 0,
+          terminado: 0
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add producto to production');
+      }
+
+      const result = await response.json();
+      const productName = productos.find(p => p.producto_id.toString() === selectedProductoId)?.nombre || 'Producto';
+      
+      if (existingProduct) {
+        // Product already exists, pedidos quantity was updated
+        toast.success('Producto actualizado', {
+          description: `${productName}: ${existingProduct.pedidos} + ${quantity} = ${existingProduct.pedidos + quantity} pedidos`,
+          duration: 4000,
+        });
+      } else {
+        // New product was added
+        toast.success('Producto agregado', {
+          description: `${productName} agregado a producción con ${quantity} pedidos`,
+          duration: 3000,
+        });
+      }
+      
+      // Refresh the data
+      await fetchData();
+      
+      // Reset form
+      setSelectedProductoId('');
+      setProductoSearchTerm('');
+      setPedidosQuantity('');
+      setShowAddProductoDialog(false);
+      setComboboxOpen(false);
+    } catch (error: any) {
+      console.error('Error adding producto:', error);
+      toast.error('Error al agregar producto', {
+        description: error.message,
+        duration: 4000,
+      });
+    } finally {
+      setIsAddingProducto(false);
+    }
+  };
+
+  // Load initial productos when combobox opens
+  useEffect(() => {
+    if (comboboxOpen && productos.length > 0) {
+      searchProductos('');
+    }
+  }, [comboboxOpen, productos, searchProductos]);
+
+  // Initialize productos on component mount
+  useEffect(() => {
+    fetchProductos(0, true);
+  }, [fetchProductos]);
 
   const applyFilters = useCallback((searchTerm: string, statusFilter: string) => {
     if (!data) return;
@@ -418,6 +682,182 @@ export const ProductionActiveListing: React.FC = () => {
             Balanceado
           </Button>
           <div className="w-px h-4 bg-gray-300 mx-1" />
+          <Dialog 
+            open={showAddProductoDialog} 
+            onOpenChange={(open) => {
+              setShowAddProductoDialog(open);
+                             if (open) {
+                 // Reset form when opening
+                 setSelectedProductoId('');
+                 setProductoSearchTerm('');
+                 setPedidosQuantity('');
+                 setComboboxOpen(false);
+               }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button 
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-sm">Agregar Producto a Producción</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Producto</label>
+                  <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={comboboxOpen}
+                        className="w-full justify-between h-8 text-xs"
+                      >
+                        {selectedProductoId
+                          ? (() => {
+                              const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId);
+                              return selectedProduct 
+                                ? `${selectedProduct.nombre}${selectedProduct.sku ? ` (${selectedProduct.sku})` : ''}`
+                                : "Producto seleccionado";
+                            })()
+                          : "Buscar producto..."}
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                      <Command shouldFilter={false}>
+                                                 <CommandInput 
+                           placeholder="Buscar por nombre o SKU..." 
+                           value={productoSearchTerm}
+                           onValueChange={handleProductoSearchChange}
+                           className="text-xs"
+                         />
+                        <CommandList>
+                          {isSearching && (
+                            <div className="p-2 text-center text-xs flex items-center justify-center text-muted-foreground">
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Buscando...
+                            </div>
+                          )}
+                          {!isSearching && searchResults.length === 0 && (
+                            <CommandEmpty className="text-xs">No se encontraron productos.</CommandEmpty>
+                          )}
+                          {!isSearching && searchResults.length > 0 && (
+                            <CommandGroup>
+                              {searchResults.map((producto) => (
+                                <CommandItem
+                                  key={producto.producto_id}
+                                  value={producto.producto_id.toString()}
+                                  onSelect={(value) => {
+                                    setSelectedProductoId(value);
+                                    setComboboxOpen(false);
+                                                                         const selected = productos.find(p => p.producto_id.toString() === value);
+                                     if (selected) {
+                                       setProductoSearchTerm(selected.nombre);
+                                     }
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-1 h-3 w-3",
+                                      selectedProductoId === producto.producto_id.toString() ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <Package className="mr-1 h-3 w-3 text-muted-foreground" />
+                                  <div className="flex-1">
+                                    <div className="font-medium">
+                                      {producto.nombre}
+                                    </div>
+                                    {producto.sku && (
+                                      <div className="text-xs text-muted-foreground">
+                                        SKU: {producto.sku}
+                                      </div>
+                                    )}
+                                    {producto.tipo_producto && (
+                                      <div className="text-xs text-muted-foreground">
+                                        Tipo: {producto.tipo_producto}
+                                      </div>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                                                             {!productoSearchTerm.trim() && hasMoreProducts && (
+                                <div 
+                                  ref={loadMoreTriggerRef}
+                                  className="p-2 text-center text-xs text-muted-foreground cursor-pointer hover:bg-muted/50"
+                                  onClick={() => {
+                                    if (!isLoadingMore) {
+                                      loadMoreProductos();
+                                    }
+                                  }}
+                                >
+                                  {isLoadingMore ? (
+                                    <div className="flex items-center justify-center">
+                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                      Cargando más productos...
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <div>Desplázate hacia abajo para cargar más...</div>
+                                      <div className="text-xs text-muted-foreground/70 mt-1">O haz clic aquí</div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Cantidad de Pedidos</label>
+                  <Input 
+                    type="number"
+                    value={pedidosQuantity}
+                    onChange={(e) => setPedidosQuantity(e.target.value)}
+                    placeholder="ej: 100"
+                    min="1"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowAddProductoDialog(false)} 
+                    size="sm" 
+                    className="h-7 px-2 text-xs"
+                    disabled={isAddingProducto}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={handleAddProducto} 
+                    disabled={!selectedProductoId || !pedidosQuantity || isAddingProducto} 
+                    size="sm" 
+                    className="h-7 px-2 text-xs"
+                  >
+                    {isAddingProducto ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Agregando...
+                      </>
+                    ) : (
+                      'Agregar'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button 
             onClick={fetchData} 
             variant="ghost"
