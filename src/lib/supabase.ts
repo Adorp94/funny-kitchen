@@ -171,15 +171,17 @@ export async function insertCliente(cliente: Omit<Cliente, 'cliente_id'>) {
   }
 }
 
-// Insert a new product
+// Insert a new product using API with SKU generation
 export async function insertProducto(producto: Omit<Producto, 'producto_id'>) {
-  const supabase = createClientComponentClient();
-  
   try {
-    const { data, error } = await supabase
-      .from('productos')
-      .insert({
-        nombre: producto.nombre.trim(),
+    // Use the API endpoint which includes SKU generation logic
+    const response = await fetch('/api/productos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nombre: producto.nombre.trim(), // Trim name to avoid extra spaces
         tipo_ceramica: producto.tipo_ceramica || null,
         precio: producto.precio || 0,
         sku: producto.sku || null,
@@ -191,11 +193,21 @@ export async function insertProducto(producto: Omit<Producto, 'producto_id'>) {
         tiempo_produccion: producto.tiempo_produccion || null,
         cantidad_inventario: producto.cantidad_inventario || 0,
         inventario: producto.inventario || null
-      })
-      .select()
-      .single();
-      
-    return { data, error };
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create product');
+    }
+
+    const result = await response.json();
+    
+    if (result.success && result.producto) {
+      return { data: result.producto, error: null };
+    } else {
+      throw new Error('Unexpected API response format');
+    }
   } catch (error) {
     console.error('Error inserting producto:', error);
     return { data: null, error };

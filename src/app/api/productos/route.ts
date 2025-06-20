@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       .from('productos')
       .insert({
         producto_id: nextId,
-        nombre: body.nombre.trim(),
+        nombre: (body.nombre || '').trim(), // Always trim and handle undefined/null
         tipo_ceramica: body.tipo_ceramica || null,
         precio: body.precio || 0,
         sku: sku || null,
@@ -172,7 +172,7 @@ export async function PATCH(request: NextRequest) {
   try {
     // Ensure moldes_disponibles has a default value to prevent null errors
     const updateData: any = {
-      nombre: body.nombre,
+      nombre: (body.nombre || '').trim(), // Always trim and handle undefined/null
       tipo_ceramica: body.tipo_ceramica,
       precio: body.precio,
       sku: body.sku,

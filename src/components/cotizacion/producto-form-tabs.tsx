@@ -697,7 +697,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     try {
       // Create producto object for API
       const productoToCreate = {
-        nombre: formData.nombre,
+        nombre: formData.nombre.trim(), // Trim name to avoid extra spaces
         tipo_ceramica: formData.tipo_ceramica || null,
         precio: formData.precio ? parseFloat(formData.precio) : null,
         sku: formData.sku || null,
