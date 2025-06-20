@@ -156,6 +156,34 @@ export function CotizacionStatusForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Total Summary Display */}
+            {cotizacion && (
+              <div className="bg-background rounded-lg border p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total de la cotización:</span>
+                  <span className="font-semibold">
+                    {new Intl.NumberFormat('es-MX', {
+                      style: 'currency',
+                      currency: cotizacion.moneda === 'USD' ? 'USD' : 'MXN',
+                      minimumFractionDigits: 2
+                    }).format(cotizacion.total)}
+                  </span>
+                </div>
+                {form.watch("montoAnticipo") && parseFloat(form.watch("montoAnticipo") || '0') > 0 && (
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span className="text-muted-foreground">Anticipo a pagar:</span>
+                    <span className="font-semibold text-primary">
+                      {new Intl.NumberFormat('es-MX', {
+                        style: 'currency',
+                        currency: cotizacion.moneda === 'USD' ? 'USD' : 'MXN',
+                        minimumFractionDigits: 2
+                      }).format(parseFloat(form.watch("montoAnticipo") || '0'))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Monto Anticipo Input - Manual Handling */}
             <div className="space-y-2">
                <div className="flex justify-between items-center">
