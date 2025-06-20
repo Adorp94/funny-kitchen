@@ -67,10 +67,41 @@ export const TestingListing: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Production constants
+  // Production constants - More realistic for actual production
   const DAILY_CAPACITY = 340; // pieces per day production capacity
   const WORK_DAYS_PER_WEEK = 6; // working days per week
   const MERMA_PERCENTAGE = 0.25; // 25% waste/buffer
+
+  // NEW: State for product data
+  const [productData, setProductData] = useState<Map<string, { vueltas_max_dia: number; moldes_disponibles: number }>>(new Map());
+
+  // NEW: Fetch real product data for accurate calculations
+  const fetchProductData = useCallback(async (productNames: string[]) => {
+    try {
+      const response = await fetch('/api/productos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_names: productNames })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const productMap = new Map();
+        
+        data.productos?.forEach((producto: any) => {
+          productMap.set(producto.nombre, {
+            vueltas_max_dia: producto.vueltas_max_dia || 1,
+            moldes_disponibles: producto.moldes_disponibles || 1
+          });
+        });
+        
+        setProductData(productMap);
+        console.log('Loaded product data for', productMap.size, 'products');
+      }
+    } catch (error) {
+      console.error('Error fetching product data:', error);
+    }
+  }, []);
 
   // Calculate work days and completion date from today
   const calculateCompletionDate = useCallback((startDay: number, daysRequired: number): { date: Date; formatted: string } => {
@@ -98,7 +129,7 @@ export const TestingListing: React.FC = () => {
     return { date: currentDate, formatted };
   }, []);
 
-  // Create production schedule with new cumulative logic
+  // IMPROVED: Create production schedule with real product data
   const createProductionSchedule = useCallback((rawData: TestingDataItem[]): ProductionScheduleItem[] => {
     // Group by product name
     const productGroups = new Map<string, {
@@ -136,66 +167,46 @@ export const TestingListing: React.FC = () => {
         new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
       );
 
-                    // Calculate total production for the entire product
-       // Step 1: Calculate total pieces across all clients
-       const totalCantidadOriginal = group.totalCantidad;
-       
-       // Step 2: Add 25% merma to the TOTAL
-       const totalCantidadConMerma = Math.ceil(totalCantidadOriginal * (1 + MERMA_PERCENTAGE));
-       
-       // Step 3: Get available molds for this product (more realistic allocation)
-       // For testing purposes, we'll use a more realistic mold allocation:
-       // - Popular products get more molds, less popular get fewer
-       // - Total molds should not exceed reasonable factory capacity
-       const getProductMoldAllocation = (productName: string, totalQuantity: number) => {
-         // Base allocation: 2-12 molds depending on demand volume
-         if (totalQuantity >= 1000) return 12; // High volume products
-         if (totalQuantity >= 500) return 8;   // Medium volume products  
-         if (totalQuantity >= 200) return 6;   // Low-medium volume products
-         if (totalQuantity >= 100) return 4;   // Low volume products
-         return 2; // Very low volume products
-       };
-       
-       const moldesDisponibles = getProductMoldAllocation(producto, totalCantidadOriginal);
-       
-       // Step 4: Calculate effective daily production capacity
-       // If molds are the limiting factor: daily_capacity = min(moldes_disponibles, DAILY_CAPACITY)
-       const effectiveDailyCapacity = Math.min(moldesDisponibles, DAILY_CAPACITY);
-       
-       // Step 5: Check if limited by molds
-       const limitadoPorMoldes = moldesDisponibles < DAILY_CAPACITY;
-       
-       // Step 6: Calculate molds theoretically needed if no mold constraint
-       const moldesNecesarios = limitadoPorMoldes ? moldesDisponibles : Math.ceil(totalCantidadConMerma / DAILY_CAPACITY);
-       
-       // Step 7: Calculate production days using effective capacity
-       const totalDiasProduccion = Math.ceil(totalCantidadConMerma / effectiveDailyCapacity);
-
-       // For individual client display, calculate their merma quantities but use total days for all
-       const clientesWithProduction = sortedClientes.map((cliente, index) => {
-         const cantidadConMerma = Math.ceil(cliente.cantidad * (1 + MERMA_PERCENTAGE));
-
-         // Debug logging for Juan Gabriel
-         if (producto === "Juan Gabriel") {
-           console.log(`${producto} - Cliente ${index + 1}: ${cliente.cliente}`);
-           console.log(`  Original: ${cliente.cantidad}, Con Merma: ${cantidadConMerma}`);
-           console.log(`  Total Original: ${totalCantidadOriginal}, Total Con Merma: ${totalCantidadConMerma}`);
-           console.log(`  Moldes Disponibles: ${moldesDisponibles}, Effective Daily Capacity: ${effectiveDailyCapacity}`);
-           console.log(`  Limitado por Moldes: ${limitadoPorMoldes}`);
-           console.log(`  Calculation: ${totalCantidadConMerma} ÷ ${effectiveDailyCapacity} = ${totalDiasProduccion} days`);
-           console.log(`  Weeks: ${totalDiasProduccion} ÷ ${WORK_DAYS_PER_WEEK} = ${Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK)} weeks`);
-         }
-
-         return {
-           ...cliente,
-           cantidadConMerma,
-           cumulativeCantidad: totalCantidadConMerma, // Show total for all
-           diasProduccion: totalDiasProduccion, // Same total days for all clients
-           order: index + 1
-         };
-       });
+      // Get REAL product data from the fetched data
+      const realProductData = productData.get(producto);
+      const vueltas_max_dia = realProductData?.vueltas_max_dia || 1;
+      const moldes_disponibles = realProductData?.moldes_disponibles || 1;
       
-              const totalSemanasProduccion = Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK);
+      // Calculate total production
+      const totalCantidadOriginal = group.totalCantidad;
+      
+      // Apply realistic merma percentage
+      const totalCantidadConMerma = Math.ceil(totalCantidadOriginal * (1 + MERMA_PERCENTAGE));
+      
+      // Calculate daily production capacity for this specific product
+      const dailyProductionCapacity = moldes_disponibles * vueltas_max_dia;
+      
+      // Check if limited by molds or by global capacity
+      const limitadoPorMoldes = dailyProductionCapacity < DAILY_CAPACITY;
+      
+      // Effective daily production (limited by either molds or global capacity)
+      const effectiveDailyCapacity = Math.min(dailyProductionCapacity, DAILY_CAPACITY);
+      
+      // Calculate production days needed
+      const totalDiasProduccion = Math.ceil(totalCantidadConMerma / effectiveDailyCapacity);
+      
+      // Calculate molds theoretically needed
+      const moldesNecesarios = Math.ceil(totalCantidadConMerma / DAILY_CAPACITY);
+
+      // For individual client display
+      const clientesWithProduction = sortedClientes.map((cliente, index) => {
+        const cantidadConMerma = Math.ceil(cliente.cantidad * (1 + MERMA_PERCENTAGE));
+
+        return {
+          ...cliente,
+          cantidadConMerma,
+          cumulativeCantidad: totalCantidadConMerma,
+          diasProduccion: totalDiasProduccion,
+          order: index + 1
+        };
+      });
+      
+      const totalSemanasProduccion = Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK);
 
       // Calculate completion date based on total production days
       const { date, formatted } = calculateCompletionDate(1, totalDiasProduccion);
@@ -203,27 +214,27 @@ export const TestingListing: React.FC = () => {
       // Get earliest date for sorting
       const earliestDate = sortedClientes.length > 0 ? sortedClientes[0].fecha : new Date().toISOString();
 
-             schedule.push({
-         producto,
-         totalCantidad: group.totalCantidad,
-         totalCantidadConMerma,
-         moldesDisponibles,
-         moldesNecesarios,
-         limitadoPorMoldes,
-         earliestDate,
-         clientes: clientesWithProduction,
-         totalDiasProduccion,
-         totalSemanasProduccion,
-         completionDate: date.toISOString().split('T')[0],
-         formattedCompletionDate: formatted
-       });
+      schedule.push({
+        producto,
+        totalCantidad: group.totalCantidad,
+        totalCantidadConMerma,
+        moldesDisponibles: moldes_disponibles,
+        moldesNecesarios,
+        limitadoPorMoldes,
+        earliestDate,
+        clientes: clientesWithProduction,
+        totalDiasProduccion,
+        totalSemanasProduccion,
+        completionDate: date.toISOString().split('T')[0],
+        formattedCompletionDate: formatted
+      });
     });
 
     // Sort products by earliest date (priority)
     return schedule.sort((a, b) => 
       new Date(a.earliestDate).getTime() - new Date(b.earliestDate).getTime()
     );
-  }, [calculateCompletionDate]);
+  }, [calculateCompletionDate, productData]);
 
   // Calculate delivery dates for client groups based on production schedule
   const calculateClientDeliveryDates = useCallback((
@@ -320,17 +331,7 @@ export const TestingListing: React.FC = () => {
       const testingItems = result.data || [];
       setData(testingItems);
       
-      // Create production schedule first
-      const schedule = createProductionSchedule(testingItems);
-      setProductionSchedule(schedule);
-
-      // Group by cliente + fecha
-      const grouped = groupData(testingItems);
-      
-      // Calculate delivery dates for client groups
-      const groupedWithDelivery = calculateClientDeliveryDates(grouped, schedule);
-      setGroupedData(groupedWithDelivery);
-      setFilteredData(groupedWithDelivery);
+      // The rest will be handled by useEffect when data changes
       
     } catch (err: any) {
       console.error("Error in fetchData:", err);
@@ -342,7 +343,7 @@ export const TestingListing: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [groupData, createProductionSchedule, calculateClientDeliveryDates]);
+  }, []); // Remove dependencies to prevent infinite loop
 
   const handleSearch = useCallback((term: string) => {
     setSearchTerm(term);
@@ -359,7 +360,190 @@ export const TestingListing: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, []);
+
+  // Handle product data fetching when data changes
+  useEffect(() => {
+    if (data.length > 0) {
+      const uniqueProductNames = [...new Set(data.map((item: TestingDataItem) => item.producto))];
+      fetchProductData(uniqueProductNames);
+    }
+  }, [data]);
+
+  // Handle initial grouping and schedule creation when data is first loaded
+  useEffect(() => {
+    if (data.length > 0 && productData.size === 0) {
+      // Create initial schedule without product data (will be updated later)
+      const schedule = createProductionSchedule(data);
+      setProductionSchedule(schedule);
+
+      // Group by cliente + fecha
+      const grouped = groupData(data);
+      
+      // Calculate delivery dates for client groups
+      const groupedWithDelivery = calculateClientDeliveryDates(grouped, schedule);
+      setGroupedData(groupedWithDelivery);
+      setFilteredData(groupedWithDelivery);
+    }
+  }, [data]);
+
+  // Recreate production schedule when product data is loaded
+  useEffect(() => {
+    if (data.length > 0 && productData.size > 0) {
+      console.log('Recreating production schedule with real product data...');
+      
+      // Create production schedule with product data inline to avoid dependency issues
+      const productGroups = new Map<string, {
+        totalCantidad: number;
+        clientes: Array<{ cliente: string; fecha: string; cantidad: number; }>;
+      }>();
+
+      data.forEach(item => {
+        if (productGroups.has(item.producto)) {
+          const group = productGroups.get(item.producto)!;
+          group.totalCantidad += item.cantidad;
+          group.clientes.push({
+            cliente: item.cliente,
+            fecha: item.fecha,
+            cantidad: item.cantidad
+          });
+        } else {
+          productGroups.set(item.producto, {
+            totalCantidad: item.cantidad,
+            clientes: [{
+              cliente: item.cliente,
+              fecha: item.fecha,
+              cantidad: item.cantidad
+            }]
+          });
+        }
+      });
+
+      // Convert to schedule
+      const schedule: ProductionScheduleItem[] = [];
+      
+      productGroups.forEach((group, producto) => {
+        const sortedClientes = group.clientes.sort((a, b) => 
+          new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+        );
+
+        const realProductData = productData.get(producto);
+        const vueltas_max_dia = realProductData?.vueltas_max_dia || 1;
+        const moldes_disponibles = realProductData?.moldes_disponibles || 1;
+        
+        const totalCantidadOriginal = group.totalCantidad;
+        const totalCantidadConMerma = Math.ceil(totalCantidadOriginal * (1 + MERMA_PERCENTAGE));
+        const dailyProductionCapacity = moldes_disponibles * vueltas_max_dia;
+        const limitadoPorMoldes = dailyProductionCapacity < DAILY_CAPACITY;
+        const effectiveDailyCapacity = Math.min(dailyProductionCapacity, DAILY_CAPACITY);
+        const totalDiasProduccion = Math.ceil(totalCantidadConMerma / effectiveDailyCapacity);
+        const moldesNecesarios = Math.ceil(totalCantidadConMerma / DAILY_CAPACITY);
+
+        const clientesWithProduction = sortedClientes.map((cliente, index) => {
+          const cantidadConMerma = Math.ceil(cliente.cantidad * (1 + MERMA_PERCENTAGE));
+          return {
+            ...cliente,
+            cantidadConMerma,
+            cumulativeCantidad: totalCantidadConMerma,
+            diasProduccion: totalDiasProduccion,
+            order: index + 1
+          };
+        });
+        
+        const totalSemanasProduccion = Math.ceil(totalDiasProduccion / WORK_DAYS_PER_WEEK);
+        const { date, formatted } = calculateCompletionDate(1, totalDiasProduccion);
+        const earliestDate = sortedClientes.length > 0 ? sortedClientes[0].fecha : new Date().toISOString();
+
+        schedule.push({
+          producto,
+          totalCantidad: group.totalCantidad,
+          totalCantidadConMerma,
+          moldesDisponibles: moldes_disponibles,
+          moldesNecesarios,
+          limitadoPorMoldes,
+          earliestDate,
+          clientes: clientesWithProduction,
+          totalDiasProduccion,
+          totalSemanasProduccion,
+          completionDate: date.toISOString().split('T')[0],
+          formattedCompletionDate: formatted
+        });
+      });
+
+      // Sort and set schedule
+      const sortedSchedule = schedule.sort((a, b) => 
+        new Date(a.earliestDate).getTime() - new Date(b.earliestDate).getTime()
+      );
+      setProductionSchedule(sortedSchedule);
+      
+      // Update grouped data for client view
+      const clientGroups = new Map<string, GroupedTestingData>();
+      data.forEach(item => {
+        const key = `${item.cliente}-${item.fecha}`;
+        if (clientGroups.has(key)) {
+          const group = clientGroups.get(key)!;
+          group.productos.push({
+            id: item.id,
+            producto: item.producto,
+            cantidad: item.cantidad
+          });
+          group.totalCantidad += item.cantidad;
+          group.ids.push(item.id);
+        } else {
+          clientGroups.set(key, {
+            cliente: item.cliente,
+            fecha: item.fecha,
+            productos: [{
+              id: item.id,
+              producto: item.producto,
+              cantidad: item.cantidad
+            }],
+            totalCantidad: item.cantidad,
+            ids: [item.id]
+          });
+        }
+      });
+
+      const grouped = Array.from(clientGroups.values()).sort((a, b) => 
+        new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+      );
+      
+      // Calculate delivery dates
+      const productCompletionMap = new Map<string, { date: string; formatted: string }>();
+      sortedSchedule.forEach(item => {
+        productCompletionMap.set(item.producto, {
+          date: item.completionDate,
+          formatted: item.formattedCompletionDate
+        });
+      });
+
+      const groupedWithDelivery = grouped.map(group => {
+        let latestDate = new Date('1900-01-01');
+        let latestFormatted = 'N/A';
+
+        group.productos.forEach(producto => {
+          const completion = productCompletionMap.get(producto.producto);
+          if (completion) {
+            const completionDate = new Date(completion.date);
+            if (completionDate > latestDate) {
+              latestDate = completionDate;
+              latestFormatted = completion.formatted;
+            }
+          }
+        });
+
+        return {
+          ...group,
+          deliveryDate: latestDate.getTime() > new Date('1900-01-01').getTime() ? 
+            latestDate.toISOString().split('T')[0] : undefined,
+          formattedDeliveryDate: latestFormatted !== 'N/A' ? latestFormatted : undefined
+        };
+      });
+      
+      setGroupedData(groupedWithDelivery);
+      setFilteredData(groupedWithDelivery);
+    }
+  }, [data.length, productData.size]); // Only depend on the length/size, not the functions
 
   useEffect(() => {
     handleSearch(searchTerm);
@@ -645,36 +829,60 @@ export const TestingListing: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="produccion" className="mt-2">
-          {/* Compact Summary Bar */}
+          {/* Enhanced Summary Bar with Key Insights */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
-            <div className="grid grid-cols-7 gap-4 text-center">
+            <div className="grid grid-cols-8 gap-3 text-center">
               <div>
                 <div className="text-sm font-medium text-gray-900">{totalScheduledPieces.toLocaleString()}</div>
-                <div className="text-xs text-gray-500">Piezas Orig.</div>
+                <div className="text-xs text-gray-500">Piezas</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-900">{totalScheduledPiecesConMerma.toLocaleString()}</div>
+                <div className="text-sm font-medium text-blue-600">{totalScheduledPiecesConMerma.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">Con Merma</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-gray-900">{DAILY_CAPACITY}</div>
-                <div className="text-xs text-gray-500">Cap./Día</div>
+              <div className="flex flex-col items-center">
+                <div className="text-sm font-medium text-gray-900">{Math.round((totalScheduledPiecesConMerma / DAILY_CAPACITY) * 100)}%</div>
+                <div className="text-xs text-gray-500">Capacidad</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-red-600">{productosLimitadosPorMoldes}</div>
+                <div className={`text-sm font-medium ${productosLimitadosPorMoldes > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {productosLimitadosPorMoldes}
+                </div>
                 <div className="text-xs text-gray-500">Limitados</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">{totalWorkDays}</div>
-                <div className="text-xs text-gray-500">Días Total</div>
+                <div className="text-xs text-gray-500">Días</div>
               </div>
               <div>
                 <div className="text-sm font-medium text-gray-900">{totalWorkWeeks}</div>
                 <div className="text-xs text-gray-500">Semanas</div>
               </div>
               <div>
-                <div className="text-sm font-medium text-gray-900 leading-tight">{lastCompletionDate}</div>
+                <div className="text-sm font-medium text-gray-900">{productionSchedule.length}</div>
+                <div className="text-xs text-gray-500">Productos</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-900 leading-tight">{lastCompletionDate?.split(',')[0] || 'N/A'}</div>
                 <div className="text-xs text-gray-500">Última Entrega</div>
+              </div>
+            </div>
+            
+            {/* Warning/Status indicators */}
+            {productosLimitadosPorMoldes > 0 && (
+              <div className="mt-2 text-center">
+                <div className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  {productosLimitadosPorMoldes} productos limitados por moldes disponibles
+                </div>
+              </div>
+            )}
+            
+            {/* Real-time data indicator */}
+            <div className="mt-2 text-center">
+              <div className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                Datos en tiempo real desde cotizaciones en producción
               </div>
             </div>
           </div>
@@ -724,11 +932,21 @@ export const TestingListing: React.FC = () => {
                       {/* Moldes */}
                       <TableCell className="px-3 py-2 text-xs text-center">
                         <div className="flex items-center justify-center space-x-1">
-                          <span className="text-gray-600">{item.moldesDisponibles}</span>
+                          <span className={`${item.limitadoPorMoldes ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                            {item.moldesDisponibles}
+                          </span>
                           {item.limitadoPorMoldes && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-red-400" title="Limitado por moldes" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400" title="Limitado por moldes disponibles" />
+                          )}
+                          {!item.limitadoPorMoldes && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-400" title="Capacidad suficiente" />
                           )}
                         </div>
+                        {item.limitadoPorMoldes && (
+                          <div className="text-xs text-red-500 mt-0.5">
+                            Necesita {item.moldesNecesarios}
+                          </div>
+                        )}
                       </TableCell>
 
                       {/* Días Totales */}
@@ -745,12 +963,29 @@ export const TestingListing: React.FC = () => {
 
                       {/* Fecha Entrega */}
                       <TableCell className="px-3 py-2 text-xs text-center">
-                        <span className="text-gray-900 font-medium">
-                          {new Date(item.completionDate).toLocaleDateString('es-MX', { 
-                            day: '2-digit',
-                            month: '2-digit'
-                          })}
-                        </span>
+                        <div className="flex flex-col items-center">
+                          <span className={`font-medium ${item.limitadoPorMoldes ? 'text-red-600' : 'text-gray-900'}`}>
+                            {new Date(item.completionDate).toLocaleDateString('es-MX', { 
+                              day: '2-digit',
+                              month: '2-digit'
+                            })}
+                          </span>
+                          {/* Days from today indicator */}
+                          {(() => {
+                            const today = new Date();
+                            const deliveryDate = new Date(item.completionDate);
+                            const diffTime = deliveryDate.getTime() - today.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (diffDays <= 7) {
+                              return <span className="text-xs text-red-500">En {diffDays}d</span>;
+                            } else if (diffDays <= 14) {
+                              return <span className="text-xs text-yellow-600">En {diffDays}d</span>;
+                            } else {
+                              return <span className="text-xs text-gray-500">En {diffDays}d</span>;
+                            }
+                          })()}
+                        </div>
                       </TableCell>
 
                       {/* Clientes */}

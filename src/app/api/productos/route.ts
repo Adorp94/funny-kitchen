@@ -87,6 +87,26 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // Handle batch lookup by product names for production scheduling
+    if (body.product_names && Array.isArray(body.product_names)) {
+      const { data, error } = await supabase
+        .from('productos')
+        .select('nombre, vueltas_max_dia, moldes_disponibles')
+        .in('nombre', body.product_names);
+      
+      if (error) {
+        console.error('Error fetching products by names:', error);
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        );
+      }
+      
+      return NextResponse.json({ 
+        productos: data || []
+      });
+    }
+    
     // First, get the next ID for the product
     const { data: maxIdData, error: maxIdError } = await supabase
       .from('productos')
