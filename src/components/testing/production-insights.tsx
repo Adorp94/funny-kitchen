@@ -1,316 +1,303 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
-  TrendingUp, 
-  TrendingDown, 
   AlertTriangle, 
   CheckCircle, 
   Clock,
   Target,
-  Zap,
-  BarChart3 
+  TrendingUp,
+  TrendingDown,
+  Factory,
+  Package
 } from 'lucide-react';
 
-interface ProductionInsight {
-  type: 'deficit' | 'surplus' | 'balanced' | 'urgent' | 'capacity';
-  priority: 'high' | 'medium' | 'low';
+interface SimpleInsight {
+  type: 'warning' | 'success' | 'info' | 'urgent';
+  icon: JSX.Element;
   title: string;
-  description: string;
-  value?: number;
-  target?: number;
+  message: string;
+  action?: string;
   products?: string[];
+  value?: number;
 }
 
-interface ProductionMetrics {
-  totalActiveProducts: number;
-  totalDeficit: number;
-  totalSurplus: number;
-  capacityUtilization: number;
-  productionEfficiency: number;
-  avgCompletionRate: number;
+interface ProductionOverview {
+  totalProducts: number;
+  productsOnTrack: number;
+  productsBehind: number;
+  productsAhead: number;
+  overallProgress: number;
 }
 
 export const ProductionInsights: React.FC = () => {
-  const [insights, setInsights] = useState<ProductionInsight[]>([]);
-  const [metrics, setMetrics] = useState<ProductionMetrics | null>(null);
+  const [insights, setInsights] = useState<SimpleInsight[]>([]);
+  const [overview, setOverview] = useState<ProductionOverview | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const calculateInsights = useCallback(async () => {
+  const generateSimpleInsights = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch real production data
-      const activeResponse = await fetch('/api/production-active');
-      const activeData = await activeResponse.json();
+      const response = await fetch('/api/production-active');
+      const data = await response.json();
       
-      // Fetch simulation data
-      const testingResponse = await fetch('/api/testing-datos');
-      const testingData = await testingResponse.json();
+      if (!data.success || !data.data) {
+        setLoading(false);
+        return;
+      }
 
-      const activeProducts = activeData.data || [];
-      const testingProducts = testingData.data || [];
+      const products = data.data;
+      const newInsights: SimpleInsight[] = [];
 
-      // Calculate insights
-      const newInsights: ProductionInsight[] = [];
+      // Calculate overview
+      const productsOnTrack = products.filter((p: any) => p.faltan_sobran >= -10 && p.faltan_sobran <= 10).length;
+      const productsBehind = products.filter((p: any) => p.faltan_sobran < -10).length;
+      const productsAhead = products.filter((p: any) => p.faltan_sobran > 10).length;
       
-      // 1. Critical Deficit Analysis
-      const criticalDeficit = activeProducts.filter((p: any) => p.faltan_sobran < -50);
-      if (criticalDeficit.length > 0) {
-        newInsights.push({
-          type: 'deficit',
-          priority: 'high',
-          title: 'Déficit Crítico Detectado',
-          description: `${criticalDeficit.length} productos con déficit mayor a 50 piezas`,
-          value: criticalDeficit.reduce((sum: number, p: any) => sum + Math.abs(p.faltan_sobran), 0),
-          products: criticalDeficit.map((p: any) => p.producto_nombre).slice(0, 3)
-        });
-      }
+      const totalPedidos = products.reduce((sum: number, p: any) => sum + p.pedidos, 0);
+      const totalTerminado = products.reduce((sum: number, p: any) => sum + p.terminado, 0);
+      const overallProgress = totalPedidos > 0 ? (totalTerminado / totalPedidos) * 100 : 0;
 
-      // 2. Production Efficiency
-      const totalPedidos = activeProducts.reduce((sum: number, p: any) => sum + p.pedidos, 0);
-      const totalEnProceso = activeProducts.reduce((sum: number, p: any) => sum + p.piezas_en_proceso, 0);
-      const efficiency = totalPedidos > 0 ? (totalEnProceso / totalPedidos) * 100 : 0;
-      
-      newInsights.push({
-        type: 'capacity',
-        priority: efficiency < 50 ? 'high' : efficiency < 80 ? 'medium' : 'low',
-        title: 'Eficiencia de Producción',
-        description: `${efficiency.toFixed(1)}% de los pedidos están en proceso`,
-        value: efficiency,
-        target: 85
-      });
-
-      // 3. Bottleneck Analysis - Products with high "Por Detallar"
-      const bottleneckProducts = activeProducts.filter((p: any) => p.por_detallar > 20);
-      if (bottleneckProducts.length > 0) {
-        newInsights.push({
-          type: 'urgent',
-          priority: 'medium',
-          title: 'Cuello de Botella en Detallado',
-          description: `${bottleneckProducts.length} productos con más de 20 piezas esperando detallado`,
-          value: bottleneckProducts.reduce((sum: number, p: any) => sum + p.por_detallar, 0),
-          products: bottleneckProducts.map((p: any) => p.producto_nombre).slice(0, 3)
-        });
-      }
-
-      // 4. Excess Production Analysis
-      const excessProducts = activeProducts.filter((p: any) => p.faltan_sobran > 30);
-      if (excessProducts.length > 0) {
-        newInsights.push({
-          type: 'surplus',
-          priority: 'low',
-          title: 'Sobreproducción Detectada',
-          description: `${excessProducts.length} productos con exceso mayor a 30 piezas`,
-          value: excessProducts.reduce((sum: number, p: any) => sum + p.faltan_sobran, 0),
-          products: excessProducts.map((p: any) => p.producto_nombre).slice(0, 3)
-        });
-      }
-
-      // 5. Simulation vs Reality Comparison
-      if (testingProducts.length > 0) {
-        const simulationTotal = testingProducts.reduce((sum: number, p: any) => sum + p.cantidad, 0);
-        const activeTotal = totalPedidos;
-        const variance = ((activeTotal - simulationTotal) / simulationTotal) * 100;
-        
-        newInsights.push({
-          type: variance > 0 ? 'surplus' : 'deficit',
-          priority: Math.abs(variance) > 20 ? 'high' : 'medium',
-          title: 'Comparación Simulación vs Realidad',
-          description: `${variance > 0 ? 'Incremento' : 'Reducción'} del ${Math.abs(variance).toFixed(1)}% vs simulación`,
-          value: activeTotal,
-          target: simulationTotal
-        });
-      }
-
-      // Calculate overall metrics
-      const newMetrics: ProductionMetrics = {
-        totalActiveProducts: activeProducts.length,
-        totalDeficit: activeProducts.filter((p: any) => p.faltan_sobran < 0).length,
-        totalSurplus: activeProducts.filter((p: any) => p.faltan_sobran > 0).length,
-        capacityUtilization: efficiency,
-        productionEfficiency: activeProducts.length > 0 ? 
-          (activeProducts.filter((p: any) => p.faltan_sobran >= 0).length / activeProducts.length) * 100 : 0,
-        avgCompletionRate: activeProducts.length > 0 ? 
-          activeProducts.reduce((sum: number, p: any) => sum + ((p.terminado / Math.max(p.pedidos, 1)) * 100), 0) / activeProducts.length : 0
+      const newOverview: ProductionOverview = {
+        totalProducts: products.length,
+        productsOnTrack,
+        productsBehind,
+        productsAhead,
+        overallProgress
       };
 
+      // 1. Products that need immediate attention (critical deficit)
+      const criticalProducts = products.filter((p: any) => p.faltan_sobran < -50);
+      if (criticalProducts.length > 0) {
+        newInsights.push({
+          type: 'urgent',
+          icon: <AlertTriangle className="h-4 w-4" />,
+          title: 'Atención Urgente Requerida',
+          message: `${criticalProducts.length} productos necesitan más de 50 piezas para cumplir pedidos`,
+          action: 'Revisar producción y priorizar estos productos',
+          products: criticalProducts.map((p: any) => p.producto_nombre).slice(0, 3),
+          value: criticalProducts.reduce((sum: number, p: any) => sum + Math.abs(p.faltan_sobran), 0)
+        });
+      }
+
+      // 2. Bottlenecks in the pipeline
+      const detallePendiente = products.filter((p: any) => p.por_detallar > 20);
+      if (detallePendiente.length > 0) {
+        newInsights.push({
+          type: 'warning',
+          icon: <Clock className="h-4 w-4" />,
+          title: 'Productos Esperando Detallado',
+          message: `${detallePendiente.length} productos tienen piezas acumuladas esperando ser detalladas`,
+          action: 'Asignar más recursos al proceso de detallado',
+          products: detallePendiente.map((p: any) => p.producto_nombre).slice(0, 3)
+        });
+      }
+
+      // 3. Sancocho bottleneck
+      const sancochoPendiente = products.filter((p: any) => p.detallado > 30);
+      if (sancochoPendiente.length > 0) {
+        newInsights.push({
+          type: 'warning',
+          icon: <Factory className="h-4 w-4" />,
+          title: 'Cuello de Botella en Sancocho',
+          message: `${sancochoPendiente.length} productos tienen piezas detalladas esperando sancocho`,
+          action: 'Optimizar capacidad de hornos',
+          products: sancochoPendiente.map((p: any) => p.producto_nombre).slice(0, 3)
+        });
+      }
+
+      // 4. Overproduction warning
+      const overProduced = products.filter((p: any) => p.faltan_sobran > 50);
+      if (overProduced.length > 0) {
+        newInsights.push({
+          type: 'info',
+          icon: <Package className="h-4 w-4" />,
+          title: 'Sobreproducción Detectada',
+          message: `${overProduced.length} productos tienen exceso de más de 50 piezas`,
+          action: 'Considerar pausar producción y redistribuir recursos',
+          products: overProduced.map((p: any) => p.producto_nombre).slice(0, 3)
+        });
+      }
+
+      // 5. Good news - products on track
+      if (productsOnTrack > productsBehind && overallProgress > 70) {
+        newInsights.push({
+          type: 'success',
+          icon: <CheckCircle className="h-4 w-4" />,
+          title: 'Producción en Buen Ritmo',
+          message: `${productsOnTrack} productos están dentro del rango esperado`,
+          action: 'Mantener el ritmo actual de producción'
+        });
+      }
+
+      // 6. Overall production status
+      if (overallProgress < 50) {
+        newInsights.push({
+          type: 'warning',
+          icon: <TrendingDown className="h-4 w-4" />,
+          title: 'Progreso General Bajo',
+          message: `Solo ${overallProgress.toFixed(1)}% de todos los pedidos están completos`,
+          action: 'Revisar capacidad general y cuellos de botella'
+        });
+      } else if (overallProgress > 80) {
+        newInsights.push({
+          type: 'success',
+          icon: <TrendingUp className="h-4 w-4" />,
+          title: 'Excelente Progreso',
+          message: `${overallProgress.toFixed(1)}% de progreso general en pedidos`,
+          action: 'Continuar con el buen trabajo'
+        });
+      }
+
+      setOverview(newOverview);
       setInsights(newInsights);
-      setMetrics(newMetrics);
     } catch (error) {
-      console.error('Error calculating insights:', error);
+      console.error('Error generating insights:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    calculateInsights();
-  }, [calculateInsights]);
+    generateSimpleInsights();
+    // Refresh every 30 seconds
+    const interval = setInterval(generateSimpleInsights, 30000);
+    return () => clearInterval(interval);
+  }, [generateSimpleInsights]);
 
-  const getInsightIcon = (type: string) => {
+  const getInsightStyle = (type: string) => {
     switch (type) {
-      case 'deficit': return <TrendingDown className="h-5 w-5 text-red-500" />;
-      case 'surplus': return <TrendingUp className="h-5 w-5 text-green-500" />;
-      case 'urgent': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case 'capacity': return <BarChart3 className="h-5 w-5 text-blue-500" />;
-      default: return <CheckCircle className="h-5 w-5 text-gray-500" />;
+      case 'urgent': return 'bg-red-50 border-red-200 text-red-900';
+      case 'warning': return 'bg-orange-50 border-orange-200 text-orange-900';
+      case 'success': return 'bg-green-50 border-green-200 text-green-900';
+      case 'info': return 'bg-blue-50 border-blue-200 text-blue-900';
+      default: return 'bg-gray-50 border-gray-200 text-gray-900';
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+  const getIconColor = (type: string) => {
+    switch (type) {
+      case 'urgent': return 'text-red-600';
+      case 'warning': return 'text-orange-600';
+      case 'success': return 'text-green-600';
+      case 'info': return 'text-blue-600';
+      default: return 'text-gray-600';
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-        <div className="flex justify-center items-center space-x-2">
-          <BarChart3 className="h-4 w-4 animate-pulse text-gray-400" />
-          <span className="text-xs text-gray-500">Calculando insights...</span>
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/3 mx-auto mb-2"></div>
+          <div className="h-3 bg-gray-200 rounded w-1/2 mx-auto"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Compact Metrics Bar */}
-      {metrics && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <div className="grid grid-cols-4 gap-6 text-center">
-            <div>
-              <div className="text-sm font-medium text-gray-900">{metrics.capacityUtilization.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500">Utilización</div>
-              <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                <div 
-                  className="bg-gray-600 h-1 rounded-full" 
-                  style={{ width: `${Math.min(metrics.capacityUtilization, 100)}%` }}
-                />
-              </div>
+    <div className="space-y-4">
+      {/* Simple Overview */}
+      {overview && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Resumen de Producción</h3>
+          
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-green-600">{overview.productsOnTrack}</div>
+              <div className="text-xs text-gray-500">En Tiempo</div>
             </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-red-600">{overview.productsBehind}</div>
+              <div className="text-xs text-gray-500">Atrasados</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-blue-600">{overview.productsAhead}</div>
+              <div className="text-xs text-gray-500">Adelantados</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-900">{overview.totalProducts}</div>
+              <div className="text-xs text-gray-500">Total</div>
+            </div>
+          </div>
 
-            <div>
-              <div className="text-sm font-medium text-gray-900">{metrics.productionEfficiency.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500">Eficiencia</div>
-              <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                <div 
-                  className="bg-gray-600 h-1 rounded-full" 
-                  style={{ width: `${Math.min(metrics.productionEfficiency, 100)}%` }}
-                />
-              </div>
+          <div>
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>Progreso General</span>
+              <span>{overview.overallProgress.toFixed(1)}%</span>
             </div>
-            <div>
-              <div className="text-sm font-medium text-gray-900">{metrics.avgCompletionRate.toFixed(1)}%</div>
-              <div className="text-xs text-gray-500">Completado</div>
-              <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                <div 
-                  className="bg-gray-600 h-1 rounded-full" 
-                  style={{ width: `${Math.min(metrics.avgCompletionRate, 100)}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-red-600">{metrics.totalDeficit}</div>
-              <div className="text-xs text-gray-500">En déficit</div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-gray-600 h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${Math.min(overview.overallProgress, 100)}%` }}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Insights */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-          <h3 className="text-xs font-medium text-gray-700">Insights de Producción</h3>
+      {/* Simple Insights */}
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-900">Recomendaciones</h3>
         </div>
-        <div className="p-3 space-y-3">
-          {insights.map((insight, index) => (
-            <div 
-              key={index} 
-              className={`p-3 rounded border text-xs ${
-                insight.priority === 'high' 
-                  ? 'bg-red-50 border-red-200' 
-                  : insight.priority === 'medium' 
-                  ? 'bg-orange-50 border-orange-200' 
-                  : 'bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-medium text-gray-900">{insight.title}</h4>
-                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                      insight.priority === 'high' 
-                        ? 'bg-red-100 text-red-700' 
-                        : insight.priority === 'medium' 
-                        ? 'bg-orange-100 text-orange-700' 
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {insight.priority === 'high' ? 'Alta' : insight.priority === 'medium' ? 'Media' : 'Baja'}
-                    </span>
+        
+        <div className="p-4 space-y-3">
+          {insights.length === 0 ? (
+            <div className="text-center py-6">
+              <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">¡Todo en orden!</p>
+              <p className="text-xs text-gray-500">No hay problemas críticos detectados</p>
+            </div>
+          ) : (
+            insights.map((insight, index) => (
+              <div 
+                key={index} 
+                className={`p-3 rounded-lg border ${getInsightStyle(insight.type)}`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div className={getIconColor(insight.type)}>
+                    {insight.icon}
                   </div>
-                  <p className="text-gray-600 mt-1">{insight.description}</p>
-                  
-                  {/* Progress bar for metrics with targets */}
-                  {insight.target && (
-                    <div className="mt-2">
-                      <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>{insight.value?.toFixed(1)}</span>
-                        <span>Meta: {insight.target}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1">
-                        <div 
-                          className="bg-gray-600 h-1 rounded-full" 
-                          style={{ width: `${Math.min(((insight.value || 0) / insight.target) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium mb-1">{insight.title}</h4>
+                    <p className="text-sm mb-2">{insight.message}</p>
+                    
+                    {insight.action && (
+                      <p className="text-xs italic opacity-80 mb-2">
+                        💡 {insight.action}
+                      </p>
+                    )}
 
-                  {/* Product list for specific insights */}
-                  {insight.products && insight.products.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-gray-500 mb-1">Productos afectados:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {insight.products.slice(0, 3).map((product, pIndex) => (
-                          <span key={pIndex} className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-xs">
+                    {insight.products && insight.products.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {insight.products.map((product, pIndex) => (
+                          <span 
+                            key={pIndex} 
+                            className="bg-white bg-opacity-50 px-2 py-1 rounded text-xs"
+                          >
                             {product}
                           </span>
                         ))}
-                        {insight.products.length > 3 && (
-                          <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-xs">
-                            +{insight.products.length - 3} más
-                          </span>
-                        )}
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {insight.value && (
+                      <div className="text-xs font-medium">
+                        Total: {insight.value} piezas
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
-
-      {insights.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </div>
-          <h3 className="text-sm font-medium text-gray-900 mb-1">Sistema en Balance</h3>
-          <p className="text-xs text-gray-500">
-            No se detectaron problemas críticos en la producción actual.
-          </p>
-        </div>
-      )}
     </div>
   );
 }; 
