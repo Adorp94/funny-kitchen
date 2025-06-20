@@ -108,7 +108,7 @@ export function MoldesActivos() {
       setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching productos:', error);
-      toast.error('Error al cargar los productos', {
+      toast.error('Error al cargar los productos disponibles', {
         description: 'No se pudieron cargar los productos disponibles',
         duration: 4000,
       });
@@ -153,15 +153,26 @@ export function MoldesActivos() {
         // For initial display, show the loaded products (with infinite scroll support)
         setSearchResults(productos);
       } else {
-        const filtered = productos.filter(producto => 
-          producto.nombre.toLowerCase().includes(searchValue.toLowerCase()) ||
-          (producto.sku && producto.sku.toLowerCase().includes(searchValue.toLowerCase()))
-        );
-        setSearchResults(filtered);
+        // Make API call to search products
+        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=50`);
+        if (!response.ok) {
+          throw new Error('Failed to search productos');
+        }
+        const result = await response.json();
+        const searchedProductos = (result.data || result).map((p: any) => ({
+          producto_id: p.producto_id,
+          nombre: p.nombre,
+          sku: p.sku
+        }));
+        setSearchResults(searchedProductos);
       }
     } catch (error) {
       console.error('Error searching productos:', error);
       setSearchResults([]);
+      toast.error('Error al buscar productos', {
+        description: 'No se pudieron buscar los productos',
+        duration: 3000,
+      });
     } finally {
       setIsSearching(false);
     }
@@ -268,7 +279,8 @@ export function MoldesActivos() {
   }, [comboboxOpen, productos, searchProductos]);
 
   // Get selected product for display
-  const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId);
+  const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId) || 
+                         searchResults.find(p => p.producto_id.toString() === selectedProductoId);
 
   // Add producto to mesa
   const handleAddProducto = async () => {
@@ -524,8 +536,8 @@ export function MoldesActivos() {
       ) : (
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {mesas.map((mesa) => (
-            <Card key={mesa.id} className="border">
-              <CardHeader className="p-2">
+            <Card key={mesa.id} className="border min-h-[120px] flex flex-col">
+              <CardHeader className="p-2 flex-shrink-0">
                 <div className="flex justify-between items-center">
                   <CardTitle className="flex items-center gap-1 text-sm">
                     <TableIcon className="h-3 w-3" />
@@ -598,7 +610,7 @@ export function MoldesActivos() {
                                           onSelect={(value) => {
                                             setSelectedProductoId(value);
                                             setComboboxOpen(false);
-                                            const selected = productos.find(p => p.producto_id.toString() === value);
+                                            const selected = searchResults.find(p => p.producto_id.toString() === value);
                                             if (selected) {
                                               setSearchTerm(selected.nombre);
                                             }
@@ -679,12 +691,14 @@ export function MoldesActivos() {
                   </Dialog>
                 </div>
               </CardHeader>
-              <CardContent className="p-2">
-                <div className="space-y-1">
+              <CardContent className="p-2 flex-1 flex flex-col">
+                <div className="space-y-1 flex-1">
                   {mesa.productos.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-2">
-                      Sin productos
-                    </p>
+                    <div className="flex-1 flex items-center justify-center min-h-[60px]">
+                      <p className="text-xs text-muted-foreground text-center">
+                        Sin productos
+                      </p>
+                    </div>
                   ) : (
                     mesa.productos.map((producto) => {
                       const isEditing = editingQuantities[producto.id] !== undefined;
@@ -728,7 +742,7 @@ export function MoldesActivos() {
                   )}
                 </div>
                 {mesa.productos.length > 0 && (
-                  <div className="mt-2 pt-1 border-t">
+                  <div className="mt-2 pt-1 border-t flex-shrink-0">
                     <div className="flex justify-between text-xs">
                       <span className="font-medium">Total:</span>
                       <span className="font-bold">
