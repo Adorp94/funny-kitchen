@@ -4,10 +4,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, Download, X, ArrowUpDown } from 'lucide-react';
+import { Loader2, Search, Download, ArrowUpDown } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from '@/lib/utils';
 
@@ -30,7 +29,6 @@ export default function InventarioMoldesPage() {
   const [editingQuantities, setEditingQuantities] = useState<Record<number, string>>({});
   const [pendingUpdates, setPendingUpdates] = useState<Set<number>>(new Set());
   const [savingUpdates, setSavingUpdates] = useState<Set<number>>(new Set());
-  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(new Set());
   const [filterStock, setFilterStock] = useState<'all' | 'sin-moldes' | 'moldes-bajos' | 'moldes-suficientes'>('all');
   const [sortBy, setSortBy] = useState<'nombre' | 'sku' | 'moldes'>('nombre');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -228,23 +226,11 @@ export default function InventarioMoldesPage() {
   };
 
   // Toggle product selection
-  const toggleProductSelection = (producto_id: number) => {
-    setSelectedProducts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(producto_id)) {
-        newSet.delete(producto_id);
-      } else {
-        newSet.add(producto_id);
-      }
-      return newSet;
-    });
-  };
+
 
   // Export to CSV
   const exportToCSV = () => {
-    const dataToExport = selectedProducts.size > 0 
-      ? productos.filter(p => selectedProducts.has(p.producto_id))
-      : filteredAndSortedProductos;
+    const dataToExport = filteredAndSortedProductos;
 
     const csv = [
       ['SKU', 'NOMBRE', 'MOLDES'].join(','),
@@ -308,27 +294,6 @@ export default function InventarioMoldesPage() {
       <Table>
         <TableHeader>
           <TableRow className="h-6 bg-gray-50">
-            <TableHead className="w-6 p-1">
-              <Checkbox
-                checked={products.length > 0 && products.every(p => selectedProducts.has(p.producto_id))}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    const tableIds = products.map(p => p.producto_id);
-                    setSelectedProducts(prev => new Set([...prev, ...tableIds]));
-                  } else {
-                    const tableIds = products.map(p => p.producto_id);
-                    setSelectedProducts(prev => {
-                      const newSet = new Set(prev);
-                      tableIds.forEach(id => newSet.delete(id));
-                      return newSet;
-                    });
-                  }
-                }}
-              />
-            </TableHead>
-            <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
-              ID
-            </TableHead>
             <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
               SKU
             </TableHead>
@@ -345,7 +310,6 @@ export default function InventarioMoldesPage() {
             const isEditing = editingQuantities[producto.producto_id] !== undefined;
             const isPending = pendingUpdates.has(producto.producto_id);
             const isSaving = savingUpdates.has(producto.producto_id);
-            const isSelected = selectedProducts.has(producto.producto_id);
             const currentMoldes = producto.moldes_disponibles || 0;
             const displayValue = isEditing 
               ? editingQuantities[producto.producto_id] 
@@ -359,19 +323,9 @@ export default function InventarioMoldesPage() {
                   "h-6 hover:bg-gray-50",
                   isPending && "bg-yellow-50",
                   isSaving && "bg-blue-50",
-                  isSelected && "bg-blue-50",
                   status.bg
                 )}
               >
-                <TableCell className="p-1">
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => toggleProductSelection(producto.producto_id)}
-                  />
-                </TableCell>
-                <TableCell className="p-1 text-xs text-gray-500 font-mono">
-                  {producto.producto_id}
-                </TableCell>
                 <TableCell className="p-1 text-xs text-gray-600">
                   {producto.sku || '-'}
                 </TableCell>
@@ -456,12 +410,6 @@ export default function InventarioMoldesPage() {
             <SelectItem value="moldes-suficientes">Suficientes (4+)</SelectItem>
           </SelectContent>
         </Select>
-        {selectedProducts.size > 0 && (
-          <Button variant="outline" size="sm" onClick={() => setSelectedProducts(new Set())} className="h-6 text-xs">
-            <X className="h-3 w-3 mr-1" />
-            {selectedProducts.size}
-          </Button>
-        )}
         <Button variant="outline" size="sm" onClick={exportToCSV} className="h-6 text-xs">
           <Download className="h-3 w-3 mr-1" />
           CSV
