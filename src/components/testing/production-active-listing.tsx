@@ -119,7 +119,7 @@ export const ProductionActiveListing: React.FC = () => {
   // Fetch productos for selection
   const fetchProductos = useCallback(async (page = 0, reset = true) => {
     try {
-      const pageSize = 20;
+      const pageSize = 50; // Increased from 20 to show more products initially
       const response = await fetch(`/api/productos?page=${page}&pageSize=${pageSize}`);
       if (!response.ok) {
         throw new Error('Failed to fetch productos');
@@ -174,17 +174,30 @@ export const ProductionActiveListing: React.FC = () => {
     setIsSearching(true);
     try {
       if (!searchValue.trim()) {
+        // For initial display, show the loaded products (with infinite scroll support)
         setSearchResults(productos);
       } else {
-        const filtered = productos.filter(producto => 
-          producto.nombre.toLowerCase().includes(searchValue.toLowerCase()) ||
-          (producto.sku && producto.sku.toLowerCase().includes(searchValue.toLowerCase()))
-        );
-        setSearchResults(filtered);
+        // Make API call to search all products in the database
+        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=100`);
+        if (!response.ok) {
+          throw new Error('Failed to search productos');
+        }
+        const result = await response.json();
+        const searchedProductos = (result.data || result).map((p: any) => ({
+          producto_id: p.producto_id,
+          nombre: p.nombre,
+          sku: p.sku,
+          tipo_producto: p.tipo_producto
+        }));
+        setSearchResults(searchedProductos);
       }
     } catch (error) {
       console.error('Error searching productos:', error);
       setSearchResults([]);
+      toast.error('Error al buscar productos', {
+        description: 'No se pudieron buscar los productos',
+        duration: 3000,
+      });
     } finally {
       setIsSearching(false);
     }
@@ -201,18 +214,22 @@ export const ProductionActiveListing: React.FC = () => {
     if (!comboboxOpen) return;
 
     let scrollContainer: HTMLElement | null = null;
+    let retryCount = 0;
+    const maxRetries = 20; // Try for 2 seconds
     
     const findScrollContainer = () => {
       const selectors = [
         '[cmdk-list]',
         '[role="listbox"]',
         '.cmdk-list',
-        '[data-cmdk-list]'
+        '[data-cmdk-list]',
+        '[data-radix-command-list]'
       ];
       
       for (const selector of selectors) {
         const element = document.querySelector(selector) as HTMLElement;
         if (element) {
+          console.log('Found scroll container:', selector);
           return element;
         }
       }
@@ -229,12 +246,24 @@ export const ProductionActiveListing: React.FC = () => {
 
       scrollTimeoutRef.current = setTimeout(() => {
         const { scrollTop, scrollHeight, clientHeight } = target;
-        const scrollPercentage = (scrollTop / (scrollHeight - clientHeight)) * 100;
-        const isNearBottom = scrollPercentage > 80;
+        const scrollPercentage = scrollHeight > clientHeight ? (scrollTop / (scrollHeight - clientHeight)) * 100 : 0;
+        const isNearBottom = scrollPercentage > 70; // Lower threshold for better UX
 
-                 if (isNearBottom && !productoSearchTerm.trim() && hasMoreProducts && !isLoadingMore) {
-           loadMoreProductos();
-         }
+        console.log('Scroll detected:', { 
+          scrollTop, 
+          scrollHeight, 
+          clientHeight, 
+          scrollPercentage: Math.round(scrollPercentage),
+          isNearBottom,
+          hasMoreProducts,
+          isLoadingMore,
+          searchTerm: productoSearchTerm.trim()
+        });
+
+        if (isNearBottom && !productoSearchTerm.trim() && hasMoreProducts && !isLoadingMore) {
+          console.log('Loading more products...');
+          loadMoreProductos();
+        }
       }, 100);
     };
 
@@ -242,12 +271,17 @@ export const ProductionActiveListing: React.FC = () => {
       scrollContainer = findScrollContainer();
       if (scrollContainer) {
         scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-      } else {
+        console.log('Scroll listener attached successfully');
+      } else if (retryCount < maxRetries) {
+        retryCount++;
         setTimeout(setupScrollListener, 100);
+      } else {
+        console.warn('Could not find scroll container after', maxRetries, 'attempts');
       }
     };
 
-    setupScrollListener();
+    // Delay setup to ensure DOM is ready
+    setTimeout(setupScrollListener, 200);
 
     return () => {
       if (scrollContainer) {
@@ -792,7 +826,7 @@ export const ProductionActiveListing: React.FC = () => {
                                                              {!productoSearchTerm.trim() && hasMoreProducts && (
                                 <div 
                                   ref={loadMoreTriggerRef}
-                                  className="p-2 text-center text-xs text-muted-foreground cursor-pointer hover:bg-muted/50"
+                                  className="p-3 text-center cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
                                   onClick={() => {
                                     if (!isLoadingMore) {
                                       loadMoreProductos();
@@ -800,14 +834,14 @@ export const ProductionActiveListing: React.FC = () => {
                                   }}
                                 >
                                   {isLoadingMore ? (
-                                    <div className="flex items-center justify-center">
-                                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    <div className="flex items-center justify-center text-sm text-gray-600">
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                       Cargando más productos...
                                     </div>
                                   ) : (
-                                    <div>
-                                      <div>Desplázate hacia abajo para cargar más...</div>
-                                      <div className="text-xs text-muted-foreground/70 mt-1">O haz clic aquí</div>
+                                    <div className="text-sm text-blue-600 font-medium">
+                                      <div>📦 Cargar más productos</div>
+                                      <div className="text-xs text-gray-500 mt-1">Click aquí o desplázate hacia abajo</div>
                                     </div>
                                   )}
                                 </div>

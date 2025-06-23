@@ -82,7 +82,7 @@ export function MoldesActivos() {
 
   const fetchProductos = useCallback(async (page = 0, reset = true) => {
     try {
-      const pageSize = 20; // Load 20 products per batch
+      const pageSize = 50; // Increased from 20 to show more products initially
       const response = await fetch(`/api/productos?page=${page}&pageSize=${pageSize}`);
       if (!response.ok) {
         throw new Error('Failed to fetch productos');
@@ -154,7 +154,7 @@ export function MoldesActivos() {
         setSearchResults(productos);
       } else {
         // Make API call to search products
-        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=50`);
+        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=100`);
         if (!response.ok) {
           throw new Error('Failed to search productos');
         }
@@ -192,6 +192,8 @@ export function MoldesActivos() {
     if (!comboboxOpen) return;
 
     let scrollContainer: HTMLElement | null = null;
+    let retryCount = 0;
+    const maxRetries = 20; // Try for 2 seconds
     
     // Find the scrollable container within the Command component
     const findScrollContainer = () => {
@@ -200,7 +202,8 @@ export function MoldesActivos() {
         '[cmdk-list]',
         '[role="listbox"]',
         '.cmdk-list',
-        '[data-cmdk-list]'
+        '[data-cmdk-list]',
+        '[data-radix-command-list]'
       ];
       
       for (const selector of selectors) {
@@ -224,8 +227,8 @@ export function MoldesActivos() {
 
       scrollTimeoutRef.current = setTimeout(() => {
         const { scrollTop, scrollHeight, clientHeight } = target;
-        const scrollPercentage = (scrollTop / (scrollHeight - clientHeight)) * 100;
-        const isNearBottom = scrollPercentage > 80; // Trigger at 80% scroll
+        const scrollPercentage = scrollHeight > clientHeight ? (scrollTop / (scrollHeight - clientHeight)) * 100 : 0;
+        const isNearBottom = scrollPercentage > 70; // Lower threshold for better UX
 
         console.log('Scroll event:', { 
           scrollTop, 
@@ -251,13 +254,17 @@ export function MoldesActivos() {
       if (scrollContainer) {
         scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
         console.log('Scroll listener attached successfully');
-      } else {
-        console.log('Scroll container not found, retrying...');
+      } else if (retryCount < maxRetries) {
+        retryCount++;
+        console.log('Scroll container not found, retrying...', retryCount);
         setTimeout(setupScrollListener, 100); // Retry after 100ms
+      } else {
+        console.warn('Could not find scroll container after', maxRetries, 'attempts');
       }
     };
 
-    setupScrollListener();
+    // Delay setup to ensure DOM is ready
+    setTimeout(setupScrollListener, 200);
 
     return () => {
       if (scrollContainer) {
@@ -642,7 +649,7 @@ export function MoldesActivos() {
                                       {!searchTerm.trim() && hasMoreProducts && (
                                         <div 
                                           ref={loadMoreTriggerRef}
-                                          className="p-2 text-center text-xs text-muted-foreground cursor-pointer hover:bg-muted/50"
+                                          className="p-3 text-center cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
                                           onClick={() => {
                                             console.log('Manual load more clicked');
                                             if (!isLoadingMore) {
@@ -651,14 +658,14 @@ export function MoldesActivos() {
                                           }}
                                         >
                                           {isLoadingMore ? (
-                                            <div className="flex items-center justify-center">
-                                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                            <div className="flex items-center justify-center text-sm text-gray-600">
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                               Cargando más productos...
                                             </div>
                                           ) : (
-                                            <div>
-                                              <div>Desplázate hacia abajo para cargar más...</div>
-                                              <div className="text-xs text-muted-foreground/70 mt-1">O haz clic aquí</div>
+                                            <div className="text-sm text-blue-600 font-medium">
+                                              <div>📦 Cargar más productos</div>
+                                              <div className="text-xs text-gray-500 mt-1">Click aquí o desplázate hacia abajo</div>
                                             </div>
                                           )}
                                         </div>
