@@ -1,4 +1,6 @@
-{
+import { LayoutGrid, DollarSign } from "lucide-react";
+
+export const sidebarConfig = {
   items: [
     {
       title: "Cotizaciones",
@@ -28,4 +30,4 @@
     },
     // ... other items ...
   ],
-} 
+}; 

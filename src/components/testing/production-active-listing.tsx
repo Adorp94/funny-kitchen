@@ -266,18 +266,19 @@ export const ProductionActiveListing: React.FC = () => {
 
     // Handle adding producto to production
   const handleAddProducto = async () => {
-    if (!selectedProductoId || !pedidosQuantity) {
+    if (!selectedProductoId) {
       toast.error('Campos requeridos', {
-        description: 'Por favor selecciona un producto y especifica la cantidad de pedidos',
+        description: 'Por favor selecciona un producto',
         duration: 3000,
       });
       return;
     }
 
-    const quantity = parseInt(pedidosQuantity);
-    if (isNaN(quantity) || quantity <= 0) {
+    // Use 0 as default quantity if no quantity is provided or is empty
+    const quantity = pedidosQuantity ? parseInt(pedidosQuantity) : 0;
+    if (isNaN(quantity) || quantity < 0) {
       toast.error('Cantidad inválida', {
-        description: 'La cantidad debe ser un número entero positivo',
+        description: 'La cantidad debe ser un número entero no negativo',
         duration: 3000,
       });
       return;
@@ -819,15 +820,16 @@ export const ProductionActiveListing: React.FC = () => {
                   </Popover>
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1 block">Cantidad de Pedidos</label>
+                  <label className="text-xs font-medium mb-1 block">Cantidad de Pedidos (opcional)</label>
                   <Input 
                     type="number"
                     value={pedidosQuantity}
                     onChange={(e) => setPedidosQuantity(e.target.value)}
-                    placeholder="ej: 100"
-                    min="1"
+                    placeholder="0 (por defecto)"
+                    min="0"
                     className="h-8 text-xs"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Si no especificas una cantidad, se usará 0 por defecto</p>
                 </div>
                 <div className="flex justify-end space-x-2">
                   <Button 
@@ -841,7 +843,7 @@ export const ProductionActiveListing: React.FC = () => {
                   </Button>
                   <Button 
                     onClick={handleAddProducto} 
-                    disabled={!selectedProductoId || !pedidosQuantity || isAddingProducto} 
+                    disabled={!selectedProductoId || isAddingProducto} 
                     size="sm" 
                     className="h-7 px-2 text-xs"
                   >

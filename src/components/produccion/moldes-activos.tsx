@@ -284,15 +284,18 @@ export function MoldesActivos() {
 
   // Add producto to mesa
   const handleAddProducto = async () => {
-    if (!selectedMesaId || !selectedProductoId || !cantidadMoldes) {
+    if (!selectedMesaId || !selectedProductoId) {
       toast.error('Campos requeridos', {
-        description: 'Por favor complete todos los campos',
+        description: 'Por favor selecciona una mesa y un producto',
         duration: 3000,
       });
       return;
     }
 
     try {
+      // Use 0 as default quantity if no quantity is provided or is empty
+      const quantity = cantidadMoldes ? parseInt(cantidadMoldes) : 0;
+      
       const response = await fetch('/api/moldes-activos/productos', {
         method: 'POST',
         headers: {
@@ -301,7 +304,7 @@ export function MoldesActivos() {
         body: JSON.stringify({
           mesa_id: selectedMesaId,
           producto_id: parseInt(selectedProductoId),
-          cantidad_moldes: parseInt(cantidadMoldes)
+          cantidad_moldes: quantity
         })
       });
 
@@ -668,21 +671,22 @@ export function MoldesActivos() {
                           </Popover>
                         </div>
                         <div>
-                          <label className="text-xs font-medium mb-1 block">Cantidad de Moldes</label>
+                          <label className="text-xs font-medium mb-1 block">Cantidad de Moldes (opcional)</label>
                           <Input 
                             type="number"
                             value={cantidadMoldes}
                             onChange={(e) => setCantidadMoldes(e.target.value)}
-                            placeholder="ej: 10"
-                            min="1"
+                            placeholder="0 (por defecto)"
+                            min="0"
                             className="h-8 text-xs"
                           />
+                          <p className="text-xs text-gray-500 mt-1">Si no especificas una cantidad, se usará 0 por defecto</p>
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button variant="outline" onClick={() => setShowAddProductoDialog(false)} size="sm" className="h-7 px-2 text-xs">
                             Cancelar
                           </Button>
-                          <Button onClick={handleAddProducto} disabled={!selectedProductoId || !cantidadMoldes} size="sm" className="h-7 px-2 text-xs">
+                          <Button onClick={handleAddProducto} disabled={!selectedProductoId} size="sm" className="h-7 px-2 text-xs">
                             Agregar
                           </Button>
                         </div>
