@@ -292,19 +292,19 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     let displayTotal = 0;
 
     if (moneda === 'MXN') {
-      displaySubtotal = subtotalAfterDiscountMXN;
+      displaySubtotal = baseSubtotalMXN; // Use BASE subtotal, not the already discounted one
       displayShippingCost = shippingCostMXN; // Already MXN
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
     } else if (moneda === 'USD' && exchangeRate) {
-      displaySubtotal = convertMXNtoUSD(subtotalAfterDiscountMXN);
+      displaySubtotal = convertMXNtoUSD(baseSubtotalMXN); // Use BASE subtotal, not the already discounted one
       // Shipping cost was input in USD, so use it directly
       displayShippingCost = shippingCostInput;
       displayIvaAmount = convertMXNtoUSD(ivaAmountMXN);
       displayTotal = convertMXNtoUSD(totalMXN);
     } else {
       // Fallback: Display MXN values if USD selected but no rate
-      displaySubtotal = subtotalAfterDiscountMXN;
+      displaySubtotal = baseSubtotalMXN; // Use BASE subtotal, not the already discounted one
       displayShippingCost = shippingCostMXN; // Display the calculated MXN cost
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
