@@ -25,7 +25,8 @@ import {
   Clock,
   Loader2,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Download
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
@@ -62,9 +63,11 @@ interface CotizacionPayment {
 interface CashFlowSectionProps {
   selectedMonth?: number;
   selectedYear?: number;
+  onDownloadCSV?: () => void;
+  isDownloadingCSV?: boolean;
 }
 
-export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSectionProps) {
+export function CashFlowSection({ selectedMonth, selectedYear, onDownloadCSV, isDownloadingCSV }: CashFlowSectionProps) {
   const [metrics, setMetrics] = useState<CashFlowMetrics>({
     totalActiveQuotes: { mxn: 0, usd: 0 },
     actualPayments: { mxn: 0, usd: 0 },
@@ -267,18 +270,36 @@ export function CashFlowSection({ selectedMonth, selectedYear }: CashFlowSection
       {/* Payments Table */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-gray-100 rounded-md">
-              <TrendingUp className="h-4 w-4 text-gray-600" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-gray-100 rounded-md">
+                <TrendingUp className="h-4 w-4 text-gray-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold text-gray-900">
+                  Pagos de Cotizaciones Vendidas
+                </CardTitle>
+                <CardDescription className="text-xs text-gray-500 mt-0.5">
+                  Pagos recibidos de cotizaciones en producción o con anticipo
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-sm font-semibold text-gray-900">
-                Pagos de Cotizaciones Vendidas
-              </CardTitle>
-              <CardDescription className="text-xs text-gray-500 mt-0.5">
-                Pagos recibidos de cotizaciones en producción o con anticipo
-              </CardDescription>
-            </div>
+            {onDownloadCSV && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDownloadCSV}
+                disabled={isDownloadingCSV}
+                className="h-7 text-xs"
+              >
+                {isDownloadingCSV ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-3 w-3" />
+                )}
+                Descargar CSV
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">

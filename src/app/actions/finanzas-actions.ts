@@ -1404,4 +1404,141 @@ export async function getCotizacionPayments(
       error: error instanceof Error ? error.message : 'Error desconocido'
     };
   }
+}
+
+// Get all cash flow data for CSV export (filtered by month/year)
+export async function getCashFlowDataForCSV(
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    // First get all active cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
+    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
+      .from('cotizaciones')
+      .select('cotizacion_id')
+      .or('estado.eq.producción,estatus_pago.eq.anticipo');
+
+    if (activeCotizacionError) {
+      console.error('Error fetching active cotizaciones for CSV:', activeCotizacionError);
+      return { success: false, error: activeCotizacionError.message };
+    }
+
+    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
+
+    if (activeCotizacionIdsList.length === 0) {
+      // Return empty CSV with headers
+      const headers = [
+        'ID_Pago',
+        'Folio_Cotizacion',
+        'Cliente',
+        'Fecha_Pago',
+        'Monto_Original',
+        'Moneda',
+        'Metodo_Pago',
+        'Total_Cotizacion',
+        'Estatus_Pago'
+      ].join(',');
+      return { success: true, data: headers };
+    }
+
+    // Build the query for payments related to ACTIVE cotizaciones
+    let query = supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        cotizacion_id,
+        monto,
+        monto_mxn,
+        moneda,
+        metodo_pago,
+        fecha_pago,
+        notas,
+        porcentaje_aplicado,
+        cotizaciones!inner (
+          cotizacion_id,
+          folio,
+          total,
+          total_mxn,
+          moneda,
+          cliente_id,
+          fecha_creacion,
+          estado,
+          estatus_pago
+        )
+      `)
+      .eq('tipo_ingreso', 'cotizacion')
+      .not('cotizacion_id', 'is', null)
+      .in('cotizacion_id', activeCotizacionIdsList);
+
+    // Apply date filters
+    if (year) {
+      if (month) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        let nextMonthYear = year;
+        let nextMonth = month + 1;
+        if (nextMonth > 12) {
+          nextMonth = 1;
+          nextMonthYear += 1;
+        }
+        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        query = query.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
+      } else {
+        const yearStart = `${year}-01-01T00:00:00Z`;
+        const yearEnd = `${year}-12-31T23:59:59Z`;
+        query = query.gte('fecha_pago', yearStart).lte('fecha_pago', yearEnd);
+      }
+    }
+
+    const { data: payments, error: paymentsError } = await query
+      .order('fecha_pago', { ascending: false });
+
+    if (paymentsError) {
+      console.error('Error fetching cash flow payments for CSV:', paymentsError);
+      return { success: false, error: `Failed to fetch cash flow data: ${paymentsError.message}` };
+    }
+
+    // Get client names for the cotizaciones
+    const clienteIds = [...new Set(
+      payments?.map(p => p.cotizaciones?.cliente_id).filter(Boolean)
+    )];
+
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('cliente_id, nombre')
+      .in('cliente_id', clienteIds);
+
+    if (clientesError) {
+      console.warn('Error fetching client names for CSV:', clientesError);
+    }
+
+    const clienteMap = clientes?.reduce((acc: { [key: number]: string }, cliente) => {
+      acc[cliente.cliente_id] = cliente.nombre;
+      return acc;
+    }, {}) || {};
+
+    // Format the data for CSV
+    const formattedData = payments?.map(payment => ({
+      ID_Pago: payment.pago_id,
+      Folio_Cotizacion: payment.cotizaciones?.folio || '',
+      Cliente: clienteMap[payment.cotizaciones?.cliente_id as number] || 'Cliente desconocido',
+      Fecha_Pago: payment.fecha_pago ? new Date(payment.fecha_pago).toLocaleDateString('es-MX') : '',
+      Monto_Original: payment.monto,
+      Moneda: payment.moneda,
+      Metodo_Pago: payment.metodo_pago,
+      Total_Cotizacion: payment.cotizaciones?.total || payment.cotizaciones?.total_mxn || 0,
+      Estatus_Pago: payment.cotizaciones?.estatus_pago || ''
+    })) || [];
+
+    // Convert to CSV string
+    const csvString = convertToCSV(formattedData);
+
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('Error in getCashFlowDataForCSV:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred while generating Cash Flow CSV'
+    };
+  }
 } 

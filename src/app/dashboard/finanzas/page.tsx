@@ -36,6 +36,7 @@ import {
   getFinancialMetrics,
   getAllIngresosForCSV,
   getAllEgresosForCSV,
+  getCashFlowDataForCSV,
   deleteIngreso,
   deleteEgreso
 } from '@/app/actions/finanzas-actions';
@@ -121,6 +122,7 @@ export default function FinanzasPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDownloadingIngresos, setIsDownloadingIngresos] = useState(false);
   const [isDownloadingEgresos, setIsDownloadingEgresos] = useState(false);
+  const [isDownloadingCashFlow, setIsDownloadingCashFlow] = useState(false);
 
   // State for financial metrics
   const [metrics, setMetrics] = useState({
@@ -382,6 +384,46 @@ export default function FinanzasPage() {
     }
   };
 
+  const handleDownloadCashFlowCSV = async () => {
+    setIsDownloadingCashFlow(true);
+    try {
+      const result = await getCashFlowDataForCSV(
+        selectedMonth || undefined,
+        selectedYear || undefined
+      );
+      
+      // Check for success and if data is a non-empty string
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        const monthStr = selectedMonth ? `_${String(selectedMonth).padStart(2, '0')}` : '';
+        const yearStr = selectedYear ? `_${selectedYear}` : '';
+        link.setAttribute('download', `flujo_efectivo${yearStr}${monthStr}_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+         // Handle successful request but no data (e.g., empty CSV)
+         console.log("Cash Flow CSV generated successfully, but it is empty (no data found for filters).");
+         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
+      } else {
+        // Handle failure
+        console.error("Error generating Cash Flow CSV. Full result:", result);
+        // TODO: Show toast notification error using result.error
+      }
+    } catch (error) {
+      console.error("Error downloading Cash Flow CSV (catch block):", error);
+      // TODO: Show toast notification error
+    } finally {
+      setIsDownloadingCashFlow(false);
+    }
+  };
+
   // --- Delete Handlers ---
   const handleDeleteIngreso = async (pagoId: number) => {
     try {
@@ -591,6 +633,8 @@ export default function FinanzasPage() {
              <CashFlowSection 
                selectedMonth={selectedMonth || undefined}
                selectedYear={selectedYear || undefined}
+               onDownloadCSV={handleDownloadCashFlowCSV}
+               isDownloadingCSV={isDownloadingCashFlow}
              />
            </TabsContent>
            <TabsContent value="ingresos" className="space-y-4">
