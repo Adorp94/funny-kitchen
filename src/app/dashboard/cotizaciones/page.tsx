@@ -81,6 +81,9 @@ export default function CotizacionesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15; // Increase items per page slightly
   
+  // Add state for CSV download
+  const [isDownloadingCSV, setIsDownloadingCSV] = useState(false);
+  
   const fetchCotizacionesData = useCallback(async () => {
     try {
       setLoading(true);
@@ -296,6 +299,48 @@ export default function CotizacionesPage() {
     }
   };
   
+  const handleDownloadCSV = async () => {
+    try {
+      setIsDownloadingCSV(true);
+      
+      // Build query parameters for filtering
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterEstado !== 'todos') params.append('estado', filterEstado);
+      
+      const response = await fetch(`/api/cotizaciones/export-csv?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errorData.error || 'Error al generar el CSV');
+      }
+      
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') 
+        : `cotizaciones_${new Date().toISOString().split('T')[0]}.csv`;
+      
+      // Create and download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('CSV descargado exitosamente');
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      toast.error(`Error al descargar CSV: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setIsDownloadingCSV(false);
+    }
+  };
+  
   // Get status badge component - using standard variants
   const getStatusBadge = (estado: string) => {
     const status = estado?.toLowerCase() || 'desconocido';
@@ -407,18 +452,33 @@ export default function CotizacionesPage() {
           </p>
         </div>
         
-        <Button
-          onClick={handleNewCotizacion}
-          size="sm"
-          disabled={isNavigating || loading}
-        >
-          {isNavigating ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="mr-2 h-4 w-4" />
-          )}
-          Nueva Cotización
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleDownloadCSV}
+            variant="outline"
+            size="sm"
+            disabled={isDownloadingCSV || loading}
+          >
+            {isDownloadingCSV ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Exportar CSV
+          </Button>
+          <Button
+            onClick={handleNewCotizacion}
+            size="sm"
+            disabled={isNavigating || loading}
+          >
+            {isNavigating ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            Nueva Cotización
+          </Button>
+        </div>
       </div>
       
       {/* Error details section */}
