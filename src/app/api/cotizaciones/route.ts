@@ -508,16 +508,64 @@ export async function POST(req: NextRequest) {
     console.log(`Starting next cotizacion_producto_id from: ${nextId}`);
     // --- End Fetch Max ID ---
 
-    const productosToInsert = productos
-      .map((p: any) => {
+    // Handle custom products by creating them first
+    const processedProducts = [];
+    
+    for (const p of productos) {
         const frontendId = p.producto_id ?? p.id;
-        const dbProductoId = Number(frontendId);
+        let finalProductoId = Number(frontendId);
 
-        // Ensure product exists in DB before adding
-        if (isNaN(dbProductoId) || !existingProductIds.has(dbProductoId)) {
-            console.warn(`Skipping product - ID not found in DB or invalid: ${frontendId}`);
-            return null;
+        // If product doesn't exist in DB, check if it's a custom product
+        if (isNaN(finalProductoId) || !existingProductIds.has(finalProductoId)) {
+            // Check if this is a custom product (has a name but no valid producto_id)
+            if (p.nombre && (isNaN(finalProductoId) || String(frontendId).startsWith('new-'))) {
+                console.log(`Creating custom product in productos table: ${p.nombre}`);
+                
+                const customProductData = {
+                    nombre: p.nombre,
+                    tipo_ceramica: 'CERÁMICA DE ALTA TEMPERATURA', // Default value
+                    tipo_producto: 'Personalizado',
+                    descripcion: p.descripcion || null,
+                    colores: Array.isArray(p.colores) && p.colores.length > 0 
+                        ? p.colores.join(',') 
+                        : typeof p.colores === 'string' && p.colores.trim() !== '' 
+                        ? p.colores.trim() 
+                        : null,
+                    capacidad: 0, // Default for custom products
+                    unidad: 'unidad', // Default unit
+                    precio: p.precio_unitario || p.precio || 0,
+                    cantidad_inventario: 0
+                };
+
+                const { data: newProduct, error: createProductError } = await supabase
+                    .from('productos')
+                    .insert(customProductData)
+                    .select('producto_id')
+                    .single();
+
+                if (createProductError) {
+                    console.error("Error creating custom product:", createProductError);
+                    // Rollback: Delete the just inserted cotizacion
+                    await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+                    return NextResponse.json({ 
+                        error: `Error al crear producto personalizado "${p.nombre}": ${createProductError.message}`,
+                        details: createProductError.message 
+                    }, { status: 500 });
+                }
+
+                finalProductoId = newProduct.producto_id;
+                console.log(`Created custom product with ID: ${finalProductoId}`);
+            } else {
+                console.warn(`Skipping product - ID not found in DB or invalid: ${frontendId}`);
+                continue; // Skip to next product
+            }
         }
+        
+        processedProducts.push({ ...p, finalProductoId });
+    }
+
+    const productosToInsert = processedProducts
+      .map((p: any) => {
 
         // Use the MXN values sent from the frontend for the product
         const prod_original_precio_mxn = p.precio_unitario_mxn;
@@ -540,7 +588,7 @@ export async function POST(req: NextRequest) {
         return {
           cotizacion_producto_id: currentId, // Assign explicit ID
           cotizacion_id: cotizacionId,
-          producto_id: dbProductoId,
+          producto_id: p.finalProductoId,
           cantidad: p.cantidad,
           // Calculated display values for DB
           precio_unitario: prod_db_precio,

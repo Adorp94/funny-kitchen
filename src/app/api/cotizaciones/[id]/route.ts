@@ -259,10 +259,51 @@ export async function PUT(
 
         // 2. Process incoming products
         for (const producto of data.productos) {
+            // Handle custom products by creating them in productos table first
+            let finalProductoId = producto.producto_id ? parseInt(producto.producto_id, 10) : null;
+            
+            // If this is a custom product (no producto_id), create it in productos table first
+            if (!finalProductoId && producto.nombre) {
+                console.log(`Creating custom product in productos table: ${producto.nombre}`);
+                
+                const customProductData = {
+                    nombre: producto.nombre,
+                    tipo_ceramica: 'CERÁMICA DE ALTA TEMPERATURA', // Default value
+                    tipo_producto: 'Personalizado',
+                    descripcion: producto.descripcion || null,
+                    colores: Array.isArray(producto.colores) && producto.colores.length > 0 
+                        ? producto.colores.join(',') 
+                        : typeof producto.colores === 'string' && producto.colores.trim() !== '' 
+                        ? producto.colores.trim() 
+                        : null,
+                    capacidad: 0, // Default for custom products
+                    unidad: 'unidad', // Default unit
+                    precio: producto.precio_unitario || 0,
+                    cantidad_inventario: 0
+                };
+
+                const { data: newProduct, error: createProductError } = await supabase
+                    .from('productos')
+                    .insert(customProductData)
+                    .select('producto_id')
+                    .single();
+
+                if (createProductError) {
+                    console.error("Error creating custom product:", createProductError);
+                    return NextResponse.json({ 
+                        error: `Error al crear producto personalizado "${producto.nombre}": ${createProductError.message}`,
+                        details: createProductError.message 
+                    }, { status: 500 });
+                }
+
+                finalProductoId = newProduct.producto_id;
+                console.log(`Created custom product with ID: ${finalProductoId}`);
+            }
+
             const dbProductoData = {
                 // Map all relevant fields for insert/update
                 cotizacion_id: cotizacionId,
-                producto_id: producto.producto_id ? parseInt(producto.producto_id, 10) : null,
+                producto_id: finalProductoId,
                 cantidad: producto.cantidad ? parseInt(producto.cantidad, 10) : 1,
                 precio_unitario: producto.precio_unitario ? parseFloat(producto.precio_unitario) : 0,
                 descuento_producto: producto.descuento_producto ? parseFloat(producto.descuento_producto) : 0,
@@ -274,9 +315,10 @@ export async function PUT(
                 descripcion: typeof producto.descripcion === 'string' && producto.descripcion.trim() !== '' ? producto.descripcion.trim() : null
             };
 
+            // Skip if we still don't have a valid producto_id (this shouldn't happen now)
             if (!dbProductoData.producto_id) {
-                 console.warn(`Skipping product with missing producto_id: ${producto.nombre}`);
-                 continue; // Skip items without a base product ID
+                console.warn(`Skipping product - still no producto_id after processing: ${producto.nombre}`);
+                continue;
             }
             
             incomingProductoIds.add(dbProductoData.producto_id);
