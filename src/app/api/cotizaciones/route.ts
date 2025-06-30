@@ -537,9 +537,31 @@ export async function POST(req: NextRequest) {
                     cantidad_inventario: 0
                 };
 
+                // Get the next producto_id
+                const { data: maxProductData, error: maxProductError } = await supabase
+                    .from('productos')
+                    .select('producto_id')
+                    .order('producto_id', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (maxProductError) {
+                    console.error("Error fetching max producto_id:", maxProductError);
+                    await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+                    return NextResponse.json({ 
+                        error: `Error al preparar ID para producto personalizado: ${maxProductError.message}`,
+                        details: maxProductError.message 
+                    }, { status: 500 });
+                }
+
+                const nextProductId = (maxProductData?.producto_id || 0) + 1;
+                
                 const { data: newProduct, error: createProductError } = await supabase
                     .from('productos')
-                    .insert(customProductData)
+                    .insert({
+                        producto_id: nextProductId,
+                        ...customProductData
+                    })
                     .select('producto_id')
                     .single();
 

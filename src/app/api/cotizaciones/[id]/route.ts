@@ -282,9 +282,30 @@ export async function PUT(
                     cantidad_inventario: 0
                 };
 
+                // Get the next producto_id
+                const { data: maxProductData, error: maxProductError } = await supabase
+                    .from('productos')
+                    .select('producto_id')
+                    .order('producto_id', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (maxProductError) {
+                    console.error("Error fetching max producto_id:", maxProductError);
+                    return NextResponse.json({ 
+                        error: `Error al preparar ID para producto personalizado: ${maxProductError.message}`,
+                        details: maxProductError.message 
+                    }, { status: 500 });
+                }
+
+                const nextProductId = (maxProductData?.producto_id || 0) + 1;
+                
                 const { data: newProduct, error: createProductError } = await supabase
                     .from('productos')
-                    .insert(customProductData)
+                    .insert({
+                        producto_id: nextProductId,
+                        ...customProductData
+                    })
                     .select('producto_id')
                     .single();
 
@@ -367,7 +388,8 @@ export async function PUT(
         if (productsToUpdate.length > 0) {
             console.log("Updating products:", productsToUpdate);
             for (const prodToUpdate of productsToUpdate) {
-                 const { error: updateProdError } = await supabase
+                // First update the cotizacion_productos entry
+                const { error: updateProdError } = await supabase
                      .from('cotizacion_productos')
                      .update(prodToUpdate) // Pass the whole object (PK is ignored in SET part)
                      .eq('cotizacion_producto_id', prodToUpdate.cotizacion_producto_id);
@@ -375,21 +397,81 @@ export async function PUT(
                      console.error("Error updating product:", updateProdError, "Data:", prodToUpdate);
                      return NextResponse.json({ error: "Error al actualizar producto existente", details: updateProdError.message }, { status: 500 });
                  }
+
+                // Also update the base product if it's a custom product (tipo_producto = 'Personalizado')
+                // Check if this is a custom product by checking its tipo_producto
+                const { data: baseProduct, error: baseProductError } = await supabase
+                    .from('productos')
+                    .select('tipo_producto, nombre')
+                    .eq('producto_id', prodToUpdate.producto_id)
+                    .single();
+
+                if (!baseProductError && baseProduct?.tipo_producto === 'Personalizado') {
+                    // Find the original product data to get the updated name
+                    const originalProduct = data.productos.find(p => 
+                        p.cotizacion_producto_id && parseInt(p.cotizacion_producto_id, 10) === prodToUpdate.cotizacion_producto_id
+                    );
+
+                    if (originalProduct && originalProduct.nombre !== baseProduct.nombre) {
+                        console.log(`Updating base custom product ${prodToUpdate.producto_id} name from "${baseProduct.nombre}" to "${originalProduct.nombre}"`);
+                        
+                        const { error: updateBaseError } = await supabase
+                            .from('productos')
+                            .update({
+                                nombre: originalProduct.nombre,
+                                descripcion: originalProduct.descripcion || null,
+                                colores: Array.isArray(originalProduct.colores) && originalProduct.colores.length > 0 
+                                    ? originalProduct.colores.join(',') 
+                                    : typeof originalProduct.colores === 'string' && originalProduct.colores.trim() !== '' 
+                                    ? originalProduct.colores.trim() 
+                                    : null,
+                                precio: originalProduct.precio_unitario || 0
+                            })
+                            .eq('producto_id', prodToUpdate.producto_id);
+
+                        if (updateBaseError) {
+                            console.error("Error updating base custom product:", updateBaseError);
+                            // Log but don't fail the whole operation
+                        }
+                    }
+                }
             }
         }
 
         // 4c. Inserts
         if (productsToInsert.length > 0) {
+            // Get the next cotizacion_producto_id before inserting
+            const { data: maxCotizProductoData, error: maxCotizProductoError } = await supabase
+                .from('cotizacion_productos')
+                .select('cotizacion_producto_id')
+                .order('cotizacion_producto_id', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (maxCotizProductoError) {
+                console.error("Error fetching max cotizacion_producto_id:", maxCotizProductoError);
+                return NextResponse.json({ 
+                    error: `Error al preparar IDs para productos de cotización: ${maxCotizProductoError.message}`,
+                    details: maxCotizProductoError.message 
+                }, { status: 500 });
+            }
+
+            let nextCotizProductoId = (maxCotizProductoData?.cotizacion_producto_id || 0) + 1;
+            
             console.log("Inserting new products (one by one):", productsToInsert);
             for (const prodToInsert of productsToInsert) {
-                console.log("Attempting insert for:", prodToInsert);
+                const prodToInsertWithId = {
+                    ...prodToInsert,
+                    cotizacion_producto_id: nextCotizProductoId++
+                };
+                console.log("Attempting insert for:", prodToInsertWithId);
                 const { error: insertError } = await supabase
                     .from('cotizacion_productos')
-                    .insert(prodToInsert) // Insert individually
+                    .insert(prodToInsertWithId) // Insert individually with explicit ID
                     .select(); // Optionally select to confirm insert
 
                 if (insertError) {
-                    console.error("Error inserting new product:", insertError, "Data:", prodToInsert);
+                    console.error("Error inserting new product:", insertError, "Data:", prodToInsertWithId);
                     // Check for specific constraint violations
                     if (insertError.code === '23505') { // Unique constraint violation
                         if (insertError.message.includes('cotizacion_productos_pkey')) {
@@ -399,7 +481,7 @@ export async function PUT(
                             }, { status: 500 }); // Internal Server Error
                         } else if (insertError.message.includes('cotizacion_productos_cotizacion_id_producto_id_key')) {
                            return NextResponse.json({ 
-                               error: "Error: El producto \"" + prodToInsert.nombre + "\" ya existe en esta cotización.", 
+                               error: "Error: El producto ya existe en esta cotización.", 
                                details: insertError.message 
                            }, { status: 409 }); // Conflict
                         } else {
@@ -408,7 +490,7 @@ export async function PUT(
                         }
                     } else if (insertError.code === '23503') { // Foreign key violation (e.g., producto_id doesn't exist)
                          return NextResponse.json({ 
-                             error: `Error: El producto base con ID ${prodToInsert.producto_id} no existe.`, 
+                             error: `Error: El producto base con ID ${prodToInsertWithId.producto_id} no existe.`, 
                              details: insertError.message 
                          }, { status: 400 }); // Bad Request
                     }
