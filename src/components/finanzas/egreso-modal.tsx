@@ -37,17 +37,17 @@ const METODOS_PAGO = [
 ];
 
 const CATEGORIAS_GASTO = [
-  { value: "caja_chica", label: "Caja chica" },
-  { value: "devoluciones", label: "Devoluciones" },
-  { value: "envios", label: "Envíos" },
-  { value: "gastos_varios", label: "Gastos varios" },
-  { value: "instalacion_mantenimiento", label: "Instalación y mantenimiento" },
-  { value: "materia_prima", label: "Materia prima" },
-  { value: "nominas", label: "Nóminas" },
-  { value: "pago_proveedores", label: "Pago a proveedores" },
-  { value: "renta", label: "Renta" },
-  { value: "servicios", label: "Servicios" },
-  { value: "otros", label: "Otros" },
+  { value: "Caja chica", label: "Caja chica" },
+  { value: "Devoluciones", label: "Devoluciones" },
+  { value: "Envíos", label: "Envíos" },
+  { value: "Gastos varios", label: "Gastos varios" },
+  { value: "Instalación y mantenimiento", label: "Instalación y mantenimiento" },
+  { value: "Materia prima", label: "Materia prima" },
+  { value: "Nóminas", label: "Nóminas" },
+  { value: "Pago a proveedores", label: "Pago a proveedores" },
+  { value: "Renta", label: "Renta" },
+  { value: "Servicios", label: "Servicios" },
+  { value: "Otros", label: "Otros" },
 ];
 
 const egresoFormSchema = z.object({

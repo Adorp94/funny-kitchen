@@ -61,19 +61,17 @@ export function EgresosTable({
   // Translate category to Spanish
   const getCategoriaLabel = (categoria: string) => {
     const categoriasMap: Record<string, string> = {
-      "materia_prima": "Materia Prima",
-      "servicios": "Servicios",
-      "nominas": "Nóminas",
-      "renta": "Renta/Alquiler",
-      "equipo": "Equipo/Maquinaria",
-      "marketing": "Marketing",
-      "impuestos": "Impuestos",
-      "gastos_varios": "Gastos Varios",
       "Caja chica": "Caja Chica",
       "Devoluciones": "Devoluciones",
       "Envíos": "Envíos",
+      "Gastos varios": "Gastos Varios",
       "Instalación y mantenimiento": "Instalación y Mantenimiento",
+      "Materia prima": "Materia Prima",
+      "Nóminas": "Nóminas",
       "Pago a proveedores": "Pago a Proveedores",
+      "Renta": "Renta",
+      "Servicios": "Servicios",
+      "Otros": "Otros",
     };
     return categoriasMap[categoria] || categoria;
   };
@@ -81,19 +79,17 @@ export function EgresosTable({
   // Get category badge style
   const getCategoriaBadgeStyle = (categoria: string) => {
     const styleMap: Record<string, string> = {
-      "materia_prima": "bg-blue-100 text-blue-800 border-blue-200",
-      "servicios": "bg-purple-100 text-purple-800 border-purple-200",
-      "nominas": "bg-green-100 text-green-800 border-green-200",
-      "renta": "bg-yellow-100 text-yellow-800 border-yellow-200",
-      "equipo": "bg-indigo-100 text-indigo-800 border-indigo-200",
-      "marketing": "bg-orange-100 text-orange-800 border-orange-200",
-      "impuestos": "bg-red-100 text-red-800 border-red-200",
-      "gastos_varios": "bg-gray-100 text-gray-800 border-gray-200",
       "Caja chica": "bg-pink-100 text-pink-800 border-pink-200",
       "Devoluciones": "bg-teal-100 text-teal-800 border-teal-200",
       "Envíos": "bg-cyan-100 text-cyan-800 border-cyan-200",
+      "Gastos varios": "bg-gray-100 text-gray-800 border-gray-200",
       "Instalación y mantenimiento": "bg-lime-100 text-lime-800 border-lime-200",
+      "Materia prima": "bg-blue-100 text-blue-800 border-blue-200",
+      "Nóminas": "bg-green-100 text-green-800 border-green-200",
       "Pago a proveedores": "bg-sky-100 text-sky-800 border-sky-200",
+      "Renta": "bg-yellow-100 text-yellow-800 border-yellow-200",
+      "Servicios": "bg-purple-100 text-purple-800 border-purple-200",
+      "Otros": "bg-orange-100 text-orange-800 border-orange-200",
     };
     return styleMap[categoria] || "bg-gray-100 text-gray-800 border-gray-200";
   };
