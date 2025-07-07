@@ -138,19 +138,24 @@ export default function FinanzasPage() {
 
   // Fetch initial data based on default filters
   useEffect(() => {
-    // Pass filters to fetchMetrics
-    fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
-    fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined);
-    fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined);
+    // Pass filters to fetchMetrics - fix: properly handle 0 values
+    const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+    const yearParam = selectedYear === 0 ? undefined : selectedYear;
+    fetchMetrics(monthParam, yearParam); 
+    fetchIngresos(1, monthParam, yearParam);
+    fetchEgresos(1, monthParam, yearParam);
   }, [selectedMonth, selectedYear]); // Re-fetch when filters change
 
   // --- Fetching Functions ---
   // Updated fetchMetrics to accept filters
   const fetchMetrics = async (month: number | undefined, year: number | undefined) => {
+    console.log('[FinanzasPage] fetchMetrics called with:', { month, year });
     try {
       // Pass filters to the server action
       const result = await getFinancialMetrics(month, year); 
+      console.log('[FinanzasPage] getFinancialMetrics result:', result);
       if (result.success && result.data) {
+        console.log('[FinanzasPage] Setting metrics to:', result.data);
         setMetrics(result.data);
       } else {
          console.warn("Failed to fetch metrics or no data:", result.error);
@@ -205,47 +210,52 @@ export default function FinanzasPage() {
     }
   };
 
-  // Updated fetchEgresos to handle month/year being potentially 0
   const fetchEgresos = async (page: number, month: number | undefined, year: number | undefined) => {
     setLoadingEgresos(true);
     try {
-      // Pass 0 or undefined directly (backend will handle)
-      const result = await getAllEgresos(page, 10, month, year); 
+      const result = await getAllEgresos(page, 10, month, year);
       if (result.success && result.data) {
-        setEgresos(result.data);
+        if (Array.isArray(result.data)) {
+          setEgresos(result.data);
+        } else {
+          console.warn("getAllEgresos successful but data is not an array:", result.data);
+          setEgresos([]);
+        }
+        
         if (result.pagination) {
           setEgresosPagination({
             page: result.pagination.page,
             totalPages: result.pagination.totalPages
           });
         } else {
-           setEgresosPagination({ page: 1, totalPages: 1 });
+          setEgresosPagination({ page: 1, totalPages: 1 });
         }
       } else {
-        console.warn("Failed to fetch egresos or no data for filter:", result.error);
-        setEgresos([]); 
-        setEgresosPagination({ page: 1, totalPages: 1 }); 
+        console.warn("Failed to fetch egresos or no data:", result?.error);
+        setEgresos([]);
+        setEgresosPagination({ page: 1, totalPages: 1 });
       }
     } catch (error) {
       console.error("Error fetching egresos:", error);
-      setEgresos([]); 
-      setEgresosPagination({ page: 1, totalPages: 1 }); 
+      setEgresos([]);
+      setEgresosPagination({ page: 1, totalPages: 1 });
     } finally {
       setLoadingEgresos(false);
     }
   };
 
-  // Refresh data using current filters
   const refreshData = async () => {
-    console.log('[FinanzasPage] Refresh Button Clicked - Calling refreshData...');
     setIsRefreshing(true);
     try {
+      const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+      const yearParam = selectedYear === 0 ? undefined : selectedYear;
       await Promise.all([
-        // Pass filters to fetchMetrics
-        fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
-        fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined),
-        fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined)
+        fetchMetrics(monthParam, yearParam),
+        fetchIngresos(1, monthParam, yearParam),
+        fetchEgresos(1, monthParam, yearParam)
       ]);
+    } catch (error) {
+      console.error("Error refreshing data:", error);
     } finally {
       setIsRefreshing(false);
     }
@@ -257,8 +267,8 @@ export default function FinanzasPage() {
       const result = await createIngreso(data);
       if (result.success) {
         // Pass filters to fetchMetrics
-        fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
-        fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined); 
+        fetchMetrics(selectedMonth === 0 ? undefined : selectedMonth, selectedYear === 0 ? undefined : selectedYear); 
+        fetchIngresos(1, selectedMonth === 0 ? undefined : selectedMonth, selectedYear === 0 ? undefined : selectedYear); 
         return true;
       }
       return false;
@@ -276,8 +286,8 @@ export default function FinanzasPage() {
       
       if (result.success) {
         // Pass filters to fetchMetrics
-        fetchMetrics(selectedMonth || undefined, selectedYear || undefined); 
-        fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined); 
+        fetchMetrics(selectedMonth === 0 ? undefined : selectedMonth, selectedYear === 0 ? undefined : selectedYear); 
+        fetchEgresos(1, selectedMonth === 0 ? undefined : selectedMonth, selectedYear === 0 ? undefined : selectedYear); 
         return true;
       } else {
         console.error('[handleEgresoSubmit] Failed to create egreso:', result.error);
@@ -291,13 +301,15 @@ export default function FinanzasPage() {
 
   // --- Pagination Handlers (Use current filters) ---
   const handleIngresoPageChange = (page: number) => {
-    // Pass state values (can be 0)
-    fetchIngresos(page, selectedMonth || undefined, selectedYear || undefined);
+    const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+    const yearParam = selectedYear === 0 ? undefined : selectedYear;
+    fetchIngresos(page, monthParam, yearParam);
   };
 
   const handleEgresoPageChange = (page: number) => {
-    // Pass state values (can be 0)
-    fetchEgresos(page, selectedMonth || undefined, selectedYear || undefined);
+    const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+    const yearParam = selectedYear === 0 ? undefined : selectedYear;
+    fetchEgresos(page, monthParam, yearParam);
   };
 
   // --- Filter Change Handlers ---
@@ -317,10 +329,9 @@ export default function FinanzasPage() {
   const handleDownloadCashFlowCSV = async () => {
     setIsDownloadingCashFlow(true);
     try {
-      const result = await getCashFlowDataForCSV(
-        selectedMonth || undefined,
-        selectedYear || undefined
-      );
+      const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+      const yearParam = selectedYear === 0 ? undefined : selectedYear;
+      const result = await getCashFlowDataForCSV(monthParam, yearParam);
       
       // Check for success and if data is a non-empty string
       if (result.success && typeof result.data === 'string' && result.data.length > 0) {
@@ -432,9 +443,11 @@ export default function FinanzasPage() {
       const result = await deleteIngreso(pagoId);
       if (result.success) {
         // Refresh data after successful deletion
+        const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+        const yearParam = selectedYear === 0 ? undefined : selectedYear;
         await Promise.all([
-          fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
-          fetchIngresos(1, selectedMonth || undefined, selectedYear || undefined)
+          fetchMetrics(monthParam, yearParam),
+          fetchIngresos(1, monthParam, yearParam)
         ]);
       } else {
         throw new Error(result.error || "Error al eliminar el ingreso");
@@ -450,9 +463,11 @@ export default function FinanzasPage() {
       const result = await deleteEgreso(egresoId);
       if (result.success) {
         // Refresh data after successful deletion
+        const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+        const yearParam = selectedYear === 0 ? undefined : selectedYear;
         await Promise.all([
-          fetchMetrics(selectedMonth || undefined, selectedYear || undefined),
-          fetchEgresos(1, selectedMonth || undefined, selectedYear || undefined)
+          fetchMetrics(monthParam, yearParam),
+          fetchEgresos(1, monthParam, yearParam)
         ]);
       } else {
         throw new Error(result.error || "Error al eliminar el egreso");
@@ -633,8 +648,8 @@ export default function FinanzasPage() {
            </TabsList>
            <TabsContent value="cashflow" className="space-y-4">
              <CashFlowSection 
-               selectedMonth={selectedMonth || undefined}
-               selectedYear={selectedYear || undefined}
+               selectedMonth={selectedMonth === 0 ? undefined : selectedMonth}
+               selectedYear={selectedYear === 0 ? undefined : selectedYear}
                onDownloadCSV={handleDownloadCashFlowCSV}
                isDownloadingCSV={isDownloadingCashFlow}
                onDownloadHistoricCSV={handleDownloadCashFlowHistoricCSV}

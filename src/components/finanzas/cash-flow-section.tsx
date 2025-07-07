@@ -94,16 +94,21 @@ export function CashFlowSection({ selectedMonth, selectedYear, onDownloadCSV, is
 
   const fetchCashFlowData = async () => {
     setLoading(true);
+    console.log('[CashFlowSection] Fetching cash flow data with filters:', { selectedMonth, selectedYear });
     try {
       const result = await getCashFlowMetrics(
         selectedMonth || undefined, 
         selectedYear || undefined
       );
+      console.log('[CashFlowSection] getCashFlowMetrics result:', result);
       if (result.success && result.data) {
+        console.log('[CashFlowSection] Setting metrics to:', result.data);
         setMetrics(result.data);
+      } else {
+        console.error('[CashFlowSection] Failed to fetch metrics:', result.error);
       }
     } catch (error) {
-      console.error('Error fetching cash flow data:', error);
+      console.error('[CashFlowSection] Error fetching cash flow data:', error);
     } finally {
       setLoading(false);
     }

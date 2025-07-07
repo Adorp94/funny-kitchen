@@ -982,7 +982,7 @@ export async function deleteIngreso(pagoId: number): Promise<{ success: boolean;
         // Get the cotizacion total to calculate percentage
         const { data: cotizacionData, error: cotizacionError } = await supabase
           .from('cotizaciones')
-          .select('total, total_mxn')
+          .select('total, total_mxn, monto_pagado') // Check current monto_pagado for fecha_pago_inicial logic
           .eq('cotizacion_id', pagoData.cotizacion_id)
           .single();
 
@@ -1108,13 +1108,13 @@ export async function getCashFlowMetrics(
       .from('pagos')
       .select(`
         cotizacion_id,
+        monto_mxn,
+        moneda,
         cotizaciones!inner (
           cotizacion_id,
           total,
           total_mxn,
           moneda,
-          monto_pagado,
-          monto_pagado_mxn,
           estado,
           estatus_pago,
           folio
@@ -1156,42 +1156,47 @@ export async function getCashFlowMetrics(
       };
     }
 
-    // Extract unique cotizaciones (since one cotizacion can have multiple payments)
+    // Extract unique cotizaciones and calculate actual payments in period
     const uniqueCotizaciones = new Map();
+    let actualPaymentsMXN = 0;
+    let actualPaymentsUSD = 0;
+
     paymentsData?.forEach(payment => {
       const cot = payment.cotizaciones;
       if (cot && !uniqueCotizaciones.has(cot.cotizacion_id)) {
         uniqueCotizaciones.set(cot.cotizacion_id, cot);
       }
+      
+      // Sum actual payments made in the date range using reliable monto_mxn
+      // After data integrity fix, all MXN payments have monto_mxn populated
+      if (payment.moneda === 'MXN') {
+        actualPaymentsMXN += Number(payment.monto_mxn || 0);
+      } else if (payment.moneda === 'USD') {
+        // For USD payments (if any), monto_mxn contains the converted amount
+        actualPaymentsMXN += Number(payment.monto_mxn || 0);
+        // Also track USD separately if needed
+        // actualPaymentsUSD += Number(payment.monto || 0);
+      }
     });
 
     const soldCotizaciones = Array.from(uniqueCotizaciones.values());
 
-    // Calculate metrics for ALL sold cotizaciones with payments in the period
+    // Calculate total value of sold cotizaciones
     let totalActiveQuotesMXN = 0;
     let totalActiveQuotesUSD = 0;
-    let actualPaymentsMXN = 0;
-    let actualPaymentsUSD = 0;
 
     soldCotizaciones.forEach(cot => {
-      const totalMXN = Number(cot.total_mxn || 0);
-      const total = Number(cot.total || 0);
-      const paidMXN = Number(cot.monto_pagado_mxn || 0);
-      const paid = Number(cot.monto_pagado || 0);
-      
       if (cot.moneda === 'MXN') {
-        totalActiveQuotesMXN += totalMXN || total;
-        // For MXN, only use monto_pagado_mxn (don't double count with monto_pagado)
-        actualPaymentsMXN += paidMXN;
-      } else {
-        totalActiveQuotesUSD += total;
-        actualPaymentsUSD += paid;
-        totalActiveQuotesMXN += totalMXN; // Also add MXN equivalent for totals
-        actualPaymentsMXN += paidMXN; // Add converted payments
+        // For MXN cotizaciones, use total_mxn (which should equal total)
+        totalActiveQuotesMXN += Number(cot.total_mxn || cot.total || 0);
+      } else if (cot.moneda === 'USD') {
+        // For USD cotizaciones, track both currencies
+        totalActiveQuotesUSD += Number(cot.total || 0);
+        totalActiveQuotesMXN += Number(cot.total_mxn || 0); // MXN equivalent
       }
     });
 
-    // Calculate collection rate
+    // Calculate collection rate based on actual payments vs total value
     const totalActiveValue = totalActiveQuotesMXN + (totalActiveQuotesUSD * 20); // Rough conversion for rate
     const totalPaymentsValue = actualPaymentsMXN + (actualPaymentsUSD * 20);
     const collectionRate = totalActiveValue > 0 ? (totalPaymentsValue / totalActiveValue) * 100 : 0;
