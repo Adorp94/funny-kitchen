@@ -156,7 +156,6 @@ export function IngresoForm({
                   variant="outline"
                   role="combobox"
                   aria-expanded={openCotizacionPopover}
-                  aria-controls="cotizaciones-list"
                   className={cn(
                      "w-full justify-between text-muted-foreground",
                      form.formState.errors.cotizacion_id && "border-red-500"
@@ -168,26 +167,17 @@ export function IngresoForm({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
-                <Command filter={(value, search) => {
-                  // Custom filter function expects value to be `cot-${id}`
-                  const idStr = value.split('-')[1];
-                  if (!idStr) return 0;
-                  const cotizacion = cotizaciones.find(c => c.cotizacion_id === parseInt(idStr));
-                  if (!cotizacion) return 0;
-                  const itemData = `${cotizacion.folio || ''} ${cotizacion.cliente_nombre || ''}`.toLowerCase();
-                  return itemData.includes(search.toLowerCase()) ? 1 : 0;
-                }}>
+                <Command>
                   <CommandInput placeholder="Buscar cotización (Folio/Cliente)..." />
-                  <CommandList id="cotizaciones-list">
+                  <CommandList>
                     <CommandEmpty>No se encontraron cotizaciones.</CommandEmpty>
                     <CommandGroup>
                       {cotizaciones?.map((cot) => (
                         <CommandItem
                           key={cot.cotizacion_id}
-                          value={`cot-${cot.cotizacion_id}`}
-                          onSelect={(currentValue) => {
-                            const selectedId = parseInt(currentValue.split('-')[1]);
-                            form.setValue("cotizacion_id", selectedId, { shouldValidate: true });
+                          value={cot.label}
+                          onSelect={() => {
+                            form.setValue("cotizacion_id", cot.cotizacion_id, { shouldValidate: true });
                             setOpenCotizacionPopover(false);
                           }}
                           className="flex items-center justify-between w-full"
