@@ -34,13 +34,13 @@ import {
   getAllIngresos, 
   getAllEgresos,
   getFinancialMetrics,
-  getAllIngresosForCSV,
-  getAllEgresosForCSV,
   getCashFlowDataForCSV,
+  getCashFlowDataForCSVHistoric,
+  getAllFinancialDataForCSV,
   deleteIngreso,
   deleteEgreso
 } from '@/app/actions/finanzas-actions';
-import { formatCurrency, convertToCSV } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { 
   Table, 
   TableBody, 
@@ -120,9 +120,9 @@ export default function FinanzasPage() {
   const [loadingIngresos, setLoadingIngresos] = useState(false);
   const [loadingEgresos, setLoadingEgresos] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isDownloadingIngresos, setIsDownloadingIngresos] = useState(false);
-  const [isDownloadingEgresos, setIsDownloadingEgresos] = useState(false);
   const [isDownloadingCashFlow, setIsDownloadingCashFlow] = useState(false);
+  const [isDownloadingCashFlowHistoric, setIsDownloadingCashFlowHistoric] = useState(false);
+  const [isDownloadingFinancialData, setIsDownloadingFinancialData] = useState(false);
 
   // State for financial metrics
   const [metrics, setMetrics] = useState({
@@ -314,76 +314,6 @@ export default function FinanzasPage() {
   };
 
   // --- Download Handlers ---
-  const handleDownloadIngresosCSV = async () => {
-    setIsDownloadingIngresos(true);
-    try {
-      const result = await getAllIngresosForCSV(); 
-      
-      // Check for success and if data is a non-empty string
-      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
-        const csvData = result.data;
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        const date = new Date().toISOString().slice(0, 10);
-        link.setAttribute('download', `ingresos_${date}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
-         // Handle successful request but no data (e.g., empty CSV)
-         console.log("Ingresos CSV generated successfully, but it is empty (no data found for filters).");
-         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
-      } else {
-        // Handle failure
-        console.error("Error generating Ingresos CSV. Full result:", result);
-        // TODO: Show toast notification error
-      }
-    } catch (error) {
-      console.error("Error downloading Ingresos CSV (catch block):", error);
-      // TODO: Show toast notification error
-    } finally {
-      setIsDownloadingIngresos(false);
-    }
-  };
-
-  const handleDownloadEgresosCSV = async () => {
-    setIsDownloadingEgresos(true);
-    try {
-      const result = await getAllEgresosForCSV();
-      
-      // Check for success and if data is a non-empty string
-      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
-        const csvData = result.data;
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        const date = new Date().toISOString().slice(0, 10);
-        link.setAttribute('download', `egresos_${date}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
-         // Handle successful request but no data (e.g., empty CSV)
-         console.log("Egresos CSV generated successfully, but it is empty (no data found for filters).");
-         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
-      } else {
-        // Handle failure
-        console.error("Error generating Egresos CSV. Full result:", result);
-        // TODO: Show toast notification error using result.error
-      }
-    } catch (error) {
-      console.error("Error downloading Egresos CSV (catch block):", error);
-      // TODO: Show toast notification error
-    } finally {
-      setIsDownloadingEgresos(false);
-    }
-  };
-
   const handleDownloadCashFlowCSV = async () => {
     setIsDownloadingCashFlow(true);
     try {
@@ -421,6 +351,78 @@ export default function FinanzasPage() {
       // TODO: Show toast notification error
     } finally {
       setIsDownloadingCashFlow(false);
+    }
+  };
+
+  const handleDownloadCashFlowHistoricCSV = async () => {
+    setIsDownloadingCashFlowHistoric(true);
+    try {
+      const result = await getCashFlowDataForCSVHistoric();
+      
+      // Check for success and if data is a non-empty string
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `flujo_efectivo_historico_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Historial de flujo de efectivo descargado exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+         // Handle successful request but no data (e.g., empty CSV)
+         console.log("Historic Cash Flow CSV generated successfully, but it is empty (no data found).");
+         toast.info("No hay datos históricos para descargar");
+      } else {
+        // Handle failure
+        console.error("Error generating Historic Cash Flow CSV. Full result:", result);
+        toast.error("Error al generar el archivo CSV del historial");
+      }
+    } catch (error) {
+      console.error("Error downloading Historic Cash Flow CSV (catch block):", error);
+      toast.error("Error al descargar el archivo CSV del historial");
+    } finally {
+      setIsDownloadingCashFlowHistoric(false);
+    }
+  };
+
+  const handleDownloadFinancialDataCSV = async () => {
+    setIsDownloadingFinancialData(true);
+    try {
+      const result = await getAllFinancialDataForCSV();
+      
+      // Check for success and if data is a non-empty string
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `datos_financieros_completos_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Datos financieros completos descargados exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+         // Handle successful request but no data (e.g., empty CSV)
+         console.log("Financial Data CSV generated successfully, but it is empty (no data found).");
+         toast.info("No hay datos financieros para descargar");
+      } else {
+        // Handle failure
+        console.error("Error generating Financial Data CSV. Full result:", result);
+        toast.error("Error al generar el archivo CSV de datos financieros");
+      }
+    } catch (error) {
+      console.error("Error downloading Financial Data CSV (catch block):", error);
+      toast.error("Error al descargar el archivo CSV de datos financieros");
+    } finally {
+      setIsDownloadingFinancialData(false);
     }
   };
 
@@ -635,6 +637,8 @@ export default function FinanzasPage() {
                selectedYear={selectedYear || undefined}
                onDownloadCSV={handleDownloadCashFlowCSV}
                isDownloadingCSV={isDownloadingCashFlow}
+               onDownloadHistoricCSV={handleDownloadCashFlowHistoricCSV}
+               isDownloadingHistoricCSV={isDownloadingCashFlowHistoric}
              />
            </TabsContent>
            <TabsContent value="ingresos" className="space-y-4">
@@ -644,15 +648,15 @@ export default function FinanzasPage() {
                   <Button 
                      variant="outline"
                      size="sm"
-                     onClick={handleDownloadIngresosCSV}
-                     disabled={isDownloadingIngresos}
+                     onClick={handleDownloadFinancialDataCSV}
+                     disabled={isDownloadingFinancialData}
                   >
-                    {isDownloadingIngresos ? (
+                    {isDownloadingFinancialData ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Download className="mr-2 h-4 w-4" />
                     )}
-                    Descargar CSV
+                    Descargar CSV completo
                   </Button>
                </div>
              </div>
@@ -672,15 +676,15 @@ export default function FinanzasPage() {
                    <Button 
                        variant="outline"
                        size="sm"
-                       onClick={handleDownloadEgresosCSV}
-                       disabled={isDownloadingEgresos}
+                       onClick={handleDownloadFinancialDataCSV}
+                       disabled={isDownloadingFinancialData}
                    >
-                     {isDownloadingEgresos ? (
+                     {isDownloadingFinancialData ? (
                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                      ) : (
                        <Download className="mr-2 h-4 w-4" />
                      )}
-                     Descargar CSV
+                     Descargar CSV completo
                    </Button>
                  </div>
              </div>

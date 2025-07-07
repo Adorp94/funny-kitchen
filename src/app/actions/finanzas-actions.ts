@@ -1103,38 +1103,8 @@ export async function getCashFlowMetrics(
       }
     }
 
-    // First get all active cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
-    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
-      .from('cotizaciones')
-      .select('cotizacion_id')
-      .or('estado.eq.producción,estatus_pago.eq.anticipo');
-
-    if (activeCotizacionError) {
-      console.error('Error fetching active cotizaciones:', activeCotizacionError);
-      return { 
-        success: false, 
-        error: activeCotizacionError.message 
-      };
-    }
-
-    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
-
-    if (activeCotizacionIdsList.length === 0) {
-      return {
-        success: true,
-        data: {
-          totalActiveQuotes: { mxn: 0, usd: 0 },
-          actualPayments: { mxn: 0, usd: 0 },
-          pendingCollections: { mxn: 0, usd: 0 },
-          collectionRate: 0,
-          activeCotizaciones: 0,
-          totalCotizaciones: 0
-        }
-      };
-    }
-
-    // Now get payments for these active cotizaciones in the specified period
-    let activeCotizacionesWithPaymentsQuery = supabase
+    // Get ALL cotizaciones that have had payments (sold cotizaciones)
+    let cotizacionesWithPaymentsQuery = supabase
       .from('pagos')
       .select(`
         cotizacion_id,
@@ -1151,8 +1121,7 @@ export async function getCashFlowMetrics(
         )
       `)
       .eq('tipo_ingreso', 'cotizacion')
-      .not('cotizacion_id', 'is', null)
-      .in('cotizacion_id', activeCotizacionIdsList);
+      .not('cotizacion_id', 'is', null);
 
     // Apply payment date filters
     if (paymentDateFilter) {
@@ -1160,11 +1129,11 @@ export async function getCashFlowMetrics(
       for (const filter of filters) {
         const [field, operator, value] = filter.split('.');
         if (operator === 'gte') {
-          activeCotizacionesWithPaymentsQuery = activeCotizacionesWithPaymentsQuery.gte(field, value);
+          cotizacionesWithPaymentsQuery = cotizacionesWithPaymentsQuery.gte(field, value);
         } else if (operator === 'lt') {
-          activeCotizacionesWithPaymentsQuery = activeCotizacionesWithPaymentsQuery.lt(field, value);
+          cotizacionesWithPaymentsQuery = cotizacionesWithPaymentsQuery.lt(field, value);
         } else if (operator === 'lte') {
-          activeCotizacionesWithPaymentsQuery = activeCotizacionesWithPaymentsQuery.lte(field, value);
+          cotizacionesWithPaymentsQuery = cotizacionesWithPaymentsQuery.lte(field, value);
         }
       }
     }
@@ -1174,7 +1143,7 @@ export async function getCashFlowMetrics(
       .from('cotizaciones')
       .select('cotizacion_id');
 
-    const { data: paymentsData, error: paymentsError } = await activeCotizacionesWithPaymentsQuery;
+    const { data: paymentsData, error: paymentsError } = await cotizacionesWithPaymentsQuery;
 
     if (paymentsError || allCotizacionesError) {
       console.error('Error fetching cash flow data:', { 
@@ -1196,15 +1165,15 @@ export async function getCashFlowMetrics(
       }
     });
 
-    const activeCotizaciones = Array.from(uniqueCotizaciones.values());
+    const soldCotizaciones = Array.from(uniqueCotizaciones.values());
 
-    // Calculate metrics for ACTIVE cotizaciones with payments in the period
+    // Calculate metrics for ALL sold cotizaciones with payments in the period
     let totalActiveQuotesMXN = 0;
     let totalActiveQuotesUSD = 0;
     let actualPaymentsMXN = 0;
     let actualPaymentsUSD = 0;
 
-    activeCotizaciones.forEach(cot => {
+    soldCotizaciones.forEach(cot => {
       const totalMXN = Number(cot.total_mxn || 0);
       const total = Number(cot.total || 0);
       const paidMXN = Number(cot.monto_pagado_mxn || 0);
@@ -1247,7 +1216,7 @@ export async function getCashFlowMetrics(
           usd: Math.max(0, pendingCollectionsUSD) 
         },
         collectionRate: Math.round(collectionRate * 100) / 100,
-        activeCotizaciones: activeCotizaciones.length,
+        activeCotizaciones: soldCotizaciones.length,
         totalCotizaciones: allCotizaciones?.length || 0
       }
     };
@@ -1275,33 +1244,7 @@ export async function getCotizacionPayments(
   try {
     const offset = (page - 1) * pageSize;
 
-    // First get all active cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
-    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
-      .from('cotizaciones')
-      .select('cotizacion_id')
-      .or('estado.eq.producción,estatus_pago.eq.anticipo');
-
-    if (activeCotizacionError) {
-      console.error('Error fetching active cotizaciones:', activeCotizacionError);
-      return { success: false, error: activeCotizacionError.message };
-    }
-
-    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
-
-    if (activeCotizacionIdsList.length === 0) {
-      return {
-        success: true,
-        data: [],
-        pagination: {
-          page,
-          totalPages: 0,
-          totalItems: 0,
-          itemsPerPage: pageSize
-        }
-      };
-    }
-
-    // Build the query for payments related to ACTIVE cotizaciones
+    // Build the query for payments from ALL cotizaciones that have been sold (have payments)
     let query = supabase
       .from('pagos')
       .select(`
@@ -1327,8 +1270,7 @@ export async function getCotizacionPayments(
         )
       `, { count: 'exact' })
       .eq('tipo_ingreso', 'cotizacion')
-      .not('cotizacion_id', 'is', null)
-      .in('cotizacion_id', activeCotizacionIdsList);
+      .not('cotizacion_id', 'is', null);
 
     // Apply date filters
     if (year) {
@@ -1412,36 +1354,7 @@ export async function getCashFlowDataForCSV(
   year?: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
-    // First get all active cotizaciones (estado = 'producción' OR estatus_pago = 'anticipo')
-    const { data: activeCotizacionIds, error: activeCotizacionError } = await supabase
-      .from('cotizaciones')
-      .select('cotizacion_id')
-      .or('estado.eq.producción,estatus_pago.eq.anticipo');
-
-    if (activeCotizacionError) {
-      console.error('Error fetching active cotizaciones for CSV:', activeCotizacionError);
-      return { success: false, error: activeCotizacionError.message };
-    }
-
-    const activeCotizacionIdsList = activeCotizacionIds?.map(c => c.cotizacion_id) || [];
-
-    if (activeCotizacionIdsList.length === 0) {
-      // Return empty CSV with headers
-      const headers = [
-        'ID_Pago',
-        'Folio_Cotizacion',
-        'Cliente',
-        'Fecha_Pago',
-        'Monto_Original',
-        'Moneda',
-        'Metodo_Pago',
-        'Total_Cotizacion',
-        'Estatus_Pago'
-      ].join(',');
-      return { success: true, data: headers };
-    }
-
-    // Build the query for payments related to ACTIVE cotizaciones
+    // Build the query for ALL payments from cotizaciones (sold = has payments)
     let query = supabase
       .from('pagos')
       .select(`
@@ -1467,8 +1380,7 @@ export async function getCashFlowDataForCSV(
         )
       `)
       .eq('tipo_ingreso', 'cotizacion')
-      .not('cotizacion_id', 'is', null)
-      .in('cotizacion_id', activeCotizacionIdsList);
+      .not('cotizacion_id', 'is', null);
 
     // Apply date filters
     if (year) {
@@ -1495,6 +1407,23 @@ export async function getCashFlowDataForCSV(
     if (paymentsError) {
       console.error('Error fetching cash flow payments for CSV:', paymentsError);
       return { success: false, error: `Failed to fetch cash flow data: ${paymentsError.message}` };
+    }
+
+    if (!payments || payments.length === 0) {
+      // Return empty CSV with headers
+      const headers = [
+        'ID_Pago',
+        'Folio_Cotizacion',
+        'Cliente',
+        'Fecha_Pago',
+        'Monto_Original',
+        'Moneda',
+        'Metodo_Pago',
+        'Total_Cotizacion',
+        'Estatus_Pago',
+        'Estado_Cotizacion'
+      ].join(',');
+      return { success: true, data: headers };
     }
 
     // Get client names for the cotizaciones
@@ -1526,7 +1455,8 @@ export async function getCashFlowDataForCSV(
       Moneda: payment.moneda,
       Metodo_Pago: payment.metodo_pago,
       Total_Cotizacion: payment.cotizaciones?.total || payment.cotizaciones?.total_mxn || 0,
-      Estatus_Pago: payment.cotizaciones?.estatus_pago || ''
+      Estatus_Pago: payment.cotizaciones?.estatus_pago || '',
+      Estado_Cotizacion: payment.cotizaciones?.estado || ''
     })) || [];
 
     // Convert to CSV string
@@ -1539,6 +1469,281 @@ export async function getCashFlowDataForCSV(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unexpected error occurred while generating Cash Flow CSV'
+    };
+  }
+}
+
+// Get all historic cash flow data for CSV export (no date filters)
+export async function getCashFlowDataForCSVHistoric(): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    // Get ALL cotizaciones that have had payments (historically sold), regardless of current status
+    const { data: payments, error: paymentsError } = await supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        cotizacion_id,
+        monto,
+        monto_mxn,
+        moneda,
+        metodo_pago,
+        fecha_pago,
+        notas,
+        porcentaje_aplicado,
+        cotizaciones!inner (
+          cotizacion_id,
+          folio,
+          total,
+          total_mxn,
+          moneda,
+          cliente_id,
+          fecha_creacion,
+          estado,
+          estatus_pago
+        )
+      `)
+      .eq('tipo_ingreso', 'cotizacion')
+      .not('cotizacion_id', 'is', null)
+      .order('fecha_pago', { ascending: false });
+
+    if (paymentsError) {
+      console.error('Error fetching historic cash flow payments for CSV:', paymentsError);
+      return { success: false, error: `Failed to fetch historic cash flow data: ${paymentsError.message}` };
+    }
+
+    if (!payments || payments.length === 0) {
+      // Return empty CSV with headers
+      const headers = [
+        'ID_Pago',
+        'Folio_Cotizacion',
+        'Cliente',
+        'Fecha_Pago',
+        'Monto_Original',
+        'Moneda',
+        'Metodo_Pago',
+        'Total_Cotizacion',
+        'Estatus_Pago',
+        'Estado_Cotizacion'
+      ].join(',');
+      return { success: true, data: headers };
+    }
+
+    // Get client names for the cotizaciones
+    const clienteIds = [...new Set(
+      payments?.map(p => p.cotizaciones?.cliente_id).filter(Boolean)
+    )];
+
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('cliente_id, nombre')
+      .in('cliente_id', clienteIds);
+
+    if (clientesError) {
+      console.warn('Error fetching client names for historic CSV:', clientesError);
+    }
+
+    const clienteMap = clientes?.reduce((acc: { [key: number]: string }, cliente) => {
+      acc[cliente.cliente_id] = cliente.nombre;
+      return acc;
+    }, {}) || {};
+
+    // Format the data for CSV
+    const formattedData = payments?.map(payment => ({
+      ID_Pago: payment.pago_id,
+      Folio_Cotizacion: payment.cotizaciones?.folio || '',
+      Cliente: clienteMap[payment.cotizaciones?.cliente_id as number] || 'Cliente desconocido',
+      Fecha_Pago: payment.fecha_pago ? new Date(payment.fecha_pago).toLocaleDateString('es-MX') : '',
+      Monto_Original: payment.monto,
+      Moneda: payment.moneda,
+      Metodo_Pago: payment.metodo_pago,
+      Total_Cotizacion: payment.cotizaciones?.total || payment.cotizaciones?.total_mxn || 0,
+      Estatus_Pago: payment.cotizaciones?.estatus_pago || '',
+      Estado_Cotizacion: payment.cotizaciones?.estado || ''
+    })) || [];
+
+    // Convert to CSV string
+    const csvString = convertToCSV(formattedData);
+
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('Error in getCashFlowDataForCSVHistoric:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred while generating historic Cash Flow CSV'
+    };
+  }
+}
+
+// Get all financial data (ingresos + egresos) combined for CSV export (historic)
+export async function getAllFinancialDataForCSV(): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    // Get ALL ingresos (pagos) 
+    const { data: pagosData, error: pagosError } = await supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        tipo_ingreso,
+        descripcion,
+        cotizacion_id,
+        moneda,
+        monto,
+        monto_mxn,
+        metodo_pago,
+        fecha_pago,
+        notas,
+        porcentaje_aplicado
+      `)
+      .order('fecha_pago', { ascending: false });
+
+    if (pagosError) {
+      console.error('Error fetching pagos for combined CSV:', pagosError);
+      return { success: false, error: `Failed to fetch ingresos: ${pagosError.message}` };
+    }
+
+    // Get ALL egresos
+    const { data: egresosData, error: egresosError } = await supabase
+      .from('egresos')
+      .select(`
+        egreso_id,
+        descripcion,
+        categoria,
+        fecha,
+        monto,
+        monto_mxn,
+        moneda,
+        metodo_pago
+      `)
+      .order('fecha', { ascending: false });
+
+    if (egresosError) {
+      console.error('Error fetching egresos for combined CSV:', egresosError);
+      return { success: false, error: `Failed to fetch egresos: ${egresosError.message}` };
+    }
+
+    // Get cotizacion details for ingresos
+    const cotizacionIds = pagosData?.filter(pago => pago.tipo_ingreso === 'cotizacion' && pago.cotizacion_id)
+      .map(pago => pago.cotizacion_id) || [];
+
+    let cotizacionesMap: Record<number, { folio: string | null; cliente_id: number | null }> = {};
+    let clientesMap: Record<number, string> = {};
+
+    if (cotizacionIds.length > 0) {
+      const { data: cotizaciones, error: cotizacionesError } = await supabase
+        .from('cotizaciones')
+        .select('cotizacion_id, folio, cliente_id')
+        .in('cotizacion_id', cotizacionIds);
+
+      if (!cotizacionesError && cotizaciones) {
+        cotizacionesMap = cotizaciones.reduce((acc, cot) => {
+          if (cot && cot.cotizacion_id != null) {
+            acc[cot.cotizacion_id] = { folio: cot.folio, cliente_id: cot.cliente_id };
+          }
+          return acc;
+        }, {} as Record<number, { folio: string | null; cliente_id: number | null }>);
+
+        const clienteIds = cotizaciones.map(cot => cot.cliente_id).filter(id => id != null) as number[];
+
+        if (clienteIds.length > 0) {
+          const { data: clientes, error: clientesError } = await supabase
+            .from('clientes')
+            .select('cliente_id, nombre')
+            .in('cliente_id', clienteIds);
+
+          if (!clientesError && clientes) {
+            clientesMap = clientes.reduce((acc, cliente) => {
+              if (cliente && cliente.cliente_id != null) {
+                acc[cliente.cliente_id] = cliente.nombre || 'Cliente sin nombre';
+              }
+              return acc;
+            }, {} as Record<number, string>);
+          }
+        }
+      }
+    }
+
+    // Combine and format data
+    const combinedData: any[] = [];
+
+    // Add ingresos
+    pagosData?.forEach(pago => {
+      const cotizacionDetails = pago.cotizacion_id ? cotizacionesMap[pago.cotizacion_id] : null;
+      const clienteId = cotizacionDetails?.cliente_id;
+      const clienteNombre = clienteId ? clientesMap[clienteId] : null;
+
+      combinedData.push({
+        Tipo: 'Ingreso',
+        Fecha: pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString('es-MX') : '',
+        Descripcion: pago.tipo_ingreso === 'cotizacion' 
+          ? `Pago cotización ${cotizacionDetails?.folio || pago.cotizacion_id}`
+          : (pago.descripcion || 'Ingreso sin descripción'),
+        Cliente_Proveedor: pago.tipo_ingreso === 'cotizacion' 
+          ? (clienteNombre || 'Cliente no encontrado')
+          : 'N/A',
+        Categoria: pago.tipo_ingreso === 'cotizacion' ? 'Venta' : 'Otro',
+        Moneda: pago.moneda,
+        Monto_Original: pago.monto,
+        Monto_MXN: pago.monto_mxn,
+        Metodo_Pago: pago.metodo_pago,
+        Folio_Referencia: cotizacionDetails?.folio || '',
+        Porcentaje: pago.porcentaje_aplicado || '',
+        Notas: pago.notas || ''
+      });
+    });
+
+    // Add egresos
+    egresosData?.forEach(egreso => {
+      combinedData.push({
+        Tipo: 'Egreso',
+        Fecha: egreso.fecha ? new Date(egreso.fecha).toLocaleDateString('es-MX') : '',
+        Descripcion: egreso.descripcion,
+        Cliente_Proveedor: 'N/A',
+        Categoria: egreso.categoria,
+        Moneda: egreso.moneda,
+        Monto_Original: egreso.monto,
+        Monto_MXN: egreso.monto_mxn,
+        Metodo_Pago: egreso.metodo_pago,
+        Folio_Referencia: '',
+        Porcentaje: '',
+        Notas: ''
+      });
+    });
+
+    // Sort by date (most recent first)
+    combinedData.sort((a, b) => {
+      const dateA = new Date(a.Fecha.split('/').reverse().join('-'));
+      const dateB = new Date(b.Fecha.split('/').reverse().join('-'));
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    if (combinedData.length === 0) {
+      // Return empty CSV with headers
+      const headers = [
+        'Tipo',
+        'Fecha',
+        'Descripcion',
+        'Cliente_Proveedor',
+        'Categoria',
+        'Moneda',
+        'Monto_Original',
+        'Monto_MXN',
+        'Metodo_Pago',
+        'Folio_Referencia',
+        'Porcentaje',
+        'Notas'
+      ].join(',');
+      return { success: true, data: headers };
+    }
+
+    // Convert to CSV string
+    const csvString = convertToCSV(combinedData);
+
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('Error in getAllFinancialDataForCSV:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred while generating combined financial CSV'
     };
   }
 } 

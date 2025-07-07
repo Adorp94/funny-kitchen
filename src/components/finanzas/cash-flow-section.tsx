@@ -65,9 +65,11 @@ interface CashFlowSectionProps {
   selectedYear?: number;
   onDownloadCSV?: () => void;
   isDownloadingCSV?: boolean;
+  onDownloadHistoricCSV?: () => void;
+  isDownloadingHistoricCSV?: boolean;
 }
 
-export function CashFlowSection({ selectedMonth, selectedYear, onDownloadCSV, isDownloadingCSV }: CashFlowSectionProps) {
+export function CashFlowSection({ selectedMonth, selectedYear, onDownloadCSV, isDownloadingCSV, onDownloadHistoricCSV, isDownloadingHistoricCSV }: CashFlowSectionProps) {
   const [metrics, setMetrics] = useState<CashFlowMetrics>({
     totalActiveQuotes: { mxn: 0, usd: 0 },
     actualPayments: { mxn: 0, usd: 0 },
@@ -284,22 +286,40 @@ export function CashFlowSection({ selectedMonth, selectedYear, onDownloadCSV, is
                 </CardDescription>
               </div>
             </div>
-            {onDownloadCSV && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onDownloadCSV}
-                disabled={isDownloadingCSV}
-                className="h-7 text-xs"
-              >
-                {isDownloadingCSV ? (
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                ) : (
-                  <Download className="mr-1 h-3 w-3" />
-                )}
-                Descargar CSV
-              </Button>
-            )}
+            <div className="flex items-center space-x-2">
+              {onDownloadCSV && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onDownloadCSV}
+                  disabled={isDownloadingCSV}
+                  className="h-7 text-xs"
+                >
+                  {isDownloadingCSV ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-1 h-3 w-3" />
+                  )}
+                  Descargar CSV mensual
+                </Button>
+              )}
+              {onDownloadHistoricCSV && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onDownloadHistoricCSV}
+                  disabled={isDownloadingHistoricCSV}
+                  className="h-7 text-xs"
+                >
+                  {isDownloadingHistoricCSV ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-1 h-3 w-3" />
+                  )}
+                  Historial CSV
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
