@@ -383,7 +383,7 @@ export default function FinanzasPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success("Historial de flujo de efectivo descargado exitosamente");
+        toast.success("Historial de ventas descargado exitosamente");
       } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
          // Handle successful request but no data (e.g., empty CSV)
          console.log("Historic Cash Flow CSV generated successfully, but it is empty (no data found).");
@@ -574,7 +574,7 @@ export default function FinanzasPage() {
               )}
               {activeTab === "cashflow" && (
                 <div className="text-sm text-muted-foreground">
-                  Análisis de flujo de efectivo real vs. ventas
+                  Análisis de ventas reales
                 </div>
               )}
             </div>
@@ -642,7 +642,7 @@ export default function FinanzasPage() {
         {/* Data Tables Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
            <TabsList>
-             <TabsTrigger value="cashflow">Flujo de Efectivo</TabsTrigger>
+             <TabsTrigger value="cashflow">Ventas</TabsTrigger>
              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
              <TabsTrigger value="egresos">Egresos</TabsTrigger>
            </TabsList>
