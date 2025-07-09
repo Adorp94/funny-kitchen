@@ -366,7 +366,7 @@ export async function POST(req: NextRequest) {
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
 
     // --- Calculate Display Values & IVA for DB --- 
-    // Reintroduce separate variables for DB display values
+    // Fixed: db_subtotal should store BASE subtotal (before discount), not after discount
     let db_subtotal: number;
     let db_costo_envio: number;
     let db_total: number;
@@ -378,27 +378,25 @@ export async function POST(req: NextRequest) {
     const original_costo_envio_mxn = costo_envio_mxn;
     const original_total_mxn = total_mxn;
 
-    if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
-      // Convert original MXN to USD for display columns
-      db_subtotal = original_subtotal_mxn / tipo_cambio;
-      db_costo_envio = original_costo_envio_mxn / tipo_cambio;
-      db_total = original_total_mxn / tipo_cambio;
-      console.log(`Converting from MXN to USD for DB display columns: Rate ${tipo_cambio}`);
-    } else {
-      // Use original MXN values directly for display columns if currency is MXN
-      db_subtotal = original_subtotal_mxn;
-      db_costo_envio = original_costo_envio_mxn;
-      db_total = original_total_mxn;
-    }
-
-    // Calculate IVA amount based on subtotal AFTER global discount (using original MXN)
+    // Calculate subtotal after discount for IVA calculation (but don't store this in db_subtotal)
     const subtotalAfterDiscountMXN = original_subtotal_mxn * (1 - (descuento_global || 0) / 100);
     const ivaAmountMXN = iva ? subtotalAfterDiscountMXN * 0.16 : 0;
 
-    // Convert IVA amount to display currency if needed
+    // Calculate the correct total: subtotal after discount + IVA + shipping
+    const corrected_total_mxn = subtotalAfterDiscountMXN + ivaAmountMXN + original_costo_envio_mxn;
+
     if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
+      // Convert BASE subtotal (before discount) to USD for display columns
+      db_subtotal = original_subtotal_mxn / tipo_cambio;
+      db_costo_envio = original_costo_envio_mxn / tipo_cambio;
+      db_total = corrected_total_mxn / tipo_cambio;
       db_monto_iva = ivaAmountMXN / tipo_cambio;
+      console.log(`Converting from MXN to USD for DB display columns: Rate ${tipo_cambio}`);
     } else {
+      // Use BASE subtotal (before discount) directly for display columns if currency is MXN
+      db_subtotal = original_subtotal_mxn;
+      db_costo_envio = original_costo_envio_mxn;
+      db_total = corrected_total_mxn;
       db_monto_iva = ivaAmountMXN;
     }
 
