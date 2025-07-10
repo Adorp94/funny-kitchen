@@ -28,6 +28,7 @@ import { EgresoModal } from '@/components/finanzas/egreso-modal';
 import { IngresosTable } from '@/components/finanzas/ingresos-table';
 import { EgresosTable } from '@/components/finanzas/egresos-table';
 import { CashFlowSection } from '@/components/finanzas/cash-flow-section';
+import { ReportesSection } from '@/components/finanzas/reportes-section';
 import { 
   createIngreso, 
   createEgreso, 
@@ -37,6 +38,10 @@ import {
   getVentasForCSV,
   getIngresosFilteredForCSV,
   getEgresosFilteredForCSV,
+  getVentasMonthlyReport,
+  getVentasBiMonthlyReport,
+  getVentasTriMonthlyReport,
+  getVentasAnnualReport,
   deleteIngreso,
   deleteEgreso
 } from '@/app/actions/finanzas-actions';
@@ -123,6 +128,12 @@ export default function FinanzasPage() {
   const [isDownloadingVentas, setIsDownloadingVentas] = useState(false);
   const [isDownloadingIngresos, setIsDownloadingIngresos] = useState(false);
   const [isDownloadingEgresos, setIsDownloadingEgresos] = useState(false);
+  
+  // Reportes loading states
+  const [isDownloadingMonthly, setIsDownloadingMonthly] = useState(false);
+  const [isDownloadingBiMonthly, setIsDownloadingBiMonthly] = useState(false);
+  const [isDownloadingTriMonthly, setIsDownloadingTriMonthly] = useState(false);
+  const [isDownloadingAnnual, setIsDownloadingAnnual] = useState(false);
 
   // State for financial metrics
   const [metrics, setMetrics] = useState({
@@ -434,6 +445,136 @@ export default function FinanzasPage() {
     }
   };
 
+  // --- Reportes Download Handlers ---
+  const handleDownloadMonthlyReport = async (year: number, month: number) => {
+    setIsDownloadingMonthly(true);
+    try {
+      const result = await getVentasMonthlyReport(year, month);
+      
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `ventas_mensual_${year}_${month.toString().padStart(2, '0')}_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Reporte mensual descargado exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+        toast.info("No hay ventas para descargar en el período seleccionado");
+      } else {
+        console.error("Error generating Monthly Report. Full result:", result);
+        toast.error("Error al generar el reporte mensual");
+      }
+    } catch (error) {
+      console.error("Error downloading Monthly Report:", error);
+      toast.error("Error al descargar el reporte mensual");
+    } finally {
+      setIsDownloadingMonthly(false);
+    }
+  };
+
+  const handleDownloadBiMonthlyReport = async (year: number, startMonth: number) => {
+    setIsDownloadingBiMonthly(true);
+    try {
+      const result = await getVentasBiMonthlyReport(year, startMonth);
+      
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        const endMonth = startMonth + 1;
+        link.setAttribute('download', `ventas_bimestral_${year}_${startMonth.toString().padStart(2, '0')}-${endMonth.toString().padStart(2, '0')}_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Reporte bimestral descargado exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+        toast.info("No hay ventas para descargar en el período seleccionado");
+      } else {
+        console.error("Error generating Bi-Monthly Report. Full result:", result);
+        toast.error("Error al generar el reporte bimestral");
+      }
+    } catch (error) {
+      console.error("Error downloading Bi-Monthly Report:", error);
+      toast.error("Error al descargar el reporte bimestral");
+    } finally {
+      setIsDownloadingBiMonthly(false);
+    }
+  };
+
+  const handleDownloadTriMonthlyReport = async (year: number, quarter: number) => {
+    setIsDownloadingTriMonthly(true);
+    try {
+      const result = await getVentasTriMonthlyReport(year, quarter);
+      
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `ventas_trimestral_${year}_Q${quarter}_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Reporte trimestral descargado exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+        toast.info("No hay ventas para descargar en el período seleccionado");
+      } else {
+        console.error("Error generating Tri-Monthly Report. Full result:", result);
+        toast.error("Error al generar el reporte trimestral");
+      }
+    } catch (error) {
+      console.error("Error downloading Tri-Monthly Report:", error);
+      toast.error("Error al descargar el reporte trimestral");
+    } finally {
+      setIsDownloadingTriMonthly(false);
+    }
+  };
+
+  const handleDownloadAnnualReport = async (year: number) => {
+    setIsDownloadingAnnual(true);
+    try {
+      const result = await getVentasAnnualReport(year);
+      
+      if (result.success && typeof result.data === 'string' && result.data.length > 0) {
+        const csvData = result.data;
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const date = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `ventas_anual_${year}_${date}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Reporte anual descargado exitosamente");
+      } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
+        toast.info("No hay ventas para descargar en el año seleccionado");
+      } else {
+        console.error("Error generating Annual Report. Full result:", result);
+        toast.error("Error al generar el reporte anual");
+      }
+    } catch (error) {
+      console.error("Error downloading Annual Report:", error);
+      toast.error("Error al descargar el reporte anual");
+    } finally {
+      setIsDownloadingAnnual(false);
+    }
+  };
+
   // --- Delete Handlers ---
   const handleDeleteIngreso = async (pagoId: number) => {
     try {
@@ -574,6 +715,11 @@ export default function FinanzasPage() {
                   Análisis de ventas reales
                 </div>
               )}
+              {activeTab === "reportes" && (
+                <div className="text-sm text-muted-foreground">
+                  Reportes personalizados de ventas
+                </div>
+              )}
             </div>
         </div>
         
@@ -642,6 +788,7 @@ export default function FinanzasPage() {
              <TabsTrigger value="cashflow">Ventas</TabsTrigger>
              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
              <TabsTrigger value="egresos">Egresos</TabsTrigger>
+             <TabsTrigger value="reportes">Reportes</TabsTrigger>
            </TabsList>
            <TabsContent value="cashflow" className="space-y-4">
              <CashFlowSection 
@@ -706,6 +853,24 @@ export default function FinanzasPage() {
               isLoading={loadingEgresos}
               onDelete={handleDeleteEgreso}
             />
+           </TabsContent>
+           <TabsContent value="reportes" className="space-y-4">
+             <div className="flex items-center justify-between">
+               <h3 className="text-xl font-semibold tracking-tight">Reportes de Ventas</h3>
+               <div className="text-sm text-muted-foreground">
+                 Descarga reportes por diferentes períodos de tiempo
+               </div>
+             </div>
+             <ReportesSection 
+               onDownloadMonthly={handleDownloadMonthlyReport}
+               onDownloadBiMonthly={handleDownloadBiMonthlyReport}
+               onDownloadTriMonthly={handleDownloadTriMonthlyReport}
+               onDownloadAnnual={handleDownloadAnnualReport}
+               isDownloadingMonthly={isDownloadingMonthly}
+               isDownloadingBiMonthly={isDownloadingBiMonthly}
+               isDownloadingTriMonthly={isDownloadingTriMonthly}
+               isDownloadingAnnual={isDownloadingAnnual}
+             />
            </TabsContent>
          </Tabs>
       </div>

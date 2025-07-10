@@ -1701,7 +1701,6 @@ export async function getVentasForCSV(
         total,
         clientes!inner(nombre, correo, celular, razon_social)
       `)
-      .in('estado', ['producción', 'entregada', 'cerrada'])
       .in('estatus_pago', ['anticipo', 'parcial', 'pagado']);
 
     // Apply filters if provided
@@ -1861,11 +1860,9 @@ export async function getEgresosFilteredForCSV(
       const yearEnd = `${year}-12-31`;
       
       if (month && month > 0) {
-        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
-        const nextMonth = month === 12 ? 1 : month + 1;
-        const nextYear = month === 12 ? year + 1 : year;
-        const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
-        query = query.filter('fecha', 'gte', monthStart).filter('fecha', 'lt', monthEnd);
+        const monthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
+        const monthEnd = new Date(year, month, 0).toISOString().split('T')[0];
+        query = query.filter('fecha', 'gte', monthStart).filter('fecha', 'lte', monthEnd);
       } else {
         query = query.filter('fecha', 'gte', yearStart).filter('fecha', 'lte', yearEnd);
       }
@@ -1887,13 +1884,13 @@ export async function getEgresosFilteredForCSV(
     const csvData = egresos.map((egreso) => ({
       EgresoID: egreso.egreso_id,
       Fecha: egreso.fecha ? new Date(egreso.fecha).toLocaleDateString('es-MX') : '',
-      Descripcion: egreso.descripcion,
-      Categoria: egreso.categoria,
+      Descripcion: egreso.descripcion || '',
+      Categoria: egreso.categoria || '',
       Moneda: egreso.moneda,
       Monto: egreso.monto,
       MontoMXN: egreso.monto_mxn,
-      TipoCambio: egreso.tipo_cambio || '',
-      MetodoPago: egreso.metodo_pago
+      MetodoPago: egreso.metodo_pago,
+      Notas: egreso.notas || ''
     }));
 
     const csvString = convertToCSV(csvData);
@@ -1902,6 +1899,256 @@ export async function getEgresosFilteredForCSV(
 
   } catch (error) {
     console.error('[getEgresosFilteredForCSV] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+// --- REPORTES SECTION ACTIONS ---
+
+export async function getVentasMonthlyReport(
+  year: number,
+  month: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getVentasMonthlyReport] Generating monthly ventas report for:', { year, month });
+    
+    const monthStart = new Date(year, month - 1, 1).toISOString();
+    const monthEnd = new Date(year, month, 1).toISOString();
+
+    let query = supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        fecha_creacion,
+        fecha_pago_inicial,
+        moneda,
+        total,
+        clientes!inner(nombre, correo, celular, razon_social)
+      `)
+      .in('estatus_pago', ['anticipo', 'parcial', 'pagado'])
+      .filter('fecha_pago_inicial', 'gte', monthStart)
+      .filter('fecha_pago_inicial', 'lt', monthEnd);
+
+    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
+
+    if (error) {
+      console.error('[getVentasMonthlyReport] Error fetching ventas:', error);
+      return { success: false, error: `Error fetching ventas: ${error.message}` };
+    }
+
+    if (!Array.isArray(ventas) || ventas.length === 0) {
+      console.log('[getVentasMonthlyReport] No ventas found for the specified period');
+      return { success: true, data: '' };
+    }
+
+    const csvData = ventas.map((venta) => ({
+      Folio: venta.folio || '',
+      FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
+      Cliente: venta.clientes?.nombre || '',
+      RazonSocial: venta.clientes?.razon_social || '',
+      Correo: venta.clientes?.correo || '',
+      Celular: venta.clientes?.celular || '',
+      Moneda: venta.moneda || '',
+      Total: venta.total || 0
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getVentasMonthlyReport] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getVentasMonthlyReport] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+export async function getVentasBiMonthlyReport(
+  year: number,
+  startMonth: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getVentasBiMonthlyReport] Generating bi-monthly ventas report for:', { year, startMonth });
+    
+    const monthStart = new Date(year, startMonth - 1, 1).toISOString();
+    const monthEnd = new Date(year, startMonth + 1, 1).toISOString();
+
+    let query = supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        fecha_creacion,
+        fecha_pago_inicial,
+        moneda,
+        total,
+        clientes!inner(nombre, correo, celular, razon_social)
+      `)
+      .in('estatus_pago', ['anticipo', 'parcial', 'pagado'])
+      .filter('fecha_pago_inicial', 'gte', monthStart)
+      .filter('fecha_pago_inicial', 'lt', monthEnd);
+
+    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
+
+    if (error) {
+      console.error('[getVentasBiMonthlyReport] Error fetching ventas:', error);
+      return { success: false, error: `Error fetching ventas: ${error.message}` };
+    }
+
+    if (!Array.isArray(ventas) || ventas.length === 0) {
+      console.log('[getVentasBiMonthlyReport] No ventas found for the specified period');
+      return { success: true, data: '' };
+    }
+
+    const csvData = ventas.map((venta) => ({
+      Folio: venta.folio || '',
+      FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
+      Cliente: venta.clientes?.nombre || '',
+      RazonSocial: venta.clientes?.razon_social || '',
+      Correo: venta.clientes?.correo || '',
+      Celular: venta.clientes?.celular || '',
+      Moneda: venta.moneda || '',
+      Total: venta.total || 0
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getVentasBiMonthlyReport] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getVentasBiMonthlyReport] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+export async function getVentasTriMonthlyReport(
+  year: number,
+  quarter: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getVentasTriMonthlyReport] Generating tri-monthly ventas report for:', { year, quarter });
+    
+    const startMonth = (quarter - 1) * 3 + 1;
+    const monthStart = new Date(year, startMonth - 1, 1).toISOString();
+    const monthEnd = new Date(year, startMonth + 2, 1).toISOString();
+
+    let query = supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        fecha_creacion,
+        fecha_pago_inicial,
+        moneda,
+        total,
+        clientes!inner(nombre, correo, celular, razon_social)
+      `)
+      .in('estatus_pago', ['anticipo', 'parcial', 'pagado'])
+      .filter('fecha_pago_inicial', 'gte', monthStart)
+      .filter('fecha_pago_inicial', 'lt', monthEnd);
+
+    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
+
+    if (error) {
+      console.error('[getVentasTriMonthlyReport] Error fetching ventas:', error);
+      return { success: false, error: `Error fetching ventas: ${error.message}` };
+    }
+
+    if (!Array.isArray(ventas) || ventas.length === 0) {
+      console.log('[getVentasTriMonthlyReport] No ventas found for the specified period');
+      return { success: true, data: '' };
+    }
+
+    const csvData = ventas.map((venta) => ({
+      Folio: venta.folio || '',
+      FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
+      Cliente: venta.clientes?.nombre || '',
+      RazonSocial: venta.clientes?.razon_social || '',
+      Correo: venta.clientes?.correo || '',
+      Celular: venta.clientes?.celular || '',
+      Moneda: venta.moneda || '',
+      Total: venta.total || 0
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getVentasTriMonthlyReport] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getVentasTriMonthlyReport] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+export async function getVentasAnnualReport(
+  year: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getVentasAnnualReport] Generating annual ventas report for:', { year });
+    
+    const yearStart = `${year}-01-01T00:00:00Z`;
+    const yearEnd = `${year}-12-31T23:59:59Z`;
+
+    let query = supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        fecha_creacion,
+        fecha_pago_inicial,
+        moneda,
+        total,
+        clientes!inner(nombre, correo, celular, razon_social)
+      `)
+      .in('estatus_pago', ['anticipo', 'parcial', 'pagado'])
+      .filter('fecha_pago_inicial', 'gte', yearStart)
+      .filter('fecha_pago_inicial', 'lte', yearEnd);
+
+    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
+
+    if (error) {
+      console.error('[getVentasAnnualReport] Error fetching ventas:', error);
+      return { success: false, error: `Error fetching ventas: ${error.message}` };
+    }
+
+    if (!Array.isArray(ventas) || ventas.length === 0) {
+      console.log('[getVentasAnnualReport] No ventas found for the specified period');
+      return { success: true, data: '' };
+    }
+
+    const csvData = ventas.map((venta) => ({
+      Folio: venta.folio || '',
+      FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
+      Cliente: venta.clientes?.nombre || '',
+      RazonSocial: venta.clientes?.razon_social || '',
+      Correo: venta.clientes?.correo || '',
+      Celular: venta.clientes?.celular || '',
+      Moneda: venta.moneda || '',
+      Total: venta.total || 0
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getVentasAnnualReport] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getVentasAnnualReport] Unexpected error:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred' 
