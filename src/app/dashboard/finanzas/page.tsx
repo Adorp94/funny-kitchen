@@ -34,9 +34,9 @@ import {
   getAllIngresos, 
   getAllEgresos,
   getFinancialMetrics,
-  getCashFlowDataForCSV,
-  getCashFlowDataForCSVHistoric,
-  getAllFinancialDataForCSV,
+  getVentasForCSV,
+  getIngresosFilteredForCSV,
+  getEgresosFilteredForCSV,
   deleteIngreso,
   deleteEgreso
 } from '@/app/actions/finanzas-actions';
@@ -120,9 +120,9 @@ export default function FinanzasPage() {
   const [loadingIngresos, setLoadingIngresos] = useState(false);
   const [loadingEgresos, setLoadingEgresos] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isDownloadingCashFlow, setIsDownloadingCashFlow] = useState(false);
-  const [isDownloadingCashFlowHistoric, setIsDownloadingCashFlowHistoric] = useState(false);
-  const [isDownloadingFinancialData, setIsDownloadingFinancialData] = useState(false);
+  const [isDownloadingVentas, setIsDownloadingVentas] = useState(false);
+  const [isDownloadingIngresos, setIsDownloadingIngresos] = useState(false);
+  const [isDownloadingEgresos, setIsDownloadingEgresos] = useState(false);
 
   // State for financial metrics
   const [metrics, setMetrics] = useState({
@@ -326,14 +326,13 @@ export default function FinanzasPage() {
   };
 
   // --- Download Handlers ---
-  const handleDownloadCashFlowCSV = async () => {
-    setIsDownloadingCashFlow(true);
+  const handleDownloadVentasCSV = async () => {
+    setIsDownloadingVentas(true);
     try {
       const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
       const yearParam = selectedYear === 0 ? undefined : selectedYear;
-      const result = await getCashFlowDataForCSV(monthParam, yearParam);
+      const result = await getVentasForCSV(monthParam, yearParam);
       
-      // Check for success and if data is a non-empty string
       if (result.success && typeof result.data === 'string' && result.data.length > 0) {
         const csvData = result.data;
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -341,36 +340,35 @@ export default function FinanzasPage() {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
         const date = new Date().toISOString().slice(0, 10);
-        const monthStr = selectedMonth ? `_${String(selectedMonth).padStart(2, '0')}` : '';
-        const yearStr = selectedYear ? `_${selectedYear}` : '';
-        link.setAttribute('download', `flujo_efectivo${yearStr}${monthStr}_${date}.csv`);
+        const filterSuffix = monthParam && yearParam ? `_${yearParam}_${monthParam.toString().padStart(2, '0')}` : 
+                            yearParam ? `_${yearParam}` : '';
+        link.setAttribute('download', `ventas${filterSuffix}_${date}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        toast.success("Reporte de ventas descargado exitosamente");
       } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
-         // Handle successful request but no data (e.g., empty CSV)
-         console.log("Cash Flow CSV generated successfully, but it is empty (no data found for filters).");
-         // TODO: Show toast notification info (e.g., "No hay datos para descargar con los filtros seleccionados.")
+        toast.info("No hay ventas para descargar en el período seleccionado");
       } else {
-        // Handle failure
-        console.error("Error generating Cash Flow CSV. Full result:", result);
-        // TODO: Show toast notification error using result.error
+        console.error("Error generating Ventas CSV. Full result:", result);
+        toast.error("Error al generar el archivo CSV de ventas");
       }
     } catch (error) {
-      console.error("Error downloading Cash Flow CSV (catch block):", error);
-      // TODO: Show toast notification error
+      console.error("Error downloading Ventas CSV:", error);
+      toast.error("Error al descargar el archivo CSV de ventas");
     } finally {
-      setIsDownloadingCashFlow(false);
+      setIsDownloadingVentas(false);
     }
   };
 
-  const handleDownloadCashFlowHistoricCSV = async () => {
-    setIsDownloadingCashFlowHistoric(true);
+  const handleDownloadIngresosCSV = async () => {
+    setIsDownloadingIngresos(true);
     try {
-      const result = await getCashFlowDataForCSVHistoric();
+      const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+      const yearParam = selectedYear === 0 ? undefined : selectedYear;
+      const result = await getIngresosFilteredForCSV(monthParam, yearParam);
       
-      // Check for success and if data is a non-empty string
       if (result.success && typeof result.data === 'string' && result.data.length > 0) {
         const csvData = result.data;
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -378,35 +376,35 @@ export default function FinanzasPage() {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
         const date = new Date().toISOString().slice(0, 10);
-        link.setAttribute('download', `flujo_efectivo_historico_${date}.csv`);
+        const filterSuffix = monthParam && yearParam ? `_${yearParam}_${monthParam.toString().padStart(2, '0')}` : 
+                            yearParam ? `_${yearParam}` : '';
+        link.setAttribute('download', `ingresos${filterSuffix}_${date}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success("Historial de ventas descargado exitosamente");
+        toast.success("Reporte de ingresos descargado exitosamente");
       } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
-         // Handle successful request but no data (e.g., empty CSV)
-         console.log("Historic Cash Flow CSV generated successfully, but it is empty (no data found).");
-         toast.info("No hay datos históricos para descargar");
+        toast.info("No hay ingresos para descargar en el período seleccionado");
       } else {
-        // Handle failure
-        console.error("Error generating Historic Cash Flow CSV. Full result:", result);
-        toast.error("Error al generar el archivo CSV del historial");
+        console.error("Error generating Ingresos CSV. Full result:", result);
+        toast.error("Error al generar el archivo CSV de ingresos");
       }
     } catch (error) {
-      console.error("Error downloading Historic Cash Flow CSV (catch block):", error);
-      toast.error("Error al descargar el archivo CSV del historial");
+      console.error("Error downloading Ingresos CSV:", error);
+      toast.error("Error al descargar el archivo CSV de ingresos");
     } finally {
-      setIsDownloadingCashFlowHistoric(false);
+      setIsDownloadingIngresos(false);
     }
   };
 
-  const handleDownloadFinancialDataCSV = async () => {
-    setIsDownloadingFinancialData(true);
+  const handleDownloadEgresosCSV = async () => {
+    setIsDownloadingEgresos(true);
     try {
-      const result = await getAllFinancialDataForCSV();
+      const monthParam = selectedMonth === 0 ? undefined : selectedMonth;
+      const yearParam = selectedYear === 0 ? undefined : selectedYear;
+      const result = await getEgresosFilteredForCSV(monthParam, yearParam);
       
-      // Check for success and if data is a non-empty string
       if (result.success && typeof result.data === 'string' && result.data.length > 0) {
         const csvData = result.data;
         const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
@@ -414,26 +412,25 @@ export default function FinanzasPage() {
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
         const date = new Date().toISOString().slice(0, 10);
-        link.setAttribute('download', `datos_financieros_completos_${date}.csv`);
+        const filterSuffix = monthParam && yearParam ? `_${yearParam}_${monthParam.toString().padStart(2, '0')}` : 
+                            yearParam ? `_${yearParam}` : '';
+        link.setAttribute('download', `egresos${filterSuffix}_${date}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success("Datos financieros completos descargados exitosamente");
+        toast.success("Reporte de egresos descargado exitosamente");
       } else if (result.success && (typeof result.data !== 'string' || result.data.length === 0)) {
-         // Handle successful request but no data (e.g., empty CSV)
-         console.log("Financial Data CSV generated successfully, but it is empty (no data found).");
-         toast.info("No hay datos financieros para descargar");
+        toast.info("No hay egresos para descargar en el período seleccionado");
       } else {
-        // Handle failure
-        console.error("Error generating Financial Data CSV. Full result:", result);
-        toast.error("Error al generar el archivo CSV de datos financieros");
+        console.error("Error generating Egresos CSV. Full result:", result);
+        toast.error("Error al generar el archivo CSV de egresos");
       }
     } catch (error) {
-      console.error("Error downloading Financial Data CSV (catch block):", error);
-      toast.error("Error al descargar el archivo CSV de datos financieros");
+      console.error("Error downloading Egresos CSV:", error);
+      toast.error("Error al descargar el archivo CSV de egresos");
     } finally {
-      setIsDownloadingFinancialData(false);
+      setIsDownloadingEgresos(false);
     }
   };
 
@@ -650,10 +647,8 @@ export default function FinanzasPage() {
              <CashFlowSection 
                selectedMonth={selectedMonth === 0 ? undefined : selectedMonth}
                selectedYear={selectedYear === 0 ? undefined : selectedYear}
-               onDownloadCSV={handleDownloadCashFlowCSV}
-               isDownloadingCSV={isDownloadingCashFlow}
-               onDownloadHistoricCSV={handleDownloadCashFlowHistoricCSV}
-               isDownloadingHistoricCSV={isDownloadingCashFlowHistoric}
+               onDownloadVentasCSV={handleDownloadVentasCSV}
+               isDownloadingVentasCSV={isDownloadingVentas}
              />
            </TabsContent>
            <TabsContent value="ingresos" className="space-y-4">
@@ -663,15 +658,15 @@ export default function FinanzasPage() {
                   <Button 
                      variant="outline"
                      size="sm"
-                     onClick={handleDownloadFinancialDataCSV}
-                     disabled={isDownloadingFinancialData}
+                     onClick={handleDownloadIngresosCSV}
+                     disabled={isDownloadingIngresos}
                   >
-                    {isDownloadingFinancialData ? (
+                    {isDownloadingIngresos ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
                       <Download className="mr-2 h-4 w-4" />
                     )}
-                    Descargar CSV completo
+                    Descargar Ingresos
                   </Button>
                </div>
              </div>
@@ -691,15 +686,15 @@ export default function FinanzasPage() {
                    <Button 
                        variant="outline"
                        size="sm"
-                       onClick={handleDownloadFinancialDataCSV}
-                       disabled={isDownloadingFinancialData}
+                       onClick={handleDownloadEgresosCSV}
+                       disabled={isDownloadingEgresos}
                    >
-                     {isDownloadingFinancialData ? (
+                     {isDownloadingEgresos ? (
                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                      ) : (
                        <Download className="mr-2 h-4 w-4" />
                      )}
-                     Descargar CSV completo
+                     Descargar Egresos
                    </Button>
                  </div>
              </div>

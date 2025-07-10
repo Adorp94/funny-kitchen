@@ -1582,173 +1582,329 @@ export async function getCashFlowDataForCSVHistoric(): Promise<{ success: boolea
 // Get all financial data (ingresos + egresos) combined for CSV export (historic)
 export async function getAllFinancialDataForCSV(): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
-    // Get ALL ingresos (pagos) 
-    const { data: pagosData, error: pagosError } = await supabase
+    console.log('[getAllFinancialDataForCSV] Starting CSV generation...');
+
+    // Get all ingresos (pagos)
+    const { data: ingresos, error: ingresosError } = await supabase
       .from('pagos')
       .select(`
         pago_id,
-        tipo_ingreso,
-        descripcion,
-        cotizacion_id,
-        moneda,
         monto,
         monto_mxn,
+        moneda,
         metodo_pago,
         fecha_pago,
+        tipo_pago,
+        estado,
         notas,
-        porcentaje_aplicado
+        descripcion,
+        tipo_ingreso,
+        cotizacion_id,
+        cotizaciones!inner(folio, clientes!inner(nombre))
       `)
       .order('fecha_pago', { ascending: false });
 
-    if (pagosError) {
-      console.error('Error fetching pagos for combined CSV:', pagosError);
-      return { success: false, error: `Failed to fetch ingresos: ${pagosError.message}` };
+    if (ingresosError) {
+      console.error('[getAllFinancialDataForCSV] Error fetching ingresos:', ingresosError);
+      return { success: false, error: `Error fetching ingresos: ${ingresosError.message}` };
     }
 
-    // Get ALL egresos
-    const { data: egresosData, error: egresosError } = await supabase
+    // Get all egresos
+    const { data: egresos, error: egresosError } = await supabase
       .from('egresos')
-      .select(`
-        egreso_id,
-        descripcion,
-        categoria,
-        fecha,
-        monto,
-        monto_mxn,
-        moneda,
-        metodo_pago
-      `)
+      .select('*')
       .order('fecha', { ascending: false });
 
     if (egresosError) {
-      console.error('Error fetching egresos for combined CSV:', egresosError);
-      return { success: false, error: `Failed to fetch egresos: ${egresosError.message}` };
+      console.error('[getAllFinancialDataForCSV] Error fetching egresos:', egresosError);
+      return { success: false, error: `Error fetching egresos: ${egresosError.message}` };
     }
 
-    // Get cotizacion details for ingresos
-    const cotizacionIds = pagosData?.filter(pago => pago.tipo_ingreso === 'cotizacion' && pago.cotizacion_id)
-      .map(pago => pago.cotizacion_id) || [];
+    const allData: any[] = [];
 
-    let cotizacionesMap: Record<number, { folio: string | null; cliente_id: number | null }> = {};
-    let clientesMap: Record<number, string> = {};
+    // Add ingresos
+    if (Array.isArray(ingresos)) {
+      ingresos.forEach((ingreso) => {
+        allData.push({
+          Tipo: 'Ingreso',
+          Fecha: ingreso.fecha_pago ? new Date(ingreso.fecha_pago).toISOString().slice(0, 10) : '',
+          Descripcion: ingreso.descripcion || 
+            (ingreso.cotizaciones?.folio ? `Pago de cotización ${ingreso.cotizaciones.folio}` : 'Ingreso general'),
+          Categoria: ingreso.tipo_pago || 'Sin categoría',
+          Cliente: ingreso.cotizaciones?.clientes?.nombre || 'N/A',
+          Folio: ingreso.cotizaciones?.folio || 'N/A',
+          Moneda: ingreso.moneda,
+          Monto: ingreso.monto,
+          MontoMXN: ingreso.monto_mxn,
+          MetodoPago: ingreso.metodo_pago,
+          Estado: ingreso.estado,
+          Notas: ingreso.notas || ''
+        });
+      });
+    }
 
-    if (cotizacionIds.length > 0) {
-      const { data: cotizaciones, error: cotizacionesError } = await supabase
-        .from('cotizaciones')
-        .select('cotizacion_id, folio, cliente_id')
-        .in('cotizacion_id', cotizacionIds);
+    // Add egresos
+    if (Array.isArray(egresos)) {
+      egresos.forEach((egreso) => {
+        allData.push({
+          Tipo: 'Egreso',
+          Fecha: egreso.fecha ? new Date(egreso.fecha).toISOString().slice(0, 10) : '',
+          Descripcion: egreso.descripcion,
+          Categoria: egreso.categoria,
+          Cliente: 'N/A',
+          Folio: 'N/A',
+          Moneda: egreso.moneda,
+          Monto: egreso.monto,
+          MontoMXN: egreso.monto_mxn,
+          MetodoPago: egreso.metodo_pago,
+          Estado: 'Completado',
+          Notas: ''
+        });
+      });
+    }
 
-      if (!cotizacionesError && cotizaciones) {
-        cotizacionesMap = cotizaciones.reduce((acc, cot) => {
-          if (cot && cot.cotizacion_id != null) {
-            acc[cot.cotizacion_id] = { folio: cot.folio, cliente_id: cot.cliente_id };
-          }
-          return acc;
-        }, {} as Record<number, { folio: string | null; cliente_id: number | null }>);
+    if (allData.length === 0) {
+      console.log('[getAllFinancialDataForCSV] No financial data found');
+      return { success: true, data: '' };
+    }
 
-        const clienteIds = cotizaciones.map(cot => cot.cliente_id).filter(id => id != null) as number[];
+    const csvData = convertToCSV(allData);
+    console.log(`[getAllFinancialDataForCSV] CSV generated successfully with ${allData.length} records`);
+    return { success: true, data: csvData };
 
-        if (clienteIds.length > 0) {
-          const { data: clientes, error: clientesError } = await supabase
-            .from('clientes')
-            .select('cliente_id, nombre')
-            .in('cliente_id', clienteIds);
+  } catch (error) {
+    console.error('[getAllFinancialDataForCSV] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
 
-          if (!clientesError && clientes) {
-            clientesMap = clientes.reduce((acc, cliente) => {
-              if (cliente && cliente.cliente_id != null) {
-                acc[cliente.cliente_id] = cliente.nombre || 'Cliente sin nombre';
-              }
-              return acc;
-            }, {} as Record<number, string>);
-          }
-        }
+// New server action for downloading ventas (cotizaciones sold) with filters
+export async function getVentasForCSV(
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getVentasForCSV] Starting ventas CSV generation with filters:', { month, year });
+
+    // Build query for sold cotizaciones (those with payments)
+    let query = supabase
+      .from('cotizaciones')
+      .select(`
+        cotizacion_id,
+        folio,
+        fecha_creacion,
+        fecha_pago_inicial,
+        moneda,
+        total,
+        clientes!inner(nombre, correo, celular, razon_social)
+      `)
+      .in('estado', ['producción', 'entregada', 'cerrada'])
+      .in('estatus_pago', ['anticipo', 'parcial', 'pagado']);
+
+    // Apply filters if provided
+    if (year && year > 0) {
+      const yearStart = `${year}-01-01T00:00:00Z`;
+      const yearEnd = `${year}-12-31T23:59:59Z`;
+      
+      if (month && month > 0) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        const monthEnd = new Date(year, month, 1).toISOString();
+        query = query.filter('fecha_pago_inicial', 'gte', monthStart).filter('fecha_pago_inicial', 'lt', monthEnd);
+      } else {
+        query = query.filter('fecha_pago_inicial', 'gte', yearStart).filter('fecha_pago_inicial', 'lte', yearEnd);
       }
     }
 
-    // Combine and format data
-    const combinedData: any[] = [];
+    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
 
-    // Add ingresos
-    pagosData?.forEach(pago => {
-      const cotizacionDetails = pago.cotizacion_id ? cotizacionesMap[pago.cotizacion_id] : null;
-      const clienteId = cotizacionDetails?.cliente_id;
-      const clienteNombre = clienteId ? clientesMap[clienteId] : null;
-
-      combinedData.push({
-        Tipo: 'Ingreso',
-        Fecha: pago.fecha_pago ? new Date(pago.fecha_pago).toLocaleDateString('es-MX') : '',
-        Descripcion: pago.tipo_ingreso === 'cotizacion' 
-          ? `Pago cotización ${cotizacionDetails?.folio || pago.cotizacion_id}`
-          : (pago.descripcion || 'Ingreso sin descripción'),
-        Cliente_Proveedor: pago.tipo_ingreso === 'cotizacion' 
-          ? (clienteNombre || 'Cliente no encontrado')
-          : 'N/A',
-        Categoria: pago.tipo_ingreso === 'cotizacion' ? 'Venta' : 'Otro',
-        Moneda: pago.moneda,
-        Monto_Original: pago.monto,
-        Monto_MXN: pago.monto_mxn,
-        Metodo_Pago: pago.metodo_pago,
-        Folio_Referencia: cotizacionDetails?.folio || '',
-        Porcentaje: pago.porcentaje_aplicado || '',
-        Notas: pago.notas || ''
-      });
-    });
-
-    // Add egresos
-    egresosData?.forEach(egreso => {
-      combinedData.push({
-        Tipo: 'Egreso',
-        Fecha: egreso.fecha ? new Date(egreso.fecha).toLocaleDateString('es-MX') : '',
-        Descripcion: egreso.descripcion,
-        Cliente_Proveedor: 'N/A',
-        Categoria: egreso.categoria,
-        Moneda: egreso.moneda,
-        Monto_Original: egreso.monto,
-        Monto_MXN: egreso.monto_mxn,
-        Metodo_Pago: egreso.metodo_pago,
-        Folio_Referencia: '',
-        Porcentaje: '',
-        Notas: ''
-      });
-    });
-
-    // Sort by date (most recent first)
-    combinedData.sort((a, b) => {
-      const dateA = new Date(a.Fecha.split('/').reverse().join('-'));
-      const dateB = new Date(b.Fecha.split('/').reverse().join('-'));
-      return dateB.getTime() - dateA.getTime();
-    });
-
-    if (combinedData.length === 0) {
-      // Return empty CSV with headers
-      const headers = [
-        'Tipo',
-        'Fecha',
-        'Descripcion',
-        'Cliente_Proveedor',
-        'Categoria',
-        'Moneda',
-        'Monto_Original',
-        'Monto_MXN',
-        'Metodo_Pago',
-        'Folio_Referencia',
-        'Porcentaje',
-        'Notas'
-      ].join(',');
-      return { success: true, data: headers };
+    if (error) {
+      console.error('[getVentasForCSV] Error fetching ventas:', error);
+      return { success: false, error: `Error fetching ventas: ${error.message}` };
     }
 
-    // Convert to CSV string
-    const csvString = convertToCSV(combinedData);
+    if (!Array.isArray(ventas) || ventas.length === 0) {
+      console.log('[getVentasForCSV] No ventas found for the specified filters');
+      return { success: true, data: '' };
+    }
 
+    // Transform data for CSV
+    const csvData = ventas.map((venta) => ({
+      Folio: venta.folio || '',
+      FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
+      Cliente: venta.clientes?.nombre || '',
+      RazonSocial: venta.clientes?.razon_social || '',
+      Correo: venta.clientes?.correo || '',
+      Celular: venta.clientes?.celular || '',
+      Moneda: venta.moneda || '',
+      Total: venta.total || 0
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getVentasForCSV] CSV generated successfully with ${csvData.length} records`);
     return { success: true, data: csvString };
 
   } catch (error) {
-    console.error('Error in getAllFinancialDataForCSV:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'An unexpected error occurred while generating combined financial CSV'
+    console.error('[getVentasForCSV] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+// New server action for downloading only ingresos with filters
+export async function getIngresosFilteredForCSV(
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getIngresosFilteredForCSV] Starting ingresos CSV generation with filters:', { month, year });
+
+    // Build query for ingresos with filters
+    let query = supabase
+      .from('pagos')
+      .select(`
+        pago_id,
+        monto,
+        monto_mxn,
+        moneda,
+        metodo_pago,
+        fecha_pago,
+        tipo_pago,
+        estado,
+        notas,
+        descripcion,
+        tipo_ingreso,
+        porcentaje_aplicado,
+        cotizacion_id,
+        cotizaciones(folio, clientes(nombre))
+      `);
+
+    // Apply filters if provided
+    if (year && year > 0) {
+      const yearStart = `${year}-01-01T00:00:00Z`;
+      const yearEnd = `${year}-12-31T23:59:59Z`;
+      
+      if (month && month > 0) {
+        const monthStart = new Date(year, month - 1, 1).toISOString();
+        const monthEnd = new Date(year, month, 1).toISOString();
+        query = query.filter('fecha_pago', 'gte', monthStart).filter('fecha_pago', 'lt', monthEnd);
+      } else {
+        query = query.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
+      }
+    }
+
+    const { data: ingresos, error } = await query.order('fecha_pago', { ascending: false });
+
+    if (error) {
+      console.error('[getIngresosFilteredForCSV] Error fetching ingresos:', error);
+      return { success: false, error: `Error fetching ingresos: ${error.message}` };
+    }
+
+    if (!Array.isArray(ingresos) || ingresos.length === 0) {
+      console.log('[getIngresosFilteredForCSV] No ingresos found for the specified filters');
+      return { success: true, data: '' };
+    }
+
+    // Transform data for CSV
+    const csvData = ingresos.map((ingreso) => ({
+      PagoID: ingreso.pago_id,
+      Fecha: ingreso.fecha_pago ? new Date(ingreso.fecha_pago).toLocaleDateString('es-MX') : '',
+      TipoIngreso: ingreso.tipo_ingreso || '',
+      Descripcion: ingreso.descripcion || 
+        (ingreso.cotizaciones?.folio ? `Pago de cotización ${ingreso.cotizaciones.folio}` : 'Ingreso general'),
+      Cliente: ingreso.cotizaciones?.clientes?.nombre || 'N/A',
+      Folio: ingreso.cotizaciones?.folio || 'N/A',
+      Moneda: ingreso.moneda,
+      Monto: ingreso.monto,
+      MontoMXN: ingreso.monto_mxn,
+      MetodoPago: ingreso.metodo_pago,
+      TipoPago: ingreso.tipo_pago || '',
+      PorcentajeAplicado: ingreso.porcentaje_aplicado || '',
+      Estado: ingreso.estado,
+      Notas: ingreso.notas || ''
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getIngresosFilteredForCSV] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getIngresosFilteredForCSV] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+// New server action for downloading only egresos with filters
+export async function getEgresosFilteredForCSV(
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    console.log('[getEgresosFilteredForCSV] Starting egresos CSV generation with filters:', { month, year });
+
+    // Build query for egresos with filters
+    let query = supabase
+      .from('egresos')
+      .select('*');
+
+    // Apply filters if provided
+    if (year && year > 0) {
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+      
+      if (month && month > 0) {
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+        query = query.filter('fecha', 'gte', monthStart).filter('fecha', 'lt', monthEnd);
+      } else {
+        query = query.filter('fecha', 'gte', yearStart).filter('fecha', 'lte', yearEnd);
+      }
+    }
+
+    const { data: egresos, error } = await query.order('fecha', { ascending: false });
+
+    if (error) {
+      console.error('[getEgresosFilteredForCSV] Error fetching egresos:', error);
+      return { success: false, error: `Error fetching egresos: ${error.message}` };
+    }
+
+    if (!Array.isArray(egresos) || egresos.length === 0) {
+      console.log('[getEgresosFilteredForCSV] No egresos found for the specified filters');
+      return { success: true, data: '' };
+    }
+
+    // Transform data for CSV
+    const csvData = egresos.map((egreso) => ({
+      EgresoID: egreso.egreso_id,
+      Fecha: egreso.fecha ? new Date(egreso.fecha).toLocaleDateString('es-MX') : '',
+      Descripcion: egreso.descripcion,
+      Categoria: egreso.categoria,
+      Moneda: egreso.moneda,
+      Monto: egreso.monto,
+      MontoMXN: egreso.monto_mxn,
+      TipoCambio: egreso.tipo_cambio || '',
+      MetodoPago: egreso.metodo_pago
+    }));
+
+    const csvString = convertToCSV(csvData);
+    console.log(`[getEgresosFilteredForCSV] CSV generated successfully with ${csvData.length} records`);
+    return { success: true, data: csvString };
+
+  } catch (error) {
+    console.error('[getEgresosFilteredForCSV] Unexpected error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
     };
   }
 } 
