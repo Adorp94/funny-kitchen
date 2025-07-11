@@ -688,7 +688,7 @@ export async function DELETE(request: NextRequest) {
   try {
     // First delete related products
     const { error: productosError } = await supabase
-      .from('prodsxcotizacion')
+      .from('cotizacion_productos')
       .delete()
       .eq('cotizacion_id', id);
       
