@@ -245,6 +245,9 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
             ...p, // Spread internal details like id, nombre, cantidad, sku etc.
             precio: displayPrice,      // Set the calculated display price
             subtotal: displaySubtotal,  // Set the calculated display subtotal
+            // Add MXN properties for API compatibility
+            precioMXN: p.precioMXN,
+            subtotalMXN: p.subtotalConDescuentoIndividualMXN,
         };
         console.log(`[Context]   - Resulting displayProduct ${index}:`, displayProduct);
         return displayProduct;

@@ -20,6 +20,9 @@ import { formatCurrency } from '@/lib/utils';
 export interface ProductoConDescuento extends Producto {
   descuento?: number; // Discount percentage for this specific product
   cotizacion_producto_id?: number | null;
+  // Add MXN properties for API compatibility
+  precioMXN?: number;
+  subtotalMXN?: number;
 }
 
 interface ListaProductosConDescuentoProps {

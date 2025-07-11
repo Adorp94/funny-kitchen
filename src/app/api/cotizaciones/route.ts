@@ -380,9 +380,11 @@ export async function POST(req: NextRequest) {
 
     // Calculate subtotal after discount for IVA calculation (but don't store this in db_subtotal)
     const subtotalAfterDiscountMXN = original_subtotal_mxn * (1 - (descuento_global || 0) / 100);
+    
+    // CORRECTED LOGIC: Calculate IVA on subtotal WITHOUT shipping
     const ivaAmountMXN = iva ? subtotalAfterDiscountMXN * 0.16 : 0;
-
-    // Calculate the correct total: subtotal after discount + IVA + shipping
+    
+    // CORRECTED LOGIC: Total = (subtotal + IVA) + shipping (shipping added AFTER IVA)
     const corrected_total_mxn = subtotalAfterDiscountMXN + ivaAmountMXN + original_costo_envio_mxn;
 
     if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
