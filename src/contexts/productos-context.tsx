@@ -10,7 +10,8 @@ interface ProductoEnContext extends ProductoBase {
   id: string; // Ensure id is always present and string
   cantidad: number;
   precioMXN: number; // Base price in MXN
-  subtotalMXN: number; // Base subtotal in MXN
+  subtotalBrutoMXN: number; // Gross subtotal in MXN (precio * cantidad, NO discounts)
+  subtotalConDescuentoIndividualMXN: number; // Subtotal AFTER individual discount applied
   descuento: number;
   // Add other potential fields from base/display types if needed
   sku?: string;
@@ -145,7 +146,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       id: producto.id || `temp_${Date.now()}`, // Ensure ID exists
       cantidad: cantidad,
       precioMXN: precioMXN, // Store the base price
-      subtotalMXN: subtotalMXN, // Store the subtotal *with* individual discount applied
+      subtotalBrutoMXN: precioMXN * cantidad, // Store the gross subtotal
+      subtotalConDescuentoIndividualMXN: subtotalMXN, // Store the subtotal *with* individual discount applied
       descuento: descuento, // Store the individual discount percentage
     };
 
@@ -180,7 +182,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         const priceAfterDiscountMXN = p.precioMXN * (1 - descuento / 100);
         const newSubtotalMXN = priceAfterDiscountMXN * p.cantidad;
         console.log(`Context updateDiscount: ID=${id}, Discount=${descuento}, NewSubtotalMXN=${newSubtotalMXN}`);
-        return { ...p, descuento, subtotalMXN: newSubtotalMXN };
+        return { ...p, descuento, subtotalConDescuentoIndividualMXN: newSubtotalMXN };
       }
       return p;
     }));
@@ -214,13 +216,13 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
         if (moneda === 'MXN') {
             displayPrice = p.precioMXN;
-            displaySubtotal = p.subtotalMXN; // Subtotal already includes individual discount
+            displaySubtotal = p.subtotalConDescuentoIndividualMXN; // Use the discounted subtotal
             console.log(`[Context]   - Using MXN: displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
         } else if (moneda === 'USD') {
             if (exchangeRate && exchangeRate > 0) { // Ensure exchangeRate is valid
                 try {
                     displayPrice = convertMXNtoUSD(p.precioMXN);
-                    displaySubtotal = convertMXNtoUSD(p.subtotalMXN);
+                    displaySubtotal = convertMXNtoUSD(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
                     console.log(`[Context]   - Converted to USD (Rate: ${exchangeRate}): displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
                 } catch (conversionError) {
                     console.error(`[Context]   - Error converting product ${index} to USD:`, conversionError);
@@ -243,26 +245,30 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
             ...p, // Spread internal details like id, nombre, cantidad, sku etc.
             precio: displayPrice,      // Set the calculated display price
             subtotal: displaySubtotal,  // Set the calculated display subtotal
-            // Ensure ProductoDisplay specific fields are handled if any
-            precioMXN: p.precioMXN, // Keep original MXN for reference if needed by ProductoDisplay
-            subtotalMXN: p.subtotalMXN, // Keep original MXN subtotal for reference if needed
         };
         console.log(`[Context]   - Resulting displayProduct ${index}:`, displayProduct);
         return displayProduct;
     });
     // --- *** End Product Mapping for Display *** ---
 
-
-    // 1. Calculate base totals in MXN from internal state
-    let baseSubtotalMXN = 0;
+    // === CORRECT DISCOUNT LOGIC SEQUENCE ===
+    // 1. Calculate gross subtotal (precio × cantidad without any discounts)
+    let subtotalBrutoMXN = 0;
     internalProductos.forEach(p => {
-      // Subtotal reflects individual discounts
-      baseSubtotalMXN += p.subtotalMXN;
+      subtotalBrutoMXN += p.subtotalBrutoMXN;
     });
 
-    const subtotalAfterDiscountMXN = baseSubtotalMXN * (1 - globalDiscount / 100);
+    // 2. Calculate subtotal after individual discounts (already calculated per product)
+    let subtotalConDescuentosIndividualesMXN = 0;
+    internalProductos.forEach(p => {
+      subtotalConDescuentosIndividualesMXN += p.subtotalConDescuentoIndividualMXN;
+    });
 
-    // 2. Determine Shipping Cost in MXN
+    // 3. Apply global discount to the subtotal after individual discounts
+    const descuentoGlobalAmount = subtotalConDescuentosIndividualesMXN * (globalDiscount / 100);
+    const subtotalAfterGlobalDiscountMXN = subtotalConDescuentosIndividualesMXN - descuentoGlobalAmount;
+
+    // 4. Calculate shipping cost in MXN
     let shippingCostMXN = 0;
     if (shippingCostInput > 0) {
         if (moneda === 'MXN') {
@@ -275,51 +281,58 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
              console.warn("Cannot calculate MXN shipping cost from USD without exchange rate.");
         }
     }
-     console.log(` - Calculated Shipping MXN: ${shippingCostMXN}`);
+    console.log(` - Calculated Shipping MXN: ${shippingCostMXN}`);
 
-    // --- Reverted IVA Calculation ---
-    // Calculate IVA ONLY on the subtotal after global discount
-    const ivaAmountMXN = hasIva ? subtotalAfterDiscountMXN * 0.16 : 0;
-    // --- END Reverted IVA Calculation ---
+    // 5. Add shipping cost to subtotal
+    const subtotalWithShippingMXN = subtotalAfterGlobalDiscountMXN + shippingCostMXN;
 
-    // Calculate total by summing the discounted subtotal, the IVA (calculated above), and shipping
-    const totalMXN = subtotalAfterDiscountMXN + ivaAmountMXN + shippingCostMXN;
+    // 6. Apply IVA to subtotal after global discount + shipping
+    const ivaAmountMXN = hasIva ? subtotalWithShippingMXN * 0.16 : 0;
 
-    // 3. Calculate display values based on moneda
+    // 7. Calculate final total
+    const totalMXN = subtotalWithShippingMXN + ivaAmountMXN;
+    // === END CORRECT DISCOUNT LOGIC SEQUENCE ===
+
+    // 8. Calculate display values based on moneda
     let displaySubtotal = 0;
     let displayShippingCost = 0;
     let displayIvaAmount = 0;
     let displayTotal = 0;
 
     if (moneda === 'MXN') {
-      displaySubtotal = baseSubtotalMXN; // Use BASE subtotal, not the already discounted one
+      displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
       displayShippingCost = shippingCostMXN; // Already MXN
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
     } else if (moneda === 'USD' && exchangeRate) {
-      displaySubtotal = convertMXNtoUSD(baseSubtotalMXN); // Use BASE subtotal, not the already discounted one
+      displaySubtotal = convertMXNtoUSD(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
       // Shipping cost was input in USD, so use it directly
       displayShippingCost = shippingCostInput;
       displayIvaAmount = convertMXNtoUSD(ivaAmountMXN);
       displayTotal = convertMXNtoUSD(totalMXN);
     } else {
       // Fallback: Display MXN values if USD selected but no rate
-      displaySubtotal = baseSubtotalMXN; // Use BASE subtotal, not the already discounted one
+      displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
       displayShippingCost = shippingCostMXN; // Display the calculated MXN cost
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
        console.warn("Displaying MXN values as USD due to missing exchange rate.");
     }
     
-    console.log(` - Base Subtotal MXN: ${baseSubtotalMXN}`);
-    console.log(` - Subtotal After Discount MXN: ${subtotalAfterDiscountMXN}`);
+    console.log(`=== DISCOUNT CALCULATION DEBUG ===`);
+    console.log(` - Subtotal Bruto MXN: ${subtotalBrutoMXN}`);
+    console.log(` - Subtotal con Descuentos Individuales MXN: ${subtotalConDescuentosIndividualesMXN}`);
+    console.log(` - Descuento Global Amount: ${descuentoGlobalAmount}`);
+    console.log(` - Subtotal después Descuento Global MXN: ${subtotalAfterGlobalDiscountMXN}`);
+    console.log(` - Shipping MXN: ${shippingCostMXN}`);
+    console.log(` - Subtotal + Shipping MXN: ${subtotalWithShippingMXN}`);
     console.log(` - IVA MXN: ${ivaAmountMXN}`);
     console.log(` - Total MXN: ${totalMXN}`);
     console.log(` - Display Subtotal (${moneda}): ${displaySubtotal}`);
     console.log(` - Display Shipping (${moneda}): ${displayShippingCost}`);
     console.log(` - Display IVA (${moneda}): ${displayIvaAmount}`);
     console.log(` - Display Total (${moneda}): ${displayTotal}`);
-
+    console.log(`=== END DEBUG ===`);
 
     return {
       displayProductos,
@@ -328,8 +341,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         displayShippingCost,
         displayIvaAmount,
         displayTotal,
-        baseSubtotalMXN,
-        subtotalAfterDiscountMXN,
+        baseSubtotalMXN: subtotalConDescuentosIndividualesMXN, // Use subtotal after individual discounts as base
+        subtotalAfterDiscountMXN: subtotalAfterGlobalDiscountMXN, // Subtotal after global discount
         shippingCostMXN,
         ivaAmountMXN,
         totalMXN,
