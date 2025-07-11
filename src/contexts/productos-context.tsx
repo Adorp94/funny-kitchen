@@ -283,14 +283,14 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     }
     console.log(` - Calculated Shipping MXN: ${shippingCostMXN}`);
 
-    // 5. Add shipping cost to subtotal
-    const subtotalWithShippingMXN = subtotalAfterGlobalDiscountMXN + shippingCostMXN;
+    // 5. Apply IVA to subtotal after global discount (WITHOUT shipping)
+    const ivaAmountMXN = hasIva ? subtotalAfterGlobalDiscountMXN * 0.16 : 0;
 
-    // 6. Apply IVA to subtotal after global discount + shipping
-    const ivaAmountMXN = hasIva ? subtotalWithShippingMXN * 0.16 : 0;
-
-    // 7. Calculate final total
-    const totalMXN = subtotalWithShippingMXN + ivaAmountMXN;
+    // 6. Add shipping cost AFTER IVA calculation
+    const subtotalWithIvaMXN = subtotalAfterGlobalDiscountMXN + ivaAmountMXN;
+    
+    // 7. Calculate final total (subtotal + IVA + shipping)
+    const totalMXN = subtotalWithIvaMXN + shippingCostMXN;
     // === END CORRECT DISCOUNT LOGIC SEQUENCE ===
 
     // 8. Calculate display values based on moneda
@@ -325,7 +325,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     console.log(` - Descuento Global Amount: ${descuentoGlobalAmount}`);
     console.log(` - Subtotal después Descuento Global MXN: ${subtotalAfterGlobalDiscountMXN}`);
     console.log(` - Shipping MXN: ${shippingCostMXN}`);
-    console.log(` - Subtotal + Shipping MXN: ${subtotalWithShippingMXN}`);
+    console.log(` - Subtotal + IVA MXN: ${subtotalWithIvaMXN}`);
     console.log(` - IVA MXN: ${ivaAmountMXN}`);
     console.log(` - Total MXN: ${totalMXN}`);
     console.log(` - Display Subtotal (${moneda}): ${displaySubtotal}`);
