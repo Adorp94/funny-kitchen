@@ -8,6 +8,7 @@ import { DollarSign, Truck, Receipt, Percent, User, Clock, Loader2, AlertTriangl
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Cliente {
   nombre: string;
@@ -400,6 +401,18 @@ export function ResumenCotizacion({
             <span className="text-xl font-bold text-primary">
               {formatCurrency(total, moneda)}
             </span>
+          </div>
+          
+          {/* Currency Explanation */}
+          <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/30 p-3 rounded-md border border-blue-200 dark:border-blue-800 mt-4">
+            <p className="flex items-start gap-2">
+              <span className="text-blue-600 dark:text-blue-400 mt-0.5">ℹ️</span>
+              <span>
+                <strong>Nota:</strong> Los precios se ingresan en MXN (pesos mexicanos). 
+                Al seleccionar USD, los valores se convierten automáticamente usando el tipo de cambio actual 
+                (Banxico + $1.50 MXN de margen).
+              </span>
+            </p>
           </div>
         </CardContent>
       </Card>

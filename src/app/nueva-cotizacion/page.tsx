@@ -401,20 +401,20 @@ function NuevaCotizacionClient() {
     setMoneda(newCurrency);
   };
 
-  // Handle adding product (Keep existing, ensures MXN price sent to context)
+  // Handle adding product (Fixed currency conversion logic)
   const handleAddProduct = (producto: Producto) => {
      console.log(`[NuevaCotizacionClient] handleAddProduct called with producto: ${JSON.stringify(producto)}`);
-     const precioEnMonedaActual = producto.precio_unitario || 0; 
-     let precioEnMXN: number;
-     if (moneda === 'USD' && exchangeRate) {
-       precioEnMXN = convertUSDtoMXN(precioEnMonedaActual);
-     } else {
-       precioEnMXN = precioEnMonedaActual;
-     }
+     
+     // FIXED: Always assume price inputs are in MXN (base currency)
+     // This prevents confusion about what currency users should enter
+     const precioEnMXN = producto.precio_unitario || 0;
+     
+     console.log(`[NuevaCotizacionClient] Using MXN price directly: ${precioEnMXN} (no conversion applied)`);
+     
      const productoBase: ProductoBase = {
        id: producto.id || producto.producto_id?.toString() || `new_${Date.now()}`,
        nombre: producto.nombre,
-       precio: precioEnMXN, // Pass the calculated MXN price
+       precio: precioEnMXN, // Always use the input price as MXN base
        cantidad: Number(producto.cantidad) || 1,
        sku: producto.sku,
        descripcion: producto.descripcion,

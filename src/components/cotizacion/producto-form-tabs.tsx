@@ -1211,28 +1211,30 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               
               {/* Precio unitario */}
               <FormControl>
-                <FormLabel required>Precio unitario</FormLabel>
-                <Input
-                  name="precio"
-                  type="number"
-                  step="0.01"
-                  value={formData.precio}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('precio')}
-                  onWheel={preventScrollInput}
-                  placeholder="Ej: 150.00"
-                  icon={<Banknote className="h-4 w-4" />}
-                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  required
-                  readOnly={!formData.producto_id && !comboboxOpen}
-                />
-                              {touched.precio && errors.precio && (
-                <div className="text-red-500 text-xs mt-1 flex items-center">
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  {errors.precio}
+                <FormLabel required>Precio unitario (MXN)</FormLabel>
+                <div className="relative">
+                  <Input
+                    name="precio"
+                    type="number"
+                    step="0.01"
+                    value={formData.precio}
+                    onChange={handleInputChange}
+                    onBlur={() => handleBlur('precio')}
+                    onWheel={preventScrollInput}
+                    placeholder="Ej: 150.00"
+                    className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none pl-8`}
+                    required
+                  />
+                  <Banknote className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">MXN</span>
                 </div>
-              )}
-            </FormControl>
+                {touched.precio && errors.precio && (
+                  <div className="text-red-500 text-xs mt-1 flex items-center">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {errors.precio}
+                  </div>
+                )}
+              </FormControl>
             
             {/* Production Balance Display */}
             {formData.producto_id && (
@@ -1558,20 +1560,23 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
             {/* Precio y Cantidad */}
             <div className="grid grid-cols-2 gap-2">
               <FormControl>
-                <FormLabel required>Precio unitario</FormLabel>
-                <Input
-                  name="precio"
-                  type="number"
-                  step="0.01"
-                  value={formData.precio}
-                  onChange={handleInputChange}
-                  onBlur={() => handleBlur('precio')}
-                  onWheel={preventScrollInput}
-                  placeholder="Ej: 150.00"
-                  icon={<Banknote className="h-4 w-4" />}
-                  className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                  required
-                />
+                <FormLabel required>Precio unitario (MXN)</FormLabel>
+                <div className="relative">
+                  <Input
+                    name="precio"
+                    type="number"
+                    step="0.01"
+                    value={formData.precio}
+                    onChange={handleInputChange}
+                    onBlur={() => handleBlur('precio')}
+                    onWheel={preventScrollInput}
+                    placeholder="Ej: 150.00"
+                    className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none pl-8`}
+                    required
+                  />
+                  <Banknote className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">MXN</span>
+                </div>
                 {touched.precio && errors.precio && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
                     <AlertCircle className="h-3 w-3 mr-1" />

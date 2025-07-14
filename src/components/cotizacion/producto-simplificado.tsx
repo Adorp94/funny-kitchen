@@ -185,19 +185,22 @@ export function ProductoSimplificado({ onAddProduct }: ProductoFormProps) {
         
         {/* Precio */}
         <FormControl>
-          <FormLabel required>Precio unitario</FormLabel>
-          <Input
-            type="number"
-            name="precio"
-            value={producto.precio || ''}
-            onChange={handleInputChange}
-            onBlur={() => handleBlur('precio')}
-            placeholder="0.00"
-            icon={<DollarSign className="h-4 w-4" />}
-            min={0}
-            step={0.01}
-            className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-          />
+          <FormLabel required>Precio unitario (MXN)</FormLabel>
+          <div className="relative">
+            <Input
+              type="number"
+              name="precio"
+              value={producto.precio || ''}
+              onChange={handleInputChange}
+              onBlur={() => handleBlur('precio')}
+              placeholder="0.00"
+              min={0}
+              step={0.01}
+              className={`${touched.precio && errors.precio ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''} pl-8`}
+            />
+            <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">MXN</span>
+          </div>
           {touched.precio && errors.precio && (
             <div className="text-red-500 text-xs mt-1 flex items-center">
               <AlertCircle className="h-3 w-3 mr-1" />
