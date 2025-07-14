@@ -19,7 +19,7 @@ export function useExchangeRate() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
-  const MARKUP = 1.5;
+  const MARKUP = -0.8; // Subtract 0.8 from the base rate
 
   useEffect(() => {
     const fetchExchangeRate = async () => {
@@ -105,7 +105,7 @@ export function useExchangeRate() {
 
   const formatExchangeRateInfo = (): string => {
     if (!exchangeRate || !baseRate) return '';
-    return `1 USD = ${exchangeRate.toFixed(2)} MXN (Base: ${baseRate.toFixed(2)} + ${MARKUP.toFixed(2)})`;
+    return `1 USD = ${exchangeRate.toFixed(2)} MXN (Base: ${baseRate.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)})`;
   };
 
   return {
