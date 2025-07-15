@@ -559,7 +559,7 @@ export async function createIngreso(data: any): Promise<{ success: boolean; erro
     let tipoCambio = null;
 
     // Calculate monto_mxn based on moneda
-    if (moneda === 'USD') {
+    if (moneda === 'USD' || moneda === 'EUR') {
       tipoCambio = data.tipo_cambio || 18; // Consider fetching this dynamically or using a better default
       montoMXN = ingresoMonto * tipoCambio;
     }
@@ -709,7 +709,7 @@ export async function createEgreso(data: any): Promise<{ success: boolean; error
     let montoMXN = Number(data.monto);
     let tipoCambio = null;
     
-    if (data.moneda === 'USD') {
+    if (data.moneda === 'USD' || data.moneda === 'EUR') {
       tipoCambio = data.tipo_cambio || 18; // Default exchange rate
       montoMXN = montoMXN * tipoCambio;
     }
@@ -1171,10 +1171,10 @@ export async function getCashFlowMetrics(
       // After data integrity fix, all MXN payments have monto_mxn populated
       if (payment.moneda === 'MXN') {
         actualPaymentsMXN += Number(payment.monto_mxn || 0);
-      } else if (payment.moneda === 'USD') {
-        // For USD payments (if any), monto_mxn contains the converted amount
+      } else if (payment.moneda === 'USD' || payment.moneda === 'EUR') {
+        // For USD/EUR payments (if any), monto_mxn contains the converted amount
         actualPaymentsMXN += Number(payment.monto_mxn || 0);
-        // Also track USD separately if needed
+        // Also track USD/EUR separately if needed
         // actualPaymentsUSD += Number(payment.monto || 0);
       }
     });
@@ -1189,8 +1189,8 @@ export async function getCashFlowMetrics(
       if (cot.moneda === 'MXN') {
         // For MXN cotizaciones, use total_mxn (which should equal total)
         totalActiveQuotesMXN += Number(cot.total_mxn || cot.total || 0);
-      } else if (cot.moneda === 'USD') {
-        // For USD cotizaciones, track both currencies
+      } else if (cot.moneda === 'USD' || cot.moneda === 'EUR') {
+        // For USD/EUR cotizaciones, track both currencies
         totalActiveQuotesUSD += Number(cot.total || 0);
         totalActiveQuotesMXN += Number(cot.total_mxn || 0); // MXN equivalent
       }

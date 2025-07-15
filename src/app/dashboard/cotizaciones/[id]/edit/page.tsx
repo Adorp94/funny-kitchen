@@ -188,21 +188,31 @@ function EditCotizacionClient() {
 
         // Process products FIRST
         if (cotizacionData.productos && Array.isArray(cotizacionData.productos)) {
-          const initialProductos = cotizacionData.productos.map((producto: any) => ({
-             id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id.toString() : generateUniqueId(),
-             cotizacion_producto_id: producto.cotizacion_producto_id || null,
-             producto_id: producto.producto_id || null,
-             nombre: producto.nombre || 'Producto sin nombre',
-             precio: producto.precio_unitario || producto.precio || 0,
-             cantidad: producto.cantidad || 1,
-             descuento: producto.descuento_producto ?? producto.descuento ?? 0,
-             subtotal: producto.subtotal ?? ( (producto.precio_unitario || producto.precio || 0) * (producto.cantidad || 1) * (1 - (producto.descuento_producto ?? producto.descuento ?? 0)/100) ),
-             sku: producto.sku || "",
-             descripcion: producto.descripcion || "",
-             colores: Array.isArray(producto.colores) ? producto.colores :
-                     typeof producto.colores === 'string' ? producto.colores.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-             acabado: producto.acabado || ""
-          }));
+          const initialProductos = cotizacionData.productos.map((producto: any) => {
+            // Convert EUR/USD display prices back to MXN base prices for the context
+            let precioMXN = producto.precio_unitario || producto.precio || 0;
+            if (cotizacionData.moneda === 'EUR' && cotizacionData.tipo_cambio) {
+              precioMXN = precioMXN * cotizacionData.tipo_cambio;
+            } else if (cotizacionData.moneda === 'USD' && cotizacionData.tipo_cambio) {
+              precioMXN = precioMXN * cotizacionData.tipo_cambio;
+            }
+            
+            return {
+              id: producto.cotizacion_producto_id ? producto.cotizacion_producto_id.toString() : generateUniqueId(),
+              cotizacion_producto_id: producto.cotizacion_producto_id || null,
+              producto_id: producto.producto_id || null,
+              nombre: producto.nombre || 'Producto sin nombre',
+              precio: precioMXN, // Use converted MXN price
+              cantidad: producto.cantidad || 1,
+              descuento: producto.descuento_producto ?? producto.descuento ?? 0,
+              subtotal: producto.subtotal ?? ( precioMXN * (producto.cantidad || 1) * (1 - (producto.descuento_producto ?? producto.descuento ?? 0)/100) ),
+              sku: producto.sku || "",
+              descripcion: producto.descripcion || "",
+              colores: Array.isArray(producto.colores) ? producto.colores :
+                      typeof producto.colores === 'string' ? producto.colores.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+              acabado: producto.acabado || ""
+            };
+          });
 
           console.log('[Fetch] initialProductos after mapping:', initialProductos);
 

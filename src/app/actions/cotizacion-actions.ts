@@ -244,15 +244,15 @@ export async function updateCotizacionStatus(
         const tipoCambio = existingCotizacion.tipo_cambio || 1;
         const moneda = existingCotizacion.moneda || 'MXN';
         
-        const montoMXN = moneda === 'USD' ? 
+        const montoMXN = (moneda === 'USD' || moneda === 'EUR') ? 
           paymentData.monto * tipoCambio : 
           paymentData.monto;
           
         const paymentInsertData = {
           cotizacion_id: cotizacionId,
           monto: paymentData.monto,
-          monto_mxn: moneda === 'USD' ? montoMXN : null, 
-          tipo_cambio: moneda === 'USD' ? tipoCambio : null,
+          monto_mxn: (moneda === 'USD' || moneda === 'EUR') ? montoMXN : null, 
+          tipo_cambio: (moneda === 'USD' || moneda === 'EUR') ? tipoCambio : null,
           moneda: moneda,
           metodo_pago: paymentData.metodo_pago,
           notas: paymentData.notas || null,

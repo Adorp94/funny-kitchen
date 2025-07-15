@@ -309,7 +309,7 @@ export async function POST(
           try {
             const tipoCambio = existingCotizacion.tipo_cambio || 1;
             const moneda = existingCotizacion.moneda || 'MXN';
-            const montoMXN = moneda === 'USD' ? paymentData.monto * tipoCambio : paymentData.monto;
+            const montoMXN = (moneda === 'USD' || moneda === 'EUR') ? paymentData.monto * tipoCambio : paymentData.monto;
             // Use total from the *updated* cotizacion record fetched after status change
             const totalCotizacionForPercentage = updatedCotizacion.total ?? paymentData.monto; 
             const percentage = paymentData.porcentaje ?? Math.round((paymentData.monto / totalCotizacionForPercentage) * 100);
@@ -319,8 +319,8 @@ export async function POST(
               .insert({
                   cotizacion_id: cotizacionId, 
                   monto: paymentData.monto, 
-                  monto_mxn: moneda === 'USD' ? montoMXN : null,
-                  tipo_cambio: moneda === 'USD' ? tipoCambio : null, 
+                  monto_mxn: (moneda === 'USD' || moneda === 'EUR') ? montoMXN : null,
+                  tipo_cambio: (moneda === 'USD' || moneda === 'EUR') ? tipoCambio : null, 
                   moneda: moneda, 
                   metodo_pago: paymentData.metodo_pago,
                   notas: paymentData.notas || null, 

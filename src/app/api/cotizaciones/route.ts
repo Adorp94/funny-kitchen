@@ -387,13 +387,13 @@ export async function POST(req: NextRequest) {
     // CORRECTED LOGIC: Total = (subtotal + IVA) + shipping (shipping added AFTER IVA)
     const corrected_total_mxn = subtotalAfterDiscountMXN + ivaAmountMXN + original_costo_envio_mxn;
 
-    if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
-      // Convert BASE subtotal (before discount) to USD for display columns
+    if ((moneda === 'USD' || moneda === 'EUR') && tipo_cambio && tipo_cambio > 0) {
+      // Convert BASE subtotal (before discount) to USD/EUR for display columns
       db_subtotal = original_subtotal_mxn / tipo_cambio;
       db_costo_envio = original_costo_envio_mxn / tipo_cambio;
       db_total = corrected_total_mxn / tipo_cambio;
       db_monto_iva = ivaAmountMXN / tipo_cambio;
-      console.log(`Converting from MXN to USD for DB display columns: Rate ${tipo_cambio}`);
+      console.log(`Converting from MXN to ${moneda} for DB display columns: Rate ${tipo_cambio}`);
     } else {
       // Use BASE subtotal (before discount) directly for display columns if currency is MXN
       db_subtotal = original_subtotal_mxn;
@@ -596,7 +596,7 @@ export async function POST(req: NextRequest) {
         // Calculate display price/subtotal for this product
         let prod_db_precio: number;
         let prod_db_subtotal: number;
-        if (moneda === 'USD' && tipo_cambio && tipo_cambio > 0) {
+        if ((moneda === 'USD' || moneda === 'EUR') && tipo_cambio && tipo_cambio > 0) {
             prod_db_precio = prod_original_precio_mxn / tipo_cambio;
             prod_db_subtotal = prod_original_subtotal_mxn / tipo_cambio;
         } else {

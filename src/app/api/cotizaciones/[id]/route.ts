@@ -37,7 +37,7 @@ const updateCotizacionSchema = z.object({
     colores: z.array(z.string()).optional().default([]),
     acabado: z.string().optional().default(''),
   })),
-  moneda: z.enum(['MXN', 'USD']),
+  moneda: z.enum(['MXN', 'USD', 'EUR']),
   subtotal: z.number(),
   descuento_global: z.number().default(0),
   iva: z.boolean().default(false),
