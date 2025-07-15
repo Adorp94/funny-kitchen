@@ -625,10 +625,11 @@ function NuevaCotizacionClient() {
                       <SelectTrigger className="w-[100px]">
                           <SelectValue placeholder="Moneda" />
                       </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="MXN">MXN</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                      </SelectContent>
+                                          <SelectContent>
+                      <SelectItem value="MXN">MXN</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                    </SelectContent>
                   </Select>
                </div>
             </CardContent>

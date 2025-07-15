@@ -51,14 +51,16 @@ interface ProductosContextType {
   setHasIva: (hasIva: boolean) => void;
   shippingCost: number; // This is now assumed to be entered in the SELECTED currency
   setShippingCost: (cost: number) => void;
-  moneda: 'MXN' | 'USD';
-  setMoneda: (moneda: 'MXN' | 'USD') => void;
+  moneda: 'MXN' | 'USD' | 'EUR';
+  setMoneda: (moneda: 'MXN' | 'USD' | 'EUR') => void;
   exchangeRate: number | null;
   tipoCambio?: number | null; // Alias for exchangeRate
 
   // Add conversion functions for convenience
   convertMXNtoUSD: (amount: number) => number;
   convertUSDtoMXN: (amount: number) => number;
+  convertMXNtoEUR: (amount: number) => number;
+  convertEURtoMXN: (amount: number) => number;
 }
 
 const ProductosContext = createContext<ProductosContextType | undefined>(undefined);
@@ -68,7 +70,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   const [internalProductos, setInternalProductos] = useState<ProductoEnContext[]>([]);
   // --- END STATE ---
 
-  const [moneda, setMoneda] = useState<'MXN' | 'USD'>('MXN');
+  const [moneda, setMoneda] = useState<'MXN' | 'USD' | 'EUR'>('MXN');
   const [globalDiscount, setGlobalDiscount] = useState<number>(0);
   const [hasIva, setHasIva] = useState<boolean>(false);
   // Shipping cost state - value is assumed to be in the 'moneda' currency
@@ -89,12 +91,18 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   // --- End Modified Setters ---
 
   const {
-    exchangeRate,
+    exchangeRates,
     loading: exchangeRateLoading,
     error: exchangeRateError,
     convertMXNtoUSD,
-    convertUSDtoMXN
+    convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
+    getExchangeRate
   } = useExchangeRate();
+
+  // Get the exchange rate for the current selected currency
+  const exchangeRate = getExchangeRate(moneda === 'MXN' ? 'USD' : moneda);
 
   // --- Load/Save internalProductos from sessionStorage ---
   useEffect(() => {
@@ -111,7 +119,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         setInternalProductos(parsedProductos);
       } catch (e) { console.error('Error parsing saved internalProductos:', e); }
     }
-    if (savedMoneda) setMoneda(savedMoneda as 'MXN' | 'USD');
+    if (savedMoneda) setMoneda(savedMoneda as 'MXN' | 'USD' | 'EUR');
     if (savedGlobalDiscount) setGlobalDiscount(parseFloat(savedGlobalDiscount) || 0);
     if (savedHasIva) setHasIva(savedHasIva === 'true');
     if (savedShippingCost) setShippingCostInput(parseFloat(savedShippingCost) || 0);
@@ -234,6 +242,22 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
                  displayPrice = 0; // Fallback if rate is missing/invalid
                  displaySubtotal = 0;
             }
+        } else if (moneda === 'EUR') {
+            if (exchangeRate && exchangeRate > 0) { // Ensure exchangeRate is valid
+                try {
+                    displayPrice = convertMXNtoEUR(p.precioMXN);
+                    displaySubtotal = convertMXNtoEUR(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
+                    console.log(`[Context]   - Converted to EUR (Rate: ${exchangeRate}): displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
+                } catch (conversionError) {
+                    console.error(`[Context]   - Error converting product ${index} to EUR:`, conversionError);
+                    displayPrice = 0; // Fallback on error
+                    displaySubtotal = 0;
+                }
+            } else {
+                 console.warn(`[Context]   - Cannot calculate EUR display price/subtotal for product ${index}. Exchange rate invalid or null: ${exchangeRate}`);
+                 displayPrice = 0; // Fallback if rate is missing/invalid
+                 displaySubtotal = 0;
+            }
         } 
         // Log if neither MXN nor USD (should not happen with current types)
         else {
@@ -278,10 +302,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
             shippingCostMXN = shippingCostInput;
         } else if (moneda === 'USD' && exchangeRate) {
             shippingCostMXN = convertUSDtoMXN(shippingCostInput);
+        } else if (moneda === 'EUR' && exchangeRate) {
+            shippingCostMXN = convertEURtoMXN(shippingCostInput);
         } else {
-            // Fallback or handle error if rate unavailable for USD shipping
+            // Fallback or handle error if rate unavailable for USD/EUR shipping
             shippingCostMXN = 0; // Or maybe keep shippingCostInput if MXN? Decide policy.
-             console.warn("Cannot calculate MXN shipping cost from USD without exchange rate.");
+             console.warn(`Cannot calculate MXN shipping cost from ${moneda} without exchange rate.`);
         }
     }
     console.log(` - Calculated Shipping MXN: ${shippingCostMXN}`);
@@ -313,13 +339,19 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       displayShippingCost = shippingCostInput;
       displayIvaAmount = convertMXNtoUSD(ivaAmountMXN);
       displayTotal = convertMXNtoUSD(totalMXN);
+    } else if (moneda === 'EUR' && exchangeRate) {
+      displaySubtotal = convertMXNtoEUR(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
+      // Shipping cost was input in EUR, so use it directly
+      displayShippingCost = shippingCostInput;
+      displayIvaAmount = convertMXNtoEUR(ivaAmountMXN);
+      displayTotal = convertMXNtoEUR(totalMXN);
     } else {
-      // Fallback: Display MXN values if USD selected but no rate
+      // Fallback: Display MXN values if USD/EUR selected but no rate
       displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
       displayShippingCost = shippingCostMXN; // Display the calculated MXN cost
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
-       console.warn("Displaying MXN values as USD due to missing exchange rate.");
+       console.warn(`Displaying MXN values as ${moneda} due to missing exchange rate.`);
     }
     
     console.log(`=== DISCOUNT CALCULATION DEBUG ===`);
@@ -352,7 +384,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       },
     };
 
-  }, [internalProductos, globalDiscount, hasIva, shippingCostInput, moneda, exchangeRate, convertMXNtoUSD, convertUSDtoMXN]);
+  }, [internalProductos, globalDiscount, hasIva, shippingCostInput, moneda, exchangeRate, convertMXNtoUSD, convertUSDtoMXN, convertMXNtoEUR, convertEURtoMXN]);
 
 
   // --- Context Value ---
@@ -381,6 +413,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     tipoCambio: exchangeRate,
     convertMXNtoUSD,
     convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
   }), [
     calculatedFinancials.displayProductos,
     addProducto,
@@ -399,6 +433,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     exchangeRate,
     convertMXNtoUSD,
     convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
   ]);
 
 

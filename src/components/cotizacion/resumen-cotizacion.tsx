@@ -44,7 +44,7 @@ interface ResumenCotizacionProps {
   shippingCost: number;
   setShippingCost: (value: number) => void;
   total: number;
-  moneda: 'MXN' | 'USD';
+  moneda: 'MXN' | 'USD' | 'EUR';
   tiempoEstimado?: string;
   setTiempoEstimado?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   tiempoEstimadoMax?: string;

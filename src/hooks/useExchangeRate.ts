@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
 
+interface ExchangeRates {
+  USD: number;
+  EUR: number;
+}
+
+interface BaseRates {
+  USD: number;
+  EUR: number;
+}
+
 interface BanxicoResponse {
   bmx: {
     series: Array<{
@@ -14,20 +24,23 @@ interface BanxicoResponse {
 }
 
 export function useExchangeRate() {
-  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-  const [baseRate, setBaseRate] = useState<number | null>(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
+  const [baseRates, setBaseRates] = useState<BaseRates | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const MARKUP = -0.8; // Subtract 0.8 from the base rate
 
   useEffect(() => {
-    const fetchExchangeRate = async () => {
+    const fetchExchangeRates = async () => {
       try {
-        console.log('Fetching exchange rate from Banxico API...');
+        console.log('Fetching exchange rates from Banxico API...');
         
         // Set fallback values to use in case of error
-        const fallbackRate = 20.4003;
+        const fallbackRates = {
+          USD: 20.4003,
+          EUR: 22.1500
+        };
         const fallbackDate = '28/06/2024';
         
         try {
@@ -36,41 +49,50 @@ export function useExchangeRate() {
           const response = await fetch('/api/exchange-rate');
           
           if (!response.ok) {
-            throw new Error(`Failed to fetch exchange rate: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to fetch exchange rates: ${response.status} ${response.statusText}`);
           }
           
           const data = await response.json();
           
           if (!data.success) {
-            console.log('Banxico API returned unsuccessful response, using fallback rate');
+            console.log('Banxico API returned unsuccessful response, using fallback rates');
             throw new Error(data.error || 'API returned unsuccessful response');
           }
           
-          const rate = data.rate;
+          const rates = data.rates;
           const date = data.date;
           
-          if (!rate || isNaN(parseFloat(rate))) {
-            throw new Error('Invalid exchange rate value received');
+          if (!rates || !rates.USD || !rates.EUR || isNaN(parseFloat(rates.USD)) || isNaN(parseFloat(rates.EUR))) {
+            throw new Error('Invalid exchange rate values received');
           }
           
-          // Save the base rate
-          const parsedRate = parseFloat(rate);
-          setBaseRate(parsedRate);
+          // Save the base rates
+          const parsedRates = {
+            USD: parseFloat(rates.USD),
+            EUR: parseFloat(rates.EUR)
+          };
+          setBaseRates(parsedRates);
           
-          // Calculate rate with markup
-          const rateWithMarkup = parsedRate + MARKUP;
-          setExchangeRate(rateWithMarkup);
+          // Calculate rates with markup
+          const ratesWithMarkup = {
+            USD: parsedRates.USD + MARKUP,
+            EUR: parsedRates.EUR + MARKUP
+          };
+          setExchangeRates(ratesWithMarkup);
           setLastUpdated(date || fallbackDate);
           
-          console.log('Successfully fetched exchange rate:', parsedRate, 'with markup:', rateWithMarkup);
+          console.log('Successfully fetched exchange rates:', parsedRates, 'with markup:', ratesWithMarkup);
           console.log('Last updated date:', date);
         } catch (apiError) {
-          console.log('Error fetching exchange rate, using fallback values:', apiError);
-          setError(apiError instanceof Error ? apiError.message : 'Failed to fetch exchange rate');
+          console.log('Error fetching exchange rates, using fallback values:', apiError);
+          setError(apiError instanceof Error ? apiError.message : 'Failed to fetch exchange rates');
           
           // Use fallback values
-          setBaseRate(fallbackRate);
-          setExchangeRate(fallbackRate + MARKUP);
+          setBaseRates(fallbackRates);
+          setExchangeRates({
+            USD: fallbackRates.USD + MARKUP,
+            EUR: fallbackRates.EUR + MARKUP
+          });
           setLastUpdated(fallbackDate);
         }
       } finally {
@@ -78,7 +100,7 @@ export function useExchangeRate() {
       }
     };
 
-    fetchExchangeRate();
+    fetchExchangeRates();
   }, []);
 
   // Fixed function to handle the date format from Banxico
@@ -94,29 +116,47 @@ export function useExchangeRate() {
   };
 
   const convertMXNtoUSD = (amountMXN: number): number => {
-    if (!exchangeRate) return amountMXN;
-    return Number((amountMXN / exchangeRate).toFixed(2));
+    if (!exchangeRates) return amountMXN;
+    return Number((amountMXN / exchangeRates.USD).toFixed(2));
   };
 
   const convertUSDtoMXN = (amountUSD: number): number => {
-    if (!exchangeRate) return amountUSD;
-    return Number((amountUSD * exchangeRate).toFixed(2));
+    if (!exchangeRates) return amountUSD;
+    return Number((amountUSD * exchangeRates.USD).toFixed(2));
+  };
+
+  const convertMXNtoEUR = (amountMXN: number): number => {
+    if (!exchangeRates) return amountMXN;
+    return Number((amountMXN / exchangeRates.EUR).toFixed(2));
+  };
+
+  const convertEURtoMXN = (amountEUR: number): number => {
+    if (!exchangeRates) return amountEUR;
+    return Number((amountEUR * exchangeRates.EUR).toFixed(2));
+  };
+
+  const getExchangeRate = (currency: 'USD' | 'EUR'): number | null => {
+    if (!exchangeRates) return null;
+    return exchangeRates[currency];
   };
 
   const formatExchangeRateInfo = (): string => {
-    if (!exchangeRate || !baseRate) return '';
-    return `1 USD = ${exchangeRate.toFixed(2)} MXN (Base: ${baseRate.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)})`;
+    if (!exchangeRates || !baseRates) return '';
+    return `USD: ${exchangeRates.USD.toFixed(2)} MXN (Base: ${baseRates.USD.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)}) | EUR: ${exchangeRates.EUR.toFixed(2)} MXN (Base: ${baseRates.EUR.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)})`;
   };
 
   return {
-    exchangeRate,
-    baseRate,
+    exchangeRates,
+    baseRates,
     loading,
     error,
     lastUpdated,
     formatDate,
     convertMXNtoUSD,
     convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
+    getExchangeRate,
     formatExchangeRateInfo
   };
 } 

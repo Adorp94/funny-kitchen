@@ -2,53 +2,71 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    // URL for Banxico API to get the USD to MXN exchange rate
-    const url = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno';
+    // URLs for Banxico API to get exchange rates
+    const usdUrl = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno'; // USD to MXN
+    const eurUrl = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF46410/datos/oportuno'; // EUR to MXN
     
     // Token provided by the user
     const token = '66c15536eef14c33ee04957d8ac9fc8fc7c6a3fa819c6fc4d3d6515448f14433';
     
-    const response = await fetch(url, {
-      headers: {
-        'Bmx-Token': token
-      },
-      // Add a cache: 'no-store' to make a fresh request each time
-      cache: 'no-store'
-    });
+    const headers = {
+      'Bmx-Token': token
+    };
     
-    if (!response.ok) {
-      throw new Error(`Banxico API error: ${response.status} ${response.statusText}`);
+    // Fetch both USD and EUR rates in parallel
+    const [usdResponse, eurResponse] = await Promise.all([
+      fetch(usdUrl, { headers, cache: 'no-store' }),
+      fetch(eurUrl, { headers, cache: 'no-store' })
+    ]);
+    
+    if (!usdResponse.ok || !eurResponse.ok) {
+      throw new Error(`Banxico API error: USD ${usdResponse.status}, EUR ${eurResponse.status}`);
     }
     
-    const data = await response.json();
+    const [usdData, eurData] = await Promise.all([
+      usdResponse.json(),
+      eurResponse.json()
+    ]);
     
-    // Extract the exchange rate and date from the response
-    const seriesData = data?.bmx?.series?.[0]?.datos?.[0];
-    
-    if (!seriesData || !seriesData.dato) {
-      throw new Error('Invalid response from Banxico API');
+    // Extract USD rate and date
+    const usdSeriesData = usdData?.bmx?.series?.[0]?.datos?.[0];
+    if (!usdSeriesData || !usdSeriesData.dato) {
+      throw new Error('Invalid USD response from Banxico API');
     }
     
-    const exchangeRate = parseFloat(seriesData.dato);
-    const date = seriesData.fecha;
+    // Extract EUR rate and date
+    const eurSeriesData = eurData?.bmx?.series?.[0]?.datos?.[0];
+    if (!eurSeriesData || !eurSeriesData.dato) {
+      throw new Error('Invalid EUR response from Banxico API');
+    }
+    
+    const usdRate = parseFloat(usdSeriesData.dato);
+    const eurRate = parseFloat(eurSeriesData.dato);
+    const date = usdSeriesData.fecha; // Both should have the same date
     
     return NextResponse.json({
       success: true,
-      rate: exchangeRate,
+      rates: {
+        USD: usdRate,
+        EUR: eurRate
+      },
       date: date
     });
   } catch (error) {
-    console.error('Error fetching exchange rate from Banxico:', error);
+    console.error('Error fetching exchange rates from Banxico:', error);
     
-    // Fallback to a default exchange rate if the API call fails
-    const fallbackRate = 20.4003;
+    // Fallback rates if the API call fails
+    const fallbackRates = {
+      USD: 20.4003,
+      EUR: 22.1500
+    };
     const fallbackDate = '28/06/2024';
     
     return NextResponse.json({
       success: false,
-      rate: fallbackRate,
+      rates: fallbackRates,
       date: fallbackDate,
-      error: 'Failed to fetch from Banxico API, using fallback rate'
+      error: 'Failed to fetch from Banxico API, using fallback rates'
     });
   }
 } 

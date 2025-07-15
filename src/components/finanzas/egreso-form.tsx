@@ -110,8 +110,9 @@ export function EgresoForm({
               <SelectValue placeholder="Moneda" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="MXN">MXN</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
+                              <SelectItem value="MXN">MXN</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
             </SelectContent>
           </Select>
           {form.formState.errors.moneda && (
