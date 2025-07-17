@@ -211,7 +211,7 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
         <DropdownMenuTrigger asChild>
           <Button 
             variant="ghost" 
-            size={buttonSize === "sm" ? "icon-sm" : "icon"}
+            size="icon"
             className="h-8 w-8 p-0 data-[state=open]:bg-muted"
             disabled={isLoadingDetails || isDownloading}
           >
@@ -223,26 +223,28 @@ export function CotizacionActionsButton({ cotizacion, onStatusChanged, buttonSiz
             <span className="sr-only">Abrir menú</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleEditCotizacion}>
-            <FileEdit className="mr-2 h-4 w-4" />
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem onClick={handleEditCotizacion} className="text-xs py-2">
+            <FileEdit className="mr-2 h-3.5 w-3.5" />
             Editar
           </DropdownMenuItem>
           
           <DropdownMenuItem 
             onClick={() => setIsStatusModalOpen(true)}
             disabled={!canChangeStatus(cotizacion.estado)}
-            className="cursor-pointer"
+            className="cursor-pointer text-xs py-2"
           >
-            <Edit className="mr-2 h-4 w-4" />
+            <Edit className="mr-2 h-3.5 w-3.5" />
             <span>Cambiar Estado</span>
           </DropdownMenuItem>
           
-          <DropdownMenuItem onClick={handleDownloadPDF} disabled={isDownloading}>
+          <DropdownMenuSeparator />
+          
+          <DropdownMenuItem onClick={handleDownloadPDF} disabled={isDownloading} className="text-xs py-2">
             {isDownloading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="mr-2 h-3.5 w-3.5" />
             )}
             Descargar PDF
           </DropdownMenuItem>

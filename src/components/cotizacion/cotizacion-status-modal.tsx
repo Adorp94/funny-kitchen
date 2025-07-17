@@ -141,34 +141,44 @@ export function CotizacionStatusModal({
   if (isDesktop) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Cambiar Estado: {cotizacion.folio}</DialogTitle>
-            <DialogDescription>
-              Selecciona el nuevo estado y registra el anticipo si aplica.
+        <DialogContent className="sm:max-w-md border-border/50 shadow-lg">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base font-medium text-foreground">
+              Cambiar Estado
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {cotizacion.folio} • Selecciona el nuevo estado y registra el anticipo si aplica.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 px-1 max-h-[60vh] overflow-y-auto">
-            {/* Render the new form, passing submit handler */}
+          <div className="py-3 max-h-[60vh] overflow-y-auto">
             <CotizacionStatusForm
               form={form} 
               id={formId}
-              onSubmit={form.handleSubmit(handleFormSubmit)} // Use RHF handleSubmit
+              onSubmit={form.handleSubmit(handleFormSubmit)}
               isSubmitting={isSubmitting}
               cotizacion={cotizacion}
              />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+          <DialogFooter className="gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              className="h-8 px-3 text-xs"
+            >
+              Cancelar
+            </Button>
             <Button
               type="submit"
-              form={formId} // Associate button with form ID
+              form={formId}
               disabled={isSubmitting || !watchedStatus}
+              className="h-8 px-3 text-xs"
             >
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Actualizar Estado
+              {isSubmitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Actualizar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -179,36 +189,40 @@ export function CotizacionStatusModal({
   // Drawer for Mobile
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent>
-        <DrawerHeader className="text-left">
-          <DrawerTitle>Cambiar Estado: {cotizacion.folio}</DrawerTitle>
-          <DrawerDescription>
-            Selecciona el nuevo estado y registra el anticipo si aplica.
+      <DrawerContent className="border-border/50">
+        <DrawerHeader className="text-left space-y-2">
+          <DrawerTitle className="text-base font-medium text-foreground">
+            Cambiar Estado
+          </DrawerTitle>
+          <DrawerDescription className="text-sm text-muted-foreground">
+            {cotizacion.folio} • Selecciona el nuevo estado y registra el anticipo si aplica.
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="px-4 pb-0 pt-4 overflow-y-auto max-h-[70vh]">
-           {/* Render the new form, passing submit handler */}
+        <div className="px-4 pb-0 pt-2 overflow-y-auto max-h-[70vh]">
            <CotizacionStatusForm 
              form={form}
              id={formId}
-             onSubmit={form.handleSubmit(handleFormSubmit)} // Use RHF handleSubmit
+             onSubmit={form.handleSubmit(handleFormSubmit)}
              isSubmitting={isSubmitting}
              cotizacion={cotizacion}
             />
         </div>
 
-        <DrawerFooter className="pt-4">
+        <DrawerFooter className="pt-4 gap-2">
           <Button
             type="submit"
-            form={formId} // Associate button with form ID
+            form={formId}
             disabled={isSubmitting || !watchedStatus}
+            className="h-9 text-sm"
           >
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Actualizar Estado
+            {isSubmitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Actualizar
           </Button>
           <DrawerClose asChild>
-            <Button variant="outline" disabled={isSubmitting}>Cancelar</Button>
+            <Button variant="ghost" disabled={isSubmitting} className="h-9 text-sm">
+              Cancelar
+            </Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

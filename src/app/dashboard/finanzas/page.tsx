@@ -630,167 +630,196 @@ export default function FinanzasPage() {
         onSubmit={handleEgresoSubmit}
       />
 
-      <div className="py-8 md:py-12 space-y-8 md:space-y-10">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-6">
-           <div>
-             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-               <Calendar className="h-7 w-7 text-blue-600" />
-               Finanzas
-             </h1>
-             <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-               Gestiona y filtra los ingresos y egresos de tu negocio por mes y año.
-             </p>
-           </div>
-           {/* Action Buttons moved below filters */}
-         </div>
+      <div className="space-y-6">
+        {/* Clean Header */}
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-foreground flex items-center">
+            <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+            Finanzas
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Gestiona ingresos, egresos y análisis financiero.
+          </p>
+        </div>
 
-        {/* Filters and Actions Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-           {/* Filters */}
-           <div className="flex flex-col sm:flex-row items-center gap-3">
-             {/* Month Select - uses value 0 for Todos */}
-             <Select value={selectedMonth.toString()} onValueChange={handleMonthChange}>
-               <SelectTrigger className="w-full sm:w-[180px]">
-                 <SelectValue placeholder="Seleccionar Mes" />
-               </SelectTrigger>
-               <SelectContent>
-                 {months.map((month) => (
-                   <SelectItem key={month.value} value={month.value.toString()}>
-                     {month.label}
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-             {/* Year Select - uses value 0 for Todos */}
-             <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
-               <SelectTrigger className="w-full sm:w-[120px]">
-                 <SelectValue placeholder="Seleccionar Año" />
-               </SelectTrigger>
-               <SelectContent>
-                 {years.map((year) => (
-                   <SelectItem key={year.value} value={year.value.toString()}>
-                     {year.label}
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={refreshData}
-               disabled={isRefreshing || loadingIngresos || loadingEgresos}
-               className="w-full sm:w-auto"
-             >
-               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-               Actualizar Vista
-             </Button>
-           </div>
+        {/* Compact Filters and Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Filters */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedMonth.toString()} onValueChange={handleMonthChange}>
+              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-muted/50">
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((month) => (
+                  <SelectItem key={month.value} value={month.value.toString()}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+              <SelectTrigger className="w-[100px] h-8 text-xs border-0 bg-muted/50">
+                <SelectValue placeholder="Año" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((year) => (
+                  <SelectItem key={year.value} value={year.value.toString()}>
+                    {year.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshData}
+              disabled={isRefreshing || loadingIngresos || loadingEgresos}
+              className="h-8 px-3 text-xs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          </div>
 
-           {/* Action Buttons */}
-           <div className="flex flex-shrink-0 items-center space-x-3 mt-4 md:mt-0">
-              {activeTab === "ingresos" && (
-                <Button 
-                  size="sm"
-                  onClick={() => setIsIngresoModalOpen(true)}
-                  className="w-full sm:w-auto"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Ingreso
-                </Button>
-              )}
-              {activeTab === "egresos" && (
-                <Button 
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setIsEgresoModalOpen(true)}
-                  className="w-full sm:w-auto"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Egreso
-                </Button>
-              )}
-              {activeTab === "cashflow" && (
-                <div className="text-sm text-muted-foreground">
-                  Análisis de ventas reales
-                </div>
-              )}
-              {activeTab === "reportes" && (
-                <div className="text-sm text-muted-foreground">
-                  Reportes personalizados de ventas
-                </div>
-              )}
-            </div>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            {activeTab === "ingresos" && (
+              <Button 
+                size="sm"
+                onClick={() => setIsIngresoModalOpen(true)}
+                className="h-8 px-3 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Nuevo Ingreso
+              </Button>
+            )}
+            {activeTab === "egresos" && (
+              <Button 
+                variant="destructive"
+                size="sm"
+                onClick={() => setIsEgresoModalOpen(true)}
+                className="h-8 px-3 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Nuevo Egreso
+              </Button>
+            )}
+          </div>
         </div>
         
-        {/* Metrics Section (Consider if these should reflect filters) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-           <Card>
-             <CardHeader className="pb-2">
-               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-                 <DollarSign className="h-4 w-4 mr-2 text-emerald-500" />
-                 Ingresos (MXN)
-               </CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-foreground">
-                 {formatCurrency(metrics.ingresos.mxn, "MXN")}
-               </div>
-             </CardContent>
-           </Card>
-           
-           <Card>
-             <CardHeader className="pb-2">
-               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-                  <DollarSign className="h-4 w-4 mr-2 text-red-500" />
-                  Egresos (MXN)
-               </CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-foreground">
-                 {formatCurrency(metrics.egresos.mxn, "MXN")}
-               </div>
-             </CardContent>
-           </Card>
+        {/* Compact Metrics */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border-border/50 bg-background/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <DollarSign className="h-3 w-3 mr-1 text-emerald-500" />
+                    Ingresos
+                  </p>
+                  <p className="text-lg font-semibold text-foreground mt-1">
+                    {formatCurrency(metrics.ingresos.mxn, "MXN")}
+                  </p>
+                </div>
+                <div className="h-8 w-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                  <ArrowUp className="h-4 w-4 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50 bg-background/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <DollarSign className="h-3 w-3 mr-1 text-red-500" />
+                    Egresos
+                  </p>
+                  <p className="text-lg font-semibold text-foreground mt-1">
+                    {formatCurrency(metrics.egresos.mxn, "MXN")}
+                  </p>
+                </div>
+                <div className="h-8 w-8 bg-red-50 rounded-lg flex items-center justify-center">
+                  <ArrowDown className="h-4 w-4 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-           <Card>
-             <CardHeader className="pb-2">
-               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-                  <TrendingUp className="h-4 w-4 mr-2 text-blue-500" />
-                  Balance (MXN)
-               </CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className={`text-2xl font-bold ${metrics.balance.mxn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                 {formatCurrency(metrics.balance.mxn, "MXN")}
-               </div>
-             </CardContent>
-           </Card>
+          <Card className="border-border/50 bg-background/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <TrendingUp className="h-3 w-3 mr-1 text-blue-500" />
+                    Balance
+                  </p>
+                  <p className={`text-lg font-semibold mt-1 ${metrics.balance.mxn >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {formatCurrency(metrics.balance.mxn, "MXN")}
+                  </p>
+                </div>
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                  metrics.balance.mxn >= 0 ? 'bg-blue-50' : 'bg-orange-50'
+                }`}>
+                  <TrendingUp className={`h-4 w-4 ${
+                    metrics.balance.mxn >= 0 ? 'text-blue-600' : 'text-orange-600'
+                  }`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-           <Card>
-             <CardHeader className="pb-2">
-               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center">
-                  <ReceiptIcon className="h-4 w-4 mr-2 text-indigo-500" />
-                  Cotizaciones Pagadas
-               </CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className="text-2xl font-bold text-foreground">
-                 {metrics.cotizacionesPagadas}
-               </div>
-             </CardContent>
-           </Card>
-         </div>
+          <Card className="border-border/50 bg-background/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground flex items-center">
+                    <ReceiptIcon className="h-3 w-3 mr-1 text-indigo-500" />
+                    Pagadas
+                  </p>
+                  <p className="text-lg font-semibold text-foreground mt-1">
+                    {metrics.cotizacionesPagadas}
+                  </p>
+                </div>
+                <div className="h-8 w-8 bg-indigo-50 rounded-lg flex items-center justify-center">
+                  <ReceiptIcon className="h-4 w-4 text-indigo-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Data Tables Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-           <TabsList>
-             <TabsTrigger value="cashflow">Ventas</TabsTrigger>
-             <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
-             <TabsTrigger value="egresos">Egresos</TabsTrigger>
-             <TabsTrigger value="reportes">Reportes</TabsTrigger>
-           </TabsList>
-           <TabsContent value="cashflow" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4 h-9 bg-muted p-1">
+            <TabsTrigger 
+              value="cashflow" 
+              className="text-xs font-medium data-[state=active]:bg-green-100 data-[state=active]:text-green-800 data-[state=active]:shadow-sm"
+            >
+              Ventas
+            </TabsTrigger>
+            <TabsTrigger 
+              value="ingresos" 
+              className="text-xs font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 data-[state=active]:shadow-sm"
+            >
+              Ingresos
+            </TabsTrigger>
+            <TabsTrigger 
+              value="egresos" 
+              className="text-xs font-medium data-[state=active]:bg-red-100 data-[state=active]:text-red-800 data-[state=active]:shadow-sm"
+            >
+              Egresos
+            </TabsTrigger>
+            <TabsTrigger 
+              value="reportes" 
+              className="text-xs font-medium data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800 data-[state=active]:shadow-sm"
+            >
+              Reportes
+            </TabsTrigger>
+          </TabsList>
+           <TabsContent value="cashflow" className="space-y-4 mt-6">
              <CashFlowSection 
                selectedMonth={selectedMonth === 0 ? undefined : selectedMonth}
                selectedYear={selectedYear === 0 ? undefined : selectedYear}
@@ -798,24 +827,23 @@ export default function FinanzasPage() {
                isDownloadingVentasCSV={isDownloadingVentas}
              />
            </TabsContent>
-           <TabsContent value="ingresos" className="space-y-4">
+           <TabsContent value="ingresos" className="space-y-4 mt-6">
              <div className="flex items-center justify-between">
-               <h3 className="text-xl font-semibold tracking-tight">Ingresos Recientes</h3>
-               <div className="flex items-center space-x-2">
-                  <Button 
-                     variant="outline"
-                     size="sm"
-                     onClick={handleDownloadIngresosCSV}
-                     disabled={isDownloadingIngresos}
-                  >
-                    {isDownloadingIngresos ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-2 h-4 w-4" />
-                    )}
-                    Descargar Ingresos
-                  </Button>
-               </div>
+               <h3 className="text-base font-medium text-foreground">Ingresos Recientes</h3>
+               <Button 
+                 variant="ghost"
+                 size="sm"
+                 onClick={handleDownloadIngresosCSV}
+                 disabled={isDownloadingIngresos}
+                 className="h-8 px-3 text-xs"
+               >
+                 {isDownloadingIngresos ? (
+                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                 ) : (
+                   <Download className="mr-1.5 h-3.5 w-3.5" />
+                 )}
+                 Exportar
+               </Button>
              </div>
              <IngresosTable 
                ingresos={ingresos}
@@ -826,24 +854,23 @@ export default function FinanzasPage() {
                onDelete={handleDeleteIngreso}
              />
            </TabsContent>
-           <TabsContent value="egresos" className="space-y-4">
+           <TabsContent value="egresos" className="space-y-4 mt-6">
              <div className="flex items-center justify-between">
-                 <h3 className="text-xl font-semibold tracking-tight">Egresos Recientes</h3>
-                  <div className="flex items-center space-x-2">
-                   <Button 
-                       variant="outline"
-                       size="sm"
-                       onClick={handleDownloadEgresosCSV}
-                       disabled={isDownloadingEgresos}
-                   >
-                     {isDownloadingEgresos ? (
-                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                     ) : (
-                       <Download className="mr-2 h-4 w-4" />
-                     )}
-                     Descargar Egresos
-                   </Button>
-                 </div>
+               <h3 className="text-base font-medium text-foreground">Egresos Recientes</h3>
+               <Button 
+                 variant="ghost"
+                 size="sm"
+                 onClick={handleDownloadEgresosCSV}
+                 disabled={isDownloadingEgresos}
+                 className="h-8 px-3 text-xs"
+               >
+                 {isDownloadingEgresos ? (
+                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                 ) : (
+                   <Download className="mr-1.5 h-3.5 w-3.5" />
+                 )}
+                 Exportar
+               </Button>
              </div>
              <EgresosTable 
               egresos={egresos}
@@ -854,12 +881,12 @@ export default function FinanzasPage() {
               onDelete={handleDeleteEgreso}
             />
            </TabsContent>
-           <TabsContent value="reportes" className="space-y-4">
-             <div className="flex items-center justify-between">
-               <h3 className="text-xl font-semibold tracking-tight">Reportes de Ventas</h3>
-               <div className="text-sm text-muted-foreground">
+           <TabsContent value="reportes" className="space-y-4 mt-6">
+             <div className="space-y-1">
+               <h3 className="text-base font-medium text-foreground">Reportes de Ventas</h3>
+               <p className="text-sm text-muted-foreground">
                  Descarga reportes por diferentes períodos de tiempo
-               </div>
+               </p>
              </div>
              <ReportesSection 
                onDownloadMonthly={handleDownloadMonthlyReport}

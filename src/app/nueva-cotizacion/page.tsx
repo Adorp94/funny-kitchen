@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Check, AlertTriangle, CalendarClock, Crown } from "lucide-react";
 import { ClienteForm } from "@/components/cotizacion/cliente-form";
@@ -438,12 +438,12 @@ function NuevaCotizacionClient() {
   }, []);
   const clienteInitialData = useMemo(() => clienteData || {}, [clienteData]);
 
-  // Step indicator component (Keep existing)
+  // Minimal step indicator component
   const StepIndicator = ({ currentStep }: { currentStep: number }) => {
     const steps = ['Cliente', 'Productos', 'Resumen'];
     return (
-      <nav aria-label="Progress" className="w-full max-w-3xl">
-         <ol role="list" className="flex items-center w-full space-x-8 sm:space-x-16">
+      <nav aria-label="Progress" className="w-full max-w-md">
+         <ol role="list" className="flex items-center justify-between">
            {steps.map((name, stepIdx) => {
              const stepNumber = stepIdx + 1;
              const isCompleted = stepNumber < currentStep;
@@ -453,10 +453,10 @@ function NuevaCotizacionClient() {
                                 (stepNumber === 2 && currentStep === 1 && cliente);
 
              return (
-               <li key={name} className={`relative flex-1 ${stepIdx === steps.length - 1 ? 'flex-grow-0' : ''}`}>
-                 {stepIdx < steps.length - 1 ? (
-                   <div className={`absolute left-4 top-4 -ml-px h-0.5 ${isCompleted ? 'bg-primary' : 'bg-muted'} w-[calc(100%+2rem)] sm:w-[calc(100%+4rem)]`} aria-hidden="true" />
-                 ) : null}
+               <li key={name} className="relative flex flex-col items-center">
+                 {stepIdx < steps.length - 1 && (
+                   <div className={`absolute left-8 top-3 h-[1px] w-20 ${isCompleted ? 'bg-foreground' : 'bg-border'}`} aria-hidden="true" />
+                 )}
                  <button
                    onClick={() => {
                      if (canNavigate) {
@@ -465,17 +465,20 @@ function NuevaCotizacionClient() {
                      }
                    }}
                    disabled={!canNavigate && !isCurrent}
-                   className={`relative w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium z-10 transition-colors duration-200 ease-in-out ${isCompleted
-                         ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                         : isCurrent
-                         ? 'border-2 border-primary bg-background text-primary scale-110'
-                         : 'border-2 border-muted bg-background text-muted-foreground hover:border-muted-foreground'
-                     } ${!canNavigate && !isCurrent ? 'cursor-not-allowed opacity-60' : (canNavigate ? 'cursor-pointer' : '' )}`}
+                   className={`relative w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium z-10 transition-colors ${
+                     isCompleted
+                       ? 'bg-foreground text-background'
+                       : isCurrent
+                       ? 'bg-foreground text-background'
+                       : 'bg-muted text-muted-foreground'
+                   } ${!canNavigate && !isCurrent ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
                    aria-current={isCurrent ? 'step' : undefined}
                  >
-                   {isCompleted ? <Check className="h-5 w-5" /> : <span className="font-bold">{stepNumber}</span>}
+                   {isCompleted ? <Check className="h-3 w-3" /> : <span>{stepNumber}</span>}
                  </button>
-                 <span className={`absolute top-full left-4 -translate-x-1/2 mt-2 text-xs font-medium whitespace-nowrap ${isCurrent ? 'text-primary' : 'text-muted-foreground'}`}>{name}</span>
+                 <span className={`mt-2 text-xs font-medium ${isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>
+                   {name}
+                 </span>
                </li>
              );
            })}
@@ -505,149 +508,178 @@ function NuevaCotizacionClient() {
 
   // --- Render Logic --- 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Page Header */}
-      <div className="max-w-3xl mx-auto">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Nueva Cotización
-          </h1>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Clean Header */}
+      <div className="space-y-1">
+        <h1 className="text-xl font-semibold text-foreground">
+          Nueva Cotización
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Crea una nueva cotización para tus clientes paso a paso.
+        </p>
       </div>
-      {/* Step Indicator */}
-      <div className="flex justify-center pb-12">
+      
+      {/* Minimal Step Indicator */}
+      <div className="flex justify-center py-6">
          <StepIndicator currentStep={activeStep} />
       </div>
 
       {/* Step Content */}
-      <div className="max-w-3xl mx-auto">
+      <div>
         {activeStep === 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center"><User className="mr-2" /> Información del Cliente</CardTitle>
-            </CardHeader>
-            <CardContent>
-               {/* Pass mode and onModeChange to ClienteForm */}
-              <ClienteForm 
-                onClientSelect={handleClientSelect} // Use the specific handler
-                initialData={clienteInitialData} // Pass memoized initial data
-                mode={clienteFormMode}
-                onModeChange={handleModeChange} // Use the specific handler
+          <div className="border border-border/50 rounded-lg bg-background/50 p-6 space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-base font-medium text-foreground flex items-center">
+                <User className="mr-2 h-4 w-4" /> Información del Cliente
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Busca un cliente existente o crea uno nuevo.
+              </p>
+            </div>
+            
+            <ClienteForm 
+              onClientSelect={handleClientSelect}
+              initialData={clienteInitialData}
+              mode={clienteFormMode}
+              onModeChange={handleModeChange}
+            />
+            
+            {/* Minimal Premium Checkbox */}
+            <div className="flex items-center space-x-3 p-3 rounded-md bg-orange-50 border border-orange-200/50 dark:bg-orange-900/20 dark:border-orange-800/50">
+              <Checkbox 
+                id="premium-cliente"
+                checked={isPremium}
+                onCheckedChange={(checked) => setIsPremium(checked as boolean)}
+                className="border-orange-300 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
               />
-              {/* *** NEW: Premium Checkbox *** */} 
-              <div className="mt-6 flex items-center space-x-2 bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-md border border-yellow-200 dark:border-yellow-800">
-                  <Checkbox 
-                      id="premium-cliente"
-                      checked={isPremium}
-                      onCheckedChange={(checked) => setIsPremium(checked as boolean)}
-                      className="border-yellow-400 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-yellow-foreground"
-                  />
-                  <Label htmlFor="premium-cliente" className="flex items-center font-medium text-yellow-800 dark:text-yellow-200">
-                      <Crown className="h-4 w-4 mr-1.5 text-yellow-600 dark:text-yellow-400" /> Cliente Premium (Prioridad en Producción)
-                  </Label>
-                   <TooltipProvider delayDuration={100}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 p-0 text-yellow-500 dark:text-yellow-600">
-                            <AlertTriangle className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs text-sm">
-                          <p>Marcar esta opción indica que el pedido de este cliente puede adelantarse en la cola de producción si es necesario, afectando los tiempos estimados de otros pedidos.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-              </div>
-              {/* *** END NEW *** */} 
-            </CardContent>
-            <CardFooter className="justify-end">
-              <Button onClick={nextStep} disabled={!cliente}><ArrowRight className="mr-2 h-4 w-4" /> Siguiente: Productos</Button>
-            </CardFooter>
-          </Card>
+              <Label htmlFor="premium-cliente" className="flex items-center text-sm font-medium text-orange-800 dark:text-orange-200">
+                <Crown className="h-3.5 w-3.5 mr-1.5 text-orange-600 dark:text-orange-400" />
+                Cliente Premium
+              </Label>
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-orange-500 dark:text-orange-400">
+                      <AlertTriangle className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs">
+                    <p>Prioridad en la cola de producción</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            <div className="flex justify-end pt-4 border-t border-border/50">
+              <Button onClick={nextStep} disabled={!cliente} className="h-8 px-4 text-xs">
+                <ArrowRight className="mr-1.5 h-3.5 w-3.5" /> Siguiente
+              </Button>
+            </div>
+          </div>
         )}
 
         {/* Step 2: Productos */} 
         {activeStep === 2 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center"><Package className="mr-2" /> Agregar Productos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <ProductoFormTabs 
-                  onProductoChange={handleAddProduct} 
-              />
-              <h3 className="text-lg font-semibold pt-4 border-t">Productos en la Cotización</h3>
+          <div className="border border-border/50 rounded-lg bg-background/50 p-6 space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-base font-medium text-foreground flex items-center">
+                <Package className="mr-2 h-4 w-4" /> Agregar Productos
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Agrega productos desde el catálogo o crea productos personalizados.
+              </p>
+            </div>
+            
+            <ProductoFormTabs onProductoChange={handleAddProduct} />
+            
+            <div className="space-y-3 pt-4 border-t border-border/50">
+              <h3 className="text-sm font-medium text-foreground">Productos en la Cotización</h3>
               <ListaProductosConDescuento
                 productos={productos} 
                 onRemoveProduct={removeProducto} 
                 onUpdateProductDiscount={handleUpdateProductDiscount}
                 moneda={moneda}
               />
-              {/* REMOVED Financial Inputs: Global Discount, IVA, Shipping from here */}
-            </CardContent>
-            <CardFooter className="justify-between">
-              <Button variant="outline" onClick={prevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior: Cliente</Button>
-              <Button onClick={nextStep} disabled={productos.length === 0}><ArrowRight className="mr-2 h-4 w-4" /> Siguiente: Resumen</Button>
-            </CardFooter>
-          </Card>
+            </div>
+            
+            <div className="flex justify-between pt-4 border-t border-border/50">
+              <Button variant="ghost" onClick={prevStep} className="h-8 px-4 text-xs">
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Anterior
+              </Button>
+              <Button onClick={nextStep} disabled={productos.length === 0} className="h-8 px-4 text-xs">
+                <ArrowRight className="mr-1.5 h-3.5 w-3.5" /> Siguiente
+              </Button>
+            </div>
+          </div>
         )}
 
         {/* Step 3: Resumen */} 
         {activeStep === 3 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center"><Receipt className="mr-2" /> Resumen de Cotización</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <ResumenCotizacion 
-                  productos={productos}
-                  moneda={moneda}
-                  subtotal={moneda === 'MXN' ? (financials?.baseSubtotalMXN ?? 0) : (financials?.baseSubtotalMXN ? convertMXNtoUSD(financials.baseSubtotalMXN) : 0)}
-                  ivaAmount={financials?.displayIvaAmount ?? 0}
-                  globalDiscount={globalDiscount} 
-                  hasIva={hasIva}
-                  shippingCost={shippingCost}
-                  total={financials?.displayTotal ?? 0}
-                  setGlobalDiscount={setGlobalDiscount} 
-                  setHasIva={setHasIva} 
-                  setShippingCost={setShippingCost}
-                  tiempoEstimado={tiempoEstimadoInput}
-                  setTiempoEstimado={handleTiempoEstimadoChange}
-                  tiempoEstimadoMax={tiempoEstimadoMaxInput}
-                  setTiempoEstimadoMax={handleTiempoEstimadoMaxChange}
-                  etaResult={etaResult}
-                  etaLoading={etaLoading}
-                  etaError={etaError}
-                  cliente={cliente}
-              />
-               {/* Currency Selector */} 
-               <div className="flex justify-end items-center space-x-2 pt-4 border-t">
-                   <Label>Moneda de Visualización:</Label>
-                  <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
-                      <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Moneda" />
-                      </SelectTrigger>
-                                          <SelectContent>
-                      <SelectItem value="MXN">MXN</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                    </SelectContent>
-                  </Select>
-               </div>
-            </CardContent>
-            <CardFooter className="justify-between">
-              <Button variant="outline" onClick={prevStep}><ArrowLeft className="mr-2 h-4 w-4" /> Anterior: Productos</Button>
-              <Button 
-                  onClick={handleGenerateCotizacion}
-                  disabled={isLoading || !cliente || productos.length === 0}
-              >
-                  {isLoading ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                      <Save className="mr-2 h-4 w-4" /> // Reverted Icon
-                  )}
-                  {isLoading ? 'Guardando...' : 'Guardar Cotización'} {/* Reverted Text */} 
+          <div className="border border-border/50 rounded-lg bg-background/50 p-6 space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-base font-medium text-foreground flex items-center">
+                <Receipt className="mr-2 h-4 w-4" /> Resumen de Cotización
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Revisa los detalles y guarda la cotización.
+              </p>
+            </div>
+            
+            <ResumenCotizacion 
+              productos={productos}
+              moneda={moneda}
+              subtotal={moneda === 'MXN' ? (financials?.baseSubtotalMXN ?? 0) : (financials?.baseSubtotalMXN ? convertMXNtoUSD(financials.baseSubtotalMXN) : 0)}
+              ivaAmount={financials?.displayIvaAmount ?? 0}
+              globalDiscount={globalDiscount} 
+              hasIva={hasIva}
+              shippingCost={shippingCost}
+              total={financials?.displayTotal ?? 0}
+              setGlobalDiscount={setGlobalDiscount} 
+              setHasIva={setHasIva} 
+              setShippingCost={setShippingCost}
+              tiempoEstimado={tiempoEstimadoInput}
+              setTiempoEstimado={handleTiempoEstimadoChange}
+              tiempoEstimadoMax={tiempoEstimadoMaxInput}
+              setTiempoEstimadoMax={handleTiempoEstimadoMaxChange}
+              etaResult={etaResult}
+              etaLoading={etaLoading}
+              etaError={etaError}
+              cliente={cliente}
+            />
+            
+            {/* Minimal Currency Selector */} 
+            <div className="flex justify-end items-center gap-2 pt-4 border-t border-border/50">
+              <span className="text-xs text-muted-foreground">Moneda:</span>
+              <Select value={moneda} onValueChange={(value: 'MXN' | 'USD') => setMoneda(value)}>
+                <SelectTrigger className="w-[80px] h-7 text-xs border-0 bg-muted/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MXN">MXN</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex justify-between pt-4 border-t border-border/50">
+              <Button variant="ghost" onClick={prevStep} className="h-8 px-4 text-xs">
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Anterior
               </Button>
-            </CardFooter>
-          </Card>
+              <Button 
+                onClick={handleGenerateCotizacion}
+                disabled={isLoading || !cliente || productos.length === 0}
+                className="h-8 px-4 text-xs"
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {isLoading ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
         )}
       </div> 
     </div>
