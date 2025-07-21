@@ -9,11 +9,16 @@ type ProductoConEstatus = {
   fecha: string;
   precio_venta: number;
   precio_total: number;
+  producto_id: number;
   produccion_status: {
     por_detallar: number;
     detallado: number;
     sancocho: number;
     terminado: number;
+    terminado_disponible: number; // terminado - total_empaque_allocations
+  };
+  empaque_status: {
+    cantidad_empaque: number;
   };
 };
 
@@ -130,7 +135,7 @@ export async function GET(
     const productIds = productosData.map(p => p.productos.producto_id);
     
     const { data: productionStatusData, error: productionStatusError } = await supabase
-      .from('production_active')
+      .from('production_active_with_gap')
       .select(`
         producto_id,
         por_detallar,
@@ -145,6 +150,36 @@ export async function GET(
       // Continue without production status rather than failing
     }
 
+    // Get empaque status for this specific cotizacion
+    const { data: empaqueStatusData, error: empaqueStatusError } = await supabase
+      .from('production_allocations')
+      .select(`
+        producto_id,
+        cantidad_asignada
+      `)
+      .eq('cotizacion_id', parseInt(cotizacionId))
+      .eq('stage', 'empaque');
+
+    if (empaqueStatusError) {
+      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch empaque status:", empaqueStatusError);
+      // Continue without empaque status rather than failing
+    }
+
+    // Get total empaque allocations for all products to calculate available terminado
+    const { data: totalEmpaqueData, error: totalEmpaqueError } = await supabase
+      .from('production_allocations')
+      .select(`
+        producto_id,
+        cantidad_asignada
+      `)
+      .in('producto_id', productIds)
+      .eq('stage', 'empaque');
+
+    if (totalEmpaqueError) {
+      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch total empaque:", totalEmpaqueError);
+      // Continue without total empaque data
+    }
+
     // Create a map of production status by product ID
     const productionStatusMap = new Map();
     if (productionStatusData) {
@@ -155,6 +190,25 @@ export async function GET(
           sancocho: status.sancocho || 0,
           terminado: status.terminado || 0
         });
+      });
+    }
+
+    // Create a map of empaque status by product ID (for this cotizacion)
+    const empaqueStatusMap = new Map();
+    if (empaqueStatusData) {
+      empaqueStatusData.forEach(empaque => {
+        empaqueStatusMap.set(empaque.producto_id, {
+          cantidad_empaque: empaque.cantidad_asignada || 0
+        });
+      });
+    }
+
+    // Create a map of total empaque allocations by product ID (across all cotizaciones)
+    const totalEmpaqueMap = new Map();
+    if (totalEmpaqueData) {
+      totalEmpaqueData.forEach(empaque => {
+        const existing = totalEmpaqueMap.get(empaque.producto_id) || 0;
+        totalEmpaqueMap.set(empaque.producto_id, existing + (empaque.cantidad_asignada || 0));
       });
     }
 
@@ -171,13 +225,28 @@ export async function GET(
       const precioUnitario = producto.precio_unitario || 0;
       const cantidad = producto.cantidad;
       const precioTotal = precioUnitario * cantidad;
+      const productoId = producto.productos.producto_id;
       
       // Get production status for this product, default to zeros if not found
-      const produccionStatus = productionStatusMap.get(producto.productos.producto_id) || {
+      const produccionStatusBase = productionStatusMap.get(productoId) || {
         por_detallar: 0,
         detallado: 0,
         sancocho: 0,
         terminado: 0
+      };
+
+      // Calculate available terminado (total terminado - already allocated to empaque)
+      const totalEmpaqueAllocated = totalEmpaqueMap.get(productoId) || 0;
+      const terminadoDisponible = Math.max(0, produccionStatusBase.terminado - totalEmpaqueAllocated);
+
+      const produccionStatus = {
+        ...produccionStatusBase,
+        terminado_disponible: terminadoDisponible
+      };
+
+      // Get empaque status for this product, default to zeros if not found
+      const empaqueStatus = empaqueStatusMap.get(productoId) || {
+        cantidad_empaque: 0
       };
 
       return {
@@ -186,7 +255,9 @@ export async function GET(
         fecha: fechaFormatted,
         precio_venta: precioUnitario,
         precio_total: precioTotal,
-        produccion_status: produccionStatus
+        producto_id: productoId,
+        produccion_status: produccionStatus,
+        empaque_status: empaqueStatus
       };
     });
 

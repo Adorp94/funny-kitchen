@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Search, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from "sonner";
+import { MoveToEmpaqueDialog } from './move-to-empaque-dialog';
+import { EmpaqueTable } from './empaque-table';
+import { useProductionSync, dispatchProductionUpdate } from '@/lib/utils/production-sync';
 
 interface ProductoConEstatus {
   nombre: string;
@@ -14,11 +17,16 @@ interface ProductoConEstatus {
   fecha: string;
   precio_venta: number;
   precio_total: number;
+  producto_id: number;
   produccion_status: {
     por_detallar: number;
     detallado: number;
     sancocho: number;
     terminado: number;
+    terminado_disponible: number;
+  };
+  empaque_status: {
+    cantidad_empaque: number;
   };
 }
 
@@ -73,8 +81,19 @@ const ClienteSummary = React.memo(({ clienteData }: { clienteData: ClienteActivo
 ClienteSummary.displayName = 'ClienteSummary';
 
 // Memoized product row component
-const ProductRow = React.memo(({ producto, index }: { producto: ProductoConEstatus; index: number }) => (
-  <TableRow className={`hover:bg-gray-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+const ProductRow = React.memo(({ 
+  producto, 
+  index, 
+  onProductClick 
+}: { 
+  producto: ProductoConEstatus; 
+  index: number;
+  onProductClick?: (producto: ProductoConEstatus) => void;
+}) => (
+  <TableRow 
+    className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+    onClick={() => onProductClick?.(producto)}
+  >
     <TableCell className="px-3 py-2">
       <span className="text-xs font-medium text-gray-900">{producto.nombre}</span>
     </TableCell>
@@ -129,9 +148,16 @@ const ProductionStatusRow = React.memo(({ producto, index }: { producto: Product
         </span>
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(producto.produccion_status.terminado)}`}>
-          {producto.produccion_status.terminado}
-        </span>
+        <div className="space-y-1">
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(producto.produccion_status.terminado)}`}>
+            {producto.produccion_status.terminado}
+          </span>
+          {producto.produccion_status.terminado_disponible < producto.produccion_status.terminado && (
+            <div className="text-xs text-green-600">
+              {producto.produccion_status.terminado_disponible} disponible
+            </div>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -145,8 +171,12 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+  
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductoConEstatus | null>(null);
 
-  const searchCotizacion = useCallback(async () => {
+  const searchCotizacion = useCallback(async (forceRefresh = false) => {
     if (!cotizacionId.trim()) {
       toast.error("Por favor ingrese un ID de cotización");
       return;
@@ -155,8 +185,8 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     const cacheKey = cotizacionId;
     const cached = clientCache.get(cacheKey);
     
-    // Check cache first
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    // Check cache first (unless forcing refresh)
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
       setClienteData(cached.data);
       setError(null);
       setHasSearched(true);
@@ -216,6 +246,45 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setError(null);
     setHasSearched(false);
   }, []);
+
+  // Handle product click to open empaque dialog
+  const handleProductClick = useCallback((producto: ProductoConEstatus) => {
+    setSelectedProduct(producto);
+    setDialogOpen(true);
+  }, []);
+
+  // Handle dialog success (refresh data)
+  const handleDialogSuccess = useCallback(() => {
+    searchCotizacion(true); // Force refresh to get updated data
+    
+    // Also dispatch update event for other sections
+    if (selectedProduct) {
+      dispatchProductionUpdate({
+        type: 'empaque_update',
+        producto_id: selectedProduct.producto_id,
+        timestamp: Date.now(),
+        source: 'clientes-activos-empaque'
+      });
+    }
+  }, [searchCotizacion, selectedProduct]);
+
+  // Listen for production updates from other sections
+  useEffect(() => {
+    const cleanup = useProductionSync((event) => {
+      // Refresh if we have data loaded - this includes updates from empaque operations
+      if (clienteData) {
+        const affectedProducts = clienteData.productos.some(p => p.producto_id === event.producto_id);
+        
+        if (affectedProducts) {
+          console.log('Auto-refreshing clientes activos due to production update:', event);
+          // Force refresh to get updated production status
+          searchCotizacion(true);
+        }
+      }
+    });
+
+    return cleanup;
+  }, [clienteData, searchCotizacion]);
 
   return (
     <div className="space-y-3">
@@ -283,58 +352,82 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
           {/* Tables Side by Side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {/* Products Table - Left */}
-            <div className="border border-gray-200 rounded-md bg-white">
+            <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
               <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
                 <h3 className="text-xs font-medium text-gray-700">Detalle de Productos</h3>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50/50 border-b border-gray-200">
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cantidad</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Fecha</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Precio</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clienteData.productos.map((producto, index) => (
-                    <ProductRow
-                      key={`${producto.nombre}-${index}`}
-                      producto={producto}
-                      index={index}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/50 border-b border-gray-200">
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cantidad</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Fecha</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Precio</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clienteData.productos.map((producto, index) => (
+                      <ProductRow
+                        key={`${producto.nombre}-${index}`}
+                        producto={producto}
+                        index={index}
+                        onProductClick={handleProductClick}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
             {/* Production Status Table - Right */}
-            <div className="border border-gray-200 rounded-md bg-white">
+            <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
               <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
                 <h3 className="text-xs font-medium text-gray-700">Estado de Producción</h3>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50/50 border-b border-gray-200">
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Por Detallar</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Detallado</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Sancocho</TableHead>
-                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Terminado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clienteData.productos.map((producto, index) => (
-                    <ProductionStatusRow
-                      key={`status-${producto.nombre}-${index}`}
-                      producto={producto}
-                      index={index}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/50 border-b border-gray-200">
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Por Detallar</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Detallado</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Sancocho</TableHead>
+                      <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Terminado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clienteData.productos.map((producto, index) => (
+                      <ProductionStatusRow
+                        key={`status-${producto.nombre}-${index}`}
+                        producto={producto}
+                        index={index}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
+          </div>
+
+          {/* Empaque Products Table - Below main tables, aligned with left table */}
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <EmpaqueTable
+              productos={clienteData.productos
+                .filter(p => p.empaque_status.cantidad_empaque > 0)
+                .map(p => ({
+                  nombre: p.nombre,
+                  cantidad: p.empaque_status.cantidad_empaque,
+                  producto_id: p.producto_id
+                }))
+              }
+              cotizacionId={clienteData.cotizacion_id}
+              isLoading={false}
+              onProductRemoved={handleDialogSuccess}
+            />
+            {/* Empty space for alignment */}
+            <div></div>
           </div>
         </div>
       )}
@@ -348,6 +441,25 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
             Ingrese el ID de una cotización para ver el detalle de productos y su estado en la línea de producción.
           </p>
         </div>
+      )}
+
+      {/* Move to Empaque Dialog */}
+      {selectedProduct && clienteData && (
+        <MoveToEmpaqueDialog
+          isOpen={dialogOpen}
+          onClose={() => {
+            setDialogOpen(false);
+            setSelectedProduct(null);
+          }}
+          producto={{
+            nombre: selectedProduct.nombre,
+            producto_id: selectedProduct.producto_id,
+            cantidad_solicitada: selectedProduct.cantidad,
+            terminado_disponible: selectedProduct.produccion_status.terminado_disponible
+          }}
+          cotizacion_id={clienteData.cotizacion_id}
+          onSuccess={handleDialogSuccess}
+        />
       )}
     </div>
   );

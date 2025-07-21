@@ -12,6 +12,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { RefreshCw, Package, TrendingUp, TrendingDown, Minus, Factory, AlertTriangle, CheckCircle, Clock, Settings, Plus, ChevronsUpDown, Check, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from "sonner";
+import { dispatchProductionUpdate } from '@/lib/utils/production-sync';
 
 interface ProductionActiveItem {
   id: number;
@@ -633,6 +634,14 @@ export const ProductionActiveListing: React.FC = React.memo(() => {
       };
       
       toast.success('Actualizado', { description: `${fieldNames[field]} actualizado correctamente` });
+      
+      // Dispatch update event for real-time sync
+      dispatchProductionUpdate({
+        type: 'production_active_update',
+        producto_id: productId,
+        timestamp: Date.now(),
+        source: 'production-active-listing'
+      });
     } catch (err: any) {
       console.error('Error updating field:', err);
       toast.error('Error al actualizar', { description: err.message });

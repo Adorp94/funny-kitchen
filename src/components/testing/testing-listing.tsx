@@ -651,7 +651,7 @@ export const TestingListing: React.FC = () => {
           </TabsTrigger>
           <TabsTrigger value="production-active" className="flex items-center gap-1 text-xs py-1">
             <Activity className="h-3 w-3" />
-            Producción Activa
+            Bitácora
           </TabsTrigger>
           <TabsTrigger value="insights" className="flex items-center gap-1 text-xs py-1">
             <BarChart3 className="h-3 w-3" />
