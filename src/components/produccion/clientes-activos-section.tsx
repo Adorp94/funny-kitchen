@@ -9,6 +9,8 @@ import { Search, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from "sonner";
 import { MoveToEmpaqueDialog } from './move-to-empaque-dialog';
 import { EmpaqueTable } from './empaque-table';
+import { EnviadosTable } from './enviados-table';
+import { MoveToEnviadosDialog } from './move-to-enviados-dialog';
 import { useProductionSync, dispatchProductionUpdate } from '@/lib/utils/production-sync';
 
 interface ProductoConEstatus {
@@ -41,6 +43,19 @@ interface ClienteActivoData {
 
 interface ClienteActivoResponse {
   data: ClienteActivoData;
+}
+
+interface EnviadosProduct {
+  nombre: string;
+  cantidad: number;
+  producto_id: number;
+  fecha_envio: string;
+}
+
+interface EnviadosResponse {
+  data: {
+    productos_enviados: EnviadosProduct[];
+  };
 }
 
 // Cache for client data
@@ -148,16 +163,9 @@ const ProductionStatusRow = React.memo(({ producto, index }: { producto: Product
         </span>
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
-        <div className="space-y-1">
-          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(producto.produccion_status.terminado)}`}>
-            {producto.produccion_status.terminado}
-          </span>
-          {producto.produccion_status.terminado_disponible < producto.produccion_status.terminado && (
-            <div className="text-xs text-green-600">
-              {producto.produccion_status.terminado_disponible} disponible
-            </div>
-          )}
-        </div>
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(producto.produccion_status.terminado)}`}>
+          {producto.produccion_status.terminado}
+        </span>
       </TableCell>
     </TableRow>
   );
@@ -172,9 +180,36 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   
+  // Enviados data
+  const [enviadosData, setEnviadosData] = useState<EnviadosProduct[]>([]);
+  
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductoConEstatus | null>(null);
+  
+  // Move to enviados dialog state
+  const [enviadosDialogOpen, setEnviadosDialogOpen] = useState<boolean>(false);
+  const [selectedEmpaqueProduct, setSelectedEmpaqueProduct] = useState<{
+    nombre: string;
+    producto_id: number;
+    cantidad_empaque: number;
+  } | null>(null);
+
+  const fetchEnviadosData = useCallback(async (cotId: string) => {
+    try {
+      const response = await fetch(`/api/production/enviados?cotizacion_id=${cotId}`);
+      if (response.ok) {
+        const result: EnviadosResponse = await response.json();
+        setEnviadosData(result.data.productos_enviados || []);
+      } else {
+        console.error("Error fetching enviados data:", response.status);
+        setEnviadosData([]);
+      }
+    } catch (error) {
+      console.error("Error in fetchEnviadosData:", error);
+      setEnviadosData([]);
+    }
+  }, []);
 
   const searchCotizacion = useCallback(async (forceRefresh = false) => {
     if (!cotizacionId.trim()) {
@@ -221,6 +256,9 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       setClienteData(result.data);
       setError(null);
       
+      // Fetch enviados data for this cotizacion
+      await fetchEnviadosData(cotizacionId);
+      
     } catch (err: any) {
       console.error("Error in searchCotizacion:", err);
       const errorMsg = err.message || "Error al buscar la cotización.";
@@ -245,6 +283,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setClienteData(null);
     setError(null);
     setHasSearched(false);
+    setEnviadosData([]);
   }, []);
 
   // Handle product click to open empaque dialog
@@ -267,6 +306,31 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       });
     }
   }, [searchCotizacion, selectedProduct]);
+
+  // Handle empaque product click to move to enviados
+  const handleEmpaqueProductClick = useCallback((producto: any) => {
+    setSelectedEmpaqueProduct({
+      nombre: producto.nombre,
+      producto_id: producto.producto_id || 0,
+      cantidad_empaque: producto.cantidad
+    });
+    setEnviadosDialogOpen(true);
+  }, []);
+
+  // Handle enviados dialog success
+  const handleEnviadosDialogSuccess = useCallback(() => {
+    searchCotizacion(true); // Force refresh to get updated data
+    
+    // Dispatch update event for other sections
+    if (selectedEmpaqueProduct) {
+      dispatchProductionUpdate({
+        type: 'enviados_update',
+        producto_id: selectedEmpaqueProduct.producto_id,
+        timestamp: Date.now(),
+        source: 'clientes-activos-enviados'
+      });
+    }
+  }, [searchCotizacion, selectedEmpaqueProduct]);
 
   // Listen for production updates from other sections
   useEffect(() => {
@@ -411,7 +475,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
             </div>
           </div>
 
-          {/* Empaque Products Table - Below main tables, aligned with left table */}
+          {/* Empaque and Entregados Tables - Below main tables, side by side */}
           <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
             <EmpaqueTable
               productos={clienteData.productos
@@ -425,9 +489,12 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
               cotizacionId={clienteData.cotizacion_id}
               isLoading={false}
               onProductRemoved={handleDialogSuccess}
+              onProductMoved={handleEmpaqueProductClick}
             />
-            {/* Empty space for alignment */}
-            <div></div>
+            <EnviadosTable
+              productos={enviadosData}
+              isLoading={false}
+            />
           </div>
         </div>
       )}
@@ -459,6 +526,24 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
           }}
           cotizacion_id={clienteData.cotizacion_id}
           onSuccess={handleDialogSuccess}
+        />
+      )}
+
+      {/* Move to Enviados Dialog */}
+      {selectedEmpaqueProduct && clienteData && (
+        <MoveToEnviadosDialog
+          isOpen={enviadosDialogOpen}
+          onClose={() => {
+            setEnviadosDialogOpen(false);
+            setSelectedEmpaqueProduct(null);
+          }}
+          producto={{
+            nombre: selectedEmpaqueProduct.nombre,
+            producto_id: selectedEmpaqueProduct.producto_id,
+            cantidad_empaque: selectedEmpaqueProduct.cantidad_empaque
+          }}
+          cotizacion_id={clienteData.cotizacion_id}
+          onSuccess={handleEnviadosDialogSuccess}
         />
       )}
     </div>

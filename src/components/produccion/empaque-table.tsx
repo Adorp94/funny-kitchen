@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Truck } from 'lucide-react';
 import { toast } from "sonner";
 import { dispatchProductionUpdate } from '@/lib/utils/production-sync';
 
@@ -19,6 +19,7 @@ interface EmpaqueTableProps {
   cotizacionId?: number;
   isLoading?: boolean;
   onProductRemoved?: () => void;
+  onProductMoved?: (producto: EmpaqueProduct) => void;
 }
 
 // Memoized empaque product row component
@@ -27,12 +28,14 @@ const EmpaqueProductRow = React.memo(({
   index, 
   cotizacionId, 
   onRemove, 
+  onMove,
   isRemoving 
 }: { 
   producto: EmpaqueProduct; 
   index: number;
   cotizacionId?: number;
   onRemove?: (producto: EmpaqueProduct) => void;
+  onMove?: (producto: EmpaqueProduct) => void;
   isRemoving?: boolean;
 }) => (
   <TableRow className={`hover:bg-gray-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
@@ -44,18 +47,34 @@ const EmpaqueProductRow = React.memo(({
         {producto.cantidad}
       </Badge>
     </TableCell>
-    {cotizacionId && onRemove && (
+    {cotizacionId && (onRemove || onMove) && (
       <TableCell className="px-3 py-2 text-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-          onClick={() => onRemove(producto)}
-          disabled={isRemoving}
-          title="Devolver a terminado"
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        <div className="flex items-center justify-center gap-1">
+          {onMove && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+              onClick={() => onMove(producto)}
+              disabled={isRemoving}
+              title="Marcar como entregado"
+            >
+              <Truck className="h-3 w-3" />
+            </Button>
+          )}
+          {onRemove && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+              onClick={() => onRemove(producto)}
+              disabled={isRemoving}
+              title="Devolver a terminado"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </TableCell>
     )}
   </TableRow>
@@ -67,7 +86,8 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
   productos, 
   cotizacionId, 
   isLoading = false, 
-  onProductRemoved 
+  onProductRemoved,
+  onProductMoved
 }) => {
   const [removingProducts, setRemovingProducts] = useState<Set<string>>(new Set());
 
@@ -133,6 +153,7 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
   }
 
   const canRemove = cotizacionId && onProductRemoved;
+  const canMove = cotizacionId && onProductMoved;
 
   return (
     <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
@@ -158,7 +179,7 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
               <TableRow className="bg-gray-50/50 border-b border-gray-200">
                 <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
                 <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cantidad</TableHead>
-                {canRemove && (
+                {(canRemove || canMove) && (
                   <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Acciones</TableHead>
                 )}
               </TableRow>
@@ -175,6 +196,7 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
                     index={index}
                     cotizacionId={cotizacionId}
                     onRemove={canRemove ? handleRemoveProduct : undefined}
+                    onMove={canMove ? onProductMoved : undefined}
                     isRemoving={isRemoving}
                   />
                 );

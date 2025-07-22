@@ -445,6 +445,99 @@ export class ProductionPlannerService {
     }
 
 
+    /**
+     * Adds an item to the production queue AND production_active table.
+     * This is the missing method that connects cotizaciones to production tracking.
+     */
+    async addItemToQueue(
+        cotizacionProductoId: number,
+        productId: number,
+        quantity: number,
+        isPremium: boolean
+    ): Promise<number | null> {
+        console.log(`[addItemToQueue] Adding cotizacion_producto_id: ${cotizacionProductoId}, product: ${productId}, qty: ${quantity}, premium: ${isPremium}`);
+
+        try {
+            // 1. Add item to production_queue
+            const initialAssignedMolds = 1; // Default for new items
+            const vaciadoDuration = this._calculateVaciadoDurationDays(quantity, initialAssignedMolds);
+
+            const { data: newQueueItem, error: queueInsertError } = await this.supabase
+                .from('production_queue')
+                .insert({
+                    cotizacion_producto_id: cotizacionProductoId,
+                    producto_id: productId,
+                    qty_total: quantity,
+                    qty_pendiente: quantity,
+                    premium: isPremium,
+                    status: 'queued',
+                    assigned_molds: initialAssignedMolds,
+                    vaciado_duration_days: vaciadoDuration,
+                })
+                .select()
+                .single();
+
+            if (queueInsertError || !newQueueItem) {
+                console.error('Error inserting item into production_queue:', queueInsertError);
+                return null;
+            }
+
+            console.log(`[addItemToQueue] Added to production_queue with ID: ${newQueueItem.queue_id}`);
+
+            // 2. CRITICAL: Also add to production_active table so it appears in Bitácora
+            // First check if product already exists
+            const { data: existingActive, error: checkError } = await this.supabase
+                .from('production_active')
+                .select('pedidos')
+                .eq('producto_id', productId)
+                .single();
+
+            let activeInsertError;
+            if (checkError && checkError.code === 'PGRST116') {
+                // Product doesn't exist, create new
+                const { error } = await this.supabase
+                    .from('production_active')
+                    .insert({
+                        producto_id: productId,
+                        pedidos: quantity,
+                        por_detallar: 0,
+                        detallado: 0,  
+                        sancocho: 0,
+                        terminado: 0,
+                        updated_at: new Date().toISOString()
+                    });
+                activeInsertError = error;
+                console.log(`[addItemToQueue] Created new production_active entry for product ${productId} with ${quantity} pedidos`);
+            } else if (!checkError && existingActive) {
+                // Product exists, add to existing pedidos
+                const newPedidos = existingActive.pedidos + quantity;
+                const { error } = await this.supabase
+                    .from('production_active')
+                    .update({
+                        pedidos: newPedidos,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('producto_id', productId);
+                activeInsertError = error;
+                console.log(`[addItemToQueue] Updated production_active for product ${productId}: ${existingActive.pedidos} + ${quantity} = ${newPedidos} pedidos`);
+            } else {
+                activeInsertError = checkError;
+            }
+
+            if (activeInsertError) {
+                console.error('Error updating production_active:', activeInsertError);
+                // If production_active insertion fails, we could optionally rollback the queue insertion
+                // For now, just log the error and continue
+            }
+
+            return newQueueItem.queue_id;
+
+        } catch (error) {
+            console.error('Error in addItemToQueue:', error);
+            return null;
+        }
+    }
+
     async addToQueueAndCalculateDates(
         cotizacionProductoId: number,
         productId: number,
