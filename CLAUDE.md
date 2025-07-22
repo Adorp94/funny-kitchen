@@ -47,9 +47,12 @@ Key tables include:
 - `cotizaciones` - Quotations with pricing and status
 - `clientes` - Customer information
 - `productos` - Product catalog with SKUs and inventory
-- `prodsxcotizacion` - Products linked to quotations
+- `cotizacion_productos` - Products linked to quotations
 - `moldes_activos` - Active molds for production
 - `mesas_moldes` - Production workstations
+- `production_queue` - Production scheduling and planning
+- `production_active` - Real-time production tracking
+- `production_allocations` - Product allocation for packaging and delivery
 
 ### Development Patterns
 
