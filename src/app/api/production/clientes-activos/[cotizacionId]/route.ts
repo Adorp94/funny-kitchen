@@ -20,6 +20,12 @@ type ProductoConEstatus = {
   empaque_status: {
     cantidad_empaque: number;
   };
+  allocation_status: {
+    cantidad_cotizacion: number;
+    total_asignado: number;
+    cantidad_disponible: number;
+    limite_alcanzado: boolean;
+  };
 };
 
 type ClienteActivoData = {
@@ -165,6 +171,18 @@ export async function GET(
       // Continue without empaque status rather than failing
     }
 
+    // Get allocation status for all products to track limits and prevent infinite loops
+    const { data: allocationStatusData, error: allocationStatusError } = await supabase
+      .from('allocation_status')
+      .select('*')
+      .eq('cotizacion_id', parseInt(cotizacionId))
+      .in('producto_id', productIds);
+
+    if (allocationStatusError) {
+      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch allocation status:", allocationStatusError);
+      // Continue without allocation status data
+    }
+
     // Get total empaque allocations for all products to calculate available terminado
     const { data: totalEmpaqueData, error: totalEmpaqueError } = await supabase
       .from('production_allocations')
@@ -199,6 +217,19 @@ export async function GET(
       empaqueStatusData.forEach(empaque => {
         empaqueStatusMap.set(empaque.producto_id, {
           cantidad_empaque: empaque.cantidad_asignada || 0
+        });
+      });
+    }
+
+    // Create a map of allocation status by product ID
+    const allocationStatusMap = new Map();
+    if (allocationStatusData) {
+      allocationStatusData.forEach(status => {
+        allocationStatusMap.set(status.producto_id, {
+          cantidad_cotizacion: status.cantidad_cotizacion || 0,
+          total_asignado: status.total_asignado || 0,
+          cantidad_disponible: status.cantidad_disponible || 0,
+          limite_alcanzado: status.limite_alcanzado || false
         });
       });
     }
@@ -249,6 +280,14 @@ export async function GET(
         cantidad_empaque: 0
       };
 
+      // Get allocation status for this product, default to safe values if not found
+      const allocationStatus = allocationStatusMap.get(productoId) || {
+        cantidad_cotizacion: cantidad,
+        total_asignado: 0,
+        cantidad_disponible: cantidad,
+        limite_alcanzado: false
+      };
+
       return {
         nombre: producto.productos.nombre,
         cantidad: cantidad,
@@ -257,7 +296,8 @@ export async function GET(
         precio_total: precioTotal,
         producto_id: productoId,
         produccion_status: produccionStatus,
-        empaque_status: empaqueStatus
+        empaque_status: empaqueStatus,
+        allocation_status: allocationStatus
       };
     });
 

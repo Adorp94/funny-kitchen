@@ -30,6 +30,12 @@ interface ProductoConEstatus {
   empaque_status: {
     cantidad_empaque: number;
   };
+  allocation_status: {
+    cantidad_cotizacion: number;
+    total_asignado: number;
+    cantidad_disponible: number;
+    limite_alcanzado: boolean;
+  };
 }
 
 interface ClienteActivoData {
@@ -104,34 +110,58 @@ const ProductRow = React.memo(({
   producto: ProductoConEstatus; 
   index: number;
   onProductClick?: (producto: ProductoConEstatus) => void;
-}) => (
-  <TableRow 
-    className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
-    onClick={() => onProductClick?.(producto)}
-  >
-    <TableCell className="px-3 py-2">
-      <span className="text-xs font-medium text-gray-900">{producto.nombre}</span>
-    </TableCell>
-    <TableCell className="px-3 py-2 text-center">
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-        {producto.cantidad}
-      </span>
-    </TableCell>
-    <TableCell className="px-3 py-2 text-center">
-      <span className="text-xs text-gray-600">{producto.fecha}</span>
-    </TableCell>
-    <TableCell className="px-3 py-2 text-right">
-      <span className="text-xs font-medium text-gray-900">
-        ${producto.precio_venta.toLocaleString()}
-      </span>
-    </TableCell>
-    <TableCell className="px-3 py-2 text-right">
-      <span className="text-xs font-medium text-green-700">
-        ${producto.precio_total.toLocaleString()}
-      </span>
-    </TableCell>
-  </TableRow>
-));
+}) => {
+  const canClickToEmpaque = !producto.allocation_status.limite_alcanzado && 
+                           producto.produccion_status.terminado_disponible > 0;
+  
+  return (
+    <TableRow 
+      className={`${canClickToEmpaque ? 'hover:bg-blue-50/50 cursor-pointer' : 'cursor-not-allowed opacity-60'} transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+      onClick={() => canClickToEmpaque && onProductClick?.(producto)}
+      title={!canClickToEmpaque ? 
+        (producto.allocation_status.limite_alcanzado ? 
+         `Límite alcanzado: ${producto.allocation_status.total_asignado}/${producto.allocation_status.cantidad_cotizacion} asignados` :
+         'Sin productos terminados disponibles'
+        ) : 'Click para mover a empaque'}
+    >
+      <TableCell className="px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-900">{producto.nombre}</span>
+          {producto.allocation_status.limite_alcanzado && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+              Límite
+            </span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="px-3 py-2 text-center">
+        <div className="space-y-1">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+            {producto.cantidad}
+          </span>
+          {producto.allocation_status.total_asignado > 0 && (
+            <div className="text-xs text-gray-500">
+              {producto.allocation_status.total_asignado}/{producto.allocation_status.cantidad_cotizacion} asignados
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="px-3 py-2 text-center">
+        <span className="text-xs text-gray-600">{producto.fecha}</span>
+      </TableCell>
+      <TableCell className="px-3 py-2 text-right">
+        <span className="text-xs font-medium text-gray-900">
+          ${producto.precio_venta.toLocaleString()}
+        </span>
+      </TableCell>
+      <TableCell className="px-3 py-2 text-right">
+        <span className="text-xs font-medium text-green-700">
+          ${producto.precio_total.toLocaleString()}
+        </span>
+      </TableCell>
+    </TableRow>
+  );
+});
 
 ProductRow.displayName = 'ProductRow';
 
@@ -183,6 +213,13 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
   // Enviados data
   const [enviadosData, setEnviadosData] = useState<EnviadosProduct[]>([]);
   
+  // Empaque data
+  const [empaqueData, setEmpaqueData] = useState<{
+    cajas_chicas: number;
+    cajas_grandes: number;
+    comentarios: string | null;
+  } | null>(null);
+  
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductoConEstatus | null>(null);
@@ -208,6 +245,28 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     } catch (error) {
       console.error("Error in fetchEnviadosData:", error);
       setEnviadosData([]);
+    }
+  }, []);
+
+  const fetchEmpaqueData = useCallback(async (cotId: string) => {
+    try {
+      const response = await fetch(`/api/production/empaque?cotizacion_id=${cotId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setEmpaqueData({
+            cajas_chicas: result.data.cajas_chicas || 0,
+            cajas_grandes: result.data.cajas_grandes || 0,
+            comentarios: result.data.comentarios || null
+          });
+        }
+      } else {
+        console.error("Error fetching empaque data:", response.status);
+        setEmpaqueData({ cajas_chicas: 0, cajas_grandes: 0, comentarios: null });
+      }
+    } catch (error) {
+      console.error("Error in fetchEmpaqueData:", error);
+      setEmpaqueData({ cajas_chicas: 0, cajas_grandes: 0, comentarios: null });
     }
   }, []);
 
@@ -259,6 +318,9 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       // Fetch enviados data for this cotizacion
       await fetchEnviadosData(cotizacionId);
       
+      // Fetch empaque data for this cotizacion
+      await fetchEmpaqueData(cotizacionId);
+      
     } catch (err: any) {
       console.error("Error in searchCotizacion:", err);
       const errorMsg = err.message || "Error al buscar la cotización.";
@@ -284,6 +346,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setError(null);
     setHasSearched(false);
     setEnviadosData([]);
+    setEmpaqueData(null);
   }, []);
 
   // Handle product click to open empaque dialog
@@ -331,6 +394,13 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       });
     }
   }, [searchCotizacion, selectedEmpaqueProduct]);
+
+  // Handle empaque data update
+  const handleEmpaqueDataUpdated = useCallback(() => {
+    if (cotizacionId) {
+      fetchEmpaqueData(cotizacionId); // Refresh empaque data
+    }
+  }, [cotizacionId, fetchEmpaqueData]);
 
   // Listen for production updates from other sections
   useEffect(() => {
@@ -490,6 +560,8 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
               isLoading={false}
               onProductRemoved={handleDialogSuccess}
               onProductMoved={handleEmpaqueProductClick}
+              empaqueData={empaqueData}
+              onEmpaqueDataUpdated={handleEmpaqueDataUpdated}
             />
             <EnviadosTable
               productos={enviadosData}
@@ -522,7 +594,8 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
             nombre: selectedProduct.nombre,
             producto_id: selectedProduct.producto_id,
             cantidad_solicitada: selectedProduct.cantidad,
-            terminado_disponible: selectedProduct.produccion_status.terminado_disponible
+            terminado_disponible: selectedProduct.produccion_status.terminado_disponible,
+            allocation_status: selectedProduct.allocation_status
           }}
           cotizacion_id={clienteData.cotizacion_id}
           onSuccess={handleDialogSuccess}

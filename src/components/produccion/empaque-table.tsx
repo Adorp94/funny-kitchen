@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2, Truck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Trash2, Truck, Save, Package } from 'lucide-react';
 import { toast } from "sonner";
 import { dispatchProductionUpdate } from '@/lib/utils/production-sync';
 
@@ -14,12 +16,20 @@ interface EmpaqueProduct {
   producto_id?: number;
 }
 
+interface EmpaqueData {
+  cajas_chicas: number;
+  cajas_grandes: number;
+  comentarios: string | null;
+}
+
 interface EmpaqueTableProps {
   productos: EmpaqueProduct[];
   cotizacionId?: number;
   isLoading?: boolean;
   onProductRemoved?: () => void;
   onProductMoved?: (producto: EmpaqueProduct) => void;
+  empaqueData?: EmpaqueData;
+  onEmpaqueDataUpdated?: () => void;
 }
 
 // Memoized empaque product row component
@@ -87,9 +97,90 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
   cotizacionId, 
   isLoading = false, 
   onProductRemoved,
-  onProductMoved
+  onProductMoved,
+  empaqueData,
+  onEmpaqueDataUpdated
 }) => {
   const [removingProducts, setRemovingProducts] = useState<Set<string>>(new Set());
+  
+  // State for box counts and comments - using strings to handle empty values properly
+  const [cajasChicas, setCajasChicas] = useState<string>('');
+  const [cajasGrandes, setCajasGrandes] = useState<string>('');
+  const [comentarios, setComentarios] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [hasChanges, setHasChanges] = useState<boolean>(false);
+
+  // Update local state when empaqueData changes
+  useEffect(() => {
+    if (empaqueData) {
+      // Only show values if they're greater than 0, otherwise keep empty for placeholder
+      setCajasChicas(empaqueData.cajas_chicas && empaqueData.cajas_chicas > 0 ? String(empaqueData.cajas_chicas) : '');
+      setCajasGrandes(empaqueData.cajas_grandes && empaqueData.cajas_grandes > 0 ? String(empaqueData.cajas_grandes) : '');
+      setComentarios(empaqueData.comentarios || '');
+      setHasChanges(false);
+    }
+  }, [empaqueData]);
+
+  // Track changes
+  useEffect(() => {
+    if (empaqueData) {
+      // Convert current string values to numbers for comparison
+      const currentCajasChicas = cajasChicas === '' ? 0 : parseInt(cajasChicas) || 0;
+      const currentCajasGrandes = cajasGrandes === '' ? 0 : parseInt(cajasGrandes) || 0;
+      
+      const hasChanged = 
+        currentCajasChicas !== (empaqueData.cajas_chicas || 0) ||
+        currentCajasGrandes !== (empaqueData.cajas_grandes || 0) ||
+        comentarios !== (empaqueData.comentarios || '');
+      setHasChanges(hasChanged);
+    }
+  }, [cajasChicas, cajasGrandes, comentarios, empaqueData]);
+
+  const handleSaveEmpaqueData = async () => {
+    if (!cotizacionId) {
+      toast.error('Error', { description: 'ID de cotización no disponible' });
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch('/api/production/empaque', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cotizacion_id: cotizacionId,
+          cajas_chicas: cajasChicas === '' ? 0 : parseInt(cajasChicas) || 0,
+          cajas_grandes: cajasGrandes === '' ? 0 : parseInt(cajasGrandes) || 0,
+          comentarios_empaque: comentarios.trim() || null
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar información de empaque');
+      }
+
+      const result = await response.json();
+      
+      toast.success('Información guardada', {
+        description: 'Los datos de empaque se actualizaron exitosamente'
+      });
+
+      setHasChanges(false);
+      onEmpaqueDataUpdated?.();
+
+    } catch (error: any) {
+      console.error('Error saving empaque data:', error);
+      toast.error('Error al guardar', {
+        description: error.message
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleRemoveProduct = async (producto: EmpaqueProduct) => {
     if (!cotizacionId || !producto.producto_id) {
@@ -167,6 +258,89 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
           )}
         </div>
       </div>
+
+      {/* Box Counts and Comments Section */}
+      {productos.length > 0 && cotizacionId && (
+        <div className="px-3 py-3 border-b border-gray-200 bg-gray-50/25">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-700">
+              <Package className="h-3.5 w-3.5" />
+              Información de Empaque
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Cajas Chicas</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={cajasChicas}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string or valid numbers
+                    if (value === '' || (!isNaN(parseInt(value)) && parseInt(value) >= 0)) {
+                      setCajasChicas(value);
+                    }
+                  }}
+                  className="h-7 text-xs"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Cajas Grandes</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={cajasGrandes}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string or valid numbers
+                    if (value === '' || (!isNaN(parseInt(value)) && parseInt(value) >= 0)) {
+                      setCajasGrandes(value);
+                    }
+                  }}
+                  className="h-7 text-xs"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">Comentarios</label>
+              <Textarea
+                value={comentarios}
+                onChange={(e) => setComentarios(e.target.value)}
+                className="text-xs resize-none"
+                rows={2}
+                placeholder="Comentarios adicionales sobre el empaque..."
+              />
+            </div>
+            
+            {hasChanges && (
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleSaveEmpaqueData}
+                  disabled={isSaving}
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin mr-1.5 h-3 w-3 border border-white border-t-transparent rounded-full"></div>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3 w-3 mr-1.5" />
+                      Guardar Cambios
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {productos.length === 0 ? (
         <div className="px-4 py-6 text-center text-gray-500">

@@ -61,19 +61,27 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check if cotizacion exists and has this product
-    const { data: cotizacionProduct, error: cotizacionError } = await supabase
-      .from('cotizacion_productos')
-      .select('cantidad')
+    // Check allocation limits to prevent infinite product loops
+    const { data: allocationStatus, error: allocationError } = await supabase
+      .from('allocation_status')
+      .select('*')
       .eq('cotizacion_id', cotizacion_id)
       .eq('producto_id', producto_id)
       .single();
 
-    if (cotizacionError) {
-      console.error("[API /production/empaque POST] Error validating cotizacion:", cotizacionError);
+    if (allocationError) {
+      console.error("[API /production/empaque POST] Error checking allocation status:", allocationError);
       return NextResponse.json({ 
-        error: 'Error al validar cotización',
-        details: 'La cotización no tiene este producto asociado'
+        error: 'Error al verificar límites de asignación',
+        details: 'No se pudo validar la cotización y producto'
+      }, { status: 400 });
+    }
+
+    // Check if adding this quantity would exceed the cotización limit
+    if (allocationStatus.cantidad_disponible < cantidad) {
+      return NextResponse.json({ 
+        error: 'Límite de asignación excedido',
+        details: `Solo quedan ${allocationStatus.cantidad_disponible} productos disponibles para asignar de los ${allocationStatus.cantidad_cotizacion} originalmente ordenados. Ya se han asignado ${allocationStatus.total_asignado} productos.`
       }, { status: 400 });
     }
 
@@ -221,6 +229,9 @@ export async function GET(request: NextRequest) {
         cantidad_asignada,
         fecha_asignacion,
         notas,
+        cajas_chicas,
+        cajas_grandes,
+        comentarios_empaque,
         productos!inner (
           nombre
         )
@@ -244,8 +255,16 @@ export async function GET(request: NextRequest) {
         month: '2-digit',
         year: '2-digit'
       }),
-      notas: item.notas
+      notas: item.notas,
+      cajas_chicas: item.cajas_chicas || 0,
+      cajas_grandes: item.cajas_grandes || 0,
+      comentarios_empaque: item.comentarios_empaque
     })) || [];
+
+    // Aggregate box counts and comments for the cotización
+    const totalCajasChicas = empaqueData?.reduce((sum, item) => sum + (item.cajas_chicas || 0), 0) || 0;
+    const totalCajasGrandes = empaqueData?.reduce((sum, item) => sum + (item.cajas_grandes || 0), 0) || 0;
+    const comentarios = empaqueData?.find(item => item.comentarios_empaque)?.comentarios_empaque;
 
     console.log("[API /production/empaque GET] Found empaque products:", productos.length);
 
@@ -255,7 +274,10 @@ export async function GET(request: NextRequest) {
         cotizacion_id: parseInt(cotizacionId),
         productos_empaque: productos,
         total_productos: productos.length,
-        total_cantidad: productos.reduce((sum, p) => sum + p.cantidad, 0)
+        total_cantidad: productos.reduce((sum, p) => sum + p.cantidad, 0),
+        cajas_chicas: totalCajasChicas,
+        cajas_grandes: totalCajasGrandes,
+        comentarios: comentarios
       }
     });
 
@@ -399,6 +421,131 @@ export async function DELETE(request: NextRequest) {
 
   } catch (error) {
     console.error('[API /production/empaque DELETE] Unexpected error:', error);
+    return NextResponse.json({ 
+      error: 'Error interno del servidor', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  console.log("[API /production/empaque PATCH] === STARTING REQUEST ===");
+  
+  try {
+    const body = await request.json();
+    const { cotizacion_id, cajas_chicas, cajas_grandes, comentarios_empaque } = body;
+
+    console.log("[API /production/empaque PATCH] Request data:", { 
+      cotizacion_id, 
+      cajas_chicas, 
+      cajas_grandes, 
+      comentarios_empaque 
+    });
+
+    // Validate request data
+    if (!cotizacion_id) {
+      return NextResponse.json({ 
+        error: 'Datos inválidos',
+        details: 'cotizacion_id es requerido'
+      }, { status: 400 });
+    }
+
+    if (cajas_chicas !== undefined && (cajas_chicas < 0 || !Number.isInteger(cajas_chicas))) {
+      return NextResponse.json({ 
+        error: 'Datos inválidos',
+        details: 'cajas_chicas debe ser un número entero no negativo'
+      }, { status: 400 });
+    }
+
+    if (cajas_grandes !== undefined && (cajas_grandes < 0 || !Number.isInteger(cajas_grandes))) {
+      return NextResponse.json({ 
+        error: 'Datos inválidos',
+        details: 'cajas_grandes debe ser un número entero no negativo'
+      }, { status: 400 });
+    }
+
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get: (name: string) => cookieStore.get(name)?.value,
+          set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
+          remove: (name: string, options: any) => cookieStore.remove(name, options),
+        },
+      }
+    );
+
+    // Check if there are empaque allocations for this cotización
+    const { data: existingAllocations, error: checkError } = await supabase
+      .from('production_allocations')
+      .select('id')
+      .eq('cotizacion_id', cotizacion_id)
+      .eq('stage', 'empaque');
+
+    if (checkError) {
+      console.error("[API /production/empaque PATCH] Error checking allocations:", checkError);
+      return NextResponse.json({ 
+        error: 'Error al verificar asignaciones existentes',
+        details: checkError.message 
+      }, { status: 500 });
+    }
+
+    if (!existingAllocations || existingAllocations.length === 0) {
+      return NextResponse.json({ 
+        error: 'No hay productos en empaque',
+        details: 'No se encontraron productos en empaque para esta cotización'
+      }, { status: 404 });
+    }
+
+    // Build update object
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (cajas_chicas !== undefined) {
+      updateData.cajas_chicas = cajas_chicas;
+    }
+    
+    if (cajas_grandes !== undefined) {
+      updateData.cajas_grandes = cajas_grandes;
+    }
+    
+    if (comentarios_empaque !== undefined) {
+      updateData.comentarios_empaque = comentarios_empaque || null;
+    }
+
+    // Update all empaque allocations for this cotización
+    const { error: updateError } = await supabase
+      .from('production_allocations')
+      .update(updateData)
+      .eq('cotizacion_id', cotizacion_id)
+      .eq('stage', 'empaque');
+
+    if (updateError) {
+      console.error("[API /production/empaque PATCH] Error updating allocations:", updateError);
+      return NextResponse.json({ 
+        error: 'Error al actualizar información de empaque',
+        details: updateError.message 
+      }, { status: 500 });
+    }
+
+    console.log("[API /production/empaque PATCH] Successfully updated empaque info");
+
+    return NextResponse.json({
+      success: true,
+      message: 'Información de empaque actualizada exitosamente',
+      data: {
+        cotizacion_id,
+        cajas_chicas: cajas_chicas !== undefined ? cajas_chicas : null,
+        cajas_grandes: cajas_grandes !== undefined ? cajas_grandes : null,
+        comentarios_empaque: comentarios_empaque !== undefined ? comentarios_empaque : null
+      }
+    });
+
+  } catch (error) {
+    console.error('[API /production/empaque PATCH] Unexpected error:', error);
     return NextResponse.json({ 
       error: 'Error interno del servidor', 
       details: error instanceof Error ? error.message : 'Unknown error' 

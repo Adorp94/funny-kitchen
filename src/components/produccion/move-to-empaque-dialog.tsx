@@ -26,6 +26,12 @@ interface MoveToEmpaqueDialogProps {
     producto_id: number;
     cantidad_solicitada: number;
     terminado_disponible: number;
+    allocation_status?: {
+      cantidad_cotizacion: number;
+      total_asignado: number;
+      cantidad_disponible: number;
+      limite_alcanzado: boolean;
+    };
   };
   cotizacion_id: number;
   onSuccess: () => void;
@@ -117,7 +123,11 @@ export const MoveToEmpaqueDialog: React.FC<MoveToEmpaqueDialogProps> = ({
     }
   };
 
-  const maxCantidad = Math.min(producto.terminado_disponible, producto.cantidad_solicitada);
+  // Calculate maximum available considering allocation limits
+  const maxCantidadSinLimite = Math.min(producto.terminado_disponible, producto.cantidad_solicitada);
+  const maxCantidad = producto.allocation_status 
+    ? Math.min(maxCantidadSinLimite, producto.allocation_status.cantidad_disponible)
+    : maxCantidadSinLimite;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -158,6 +168,26 @@ export const MoveToEmpaqueDialog: React.FC<MoveToEmpaqueDialogProps> = ({
                 </Badge>
               </div>
             </div>
+
+            {/* Allocation Status */}
+            {producto.allocation_status && (
+              <div className="mt-3 pt-2 border-t border-gray-200">
+                <div className="text-xs text-gray-600 mb-1">Estado de Asignación</div>
+                <div className="flex items-center justify-between text-xs">
+                  <span>Asignados: {producto.allocation_status.total_asignado}/{producto.allocation_status.cantidad_cotizacion}</span>
+                  <span className={`font-medium ${producto.allocation_status.cantidad_disponible > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    Disponibles: {producto.allocation_status.cantidad_disponible}
+                  </span>
+                </div>
+                {producto.allocation_status.limite_alcanzado && (
+                  <div className="mt-1">
+                    <Badge variant="destructive" className="text-xs">
+                      Límite Alcanzado
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Quantity Input */}
