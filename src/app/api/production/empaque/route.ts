@@ -61,27 +61,46 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Check allocation limits to prevent infinite product loops
-    const { data: allocationStatus, error: allocationError } = await supabase
-      .from('allocation_status')
-      .select('*')
+    // Check allocation limits by calculating from existing data
+    // Get the original quantity ordered in the cotización
+    const { data: cotizacionProducto, error: cotizacionError } = await supabase
+      .from('cotizacion_productos')
+      .select('cantidad')
       .eq('cotizacion_id', cotizacion_id)
       .eq('producto_id', producto_id)
       .single();
 
-    if (allocationError) {
-      console.error("[API /production/empaque POST] Error checking allocation status:", allocationError);
+    if (cotizacionError) {
+      console.error("[API /production/empaque POST] Error fetching cotización producto:", cotizacionError);
       return NextResponse.json({ 
         error: 'Error al verificar límites de asignación',
         details: 'No se pudo validar la cotización y producto'
       }, { status: 400 });
     }
 
+    // Get total already allocated to all stages for this product and cotización
+    const { data: existingAllocations, error: allocationsError } = await supabase
+      .from('production_allocations')
+      .select('cantidad_asignada')
+      .eq('cotizacion_id', cotizacion_id)
+      .eq('producto_id', producto_id);
+
+    if (allocationsError) {
+      console.error("[API /production/empaque POST] Error fetching existing allocations:", allocationsError);
+      return NextResponse.json({ 
+        error: 'Error al verificar asignaciones existentes',
+        details: allocationsError.message
+      }, { status: 500 });
+    }
+
+    const totalAllocated = existingAllocations?.reduce((sum, alloc) => sum + alloc.cantidad_asignada, 0) || 0;
+    const cantidadDisponible = cotizacionProducto.cantidad - totalAllocated;
+
     // Check if adding this quantity would exceed the cotización limit
-    if (allocationStatus.cantidad_disponible < cantidad) {
+    if (cantidadDisponible < cantidad) {
       return NextResponse.json({ 
         error: 'Límite de asignación excedido',
-        details: `Solo quedan ${allocationStatus.cantidad_disponible} productos disponibles para asignar de los ${allocationStatus.cantidad_cotizacion} originalmente ordenados. Ya se han asignado ${allocationStatus.total_asignado} productos.`
+        details: `Solo quedan ${cantidadDisponible} productos disponibles para asignar de los ${cotizacionProducto.cantidad} originalmente ordenados. Ya se han asignado ${totalAllocated} productos.`
       }, { status: 400 });
     }
 

@@ -77,8 +77,8 @@ export async function POST(
 
     // Validate payment data if provided and status is producción
     if (newStatus === 'producción' && paymentData) {
-      if (!paymentData.monto || typeof paymentData.monto !== 'number' || paymentData.monto <= 0) {
-        return NextResponse.json({ error: 'El monto del pago debe ser mayor a 0' }, { status: 400 });
+      if (typeof paymentData.monto !== 'number' || paymentData.monto < 0) {
+        return NextResponse.json({ error: 'El monto del pago debe ser mayor o igual a 0' }, { status: 400 });
       }
       if (!paymentData.metodo_pago || typeof paymentData.metodo_pago !== 'string') {
         return NextResponse.json({ error: 'El método de pago es requerido' }, { status: 400 });
@@ -304,8 +304,8 @@ export async function POST(
           else console.log('[API /cotizaciones/[id]/status POST] History recorded (without user ID)');
       } catch (historyErr) { console.error('[API /cotizaciones/[id]/status POST] Failed to record history:', historyErr); }
 
-      // 6. Record Payment (if provided)
-      if (paymentData) {
+      // 6. Record Payment (if provided and amount > 0)
+      if (paymentData && paymentData.monto > 0) {
           try {
             const tipoCambio = existingCotizacion.tipo_cambio || 1;
             const moneda = existingCotizacion.moneda || 'MXN';
@@ -371,7 +371,11 @@ export async function POST(
       }
 
       // 8. Return Success Response
-      const successMessage = `Estado actualizado a "${newStatus}". ${planningWarnings.length > 0 ? 'Planning Warnings: ' + planningWarnings.join('; ') : ''}`;
+      const successMessage = `Estado actualizado a "${newStatus}".`;
+      // Log planning warnings to console for debugging (don't show to user)
+      if (planningWarnings.length > 0) {
+        console.warn(`[API /cotizaciones/[id]/status POST] Planning warnings for cotizacion ${cotizacionId}:`, planningWarnings.join('; '));
+      }
       console.log(`[API /cotizaciones/[id]/status POST] Action finished successfully for cotizacion ${cotizacionId}. ETA: ${finalDeliveryDateStr}`);
       return NextResponse.json({ 
         success: true,

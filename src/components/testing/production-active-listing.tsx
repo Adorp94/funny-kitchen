@@ -225,6 +225,13 @@ export const ProductionActiveListing: React.FC = React.memo(() => {
   // Debounced search term to reduce filtering frequency
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  // Helper function to determine production status
+  const getProductionStatus = (item: ProductionActiveItem): 'deficit' | 'surplus' | 'balanced' => {
+    if (item.faltan_sobran < 0) return 'deficit';
+    if (item.faltan_sobran > 0) return 'surplus';
+    return 'balanced';
+  };
+
   // Memoized filtered and paginated data
   const filteredData = useMemo(() => {
     let filtered = data;
@@ -429,12 +436,6 @@ export const ProductionActiveListing: React.FC = React.memo(() => {
   const handleStatusFilter = useCallback((filter: 'all' | 'deficit' | 'surplus' | 'balanced') => {
     setStatusFilter(filter);
   }, []);
-
-  const getProductionStatus = (item: ProductionActiveItem): 'deficit' | 'surplus' | 'balanced' => {
-    if (item.faltan_sobran < 0) return 'deficit';
-    if (item.faltan_sobran > 0) return 'surplus';
-    return 'balanced';
-  };
 
   // Handle adding producto to production
   const handleAddProducto = async () => {

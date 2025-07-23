@@ -63,11 +63,13 @@ const formSchema = z.object({
 }).refine((data) => {
   if (data.newStatus === 'producción' || data.newStatus === 'enviar_inventario') {
     const monto = parseFloat(data.montoAnticipo || 'NaN');
-    return !!data.montoAnticipo && !isNaN(monto) && monto > 0 && !!data.metodoPago;
+    // For 'producción', allow 0 as a valid amount; for 'enviar_inventario', require > 0
+    const minAmount = data.newStatus === 'producción' ? 0 : 0.01;
+    return !!data.montoAnticipo && !isNaN(monto) && monto >= minAmount && !!data.metodoPago;
   }
   return true;
 }, {
-  message: "Monto y método de pago son requeridos, y el monto debe ser mayor a 0.",
+  message: "Monto y método de pago son requeridos. Para 'Marcar como Producción' se permite monto 0.",
   path: ["montoAnticipo"],
 });
 
