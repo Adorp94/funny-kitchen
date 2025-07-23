@@ -6,7 +6,7 @@ import { MoldesActivos } from "@/components/produccion/moldes-activos";
 import { PedidosSection } from "@/components/produccion/pedidos-section";
 import { ClientesActivosSection } from "@/components/produccion/clientes-activos-section";
 import { ProductionActiveListing } from "@/components/testing/production-active-listing";
-import { ReviewSection } from "@/components/produccion/review-section";
+import { ReviewSectionOptimized } from "@/components/produccion/review-section-optimized";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye } from 'lucide-react';
 
@@ -83,7 +83,7 @@ export default function ProduccionPage() {
         </TabsContent>
 
         <TabsContent value="revisar" className="mt-6">
-          <ReviewSection />
+          <ReviewSectionOptimized />
         </TabsContent>
       </Tabs>
     </div>
