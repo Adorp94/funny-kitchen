@@ -171,16 +171,20 @@ export async function GET(
       // Continue without empaque status rather than failing
     }
 
-    // Get allocation status for all products to track limits and prevent infinite loops
-    const { data: allocationStatusData, error: allocationStatusError } = await supabase
-      .from('allocation_status')
-      .select('*')
+    // Get allocation status by calculating from existing tables
+    // Get only 'entregado' allocations for this specific cotizacion (products that have left the quotation)
+    const { data: thisCotizacionEntregados, error: thisEntregadosError } = await supabase
+      .from('production_allocations')
+      .select(`
+        producto_id,
+        cantidad_asignada
+      `)
       .eq('cotizacion_id', parseInt(cotizacionId))
+      .eq('stage', 'entregado')
       .in('producto_id', productIds);
 
-    if (allocationStatusError) {
-      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch allocation status:", allocationStatusError);
-      // Continue without allocation status data
+    if (thisEntregadosError) {
+      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch this cotization entregados:", thisEntregadosError);
     }
 
     // Get total empaque allocations for all products to calculate available terminado
@@ -221,16 +225,12 @@ export async function GET(
       });
     }
 
-    // Create a map of allocation status by product ID
-    const allocationStatusMap = new Map();
-    if (allocationStatusData) {
-      allocationStatusData.forEach(status => {
-        allocationStatusMap.set(status.producto_id, {
-          cantidad_cotizacion: status.cantidad_cotizacion || 0,
-          total_asignado: status.total_asignado || 0,
-          cantidad_disponible: status.cantidad_disponible || 0,
-          limite_alcanzado: status.limite_alcanzado || false
-        });
+    // Create a map of entregado allocations by product ID (products that have left this cotización)
+    const thisCotizacionEntregadosMap = new Map();
+    if (thisCotizacionEntregados) {
+      thisCotizacionEntregados.forEach(allocation => {
+        const existing = thisCotizacionEntregadosMap.get(allocation.producto_id) || 0;
+        thisCotizacionEntregadosMap.set(allocation.producto_id, existing + (allocation.cantidad_asignada || 0));
       });
     }
 
@@ -266,9 +266,16 @@ export async function GET(
         terminado: 0
       };
 
-      // Calculate available terminado (total terminado - already allocated to empaque)
+      // Calculate available terminado considering both global stock and this cotización's limits
       const totalEmpaqueAllocated = totalEmpaqueMap.get(productoId) || 0;
-      const terminadoDisponible = Math.max(0, produccionStatusBase.terminado - totalEmpaqueAllocated);
+      const globalTerminadoDisponible = Math.max(0, produccionStatusBase.terminado - totalEmpaqueAllocated);
+      
+      // Also consider this cotización's remaining allocation limit
+      const totalEntregadoThisCotizacion = thisCotizacionEntregadosMap.get(productoId) || 0;
+      const remainingQuotaForThisCotizacion = Math.max(0, cantidad - totalEntregadoThisCotizacion);
+      
+      // The actual available amount is the minimum of global stock and remaining quota
+      const terminadoDisponible = Math.min(globalTerminadoDisponible, remainingQuotaForThisCotizacion);
 
       const produccionStatus = {
         ...produccionStatusBase,
@@ -280,12 +287,16 @@ export async function GET(
         cantidad_empaque: 0
       };
 
-      // Get allocation status for this product, default to safe values if not found
-      const allocationStatus = allocationStatusMap.get(productoId) || {
+      // Calculate allocation status for this product from actual data
+      // Only count products that have been delivered (entregado) as "used up" from the quotation
+      const cantidadDisponible = cantidad - totalEntregadoThisCotizacion;
+      const limiteAlcanzado = totalEntregadoThisCotizacion >= cantidad;
+      
+      const allocationStatus = {
         cantidad_cotizacion: cantidad,
-        total_asignado: 0,
-        cantidad_disponible: cantidad,
-        limite_alcanzado: false
+        total_asignado: totalEntregadoThisCotizacion, 
+        cantidad_disponible: Math.max(0, cantidadDisponible),
+        limite_alcanzado: limiteAlcanzado
       };
 
       return {

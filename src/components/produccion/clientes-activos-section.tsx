@@ -61,6 +61,8 @@ interface EnviadosProduct {
 interface EnviadosResponse {
   data: {
     productos_enviados: EnviadosProduct[];
+    total_cajas_chicas: number;
+    total_cajas_grandes: number;
   };
 }
 
@@ -212,6 +214,10 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
   
   // Enviados data
   const [enviadosData, setEnviadosData] = useState<EnviadosProduct[]>([]);
+  const [enviadosBoxData, setEnviadosBoxData] = useState<{
+    total_cajas_chicas: number;
+    total_cajas_grandes: number;
+  }>({ total_cajas_chicas: 0, total_cajas_grandes: 0 });
   
   // Empaque data
   const [empaqueData, setEmpaqueData] = useState<{
@@ -238,13 +244,19 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       if (response.ok) {
         const result: EnviadosResponse = await response.json();
         setEnviadosData(result.data.productos_enviados || []);
+        setEnviadosBoxData({
+          total_cajas_chicas: result.data.total_cajas_chicas || 0,
+          total_cajas_grandes: result.data.total_cajas_grandes || 0
+        });
       } else {
         console.error("Error fetching enviados data:", response.status);
         setEnviadosData([]);
+        setEnviadosBoxData({ total_cajas_chicas: 0, total_cajas_grandes: 0 });
       }
     } catch (error) {
       console.error("Error in fetchEnviadosData:", error);
       setEnviadosData([]);
+      setEnviadosBoxData({ total_cajas_chicas: 0, total_cajas_grandes: 0 });
     }
   }, []);
 
@@ -346,6 +358,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setError(null);
     setHasSearched(false);
     setEnviadosData([]);
+    setEnviadosBoxData({ total_cajas_chicas: 0, total_cajas_grandes: 0 });
     setEmpaqueData(null);
   }, []);
 
@@ -566,6 +579,8 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
             <EnviadosTable
               productos={enviadosData}
               isLoading={false}
+              totalCajasChicas={enviadosBoxData.total_cajas_chicas}
+              totalCajasGrandes={enviadosBoxData.total_cajas_grandes}
             />
           </div>
         </div>

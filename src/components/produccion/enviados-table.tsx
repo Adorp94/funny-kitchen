@@ -9,11 +9,16 @@ interface EnviadosProduct {
   cantidad: number;
   producto_id?: number;
   fecha_envio?: string;
+  cajas_chicas?: number;
+  cajas_grandes?: number;
+  comentarios_empaque?: string;
 }
 
 interface EnviadosTableProps {
   productos: EnviadosProduct[];
   isLoading?: boolean;
+  totalCajasChicas?: number;
+  totalCajasGrandes?: number;
 }
 
 // Memoized enviados product row component
@@ -34,6 +39,23 @@ const EnviadosProductRow = React.memo(({
       </Badge>
     </TableCell>
     <TableCell className="px-3 py-2 text-center">
+      <div className="space-y-1">
+        {(producto.cajas_chicas || 0) > 0 && (
+          <Badge variant="outline" className="text-xs bg-green-50 border-green-300 text-green-700 mr-1">
+            {producto.cajas_chicas} CC
+          </Badge>
+        )}
+        {(producto.cajas_grandes || 0) > 0 && (
+          <Badge variant="outline" className="text-xs bg-blue-50 border-blue-300 text-blue-700">
+            {producto.cajas_grandes} CG
+          </Badge>
+        )}
+        {!producto.cajas_chicas && !producto.cajas_grandes && (
+          <span className="text-xs text-gray-400">-</span>
+        )}
+      </div>
+    </TableCell>
+    <TableCell className="px-3 py-2 text-center">
       <span className="text-xs text-gray-600">{producto.fecha_envio || '-'}</span>
     </TableCell>
   </TableRow>
@@ -43,7 +65,9 @@ EnviadosProductRow.displayName = 'EnviadosProductRow';
 
 export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({ 
   productos, 
-  isLoading = false 
+  isLoading = false,
+  totalCajasChicas = 0,
+  totalCajasGrandes = 0
 }) => {
 
   if (isLoading) {
@@ -62,11 +86,27 @@ export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({
       <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium text-gray-700">Productos Entregados</h3>
-          {productos.length > 0 && (
-            <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
-              {productos.length} productos
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {productos.length > 0 && (
+              <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
+                {productos.length} productos
+              </Badge>
+            )}
+            {(totalCajasChicas > 0 || totalCajasGrandes > 0) && (
+              <div className="flex items-center gap-1">
+                {totalCajasChicas > 0 && (
+                  <Badge variant="outline" className="text-xs bg-green-50 border-green-300 text-green-700">
+                    {totalCajasChicas} CC
+                  </Badge>
+                )}
+                {totalCajasGrandes > 0 && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 border-blue-300 text-blue-700">
+                    {totalCajasGrandes} CG
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
@@ -81,6 +121,7 @@ export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({
               <TableRow className="bg-gray-50/50 border-b border-gray-200">
                 <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
                 <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cantidad</TableHead>
+                <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cajas</TableHead>
                 <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Fecha Entrega</TableHead>
               </TableRow>
             </TableHeader>

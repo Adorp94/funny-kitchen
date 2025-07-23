@@ -19,11 +19,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TypeScript**: Full TypeScript support with strict mode
 
 ### Core Features
-This is a quotation management system for Funny Kitchen (ceramic artisan company) with three main modules:
+This is a quotation management system for Funny Kitchen (ceramic artisan company) with four main modules:
 
 1. **Quotations** (`/dashboard/cotizaciones/`) - Create, edit, and manage quotes
 2. **Finance** (`/dashboard/finanzas/`) - Track income, expenses, and payments
-3. **Production** (`/produccion/`) - Production queue and mold management
+3. **Production** (`/produccion/`) - Production queue, allocation management, and fulfillment tracking
 4. **Inventory** (`/dashboard/inventario/`) - Mold inventory management
 
 ### Key Architecture Patterns
@@ -78,9 +78,53 @@ Main quotation creation flow:
 - TailwindCSS configured with shadcn/ui theme system
 - Path aliases: `@/*` maps to `./src/*`
 
+### Production Management System
+The production module includes sophisticated allocation and fulfillment tracking:
+
+#### Production Stages Flow
+1. **Por Detallar** → **Detallado** → **Sancocho** → **Terminado** (manufacturing stages)
+2. **Terminado** → **Empaque** → **Entregado** (fulfillment stages)
+
+#### Key Production Components
+- **Clientes Activos Section** (`/src/components/produccion/clientes-activos-section.tsx`)
+  - Search quotations by ID to view product details and production status
+  - Move products from "Terminado" to "Empaque" with allocation limit validation
+  - Real-time production status tracking and allocation management
+
+- **Empaque Management** (`/src/components/produccion/empaque-table.tsx`, `/src/components/produccion/move-to-empaque-dialog.tsx`)
+  - Package products for specific quotations
+  - Track box counts (small/large boxes) and packaging comments
+  - Move products from "Empaque" to "Entregado" when ready for shipment
+
+- **Enviados Tracking** (`/src/components/produccion/enviados-table.tsx`, `/src/components/produccion/move-to-enviados-dialog.tsx`)
+  - Final delivery stage tracking
+  - Automatic quotation completion when all products are fully delivered
+
+#### Production API Endpoints
+- **`/api/production/clientes-activos/[cotizacionId]`** - Fetch quotation details with production status
+- **`/api/production/empaque`** - Manage empaque allocations (POST: move to empaque, GET: view empaque products, DELETE: return to terminado, PATCH: update box counts)
+- **`/api/production/enviados`** - Manage delivery allocations with auto-completion logic
+
+#### Allocation Logic
+- **Smart Validation**: Products can only be allocated up to their quotation quantity
+- **Partial Allocations**: Support for moving products in batches (e.g., 10 out of 15 pieces)
+- **Global Stock Awareness**: Considers both quotation limits and actual available terminado stock
+- **Auto-Completion**: Automatically marks quotations as 'enviada' when all products are fully delivered
+- **Demand Calculation**: Pedidos column shows net unfulfilled demand (total ordered - allocated), preventing over-production
+- **Box Tracking**: Complete preservation of packaging information across empaque → entregado stages
+
+#### Database Tables (Production-Specific)
+- `production_active` - Current production status for all products (por_detallar, detallado, sancocho, terminado)
+- `production_allocations` - Tracks product movement through empaque and entregado stages with box counts
+- `production_queue` - Production scheduling and planning queue
+- `production_active_with_gap` - View that calculates net unfulfilled demand (pedidos - allocated)
+- Migration `005_add_allocation_constraints.sql` - Allocation tracking and constraint validation
+- Migration `006_create_production_active_with_gap_view.sql` - Smart demand calculation view
+
 ### Important File Locations
 - Database migrations: `/database/migrations/`
 - API endpoints: `/src/app/api/`
 - Supabase config: `/src/lib/supabase/`
 - UI components: `/src/components/ui/`
+- Production components: `/src/components/produccion/`
 - Application constants: `/src/lib/constants.ts`

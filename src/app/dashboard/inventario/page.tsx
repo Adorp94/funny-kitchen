@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Search, Download, ArrowUpDown } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, Search, Download, ArrowUpDown, Package, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,14 @@ interface Producto {
   tipo_producto?: string;
   tipo_ceramica?: string;
   vueltas_max_dia?: number;
+}
+
+interface Stats {
+  totalProducts: number;
+  withMoldes: number;
+  withoutMoldes: number;
+  lowMoldes: number;
+  showing: number;
 }
 
 export default function InventarioMoldesPage() {
@@ -37,7 +46,6 @@ export default function InventarioMoldesPage() {
   const loadProductos = useCallback(async () => {
     try {
       setLoading(true);
-      // Request all products by setting a large pageSize
       const response = await fetch('/api/productos?pageSize=1000');
       if (!response.ok) throw new Error('Failed to fetch products');
       
@@ -58,16 +66,13 @@ export default function InventarioMoldesPage() {
   // Filter and sort products
   const filteredAndSortedProductos = useMemo(() => {
     let filtered = productos.filter(producto => {
-      // First filter: Only show products with moldes_disponibles > 0
-      if (producto.moldes_disponibles <= 0) return false;
-      
       const matchesSearch = producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (producto.sku && producto.sku.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const moldesCount = producto.moldes_disponibles || 0;
       const matchesStockFilter = (() => {
         switch (filterStock) {
-          case 'sin-moldes': return moldesCount === 0; // This will now never match since we filter out <= 0
+          case 'sin-moldes': return moldesCount === 0;
           case 'moldes-bajos': return moldesCount > 0 && moldesCount <= 3;
           case 'moldes-suficientes': return moldesCount > 3;
           default: return true;
@@ -98,18 +103,6 @@ export default function InventarioMoldesPage() {
 
     return filtered;
   }, [productos, searchTerm, filterStock, sortBy, sortOrder]);
-
-  // Split products into multiple tables with 16 records max per table
-  const productsPerTable = 16; // Changed from 35 to 16
-  const productTables = useMemo(() => {
-    const tables = [];
-    // Only create tables for the actual data we have
-    for (let i = 0; i < filteredAndSortedProductos.length; i += productsPerTable) {
-      tables.push(filteredAndSortedProductos.slice(i, i + productsPerTable));
-    }
-    // Return empty array if no products to avoid showing empty tables
-    return tables.length > 0 ? tables : [];
-  }, [filteredAndSortedProductos]);
 
   // Handle quantity input change
   const handleQuantityInputChange = (producto_id: number, value: string) => {
@@ -225,9 +218,6 @@ export default function InventarioMoldesPage() {
     }
   };
 
-  // Toggle product selection
-
-
   // Export to CSV
   const exportToCSV = () => {
     const dataToExport = filteredAndSortedProductos;
@@ -255,9 +245,24 @@ export default function InventarioMoldesPage() {
   // Get mold status
   const getMoldStatus = (moldes: number) => {
     const count = moldes || 0;
-    if (count === 0) return { color: 'text-red-600', bg: 'bg-red-50' };
-    if (count <= 3) return { color: 'text-yellow-600', bg: 'bg-yellow-50' };
-    return { color: 'text-green-600', bg: 'bg-green-50' };
+    if (count === 0) return { 
+      color: 'text-red-700', 
+      bg: 'bg-red-50 border-red-200', 
+      badge: 'destructive',
+      icon: <AlertTriangle className="h-3 w-3" />
+    };
+    if (count <= 3) return { 
+      color: 'text-yellow-700', 
+      bg: 'bg-yellow-50 border-yellow-200', 
+      badge: 'secondary',
+      icon: <AlertTriangle className="h-3 w-3" />
+    };
+    return { 
+      color: 'text-green-700', 
+      bg: 'bg-green-50 border-green-200', 
+      badge: 'default',
+      icon: <CheckCircle className="h-3 w-3" />
+    };
   };
 
   // Handle sorting
@@ -270,8 +275,8 @@ export default function InventarioMoldesPage() {
     }
   };
 
-  // Stats - Updated to reflect new filtering logic
-  const stats = useMemo(() => {
+  // Stats
+  const stats: Stats = useMemo(() => {
     const totalProducts = productos.length;
     const withMoldes = productos.filter(p => (p.moldes_disponibles || 0) > 0).length;
     const withoutMoldes = productos.filter(p => (p.moldes_disponibles || 0) === 0).length;
@@ -288,156 +293,265 @@ export default function InventarioMoldesPage() {
     };
   }, [productos, filteredAndSortedProductos]);
 
-  // Render a single table
-  const renderTable = (products: Producto[], tableIndex: number) => (
-    <div key={tableIndex} className="border rounded">
-      <Table>
-        <TableHeader>
-          <TableRow className="h-6 bg-gray-50">
-            <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
-              SKU
-            </TableHead>
-            <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold">
-              PRODUCTO
-            </TableHead>
-            <TableHead className="cursor-pointer hover:bg-gray-100 p-1 text-xs font-bold text-center w-16">
-              QTY
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.map((producto) => {
-            const isEditing = editingQuantities[producto.producto_id] !== undefined;
-            const isPending = pendingUpdates.has(producto.producto_id);
-            const isSaving = savingUpdates.has(producto.producto_id);
-            const currentMoldes = producto.moldes_disponibles || 0;
-            const displayValue = isEditing 
-              ? editingQuantities[producto.producto_id] 
-              : currentMoldes.toString();
-            const status = getMoldStatus(currentMoldes);
-
-            return (
-              <TableRow 
-                key={producto.producto_id} 
-                className={cn(
-                  "h-6 hover:bg-gray-50",
-                  isPending && "bg-yellow-50",
-                  isSaving && "bg-blue-50",
-                  status.bg
-                )}
-              >
-                <TableCell className="p-1 text-xs text-gray-600">
-                  {producto.sku || '-'}
-                </TableCell>
-                <TableCell className="p-1 text-xs font-medium">
-                  <div className="truncate max-w-48" title={producto.nombre || producto.sku || 'Sin nombre'}>
-                    {producto.nombre || producto.sku || 'Sin nombre'}
-                  </div>
-                </TableCell>
-                <TableCell className="p-1 text-center">
-                  <div className="relative inline-block">
-                    <Input 
-                      type="number"
-                      value={displayValue}
-                      onChange={(e) => handleQuantityInputChange(producto.producto_id, e.target.value)}
-                      onKeyDown={(e) => handleQuantityKeyDown(e, producto.producto_id)}
-                      onBlur={() => handleQuantityBlur(producto.producto_id)}
-                      className={cn(
-                        "w-10 h-5 text-center text-xs border-0 bg-transparent focus:bg-white focus:border focus:border-blue-300",
-                        isPending && "bg-yellow-100",
-                        isSaving && "bg-blue-100",
-                        status.color,
-                        "font-bold"
-                      )}
-                      min="0"
-                      disabled={isSaving}
-                    />
-                    {isSaving && (
-                      <Loader2 className="absolute right-0 top-1/2 transform -translate-y-1/2 h-2 w-2 animate-spin text-blue-500" />
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-
   if (loading) {
     return (
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Cargando...</span>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="text-lg">Cargando inventario...</span>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-2 space-y-2">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold">INVENTARIO MOLDES</h1>
-        <div className="flex items-center gap-2 text-xs text-gray-600">
-          <span>Total productos: {stats.totalProducts}</span>
-          <span className="text-green-600">Con moldes: {stats.withMoldes}</span>
-          <span className="text-red-600">Sin moldes: {stats.withoutMoldes}</span>
-          <span className="text-yellow-600">Pocos moldes: {stats.lowMoldes}</span>
+        <div>
+          <h1 className="text-3xl font-bold">Inventario de Moldes</h1>
+          <p className="text-muted-foreground">
+            Gestión de moldes disponibles para producción
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Package className="h-5 w-5 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {stats.showing} de {stats.totalProducts} productos
+          </span>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-          <Input
-            placeholder="Buscar..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-7 h-6 text-xs"
-          />
-        </div>
-        <Select value={filterStock} onValueChange={(value: any) => setFilterStock(value)}>
-          <SelectTrigger className="w-32 h-6 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos con moldes</SelectItem>
-            <SelectItem value="moldes-bajos">Pocos moldes (1-3)</SelectItem>
-            <SelectItem value="moldes-suficientes">Suficientes (4+)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="sm" onClick={exportToCSV} className="h-6 text-xs">
-          <Download className="h-3 w-3 mr-1" />
-          CSV
-        </Button>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Con Moldes</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.withMoldes}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pocos Moldes</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.lowMoldes}</div>
+            <p className="text-xs text-muted-foreground">1-3 moldes</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sin Moldes</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.withoutMoldes}</div>
+            <p className="text-xs text-muted-foreground">Necesitan reposición</p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Status */}
-      <div className="flex items-center gap-4 text-xs text-gray-600">
-        <span>Mostrando: {stats.showing} productos con moldes disponibles</span>
-        <span>Tablas: {productTables.length} (máx. 16 productos por tabla)</span>
-        {pendingUpdates.size > 0 && (
-          <span className="text-yellow-600">Pendientes: {pendingUpdates.size}</span>
-        )}
-      </div>
+      {/* Filters and Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtros y Acciones</CardTitle>
+          <CardDescription>
+            Busca y filtra productos por estado de moldes
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre o SKU..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={filterStock} onValueChange={(value: any) => setFilterStock(value)}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los productos</SelectItem>
+                <SelectItem value="sin-moldes">Sin moldes (0)</SelectItem>
+                <SelectItem value="moldes-bajos">Pocos moldes (1-3)</SelectItem>
+                <SelectItem value="moldes-suficientes">Suficientes (4+)</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button variant="outline" onClick={exportToCSV} className="w-full sm:w-auto">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </div>
+          
+          {pendingUpdates.size > 0 && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  Tienes {pendingUpdates.size} cambio(s) pendiente(s)
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Multiple Tables Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-        {productTables.map((products, index) => renderTable(products, index))}
-      </div>
+      {/* Products Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Productos ({stats.showing})</CardTitle>
+          <CardDescription>
+            Click en la cantidad para editar. Presiona Enter para guardar o Escape para cancelar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort('sku')}
+                      className="h-8 p-0 font-medium"
+                    >
+                      SKU
+                      <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort('nombre')}
+                      className="h-8 p-0 font-medium"
+                    >
+                      Producto
+                      <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-center w-[120px]">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort('moldes')}
+                      className="h-8 p-0 font-medium"
+                    >
+                      Moldes
+                      <ArrowUpDown className="ml-2 h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-center w-[100px]">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAndSortedProductos.map((producto) => {
+                  const isEditing = editingQuantities[producto.producto_id] !== undefined;
+                  const isPending = pendingUpdates.has(producto.producto_id);
+                  const isSaving = savingUpdates.has(producto.producto_id);
+                  const currentMoldes = producto.moldes_disponibles || 0;
+                  const displayValue = isEditing 
+                    ? editingQuantities[producto.producto_id] 
+                    : currentMoldes.toString();
+                  const status = getMoldStatus(currentMoldes);
 
-      {filteredAndSortedProductos.length === 0 && (
-        <div className="text-center py-8 text-sm text-gray-500">
-          {stats.withMoldes === 0 
-            ? "No hay productos con moldes disponibles" 
-            : "No se encontraron productos con moldes que coincidan con la búsqueda"
-          }
-        </div>
-      )}
+                  return (
+                    <TableRow 
+                      key={producto.producto_id} 
+                      className={cn(
+                        "hover:bg-muted/50",
+                        isPending && "bg-yellow-50",
+                        isSaving && "bg-blue-50"
+                      )}
+                    >
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {producto.sku || '-'}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate max-w-[300px]" title={producto.nombre}>
+                            {producto.nombre}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Input 
+                            type="number"
+                            value={displayValue}
+                            onChange={(e) => handleQuantityInputChange(producto.producto_id, e.target.value)}
+                            onKeyDown={(e) => handleQuantityKeyDown(e, producto.producto_id)}
+                            onBlur={() => handleQuantityBlur(producto.producto_id)}
+                            className={cn(
+                              "w-16 h-8 text-center",
+                              isPending && "border-yellow-400 bg-yellow-50",
+                              isSaving && "border-blue-400 bg-blue-50"
+                            )}
+                            min="0"
+                            disabled={isSaving}
+                          />
+                          {isSaving && (
+                            <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center">
+                          <Badge variant={status.badge as any} className="flex items-center gap-1">
+                            {status.icon}
+                            {currentMoldes === 0 ? 'Sin stock' : 
+                             currentMoldes <= 3 ? 'Bajo' : 'OK'}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {filteredAndSortedProductos.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                No se encontraron productos
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {stats.totalProducts === 0 
+                  ? "No hay productos en el inventario" 
+                  : "Intenta ajustar los filtros de búsqueda"
+                }
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}

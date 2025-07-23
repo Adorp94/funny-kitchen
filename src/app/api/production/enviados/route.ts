@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Create or update enviados allocation
+    // 2. Create or update enviados allocation with box information preserved
     if (existingEnviados) {
       // Update existing enviados allocation
       const { error: updateEnviadosError } = await supabase
@@ -125,7 +125,11 @@ export async function POST(request: NextRequest) {
         .update({ 
           cantidad_asignada: existingEnviados.cantidad_asignada + cantidad,
           updated_at: new Date().toISOString(),
-          notas: `Actualizado: +${cantidad} productos movidos desde empaque`
+          notas: `Actualizado: +${cantidad} productos movidos desde empaque`,
+          // Preserve box information if this is the first time or aggregate if needed
+          cajas_chicas: empaqueAllocation.cajas_chicas || 0,
+          cajas_grandes: empaqueAllocation.cajas_grandes || 0,
+          comentarios_empaque: empaqueAllocation.comentarios_empaque
         })
         .eq('id', existingEnviados.id);
 
@@ -143,7 +147,7 @@ export async function POST(request: NextRequest) {
         }, { status: 500 });
       }
     } else {
-      // Create new enviados allocation
+      // Create new enviados allocation with box information
       const { error: insertEnviadosError } = await supabase
         .from('production_allocations')
         .insert({
@@ -151,7 +155,10 @@ export async function POST(request: NextRequest) {
           cotizacion_id,
           cantidad_asignada: cantidad,
           stage: 'entregado',
-          notas: `${cantidad} productos movidos desde empaque`
+          notas: `${cantidad} productos movidos desde empaque`,
+          cajas_chicas: empaqueAllocation.cajas_chicas || 0,
+          cajas_grandes: empaqueAllocation.cajas_grandes || 0,
+          comentarios_empaque: empaqueAllocation.comentarios_empaque
         });
 
       if (insertEnviadosError) {
@@ -170,6 +177,77 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[API /production/enviados POST] Successfully moved products to enviados");
+
+    // 3. Check if all products from this cotización have been fully sent
+    try {
+      // Get total quantities ordered for this cotización
+      const { data: cotizacionProductos, error: cotizacionError } = await supabase
+        .from('cotizacion_productos')
+        .select('producto_id, cantidad')
+        .eq('cotizacion_id', cotizacion_id);
+
+      if (cotizacionError) {
+        console.warn("[API /production/enviados POST] Warning: Could not check cotización completion:", cotizacionError);
+      } else if (cotizacionProductos && cotizacionProductos.length > 0) {
+        // Get total quantities sent for this cotización
+        const { data: enviadosAllocations, error: enviadosError } = await supabase
+          .from('production_allocations')
+          .select('producto_id, cantidad_asignada')
+          .eq('cotizacion_id', cotizacion_id)
+          .eq('stage', 'entregado');
+
+        if (enviadosError) {
+          console.warn("[API /production/enviados POST] Warning: Could not check enviados allocations:", enviadosError);
+        } else {
+          // Create maps for comparison
+          const orderedMap = new Map();
+          cotizacionProductos.forEach(cp => {
+            orderedMap.set(cp.producto_id, cp.cantidad);
+          });
+
+          const sentMap = new Map();
+          if (enviadosAllocations) {
+            enviadosAllocations.forEach(ea => {
+              const existing = sentMap.get(ea.producto_id) || 0;
+              sentMap.set(ea.producto_id, existing + ea.cantidad_asignada);
+            });
+          }
+
+          // Check if all products have been fully sent
+          let allProductsFullySent = true;
+          for (const [productoId, cantidadOrdenada] of orderedMap.entries()) {
+            const cantidadEnviada = sentMap.get(productoId) || 0;
+            if (cantidadEnviada < cantidadOrdenada) {
+              allProductsFullySent = false;
+              break;
+            }
+          }
+
+          // If all products are fully sent, mark cotización as 'enviada'
+          if (allProductsFullySent) {
+            console.log(`[API /production/enviados POST] All products fully sent for cotización ${cotizacion_id}, marking as 'enviada'`);
+            
+            const { error: updateStatusError } = await supabase
+              .from('cotizaciones')
+              .update({ 
+                estado: 'enviada',
+                fecha_cierre: new Date().toISOString()
+              })
+              .eq('cotizacion_id', cotizacion_id);
+
+            if (updateStatusError) {
+              console.warn("[API /production/enviados POST] Warning: Could not update cotización status to 'enviada':", updateStatusError);
+            } else {
+              console.log(`[API /production/enviados POST] Successfully marked cotización ${cotizacion_id} as 'enviada'`);
+            }
+          } else {
+            console.log(`[API /production/enviados POST] Cotización ${cotizacion_id} still has pending products to send`);
+          }
+        }
+      }
+    } catch (autoCompleteError) {
+      console.warn("[API /production/enviados POST] Warning: Error during auto-completion check:", autoCompleteError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -226,6 +304,9 @@ export async function GET(request: NextRequest) {
         cantidad_asignada,
         fecha_asignacion,
         notas,
+        cajas_chicas,
+        cajas_grandes,
+        comentarios_empaque,
         productos!inner (
           nombre
         )
@@ -250,10 +331,17 @@ export async function GET(request: NextRequest) {
         month: '2-digit',
         year: '2-digit'
       }),
-      notas: item.notas
+      notas: item.notas,
+      cajas_chicas: item.cajas_chicas || 0,
+      cajas_grandes: item.cajas_grandes || 0,
+      comentarios_empaque: item.comentarios_empaque
     })) || [];
 
     console.log("[API /production/enviados GET] Found enviados products:", productos.length);
+
+    // Calculate total box counts
+    const totalCajasChicas = productos.reduce((sum, p) => sum + (p.cajas_chicas || 0), 0);
+    const totalCajasGrandes = productos.reduce((sum, p) => sum + (p.cajas_grandes || 0), 0);
 
     return NextResponse.json({
       success: true,
@@ -261,7 +349,9 @@ export async function GET(request: NextRequest) {
         cotizacion_id: parseInt(cotizacionId),
         productos_enviados: productos,
         total_productos: productos.length,
-        total_cantidad: productos.reduce((sum, p) => sum + p.cantidad, 0)
+        total_cantidad: productos.reduce((sum, p) => sum + p.cantidad, 0),
+        total_cajas_chicas: totalCajasChicas,
+        total_cajas_grandes: totalCajasGrandes
       }
     });
 
