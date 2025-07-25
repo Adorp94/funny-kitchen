@@ -495,6 +495,29 @@ export const PedidosSection: React.FC = React.memo(() => {
           <div className="text-xs text-muted-foreground">
             {groupedPedidos.length} cotizaciones • {filteredPedidos.length} productos
           </div>
+          {groupedPedidos.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  const allFolios = new Set(groupedPedidos.map(g => g.folio));
+                  setExpandedCotizaciones(allFolios);
+                }}
+              >
+                Expandir todo
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setExpandedCotizaciones(new Set())}
+              >
+                Contraer todo
+              </Button>
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
@@ -613,7 +636,7 @@ export const PedidosSection: React.FC = React.memo(() => {
                                     <Checkbox
                                       checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
                                       onCheckedChange={() => handleProductToggle(producto)}
-                                      className="h-4 w-4"
+                                      className="h-4 w-4 !rounded-sm"
                                     />
                                   </div>
                                 )}
@@ -662,14 +685,14 @@ export const PedidosSection: React.FC = React.memo(() => {
                                   }
                                   
                                   if (days < 0) {
-                                    return <Badge variant="destructive" className="text-xs">{Math.abs(days)}d atraso</Badge>;
+                                    return <Badge className="text-xs bg-red-50 text-red-700 border-red-200 hover:bg-red-100 whitespace-nowrap">{Math.abs(days)}d atraso</Badge>;
                                   }
                                   
                                   if (days <= 7) {
-                                    return <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">Urgente</Badge>;
+                                    return <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap">Urgente</Badge>;
                                   }
                                   
-                                  return <Badge variant="outline" className="text-xs">{days}d</Badge>;
+                                  return <Badge variant="outline" className="text-xs whitespace-nowrap">{days}d</Badge>;
                                 })()}
                               </TableCell>
                             </TableRow>
