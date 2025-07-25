@@ -402,11 +402,11 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
 
   // Handle clicking on an active cotizacion
   const handleCotizacionClick = useCallback((cotizacion: CotizacionActiva) => {
-    // Extract just the number from the folio (e.g., "COT-2025-2322" -> "2322")
-    const cotizacionNumber = cotizacion.folio.replace(/^COT-\d{4}-/, '');
-    setCotizacionId(cotizacionNumber);
-    // Automatically search for this cotizacion using the extracted number directly
-    searchCotizacion(false, cotizacionNumber);
+    // Use the actual cotizacion_id instead of extracting from folio
+    const cotizacionId = cotizacion.cotizacion_id.toString();
+    setCotizacionId(cotizacionId);
+    // Automatically search for this cotizacion using the actual ID
+    searchCotizacion(false, cotizacionId);
   }, [searchCotizacion]);
 
   // Handle product click to open empaque dialog
