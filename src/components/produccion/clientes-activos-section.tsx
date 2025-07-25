@@ -205,12 +205,29 @@ const ProductionStatusRow = React.memo(({ producto, index }: { producto: Product
 
 ProductionStatusRow.displayName = 'ProductionStatusRow';
 
+interface CotizacionActiva {
+  cotizacion_id: number;
+  folio: string;
+  cliente: string;
+  estado: string;
+  fecha_creacion: string;
+  estimated_delivery_date?: string;
+  days_until_delivery?: number;
+  productos_count: number;
+  productos_en_produccion: number;
+}
+
 export const ClientesActivosSection: React.FC = React.memo(() => {
   const [cotizacionId, setCotizacionId] = useState<string>('');
   const [clienteData, setClienteData] = useState<ClienteActivoData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState<boolean>(false);
+  
+  // Active cotizaciones list state
+  const [activeCotizaciones, setActiveCotizaciones] = useState<CotizacionActiva[]>([]);
+  const [loadingActive, setLoadingActive] = useState<boolean>(false);
+  const [showActiveCotizaciones, setShowActiveCotizaciones] = useState<boolean>(true);
   
   // Enviados data
   const [enviadosData, setEnviadosData] = useState<EnviadosProduct[]>([]);
@@ -282,13 +299,34 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     }
   }, []);
 
-  const searchCotizacion = useCallback(async (forceRefresh = false) => {
-    if (!cotizacionId.trim()) {
+  const fetchActiveCotizaciones = useCallback(async () => {
+    setLoadingActive(true);
+    try {
+      const response = await fetch('/api/production/cotizaciones-activas');
+      if (response.ok) {
+        const result = await response.json();
+        setActiveCotizaciones(result.data || []);
+      } else {
+        console.error("Error fetching active cotizaciones:", response.status);
+        setActiveCotizaciones([]);
+      }
+    } catch (error) {
+      console.error("Error in fetchActiveCotizaciones:", error);
+      setActiveCotizaciones([]);
+    } finally {
+      setLoadingActive(false);
+    }
+  }, []);
+
+  const searchCotizacion = useCallback(async (forceRefresh = false, searchId?: string) => {
+    const idToSearch = searchId || cotizacionId;
+    
+    if (!idToSearch.trim()) {
       toast.error("Por favor ingrese un ID de cotización");
       return;
     }
 
-    const cacheKey = cotizacionId;
+    const cacheKey = idToSearch;
     const cached = clientCache.get(cacheKey);
     
     // Check cache first (unless forcing refresh)
@@ -304,7 +342,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setHasSearched(true);
     
     try {
-      const response = await fetch(`/api/production/clientes-activos/${cotizacionId}`);
+      const response = await fetch(`/api/production/clientes-activos/${idToSearch}`);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -328,10 +366,10 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       setError(null);
       
       // Fetch enviados data for this cotizacion
-      await fetchEnviadosData(cotizacionId);
+      await fetchEnviadosData(idToSearch);
       
       // Fetch empaque data for this cotizacion
-      await fetchEmpaqueData(cotizacionId);
+      await fetchEmpaqueData(idToSearch);
       
     } catch (err: any) {
       console.error("Error in searchCotizacion:", err);
@@ -361,6 +399,15 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     setEnviadosBoxData({ total_cajas_chicas: 0, total_cajas_grandes: 0 });
     setEmpaqueData(null);
   }, []);
+
+  // Handle clicking on an active cotizacion
+  const handleCotizacionClick = useCallback((cotizacion: CotizacionActiva) => {
+    // Extract just the number from the folio (e.g., "COT-2025-2322" -> "2322")
+    const cotizacionNumber = cotizacion.folio.replace(/^COT-\d{4}-/, '');
+    setCotizacionId(cotizacionNumber);
+    // Automatically search for this cotizacion using the extracted number directly
+    searchCotizacion(false, cotizacionNumber);
+  }, [searchCotizacion]);
 
   // Handle product click to open empaque dialog
   const handleProductClick = useCallback((producto: ProductoConEstatus) => {
@@ -433,8 +480,131 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
     return cleanup;
   }, [clienteData, searchCotizacion]);
 
+  // Load active cotizaciones on mount
+  useEffect(() => {
+    fetchActiveCotizaciones();
+  }, [fetchActiveCotizaciones]);
+
   return (
     <div className="space-y-3">
+      {/* Active Cotizaciones List */}
+      {showActiveCotizaciones && (
+        <div className="border border-gray-200 rounded-lg bg-white">
+          <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
+            <h3 className="text-xs font-medium text-gray-700">Cotizaciones en Producción Activa</h3>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={fetchActiveCotizaciones}
+                disabled={loadingActive}
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs"
+              >
+                {loadingActive ? (
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+              </Button>
+              <Button
+                onClick={() => setShowActiveCotizaciones(false)}
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+              >
+                Ocultar
+              </Button>
+            </div>
+          </div>
+          {loadingActive ? (
+            <div className="p-3">
+              <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
+            </div>
+          ) : activeCotizaciones.length > 0 ? (
+            <div className="max-h-48 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50">
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Folio</TableHead>
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Cliente</TableHead>
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Productos</TableHead>
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">En Prod.</TableHead>
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Estado</TableHead>
+                    <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Prioridad</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeCotizaciones.map((cotizacion, index) => (
+                    <TableRow
+                      key={cotizacion.cotizacion_id}
+                      className={`cursor-pointer hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+                      onClick={() => handleCotizacionClick(cotizacion)}
+                      title={`Click para buscar cotización ${cotizacion.folio}`}
+                    >
+                      <TableCell className="px-3 py-2">
+                        <span className="text-xs font-medium text-blue-600">{cotizacion.folio}</span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2">
+                        <span className="text-xs text-gray-900 truncate" title={cotizacion.cliente}>
+                          {cotizacion.cliente}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-center">
+                        <span className="text-xs text-gray-600">{cotizacion.productos_count}</span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-center">
+                        <span className="text-xs font-medium text-orange-600">{cotizacion.productos_en_produccion}</span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                          cotizacion.estado === 'producción' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {cotizacion.estado}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-center">
+                        {cotizacion.days_until_delivery !== undefined ? (
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                            cotizacion.days_until_delivery < 0 ? 'bg-red-100 text-red-700' :
+                            cotizacion.days_until_delivery <= 7 ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {cotizacion.days_until_delivery < 0 ? 
+                              `${Math.abs(cotizacion.days_until_delivery)}d atraso` : 
+                              `${cotizacion.days_until_delivery}d`
+                            }
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-xs text-gray-500">No hay cotizaciones en producción activa</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show button when list is hidden */}
+      {!showActiveCotizaciones && (
+        <div className="flex justify-center">
+          <Button
+            onClick={() => setShowActiveCotizaciones(true)}
+            variant="outline"
+            size="sm"
+            className="h-7 px-3 text-xs"
+          >
+            Mostrar Cotizaciones en Producción Activa
+          </Button>
+        </div>
+      )}
+
       {/* Search Section */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-gray-900">Buscar Cliente Activo</h2>

@@ -7,11 +7,21 @@ type PedidosData = {
   folio: string;
   cliente: string;
   producto: string;
+  producto_id?: number;
   cantidad: number;
   fecha: string;
   precio_venta: number;
   estimated_delivery_date?: string;
   days_until_delivery?: number;
+  production_status?: {
+    is_in_production: boolean;
+    pedidos: number;
+    por_detallar: number;
+    detallado: number;
+    sancocho: number;
+    terminado: number;
+    stage: 'no_production' | 'por_detallar' | 'detallado' | 'sancocho' | 'terminado';
+  };
 };
 
 export async function GET(request: NextRequest) {
@@ -104,6 +114,43 @@ export async function GET(request: NextRequest) {
         )
       `)
       .in('cotizacion_id', cotizacionIds);
+      
+    // Third, get production status for specific cotizacion+product combinations
+    // We need to check production_queue to see which cotizacion_productos are in production
+    const cotizacionProductosData = productosData || [];
+    const cotizacionProductIds = cotizacionProductosData.map(cp => {
+      // We need to find the cotizacion_producto_id for each combination
+      return {
+        cotizacion_id: cp.cotizacion_id,
+        producto_id: cp.producto_id
+      };
+    });
+
+    // Get production queue data - simpler approach
+    const { data: productionQueueData, error: queueError } = await supabase
+      .from('production_queue')
+      .select('cotizacion_producto_id, producto_id, status, qty_total, qty_pendiente')
+      .in('status', ['queued', 'in_progress']);
+
+    // Get cotizacion_productos mapping for the cotizaciones we're working with
+    const { data: cotizacionProductosMapping, error: mappingError } = await supabase
+      .from('cotizacion_productos')
+      .select('cotizacion_producto_id, cotizacion_id, producto_id')
+      .in('cotizacion_id', cotizacionIds);
+
+    // Also get global production_active data for stage information
+    const productIds = [...new Set(productosData?.map(p => p.producto_id) || [])];
+    const { data: productionData, error: productionError } = await supabase
+      .from('production_active')
+      .select(`
+        producto_id,
+        pedidos,
+        por_detallar,
+        detallado,
+        sancocho,
+        terminado
+      `)
+      .in('producto_id', productIds);
 
         if (productosError) {
       console.error("[API /production/pedidos GET] Error fetching productos:", productosError);
@@ -153,6 +200,42 @@ export async function GET(request: NextRequest) {
       for (const producto of cotizacionProductos) {
         const productoNombre = (producto.productos as any)?.nombre || 'Producto no encontrado';
         
+        // Find if this specific cotizacion+product combination is in production queue
+        const isInProductionQueue = cotizacionProductosMapping?.some(mapping => 
+          mapping.cotizacion_id === cotizacion.cotizacion_id && 
+          mapping.producto_id === producto.producto_id &&
+          productionQueueData?.some(pq => pq.cotizacion_producto_id === mapping.cotizacion_producto_id)
+        ) || false;
+
+        // Find global production status for stage information
+        const productionStatus = productionData?.find(p => p.producto_id === producto.producto_id);
+        
+        let production_status = {
+          is_in_production: isInProductionQueue,
+          pedidos: 0,
+          por_detallar: 0,
+          detallado: 0,
+          sancocho: 0,
+          terminado: 0,
+          stage: 'no_production' as const
+        };
+        
+        // If this cotizacion+product is in production queue, get the stage info
+        if (isInProductionQueue && productionStatus) {
+          production_status = {
+            is_in_production: true,
+            pedidos: productionStatus.pedidos || 0,
+            por_detallar: productionStatus.por_detallar || 0,
+            detallado: productionStatus.detallado || 0,
+            sancocho: productionStatus.sancocho || 0,
+            terminado: productionStatus.terminado || 0,
+            stage: productionStatus.terminado > 0 ? 'terminado' :
+                   productionStatus.sancocho > 0 ? 'sancocho' :
+                   productionStatus.detallado > 0 ? 'detallado' :
+                   productionStatus.por_detallar > 0 ? 'por_detallar' : 'por_detallar'
+          };
+        }
+        
         processedPedidos.push({
           folio: cotizacion.folio,
           cliente: clienteNombre,
@@ -162,7 +245,8 @@ export async function GET(request: NextRequest) {
           fecha: fechaFormatted,
           precio_venta: producto.precio_unitario || 0,
           estimated_delivery_date: estimatedDeliveryFormatted,
-          days_until_delivery: daysUntilDelivery
+          days_until_delivery: daysUntilDelivery,
+          production_status
         });
       }
     }

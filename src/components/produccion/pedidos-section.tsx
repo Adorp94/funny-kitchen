@@ -21,6 +21,15 @@ interface PedidoItem {
   precio_venta: number;
   estimated_delivery_date?: string;
   days_until_delivery?: number;
+  production_status?: {
+    is_in_production: boolean;
+    pedidos: number;
+    por_detallar: number;
+    detallado: number;
+    sancocho: number;
+    terminado: number;
+    stage: 'no_production' | 'por_detallar' | 'detallado' | 'sancocho' | 'terminado';
+  };
 }
 
 interface SelectedProduct {
@@ -181,6 +190,14 @@ export const PedidosSection: React.FC = React.memo(() => {
   const handleProductToggle = useCallback((pedido: PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean }) => {
     if (!pedido.producto_id || !pedido.hasMoldes) return;
     
+    // Prevent selection if already in production
+    if (pedido.production_status?.is_in_production) {
+      toast.error(`${pedido.producto} ya está en Producción Activa`, {
+        description: `Etapa actual: ${getProductionStageLabel(pedido.production_status.stage)}`
+      });
+      return;
+    }
+    
     const productKey = `${pedido.folio}-${pedido.producto_id}`;
     
     setSelectedProducts(prev => {
@@ -203,6 +220,18 @@ export const PedidosSection: React.FC = React.memo(() => {
       return newMap;
     });
   }, []);
+
+  // Helper function to get production stage label
+  const getProductionStageLabel = (stage: string) => {
+    switch (stage) {
+      case 'por_detallar': return 'Por Detallar';
+      case 'detallado': return 'Detallado';
+      case 'sancocho': return 'Sancocho';
+      case 'terminado': return 'Terminado';
+      case 'no_production': return 'Sin Producción';
+      default: return 'Desconocido';
+    }
+  };
 
 
   // Fetch moldes data
@@ -552,6 +581,7 @@ export const PedidosSection: React.FC = React.memo(() => {
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Cantidad</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Moldes</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Producción</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Fecha Est.</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Estado</TableHead>
                         </TableRow>
@@ -571,6 +601,12 @@ export const PedidosSection: React.FC = React.memo(() => {
                                 {!producto.hasMoldes || !producto.producto_id ? (
                                   <div className="flex items-center justify-center">
                                     <div className="h-4 w-4 rounded border-2 border-gray-200 bg-gray-100 opacity-30"></div>
+                                  </div>
+                                ) : producto.production_status?.is_in_production ? (
+                                  <div className="flex items-center justify-center" title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}>
+                                    <div className="h-4 w-4 rounded border-2 border-orange-300 bg-orange-100 opacity-60 flex items-center justify-center">
+                                      <div className="h-2 w-2 rounded-full bg-orange-500"></div>
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-center">
@@ -601,6 +637,15 @@ export const PedidosSection: React.FC = React.memo(() => {
                                     </Badge>
                                 ) : (
                                   <div className="text-xs text-muted-foreground italic">Sin moldes</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-center w-24">
+                                {producto.production_status?.is_in_production ? (
+                                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                                    {getProductionStageLabel(producto.production_status.stage)}
+                                  </Badge>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground italic">-</div>
                                 )}
                               </TableCell>
                               <TableCell className="px-4 py-2 text-center w-24">
