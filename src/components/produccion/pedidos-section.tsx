@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, Search, AlertTriangle, Clock, Calendar, CheckCircle2, ChevronDown, ChevronRight as ChevronRightIcon, User, Package, Plus } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { toast } from "sonner";
 
@@ -109,7 +109,6 @@ export const PedidosSection: React.FC = React.memo(() => {
   const [expandedCotizaciones, setExpandedCotizaciones] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, SelectedProduct>>(new Map());
-  const [selectedRowId, setSelectedRowId] = useState<string>('');
   const [isMovingToBitacora, setIsMovingToBitacora] = useState<boolean>(false);
 
   // Debounced search term to reduce filtering frequency
@@ -178,52 +177,20 @@ export const PedidosSection: React.FC = React.memo(() => {
     return groupedPedidos.flatMap(group => group.productos);
   }, [groupedPedidos]);
 
-  // Handle radio selection change
-  useEffect(() => {
-    if (selectedRowId) {
-      // Find the selected product across all groups
-      let foundProduct: (PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean }) | null = null;
-      
-      for (const group of groupedPedidos) {
-        for (const producto of group.productos) {
-          const productId = `${producto.folio}-${producto.producto_id}`;
-          if (productId === selectedRowId) {
-            foundProduct = producto;
-            break;
-          }
-        }
-        if (foundProduct) break;
-      }
-      
-      if (foundProduct && foundProduct.hasMoldes && foundProduct.producto_id) {
-        const productKey = `${foundProduct.folio}-${foundProduct.producto_id}`;
-        setSelectedProducts(new Map([
-          [productKey, {
-            folio: foundProduct.folio,
-            producto_id: foundProduct.producto_id,
-            producto_nombre: foundProduct.producto,
-            cantidad_total: foundProduct.cantidad,
-            cantidad_selected: foundProduct.cantidad
-          }]
-        ]));
-      } else {
-        setSelectedProducts(new Map());
-      }
-    } else {
-      setSelectedProducts(new Map());
-    }
-  }, [selectedRowId, groupedPedidos]);
-
-  // Handle product selection
-  const handleProductSelect = useCallback((pedido: PedidoItem, selected: boolean) => {
-    if (!pedido.producto_id) return;
+  // Handle product selection toggle
+  const handleProductToggle = useCallback((pedido: PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean }) => {
+    if (!pedido.producto_id || !pedido.hasMoldes) return;
     
     const productKey = `${pedido.folio}-${pedido.producto_id}`;
     
     setSelectedProducts(prev => {
       const newMap = new Map(prev);
       
-      if (selected) {
+      if (newMap.has(productKey)) {
+        // Remove if already selected
+        newMap.delete(productKey);
+      } else {
+        // Add if not selected
         newMap.set(productKey, {
           folio: pedido.folio,
           producto_id: pedido.producto_id,
@@ -231,13 +198,12 @@ export const PedidosSection: React.FC = React.memo(() => {
           cantidad_total: pedido.cantidad,
           cantidad_selected: pedido.cantidad
         });
-      } else {
-        newMap.delete(productKey);
       }
       
       return newMap;
     });
   }, []);
+
 
   // Fetch moldes data
   const fetchMoldesData = useCallback(async () => {
@@ -514,14 +480,14 @@ export const PedidosSection: React.FC = React.memo(() => {
               {isMovingToBitacora ? 'Moviendo...' : `Mover a Bitácora`}
             </Button>
           )}
-          {selectedRowId && (
+          {selectedProducts.size > 0 && (
             <Button
               variant="outline"
               size="sm"
               className="h-7 px-2 text-xs"
-              onClick={() => setSelectedRowId('')}
+              onClick={() => setSelectedProducts(new Map())}
             >
-              Limpiar selección
+              Limpiar selecciones
             </Button>
           )}
         </div>
@@ -529,7 +495,6 @@ export const PedidosSection: React.FC = React.memo(() => {
 
       {/* Grouped Cotizaciones */}
       <div className="space-y-2">
-        <RadioGroup value={selectedRowId} onValueChange={setSelectedRowId}>
           {groupedPedidos.length === 0 ? (
             <div className="border rounded-lg bg-card shadow-sm">
               <div className="h-24 text-center text-sm text-muted-foreground flex items-center justify-center">
@@ -585,38 +550,35 @@ export const PedidosSection: React.FC = React.memo(() => {
                         <TableRow className="hover:bg-transparent border-b">
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground w-12">Sel.</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">Cantidad</TableHead>
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">Moldes</TableHead>
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">Fecha Est.</TableHead>
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center">Estado</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Cantidad</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Moldes</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Fecha Est.</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Estado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {cotizacion.productos.map((producto) => {
-                          const productId = `${producto.folio}-${producto.producto_id}`;
-                          const isSelected = selectedRowId === productId;
+                          const productKey = `${producto.folio}-${producto.producto_id}`;
+                          const isSelected = selectedProducts.has(productKey);
                           
                           return (
                             <TableRow
-                              key={productId}
+                              key={productKey}
                               data-state={isSelected ? "selected" : undefined}
                               className="hover:bg-muted/30 transition-colors"
                             >
-                              <TableCell className="px-4 py-2">
+                              <TableCell className="px-4 py-2 w-12">
                                 {!producto.hasMoldes || !producto.producto_id ? (
                                   <div className="flex items-center justify-center">
-                                    <div className="h-4 w-4 rounded-full border-2 border-gray-200 bg-gray-100 opacity-30"></div>
+                                    <div className="h-4 w-4 rounded border-2 border-gray-200 bg-gray-100 opacity-30"></div>
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-center">
-                                    <RadioGroupItem 
-                                      value={productId} 
-                                      id={`radio-${productId}`}
+                                    <Checkbox
+                                      checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
+                                      onCheckedChange={() => handleProductToggle(producto)}
                                       className="h-4 w-4"
                                     />
-                                    <Label htmlFor={`radio-${productId}`} className="sr-only">
-                                      Select {producto.producto}
-                                    </Label>
                                   </div>
                                 )}
                               </TableCell>
@@ -626,12 +588,12 @@ export const PedidosSection: React.FC = React.memo(() => {
                                   <span className="text-sm font-medium text-foreground">{producto.producto}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center">
+                              <TableCell className="px-4 py-2 text-center w-20">
                                 <Badge variant="secondary" className="text-xs font-medium">
                                   {producto.cantidad}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center">
+                              <TableCell className="px-4 py-2 text-center w-20">
                                 {producto.hasMoldes ? (
                                     <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
                                       <Package className="h-3 w-3 mr-1" />
@@ -641,12 +603,12 @@ export const PedidosSection: React.FC = React.memo(() => {
                                   <div className="text-xs text-muted-foreground italic">Sin moldes</div>
                                 )}
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center">
+                              <TableCell className="px-4 py-2 text-center w-24">
                                 <div className="text-xs text-muted-foreground">
                                   {producto.estimated_delivery_date || '-'}
                                 </div>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center">
+                              <TableCell className="px-4 py-2 text-center w-20">
                                 {(() => {
                                   const days = producto.days_until_delivery;
                                   
@@ -675,7 +637,6 @@ export const PedidosSection: React.FC = React.memo(() => {
               </div>
             ))
           )}
-        </RadioGroup>
       </div>
 
       {/* Footer */}

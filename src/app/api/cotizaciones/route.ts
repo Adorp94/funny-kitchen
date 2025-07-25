@@ -365,6 +365,11 @@ export async function POST(req: NextRequest) {
     const fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
 
+    // Calculate estimated delivery date (fecha_creacion + tiempo_estimado_max weeks)
+    const estimatedDeliveryDate = new Date();
+    const weeksToAdd = tiempo_estimado_max || tiempo_estimado || 8; // Use max weeks, fallback to min, then default to 8
+    estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + (weeksToAdd * 7));
+
     // --- Calculate Display Values & IVA for DB --- 
     // Fixed: db_subtotal should store BASE subtotal (before discount), not after discount
     let db_subtotal: number;
@@ -440,6 +445,7 @@ export async function POST(req: NextRequest) {
         tipo_cambio: tipo_cambio,
         tiempo_estimado: tiempo_estimado || 6,
         tiempo_estimado_max: tiempo_estimado_max || 8,
+        estimated_delivery_date: estimatedDeliveryDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
         estado: 'pendiente',
         fecha_expiracion: fechaExpiracion.toISOString(),
         is_premium: isPremium // <<< ADDED: Save the isPremium flag from request body

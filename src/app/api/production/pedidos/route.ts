@@ -10,6 +10,8 @@ type PedidosData = {
   cantidad: number;
   fecha: string;
   precio_venta: number;
+  estimated_delivery_date?: string;
+  days_until_delivery?: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
       : ['aprobada', 'producción', 'pagada'];
 
     // OPTIMIZED: Use two efficient queries instead of complex nested joins
-    // First, get cotizaciones with client info
+    // First, get cotizaciones with client info, ordered by estimated delivery date (priority)
     const { data: cotizacionesData, error: cotizacionesError } = await supabase
       .from('cotizaciones')
       .select(`
@@ -58,12 +60,14 @@ export async function GET(request: NextRequest) {
         fecha_creacion,
         estado,
         cliente_id,
+        estimated_delivery_date,
         clientes (
           nombre
         )
       `)
       .in('estado', statusConditions)
-      .order('folio', { ascending: true });
+      .order('estimated_delivery_date', { ascending: true }) // Order by priority (soonest first)
+      .order('folio', { ascending: true }); // Secondary sort by folio
 
     if (cotizacionesError) {
       console.error("[API /production/pedidos GET] Error fetching cotizaciones:", cotizacionesError);
@@ -92,6 +96,7 @@ export async function GET(request: NextRequest) {
       .from('cotizacion_productos')
       .select(`
         cotizacion_id,
+        producto_id,
         cantidad,
         precio_unitario,
         productos (
@@ -124,6 +129,24 @@ export async function GET(request: NextRequest) {
         year: '2-digit'
       });
 
+      // Calculate days until delivery and format estimated delivery date
+      let estimatedDeliveryFormatted = '';
+      let daysUntilDelivery = 0;
+      
+      if (cotizacion.estimated_delivery_date) {
+        const deliveryDate = new Date(cotizacion.estimated_delivery_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time for accurate date comparison
+        deliveryDate.setHours(0, 0, 0, 0);
+        
+        daysUntilDelivery = Math.ceil((deliveryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        estimatedDeliveryFormatted = deliveryDate.toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit'
+        });
+      }
+
       // Find products for this cotizacion
       const cotizacionProductos = productosData?.filter(p => p.cotizacion_id === cotizacion.cotizacion_id) || [];
       
@@ -134,18 +157,27 @@ export async function GET(request: NextRequest) {
           folio: cotizacion.folio,
           cliente: clienteNombre,
           producto: productoNombre,
+          producto_id: producto.producto_id,
           cantidad: producto.cantidad,
           fecha: fechaFormatted,
-          precio_venta: producto.precio_unitario || 0
+          precio_venta: producto.precio_unitario || 0,
+          estimated_delivery_date: estimatedDeliveryFormatted,
+          days_until_delivery: daysUntilDelivery
         });
       }
     }
 
-    // Sort by folio and then by product name
+    // Sort by priority (days until delivery), then by folio, then by product name
     processedPedidos.sort((a, b) => {
+      // Primary sort: by days until delivery (ascending - soonest first)
+      if (a.days_until_delivery !== b.days_until_delivery) {
+        return a.days_until_delivery - b.days_until_delivery;
+      }
+      // Secondary sort: by folio
       if (a.folio !== b.folio) {
         return a.folio.localeCompare(b.folio);
       }
+      // Tertiary sort: by product name
       return a.producto.localeCompare(b.producto);
     });
 
