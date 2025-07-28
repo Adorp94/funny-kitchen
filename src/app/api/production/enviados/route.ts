@@ -178,7 +178,57 @@ export async function POST(request: NextRequest) {
 
     console.log("[API /production/enviados POST] Successfully moved products to enviados");
 
-    // 3. Check if all products from this cotización have been fully sent
+    // 3. CRITICAL: Subtract delivered quantities from bitácora (production_active.pedidos)
+    // This prevents overproduction of already delivered products
+    try {
+      // Get current bitácora entry for this product
+      const { data: bitacoraEntry, error: bitacoraError } = await supabase
+        .from('production_active')
+        .select('pedidos')
+        .eq('producto_id', producto_id)
+        .single();
+
+      if (bitacoraError && bitacoraError.code !== 'PGRST116') {
+        console.warn("[API /production/enviados POST] Warning: Could not fetch bitácora entry:", bitacoraError);
+      } else if (bitacoraEntry) {
+        // Calculate new pedidos quantity (don't go below 0)
+        const newPedidos = Math.max(0, bitacoraEntry.pedidos - cantidad);
+        
+        if (newPedidos === 0) {
+          // Remove from bitácora entirely if no more pedidos needed
+          const { error: deleteError } = await supabase
+            .from('production_active')
+            .delete()
+            .eq('producto_id', producto_id);
+            
+          if (deleteError) {
+            console.warn("[API /production/enviados POST] Warning: Could not remove product from bitácora:", deleteError);
+          } else {
+            console.log(`[API /production/enviados POST] Removed product ${producto_id} from bitácora (all delivered)`);
+          }
+        } else {
+          // Update bitácora with reduced quantity
+          const { error: updateError } = await supabase
+            .from('production_active')
+            .update({
+              pedidos: newPedidos,
+              updated_at: new Date().toISOString()
+            })
+            .eq('producto_id', producto_id);
+            
+          if (updateError) {
+            console.warn("[API /production/enviados POST] Warning: Could not update bitácora:", updateError);
+          } else {
+            console.log(`[API /production/enviados POST] Updated bitácora for product ${producto_id}: ${bitacoraEntry.pedidos} -> ${newPedidos} pedidos`);
+          }
+        }
+      }
+    } catch (bitacoraUpdateError) {
+      console.warn("[API /production/enviados POST] Warning: Error updating bitácora:", bitacoraUpdateError);
+      // Don't fail the main operation if bitácora update fails
+    }
+
+    // 4. Check if all products from this cotización have been fully sent
     try {
       // Get total quantities ordered for this cotización
       const { data: cotizacionProductos, error: cotizacionError } = await supabase

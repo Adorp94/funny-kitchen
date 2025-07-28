@@ -5,10 +5,11 @@ import { TestingListing } from "@/components/testing/testing-listing";
 import { MoldesActivos } from "@/components/produccion/moldes-activos";
 import { PedidosSection } from "@/components/produccion/pedidos-section";
 import { ClientesActivosSection } from "@/components/produccion/clientes-activos-section";
+import { EnviosSection } from "@/components/produccion/envios-section";
 import { ProductionActiveListing } from "@/components/testing/production-active-listing";
 import { ReviewSectionOptimized } from "@/components/produccion/review-section-optimized";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye } from 'lucide-react';
+import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye, Truck } from 'lucide-react';
 
 export default function ProduccionPage() {
 
@@ -27,7 +28,7 @@ export default function ProduccionPage() {
 
       <Tabs defaultValue="pedidos" className="w-full">
         <div className="border-b border-border/50">
-          <TabsList className="grid w-full grid-cols-5 h-10 bg-background/50 border-0 rounded-none p-0">
+          <TabsList className="grid w-full grid-cols-6 h-10 bg-background/50 border-0 rounded-none p-0">
             <TabsTrigger 
               value="pedidos" 
               className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-blue-50/50 data-[state=active]:text-blue-700 hover:bg-muted/30 transition-colors"
@@ -63,6 +64,13 @@ export default function ProduccionPage() {
               <Eye className="h-3.5 w-3.5" />
               Revisar
             </TabsTrigger>
+            <TabsTrigger 
+              value="envios" 
+              className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-teal-500 data-[state=active]:bg-teal-50/50 data-[state=active]:text-teal-700 hover:bg-muted/30 transition-colors"
+            >
+              <Truck className="h-3.5 w-3.5" />
+              Envíos
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -84,6 +92,10 @@ export default function ProduccionPage() {
 
         <TabsContent value="revisar" className="mt-6">
           <ReviewSectionOptimized />
+        </TabsContent>
+
+        <TabsContent value="envios" className="mt-6">
+          <EnviosSection />
         </TabsContent>
       </Tabs>
     </div>
