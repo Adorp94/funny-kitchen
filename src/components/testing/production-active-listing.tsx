@@ -313,15 +313,10 @@ export const ProductionActiveListing: React.FC = React.memo(() => {
       }
       
       const result = await response.json();
-      console.log("Production Active data received from API:", result);
       
       const productionItems = result.data || [];
       setData(productionItems);
       setLastFetch(now);
-      
-      if (productionItems.length > 0) {
-        toast.success(`${productionItems.length} productos cargados exitosamente`);
-      }
       
     } catch (err: any) {
       if (err.name === 'AbortError') {

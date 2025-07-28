@@ -186,7 +186,7 @@ export const PedidosSection: React.FC = React.memo(() => {
     return groupedPedidos.flatMap(group => group.productos);
   }, [groupedPedidos]);
 
-  // Handle product selection toggle
+  // Handle product selection toggle - optimized for instant response
   const handleProductToggle = useCallback((pedido: PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean }) => {
     if (!pedido.producto_id || !pedido.hasMoldes) return;
     
@@ -200,14 +200,13 @@ export const PedidosSection: React.FC = React.memo(() => {
     
     const productKey = `${pedido.folio}-${pedido.producto_id}`;
     
+    // Immediate UI update - no async operations
     setSelectedProducts(prev => {
       const newMap = new Map(prev);
       
       if (newMap.has(productKey)) {
-        // Remove if already selected
         newMap.delete(productKey);
       } else {
-        // Add if not selected
         newMap.set(productKey, {
           folio: pedido.folio,
           producto_id: pedido.producto_id,
@@ -398,8 +397,20 @@ export const PedidosSection: React.FC = React.memo(() => {
 
   // Initial load
   useEffect(() => {
-    fetchPedidos();
-    fetchMoldesData();
+    let mounted = true;
+    
+    const loadData = async () => {
+      if (mounted) {
+        await fetchPedidos();
+        await fetchMoldesData();
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
   }, [fetchPedidos, fetchMoldesData]);
 
   if (loading && pedidos.length === 0) {
@@ -520,8 +531,8 @@ export const PedidosSection: React.FC = React.memo(() => {
           )}
         </div>
         
-        <div className="flex items-center gap-2">
-          {selectedProducts.size > 0 && (
+        {selectedProducts.size > 0 && (
+          <div className="flex items-center gap-2">
             <Button
               onClick={handleMoveToBitacora}
               disabled={isMovingToBitacora}
@@ -531,8 +542,6 @@ export const PedidosSection: React.FC = React.memo(() => {
               <Plus className="h-3 w-3 mr-1" />
               {isMovingToBitacora ? 'Moviendo...' : `Mover a Bitácora`}
             </Button>
-          )}
-          {selectedProducts.size > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -541,8 +550,8 @@ export const PedidosSection: React.FC = React.memo(() => {
             >
               Limpiar selecciones
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Grouped Cotizaciones */}
@@ -601,7 +610,9 @@ export const PedidosSection: React.FC = React.memo(() => {
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-b">
                           <TableHead className="w-[50px]">
-                            <span className="sr-only">Seleccionar</span>
+                            <div className="flex items-center justify-center">
+                              <span className="sr-only">Seleccionar</span>
+                            </div>
                           </TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Cantidad</TableHead>
@@ -620,28 +631,30 @@ export const PedidosSection: React.FC = React.memo(() => {
                             <TableRow
                               key={productKey}
                               data-state={isSelected ? "selected" : undefined}
-                              className="hover:bg-muted/30 transition-colors"
+                              className="hover:bg-muted/30 transition-colors h-12"
                             >
-                              <TableCell>
-                                {!producto.hasMoldes || !producto.producto_id ? (
-                                  <Checkbox
-                                    disabled
-                                    aria-label="Producto sin moldes disponibles"
-                                  />
-                                ) : producto.production_status?.is_in_production ? (
-                                  <div 
-                                    className="flex h-4 w-4 items-center justify-center rounded-sm border border-orange-300 bg-orange-100 opacity-60"
-                                    title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}
-                                  >
-                                    <div className="h-2 w-2 rounded-full bg-orange-500" />
-                                  </div>
-                                ) : (
-                                  <Checkbox
-                                    checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
-                                    onCheckedChange={() => handleProductToggle(producto)}
-                                    aria-label={`Seleccionar ${producto.producto}`}
-                                  />
-                                )}
+                              <TableCell className="h-12">
+                                <div className="flex items-center justify-center h-full">
+                                  {!producto.hasMoldes || !producto.producto_id ? (
+                                    <Checkbox
+                                      disabled
+                                      aria-label="Producto sin moldes disponibles"
+                                    />
+                                  ) : producto.production_status?.is_in_production ? (
+                                    <div 
+                                      className="flex h-4 w-4 items-center justify-center rounded-sm border border-orange-300 bg-orange-100 opacity-60"
+                                      title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}
+                                    >
+                                      <div className="h-2 w-2 rounded-full bg-orange-500" />
+                                    </div>
+                                  ) : (
+                                    <Checkbox
+                                      checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
+                                      onCheckedChange={() => handleProductToggle(producto)}
+                                      aria-label={`Seleccionar ${producto.producto}`}
+                                    />
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="px-4 py-2">
                                 <div className="flex items-center gap-2">
