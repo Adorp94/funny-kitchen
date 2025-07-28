@@ -531,27 +531,26 @@ export const PedidosSection: React.FC = React.memo(() => {
           )}
         </div>
         
-        {selectedProducts.size > 0 && (
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleMoveToBitacora}
-              disabled={isMovingToBitacora}
-              size="sm"
-              className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              {isMovingToBitacora ? 'Moviendo...' : `Mover a Bitácora`}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => setSelectedProducts(new Map())}
-            >
-              Limpiar selecciones
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleMoveToBitacora}
+            disabled={isMovingToBitacora || selectedProducts.size === 0}
+            size="sm"
+            className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            {isMovingToBitacora ? 'Moviendo...' : `Mover a Bitácora`}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setSelectedProducts(new Map())}
+            disabled={selectedProducts.size === 0}
+          >
+            Limpiar selecciones
+          </Button>
+        </div>
       </div>
 
       {/* Grouped Cotizaciones */}

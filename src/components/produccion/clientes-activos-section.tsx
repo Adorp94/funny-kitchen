@@ -365,11 +365,11 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
       setClienteData(result.data);
       setError(null);
       
-      // Fetch enviados data for this cotizacion
-      await fetchEnviadosData(idToSearch);
-      
-      // Fetch empaque data for this cotizacion
-      await fetchEmpaqueData(idToSearch);
+      // Fetch additional data in parallel instead of sequentially
+      await Promise.all([
+        fetchEnviadosData(idToSearch),
+        fetchEmpaqueData(idToSearch)
+      ]);
       
     } catch (err: any) {
       console.error("Error in searchCotizacion:", err);
@@ -521,7 +521,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
               <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
             </div>
           ) : activeCotizaciones.length > 0 ? (
-            <div className="max-h-48 overflow-y-auto">
+            <div className="max-h-48 overflow-y-auto rounded-b-lg">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50/50">
@@ -533,7 +533,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
                     <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Prioridad</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="[&_tr:last-child]:border-0">
                   {activeCotizaciones.map((cotizacion, index) => (
                     <TableRow
                       key={cotizacion.cotizacion_id}
@@ -673,7 +673,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
               <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
                 <h3 className="text-xs font-medium text-gray-700">Detalle de Productos</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-b-lg">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50/50 border-b border-gray-200">
@@ -684,7 +684,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
                       <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Total</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="[&_tr:last-child]:border-0">
                     {clienteData.productos.map((producto, index) => (
                       <ProductRow
                         key={`${producto.nombre}-${index}`}
@@ -703,7 +703,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
               <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
                 <h3 className="text-xs font-medium text-gray-700">Estado de Producción</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-b-lg">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50/50 border-b border-gray-200">
@@ -714,7 +714,7 @@ export const ClientesActivosSection: React.FC = React.memo(() => {
                       <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Terminado</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="[&_tr:last-child]:border-0">
                     {clienteData.productos.map((producto, index) => (
                       <ProductionStatusRow
                         key={`status-${producto.nombre}-${index}`}
