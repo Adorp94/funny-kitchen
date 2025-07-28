@@ -600,7 +600,9 @@ export const PedidosSection: React.FC = React.memo(() => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-b">
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground w-12">Sel.</TableHead>
+                          <TableHead className="w-[50px]">
+                            <span className="sr-only">Seleccionar</span>
+                          </TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Cantidad</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Moldes</TableHead>
@@ -620,25 +622,25 @@ export const PedidosSection: React.FC = React.memo(() => {
                               data-state={isSelected ? "selected" : undefined}
                               className="hover:bg-muted/30 transition-colors"
                             >
-                              <TableCell className="px-4 py-2 w-12">
+                              <TableCell>
                                 {!producto.hasMoldes || !producto.producto_id ? (
-                                  <div className="flex items-center justify-center">
-                                    <div className="h-4 w-4 rounded border-2 border-gray-200 bg-gray-100 opacity-30"></div>
-                                  </div>
+                                  <Checkbox
+                                    disabled
+                                    aria-label="Producto sin moldes disponibles"
+                                  />
                                 ) : producto.production_status?.is_in_production ? (
-                                  <div className="flex items-center justify-center" title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}>
-                                    <div className="h-4 w-4 rounded border-2 border-orange-300 bg-orange-100 opacity-60 flex items-center justify-center">
-                                      <div className="h-2 w-2 rounded-full bg-orange-500"></div>
-                                    </div>
+                                  <div 
+                                    className="flex h-4 w-4 items-center justify-center rounded-sm border border-orange-300 bg-orange-100 opacity-60"
+                                    title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-orange-500" />
                                   </div>
                                 ) : (
-                                  <div className="flex items-center justify-center">
-                                    <Checkbox
-                                      checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
-                                      onCheckedChange={() => handleProductToggle(producto)}
-                                      className="h-4 w-4 !rounded-sm"
-                                    />
-                                  </div>
+                                  <Checkbox
+                                    checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
+                                    onCheckedChange={() => handleProductToggle(producto)}
+                                    aria-label={`Seleccionar ${producto.producto}`}
+                                  />
                                 )}
                               </TableCell>
                               <TableCell className="px-4 py-2">
