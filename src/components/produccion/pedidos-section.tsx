@@ -850,11 +850,11 @@ export const PedidosSection: React.FC = React.memo(() => {
                               </TableCell>
                               <TableCell className="px-4 py-3 text-center w-24">
                                 {producto.production_status?.is_in_production ? (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs whitespace-nowrap">
                                     {getProductionStageLabel(producto.production_status.stage)}
                                   </Badge>
                                 ) : (
-                                  <div className="text-xs text-muted-foreground italic">-</div>
+                                  <span className="text-xs text-muted-foreground italic">-</span>
                                 )}
                               </TableCell>
                               <TableCell className="px-4 py-3 text-center w-24">
