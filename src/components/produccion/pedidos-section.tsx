@@ -21,6 +21,13 @@ interface PedidoItem {
   precio_venta: number;
   estimated_delivery_date?: string;
   days_until_delivery?: number;
+  is_premium?: boolean;
+  inventory_status?: {
+    terminado_disponible: number;
+    availability: 'sufficient' | 'partial' | 'none';
+    can_skip_production: boolean;
+    production_needed: number;
+  };
   production_status?: {
     is_in_production: boolean;
     pedidos: number;
@@ -32,12 +39,21 @@ interface PedidoItem {
   };
 }
 
-interface SelectedProduct {
+interface SelectedCotizacion {
   folio: string;
-  producto_id: number;
-  producto_nombre: string;
-  cantidad_total: number;
-  cantidad_selected: number;
+  cliente: string;
+  productos: Array<{
+    producto_id: number;
+    producto_nombre: string;
+    cantidad: number;
+    has_moldes: boolean;
+    inventory_status?: {
+      terminado_disponible: number;
+      availability: 'sufficient' | 'partial' | 'none';
+      can_skip_production: boolean;
+      production_needed: number;
+    };
+  }>;
 }
 
 interface PedidosResponse {
@@ -72,22 +88,55 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// Helper function to get inventory badge colors - modern soft palette
+const getInventoryBadgeColor = (availability: 'sufficient' | 'partial' | 'none' | undefined) => {
+  switch (availability) {
+    case 'sufficient':
+      return 'text-emerald-700 bg-emerald-100 border-emerald-300'; // More visible emerald
+    case 'partial':
+      return 'text-amber-700 bg-amber-100 border-amber-300'; // More visible amber
+    case 'none':
+      return 'text-rose-700 bg-rose-100 border-rose-300'; // More visible rose
+    default:
+      return 'text-gray-700 bg-gray-100 border-gray-300'; // Default gray
+  }
+};
+
+// Helper function to get inventory tooltip text
+const getInventoryTooltip = (pedido: PedidoItem & { moldesInfo: any; hasMoldes: boolean }) => {
+  if (!pedido.inventory_status) return '';
+  
+  const { terminado_disponible, availability, production_needed } = pedido.inventory_status;
+  
+  switch (availability) {
+    case 'sufficient':
+      return `✅ Inventario suficiente: ${terminado_disponible}/${pedido.cantidad} disponibles. Puede ir directo a empaque.`;
+    case 'partial':
+      return `⚠️ Inventario parcial: ${terminado_disponible}/${pedido.cantidad} disponibles. Necesita producir ${production_needed} más.`;
+    case 'none':
+      return `🔴 Sin inventario: 0/${pedido.cantidad} disponibles. Necesita producir todas las ${pedido.cantidad} piezas.`;
+    default:
+      return '';
+  }
+};
+
 // Memoized summary stats component
 const SummaryStats = React.memo(({ pedidos, selectedCount }: { pedidos: PedidoItem[]; selectedCount: number }) => {
   const stats = useMemo(() => {
-    const totalPedidos = pedidos.length;
+    const totalProductos = pedidos.length; // This is the count of individual products
+    const totalCotizaciones = new Set(pedidos.map(pedido => pedido.folio)).size; // Unique cotizaciones
     const totalPiezas = pedidos.reduce((sum, pedido) => sum + pedido.cantidad, 0);
     const uniqueClientes = new Set(pedidos.map(pedido => pedido.cliente)).size;
     const uniqueProductos = new Set(pedidos.map(pedido => pedido.producto)).size;
     const totalValue = pedidos.reduce((sum, pedido) => sum + (pedido.cantidad * pedido.precio_venta), 0);
     
-    return { totalPedidos, totalPiezas, uniqueClientes, uniqueProductos, totalValue };
+    return { totalCotizaciones, totalProductos, totalPiezas, uniqueClientes, uniqueProductos, totalValue };
   }, [pedidos]);
 
   return (
     <div className="grid grid-cols-4 gap-4 p-3 bg-muted/30 border rounded-lg">
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalPedidos}</div>
+        <div className="text-sm font-semibold text-foreground">{stats.totalCotizaciones}</div>
         <div className="text-xs text-muted-foreground">Cotizaciones</div>
       </div>
       <div className="text-center">
@@ -95,7 +144,7 @@ const SummaryStats = React.memo(({ pedidos, selectedCount }: { pedidos: PedidoIt
         <div className="text-xs text-muted-foreground">Piezas</div>
       </div>
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.uniqueProductos}</div>
+        <div className="text-sm font-semibold text-foreground">{stats.totalProductos}</div>
         <div className="text-xs text-muted-foreground">Productos</div>
       </div>
       <div className="text-center">
@@ -117,8 +166,20 @@ export const PedidosSection: React.FC = React.memo(() => {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [expandedCotizaciones, setExpandedCotizaciones] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number>(0);
-  const [selectedProducts, setSelectedProducts] = useState<Map<string, SelectedProduct>>(new Map());
+  const [selectedCotizaciones, setSelectedCotizaciones] = useState<Map<string, SelectedCotizacion>>(new Map());
   const [isMovingToBitacora, setIsMovingToBitacora] = useState<boolean>(false);
+  
+  // Allocation dialog states
+  const [showAllocationDialog, setShowAllocationDialog] = useState<boolean>(false);
+  const [allocationData, setAllocationData] = useState<{
+    cotizaciones: SelectedCotizacion[];
+    totalCotizaciones: number;
+    totalProducts: number;
+    canSkipProduction: number;
+    needsProduction: number;
+    needsMoldes: Array<{ producto_nombre: string; folio: string }>;
+  } | null>(null);
+  const [isProcessingAllocation, setIsProcessingAllocation] = useState<boolean>(false);
 
   // Debounced search term to reduce filtering frequency
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -186,33 +247,38 @@ export const PedidosSection: React.FC = React.memo(() => {
     return groupedPedidos.flatMap(group => group.productos);
   }, [groupedPedidos]);
 
-  // Handle product selection toggle - optimized for instant response
-  const handleProductToggle = useCallback((pedido: PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean }) => {
-    if (!pedido.producto_id || !pedido.hasMoldes) return;
-    
-    // Prevent selection if already in production
-    if (pedido.production_status?.is_in_production) {
-      toast.error(`${pedido.producto} ya está en Producción Activa`, {
-        description: `Etapa actual: ${getProductionStageLabel(pedido.production_status.stage)}`
+  // Handle cotization selection toggle - now works at cotization level
+  const handleCotizacionToggle = useCallback((cotizacionData: {
+    folio: string;
+    cliente: string;
+    productos: (PedidoItem & { moldesInfo: MoldeInfo | null; hasMoldes: boolean })[];
+  }) => {
+    // Check if any product is already in production
+    const productsInProduction = cotizacionData.productos.filter(p => p.production_status?.is_in_production);
+    if (productsInProduction.length > 0) {
+      toast.error(`Cotización ${cotizacionData.folio} tiene productos en Producción Activa`, {
+        description: `${productsInProduction.length} productos ya están en producción`
       });
       return;
     }
     
-    const productKey = `${pedido.folio}-${pedido.producto_id}`;
-    
     // Immediate UI update - no async operations
-    setSelectedProducts(prev => {
+    setSelectedCotizaciones(prev => {
       const newMap = new Map(prev);
       
-      if (newMap.has(productKey)) {
-        newMap.delete(productKey);
+      if (newMap.has(cotizacionData.folio)) {
+        newMap.delete(cotizacionData.folio);
       } else {
-        newMap.set(productKey, {
-          folio: pedido.folio,
-          producto_id: pedido.producto_id,
-          producto_nombre: pedido.producto,
-          cantidad_total: pedido.cantidad,
-          cantidad_selected: pedido.cantidad
+        newMap.set(cotizacionData.folio, {
+          folio: cotizacionData.folio,
+          cliente: cotizacionData.cliente,
+          productos: cotizacionData.productos.map(p => ({
+            producto_id: p.producto_id!,
+            producto_nombre: p.producto,
+            cantidad: p.cantidad,
+            has_moldes: p.hasMoldes,
+            inventory_status: p.inventory_status
+          }))
         });
       }
       
@@ -331,17 +397,123 @@ export const PedidosSection: React.FC = React.memo(() => {
     setSearchTerm(value);
   }, []);
 
-  // Move selected products to bitácora
+  // Prepare allocation analysis for cotization-level processing
+  const prepareAllocationAnalysis = useCallback(() => {
+    if (selectedCotizaciones.size === 0) {
+      toast.error("Selecciona al menos una cotización para procesar");
+      return;
+    }
+
+    const selectedCotizacionesArray = Array.from(selectedCotizaciones.values());
+    let totalProducts = 0;
+    let canSkipProduction = 0;
+    let needsProduction = 0;
+    const needsMoldes: Array<{ producto_nombre: string; folio: string }> = [];
+
+    // Analyze each cotization's products
+    selectedCotizacionesArray.forEach(cotizacion => {
+      cotizacion.productos.forEach(producto => {
+        totalProducts++;
+        
+        // Check if product needs moldes
+        if (!producto.has_moldes) {
+          needsMoldes.push({
+            producto_nombre: producto.producto_nombre,
+            folio: cotizacion.folio
+          });
+        }
+        
+        // Check inventory status
+        if (producto.inventory_status?.can_skip_production) {
+          canSkipProduction++;
+        } else {
+          needsProduction++;
+        }
+      });
+    });
+
+    setAllocationData({
+      cotizaciones: selectedCotizacionesArray,
+      totalCotizaciones: selectedCotizaciones.size,
+      totalProducts,
+      canSkipProduction,
+      needsProduction,
+      needsMoldes
+    });
+    setShowAllocationDialog(true);
+  }, [selectedCotizaciones]);
+
+  // Process inventory allocation for cotization-based processing
+  const handleInventoryAllocation = useCallback(async () => {
+    if (!allocationData) return;
+
+    setIsProcessingAllocation(true);
+    
+    try {
+      const response = await fetch('/api/production/process-cotizaciones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cotizaciones: allocationData.cotizaciones })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar asignaciones');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        const { summary } = result;
+        toast.success(
+          `Procesamiento completado: ${summary.successful}/${summary.total_cotizaciones} cotizaciones procesadas`,
+          {
+            description: `${summary.total_to_empaque} productos a empaque, ${summary.total_to_bitacora} a producción`
+          }
+        );
+      } else {
+        throw new Error('Error en el procesamiento de cotizaciones');
+      }
+      
+      // Clear selections and refresh data
+      setSelectedCotizaciones(new Map());
+      setShowAllocationDialog(false);
+      setAllocationData(null);
+      fetchPedidos(true);
+      
+    } catch (error: any) {
+      console.error('Error processing allocation:', error);
+      toast.error(`Error al procesar: ${error.message}`);
+    } finally {
+      setIsProcessingAllocation(false);
+    }
+  }, [allocationData, fetchPedidos]);
+
+  // Legacy move to bitácora (kept for manual override) - now works with cotizaciones
   const handleMoveToBitacora = useCallback(async () => {
-    if (selectedProducts.size === 0) {
-      toast.error("Selecciona al menos un producto para mover a bitácora");
+    if (selectedCotizaciones.size === 0) {
+      toast.error("Selecciona al menos una cotización para mover a bitácora");
       return;
     }
 
     setIsMovingToBitacora(true);
     
     try {
-      const productsToMove = Array.from(selectedProducts.values());
+      // Convert cotizaciones to product format for legacy API
+      const productsToMove: any[] = [];
+      Array.from(selectedCotizaciones.values()).forEach(cotizacion => {
+        cotizacion.productos.forEach(producto => {
+          productsToMove.push({
+            folio: cotizacion.folio,
+            producto_id: producto.producto_id,
+            producto_nombre: producto.producto_nombre,
+            cantidad_total: producto.cantidad,
+            cantidad_selected: producto.cantidad
+          });
+        });
+      });
       
       const response = await fetch('/api/production/move-to-bitacora', {
         method: 'POST',
@@ -360,10 +532,10 @@ export const PedidosSection: React.FC = React.memo(() => {
 
       const result = await response.json();
       
-      toast.success(`${selectedProducts.size} productos movidos a bitácora exitosamente`);
+      toast.success(`${selectedCotizaciones.size} cotizaciones movidas a bitácora exitosamente`);
       
       // Clear selections and refresh data
-      setSelectedProducts(new Map());
+      setSelectedCotizaciones(new Map());
       fetchPedidos(true);
       
     } catch (error: any) {
@@ -372,7 +544,7 @@ export const PedidosSection: React.FC = React.memo(() => {
     } finally {
       setIsMovingToBitacora(false);
     }
-  }, [selectedProducts, fetchPedidos]);
+  }, [selectedCotizaciones, fetchPedidos]);
 
   // Toggle cotización expansion
   const toggleCotizacion = useCallback((folio: string) => {
@@ -459,7 +631,7 @@ export const PedidosSection: React.FC = React.memo(() => {
               <SelectItem value="urgent">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-3 w-3 text-orange-600" />
-                  Urgente (≤7d)
+                  Urgente (&le;7d)
                 </div>
               </SelectItem>
               <SelectItem value="medium">
@@ -471,7 +643,7 @@ export const PedidosSection: React.FC = React.memo(() => {
               <SelectItem value="low">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-3 w-3 text-green-600" />
-                  Bajo (>14d)
+                  Bajo (&gt;14d)
                 </div>
               </SelectItem>
             </SelectContent>
@@ -498,7 +670,7 @@ export const PedidosSection: React.FC = React.memo(() => {
       </div>
 
       {/* Summary */}
-      <SummaryStats pedidos={filteredPedidos} selectedCount={selectedProducts.size} />
+      <SummaryStats pedidos={filteredPedidos} selectedCount={selectedCotizaciones.size} />
 
       {/* Controls */}
       <div className="flex items-center justify-between px-1">
@@ -533,20 +705,20 @@ export const PedidosSection: React.FC = React.memo(() => {
         
         <div className="flex items-center gap-2">
           <Button
-            onClick={handleMoveToBitacora}
-            disabled={isMovingToBitacora || selectedProducts.size === 0}
+            onClick={prepareAllocationAnalysis}
+            disabled={selectedCotizaciones.size === 0}
             size="sm"
-            className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <Plus className="h-3 w-3 mr-1" />
-            {isMovingToBitacora ? 'Moviendo...' : `Mover a Bitácora`}
+            Mover a Producción Activa ({selectedCotizaciones.size})
           </Button>
           <Button
             variant="outline"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => setSelectedProducts(new Map())}
-            disabled={selectedProducts.size === 0}
+            onClick={() => setSelectedCotizaciones(new Map())}
+            disabled={selectedCotizaciones.size === 0}
           >
             Limpiar selecciones
           </Button>
@@ -567,21 +739,29 @@ export const PedidosSection: React.FC = React.memo(() => {
           ) : (
             groupedPedidos.map((cotizacion) => (
               <div key={cotizacion.folio} className="border rounded-lg bg-card shadow-sm">
-                {/* Cotizacion Header */}
-                <div 
-                  className="flex items-center justify-between p-3 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => toggleCotizacion(cotizacion.folio)}
-                >
+                {/* Cotizacion Header with Selection */}
+                <div className="flex items-center justify-between p-3 bg-muted/30 border-b">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      {expandedCotizaciones.has(cotizacion.folio) ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <Badge variant="outline" className="text-xs font-medium">
-                        {cotizacion.folio}
-                      </Badge>
+                      <Checkbox
+                        checked={selectedCotizaciones.has(cotizacion.folio)}
+                        onCheckedChange={() => handleCotizacionToggle(cotizacion)}
+                        disabled={cotizacion.productos.some(p => p.production_status?.is_in_production)}
+                        aria-label={`Seleccionar cotización ${cotizacion.folio}`}
+                      />
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded transition-colors"
+                        onClick={() => toggleCotizacion(cotizacion.folio)}
+                      >
+                        {expandedCotizaciones.has(cotizacion.folio) ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <Badge variant="outline" className="text-xs font-medium">
+                          {cotizacion.folio}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <User className="h-3 w-3 text-muted-foreground" />
@@ -593,6 +773,16 @@ export const PedidosSection: React.FC = React.memo(() => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {cotizacion.productos.some(p => p.is_premium) && (
+                      <Badge variant="default" className="text-xs bg-purple-600 text-white">
+                        ⭐ Premium
+                      </Badge>
+                    )}
+                    {cotizacion.productos.some(p => p.production_status?.is_in_production) && (
+                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border-orange-200">
+                        En Producción
+                      </Badge>
+                    )}
                     <Badge variant="secondary" className="text-xs">
                       {cotizacion.productos.length} productos
                     </Badge>
@@ -608,13 +798,9 @@ export const PedidosSection: React.FC = React.memo(() => {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-b">
-                          <TableHead className="w-[50px]">
-                            <div className="flex items-center justify-center">
-                              <span className="sr-only">Seleccionar</span>
-                            </div>
-                          </TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Cantidad</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Inventario</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Moldes</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Producción</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Fecha Est.</TableHead>
@@ -623,90 +809,76 @@ export const PedidosSection: React.FC = React.memo(() => {
                       </TableHeader>
                       <TableBody>
                         {cotizacion.productos.map((producto) => {
-                          const productKey = `${producto.folio}-${producto.producto_id}`;
-                          const isSelected = selectedProducts.has(productKey);
-                          
                           return (
                             <TableRow
-                              key={productKey}
-                              data-state={isSelected ? "selected" : undefined}
-                              className="hover:bg-muted/30 transition-colors h-12"
+                              key={`${producto.folio}-${producto.producto_id}`}
+                              className="hover:bg-muted/30 transition-colors"
+                              title={getInventoryTooltip(producto)}
                             >
-                              <TableCell className="h-12">
-                                <div className="flex items-center justify-center h-full">
-                                  {!producto.hasMoldes || !producto.producto_id ? (
-                                    <Checkbox
-                                      disabled
-                                      aria-label="Producto sin moldes disponibles"
-                                    />
-                                  ) : producto.production_status?.is_in_production ? (
-                                    <div 
-                                      className="flex h-4 w-4 items-center justify-center rounded-sm border border-orange-300 bg-orange-100 opacity-60"
-                                      title={`Ya en producción: ${getProductionStageLabel(producto.production_status.stage)}`}
-                                    >
-                                      <div className="h-2 w-2 rounded-full bg-orange-500" />
-                                    </div>
-                                  ) : (
-                                    <Checkbox
-                                      checked={selectedProducts.has(`${producto.folio}-${producto.producto_id}`)}
-                                      onCheckedChange={() => handleProductToggle(producto)}
-                                      aria-label={`Seleccionar ${producto.producto}`}
-                                    />
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="px-4 py-2">
+                              <TableCell className="px-4 py-3">
                                 <div className="flex items-center gap-2">
                                   <div className={`h-2 w-2 rounded-full ${producto.hasMoldes ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
                                   <span className="text-sm font-medium text-foreground">{producto.producto}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-20">
+                              <TableCell className="px-4 py-3 text-center w-20">
                                 <Badge variant="secondary" className="text-xs font-medium">
                                   {producto.cantidad}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-20">
+                              <TableCell className="px-4 py-3 text-center w-24">
+                                {producto.inventory_status ? (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${getInventoryBadgeColor(producto.inventory_status.availability)}`}
+                                  >
+                                    {producto.inventory_status.terminado_disponible}/{producto.cantidad}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-4 py-3 text-center w-20">
                                 {producto.hasMoldes ? (
-                                    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    <Badge variant="outline" className="text-xs whitespace-nowrap">
                                       <Package className="h-3 w-3 mr-1" />
                                       {producto.moldesInfo?.total_moldes}
                                     </Badge>
                                 ) : (
-                                  <div className="text-xs text-muted-foreground italic">Sin moldes</div>
+                                  <span className="text-xs text-muted-foreground italic whitespace-nowrap">Sin moldes</span>
                                 )}
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-24">
+                              <TableCell className="px-4 py-3 text-center w-24">
                                 {producto.production_status?.is_in_production ? (
-                                  <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                                  <Badge variant="secondary" className="text-xs">
                                     {getProductionStageLabel(producto.production_status.stage)}
                                   </Badge>
                                 ) : (
                                   <div className="text-xs text-muted-foreground italic">-</div>
                                 )}
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-24">
+                              <TableCell className="px-4 py-3 text-center w-24">
                                 <div className="text-xs text-muted-foreground">
                                   {producto.estimated_delivery_date || '-'}
                                 </div>
                               </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-20">
+                              <TableCell className="px-4 py-3 text-center w-20">
                                 {(() => {
                                   const days = producto.days_until_delivery;
                                   
                                   if (days === undefined || days === null) {
-                                    return <Badge variant="secondary" className="text-xs">Sin fecha</Badge>;
+                                    return <div className="text-xs text-muted-foreground">Sin fecha</div>;
                                   }
                                   
                                   if (days < 0) {
-                                    return <Badge className="text-xs bg-red-50 text-red-700 border-red-200 hover:bg-red-100 whitespace-nowrap">{Math.abs(days)}d atraso</Badge>;
+                                    return <Badge className="text-xs bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100/80 whitespace-nowrap">{Math.abs(days)}d atraso</Badge>;
                                   }
                                   
                                   if (days <= 7) {
-                                    return <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap">Urgente</Badge>;
+                                    return <Badge className="text-xs bg-amber-50/80 text-amber-700 border-amber-200 hover:bg-amber-100/80 whitespace-nowrap">Urgente</Badge>;
                                   }
                                   
-                                  return <Badge variant="outline" className="text-xs whitespace-nowrap">{days}d</Badge>;
+                                  return <div className="text-xs text-muted-foreground whitespace-nowrap">{days}d</div>;
                                 })()}
                               </TableCell>
                             </TableRow>
@@ -730,6 +902,74 @@ export const PedidosSection: React.FC = React.memo(() => {
           <span>
             {filteredPedidos.reduce((sum, p) => sum + p.cantidad, 0).toLocaleString()} piezas total
           </span>
+        </div>
+      )}
+
+      {/* Allocation Confirmation Dialog */}
+      {showAllocationDialog && allocationData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Mover a Producción Activa</h3>
+            
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                Has seleccionado <strong>{allocationData.totalCotizaciones}</strong> cotizaciones con <strong>{allocationData.totalProducts}</strong> productos.
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-green-50 rounded text-sm">
+                  <span>✅ Directo a empaque (surplus):</span>
+                  <strong className="text-green-700">{allocationData.canSkipProduction}</strong>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-yellow-50 rounded text-sm">
+                  <span>🔄 A bitácora (producción):</span>
+                  <strong className="text-yellow-700">{allocationData.needsProduction}</strong>
+                </div>
+                {allocationData.needsMoldes.length > 0 && (
+                  <div className="p-2 bg-orange-50 rounded text-sm">
+                    <div className="font-medium text-orange-800 mb-1">⚠️ Productos sin moldes:</div>
+                    <div className="text-xs text-orange-700 space-y-1">
+                      {allocationData.needsMoldes.slice(0, 3).map((item, idx) => (
+                        <div key={idx}>{item.folio}: {item.producto_nombre}</div>
+                      ))}
+                      {allocationData.needsMoldes.length > 3 && (
+                        <div>+{allocationData.needsMoldes.length - 3} más...</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-xs text-gray-500">
+                • Los productos con inventario surplus irán directamente a empaque
+                • Los productos sin surplus irán a bitácora para producción
+                • Los productos sin moldes se añadirán al seguimiento de moldes necesarios
+                • Los clientes premium tendrán prioridad en la cola de producción
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowAllocationDialog(false);
+                    setAllocationData(null);
+                  }}
+                  disabled={isProcessingAllocation}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleInventoryAllocation}
+                  disabled={isProcessingAllocation}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isProcessingAllocation ? 'Procesando...' : 'Confirmar y Mover'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

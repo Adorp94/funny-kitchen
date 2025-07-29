@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, Trash2, Package, TableIcon, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { RefreshCw, Search, Plus, Trash2, Package, TableIcon, ChevronDown, ChevronRight, ChevronsUpDown, Check, Loader2, Edit3 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from '@/lib/utils';
 
@@ -33,131 +35,187 @@ interface Producto {
   sku?: string;
 }
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+// Summary stats component
+const SummaryStats = React.memo(({ mesas }: { mesas: Mesa[] }) => {
+  const stats = useMemo(() => {
+    const totalMesas = mesas.length;
+    const totalProductos = mesas.reduce((sum, mesa) => sum + mesa.productos.length, 0);
+    const totalMoldes = mesas.reduce((sum, mesa) => 
+      sum + mesa.productos.reduce((mesaSum, producto) => mesaSum + producto.cantidad_moldes, 0), 0
+    );
+    const mesasActivas = mesas.filter(mesa => mesa.productos.length > 0).length;
+    
+    return { totalMesas, totalProductos, totalMoldes, mesasActivas };
+  }, [mesas]);
+
+  return (
+    <div className="grid grid-cols-4 gap-4 p-3 bg-muted/30 border rounded-lg">
+      <div className="text-center">
+        <div className="text-sm font-semibold text-foreground">{stats.totalMesas}</div>
+        <div className="text-xs text-muted-foreground">Mesas</div>
+      </div>
+      <div className="text-center">
+        <div className="text-sm font-semibold text-foreground">{stats.totalProductos}</div>
+        <div className="text-xs text-muted-foreground">Productos</div>
+      </div>
+      <div className="text-center">
+        <div className="text-sm font-semibold text-foreground">{stats.totalMoldes.toLocaleString()}</div>
+        <div className="text-xs text-muted-foreground">Moldes</div>
+      </div>
+      <div className="text-center">
+        <div className="text-sm font-semibold text-foreground">{stats.mesasActivas}</div>
+        <div className="text-xs text-muted-foreground">Activas</div>
+      </div>
+    </div>
+  );
+});
+
+SummaryStats.displayName = 'SummaryStats';
+
 export function MoldesActivos() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(false);
-
-  // Dialog states for adding productos
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [expandedMesas, setExpandedMesas] = useState<Set<string>>(new Set());
+  
+  // Dialog states
   const [showAddProductoDialog, setShowAddProductoDialog] = useState(false);
   const [selectedMesaId, setSelectedMesaId] = useState<string>('');
-  
-  // Form states
   const [selectedProductoId, setSelectedProductoId] = useState<string>('');
   const [cantidadMoldes, setCantidadMoldes] = useState('');
-
+  
   // Combobox states
   const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchProductTerm, setSearchProductTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Producto[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  // Pagination states for infinite scroll
-  const [currentPage, setCurrentPage] = useState(0);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // State for editing quantities (to avoid constant API calls)
+  
+  // Editing states
   const [editingQuantities, setEditingQuantities] = useState<Record<string, string>>({});
+  
+  // Moldes needed states
+  const [moldesNeeded, setMoldesNeeded] = useState<any[]>([]);
+  const [showMoldesNeeded, setShowMoldesNeeded] = useState(true);
 
+  // Debounced search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  // Filter and group mesas
+  const filteredMesas = useMemo(() => {
+    let filtered = mesas;
+    
+    // Apply search filter
+    if (debouncedSearchTerm.trim()) {
+      const term = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(mesa => 
+        mesa.nombre.toLowerCase().includes(term) ||
+        mesa.productos.some(producto => 
+          producto.nombre.toLowerCase().includes(term) ||
+          (producto.sku && producto.sku.toLowerCase().includes(term))
+        )
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      switch (statusFilter) {
+        case 'active':
+          filtered = filtered.filter(mesa => mesa.productos.length > 0);
+          break;
+        case 'empty':
+          filtered = filtered.filter(mesa => mesa.productos.length === 0);
+          break;
+      }
+    }
+    
+    return filtered.sort((a, b) => a.numero - b.numero);
+  }, [mesas, debouncedSearchTerm, statusFilter]);
 
-  // Fetch data from API
+  // Fetch functions
   const fetchMesas = useCallback(async () => {
     try {
       const response = await fetch('/api/moldes-activos/mesas');
-      if (!response.ok) {
-        throw new Error('Failed to fetch mesas');
-      }
+      if (!response.ok) throw new Error('Failed to fetch mesas');
       const data = await response.json();
       setMesas(data);
     } catch (error) {
       console.error('Error fetching mesas:', error);
-      toast.error('Error al cargar las mesas', {
-        description: 'No se pudieron cargar las mesas de producción',
-        duration: 4000,
-      });
+      toast.error('Error al cargar las mesas');
     }
   }, []);
 
-  const fetchProductos = useCallback(async (page = 0, reset = true) => {
+  const fetchProductos = useCallback(async () => {
     try {
-      const pageSize = 50; // Increased from 20 to show more products initially
-      const response = await fetch(`/api/productos?page=${page}&pageSize=${pageSize}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch productos');
-      }
+      const response = await fetch('/api/productos?pageSize=100');
+      if (!response.ok) throw new Error('Failed to fetch productos');
       const result = await response.json();
-      const newProductos = (result.data || result).map((p: any) => ({
+      const productos = (result.data || result).map((p: any) => ({
         producto_id: p.producto_id,
         nombre: p.nombre,
         sku: p.sku
       }));
-
-      if (reset) {
-        // First load - replace products
-        setProductos(newProductos);
-        setCurrentPage(0);
-      } else {
-        // Infinite scroll - append products
-        setProductos(prev => [...prev, ...newProductos]);
-      }
-
-      // Update pagination state
-      setHasMoreProducts(result.hasMore || false);
-      setCurrentPage(page);
+      setProductos(productos);
     } catch (error) {
       console.error('Error fetching productos:', error);
-      toast.error('Error al cargar los productos disponibles', {
-        description: 'No se pudieron cargar los productos disponibles',
-        duration: 4000,
-      });
+      toast.error('Error al cargar productos');
+    }
+  }, []);
+
+  const fetchMoldesNeeded = useCallback(async () => {
+    try {
+      const response = await fetch('/api/production/moldes-needed');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch moldes needed:', response.status, errorText);
+        // Don't throw error, just set empty array
+        setMoldesNeeded([]);
+        return;
+      }
+      
+      const result = await response.json();
+      setMoldesNeeded(result.data || []);
+    } catch (error) {
+      console.error('Error fetching moldes needed:', error);
+      // Set empty array on error so UI doesn't break
+      setMoldesNeeded([]);
     }
   }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Reset pagination state
-      setCurrentPage(0);
-      setHasMoreProducts(true);
-      await Promise.all([fetchMesas(), fetchProductos(0, true)]);
+      // Fetch core data first, then moldes needed separately
+      await Promise.all([fetchMesas(), fetchProductos()]);
+      // Fetch moldes needed separately - don't let it break the main functionality
+      fetchMoldesNeeded();
     } finally {
       setLoading(false);
     }
-  }, [fetchMesas, fetchProductos]);
+  }, [fetchMesas, fetchProductos, fetchMoldesNeeded]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Load more products for infinite scroll
-  const loadMoreProductos = useCallback(async () => {
-    if (isLoadingMore || !hasMoreProducts) return;
-    
-    setIsLoadingMore(true);
-    try {
-      await fetchProductos(currentPage + 1, false);
-    } catch (error) {
-      console.error('Error loading more productos:', error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [currentPage, hasMoreProducts, isLoadingMore, fetchProductos]);
-
-  // Search productos with debouncing
+  // Search productos
   const searchProductos = useCallback(async (searchValue: string) => {
     setIsSearching(true);
     try {
       if (!searchValue.trim()) {
-        // For initial display, show the loaded products (with infinite scroll support)
-        setSearchResults(productos);
+        setSearchResults(productos.slice(0, 50));
       } else {
-        // Make API call to search products
-        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=100`);
-        if (!response.ok) {
-          throw new Error('Failed to search productos');
-        }
+        const response = await fetch(`/api/productos?query=${encodeURIComponent(searchValue)}&pageSize=50`);
+        if (!response.ok) throw new Error('Failed to search productos');
         const result = await response.json();
         const searchedProductos = (result.data || result).map((p: any) => ({
           producto_id: p.producto_id,
@@ -169,145 +227,66 @@ export function MoldesActivos() {
     } catch (error) {
       console.error('Error searching productos:', error);
       setSearchResults([]);
-      toast.error('Error al buscar productos', {
-        description: 'No se pudieron buscar los productos',
-        duration: 3000,
-      });
     } finally {
       setIsSearching(false);
     }
   }, [productos]);
 
-  // Handle search input change with debouncing
-  const handleSearchInputChange = useCallback((value: string) => {
+  // Handle search
+  const handleSearch = useCallback((value: string) => {
     setSearchTerm(value);
+  }, []);
+
+  const handleProductSearchChange = useCallback((value: string) => {
+    setSearchProductTerm(value);
     searchProductos(value);
   }, [searchProductos]);
 
-  // Enhanced scroll detection for Command component
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout>();
-
-  useEffect(() => {
-    if (!comboboxOpen) return;
-
-    let scrollContainer: HTMLElement | null = null;
-    let retryCount = 0;
-    const maxRetries = 20; // Try for 2 seconds
-    
-    // Find the scrollable container within the Command component
-    const findScrollContainer = () => {
-      // Try multiple selectors to find the Command's scroll container
-      const selectors = [
-        '[cmdk-list]',
-        '[role="listbox"]',
-        '.cmdk-list',
-        '[data-cmdk-list]',
-        '[data-radix-command-list]'
-      ];
-      
-      for (const selector of selectors) {
-        const element = document.querySelector(selector) as HTMLElement;
-        if (element) {
-          console.log('Found scroll container:', selector);
-          return element;
-        }
-      }
-      return null;
-    };
-
-    // Enhanced scroll handler with debouncing
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
-
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      scrollTimeoutRef.current = setTimeout(() => {
-        const { scrollTop, scrollHeight, clientHeight } = target;
-        const scrollPercentage = scrollHeight > clientHeight ? (scrollTop / (scrollHeight - clientHeight)) * 100 : 0;
-        const isNearBottom = scrollPercentage > 70; // Lower threshold for better UX
-
-        console.log('Scroll event:', { 
-          scrollTop, 
-          scrollHeight, 
-          clientHeight, 
-          scrollPercentage: Math.round(scrollPercentage),
-          isNearBottom,
-          hasMoreProducts,
-          isLoadingMore,
-          searchTerm: searchTerm.trim()
-        });
-
-        if (isNearBottom && !searchTerm.trim() && hasMoreProducts && !isLoadingMore) {
-          console.log('Triggering load more from scroll...');
-          loadMoreProductos();
-        }
-      }, 100); // 100ms debounce
-    };
-
-    // Set up with retry mechanism
-    const setupScrollListener = () => {
-      scrollContainer = findScrollContainer();
-      if (scrollContainer) {
-        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-        console.log('Scroll listener attached successfully');
-      } else if (retryCount < maxRetries) {
-        retryCount++;
-        console.log('Scroll container not found, retrying...', retryCount);
-        setTimeout(setupScrollListener, 100); // Retry after 100ms
+  // Toggle mesa expansion
+  const toggleMesa = useCallback((mesaId: string) => {
+    setExpandedMesas(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(mesaId)) {
+        newSet.delete(mesaId);
       } else {
-        console.warn('Could not find scroll container after', maxRetries, 'attempts');
+        newSet.add(mesaId);
       }
-    };
+      return newSet;
+    });
+  }, []);
 
-    // Delay setup to ensure DOM is ready
-    setTimeout(setupScrollListener, 200);
+  // Expand all mesas by default when data loads
+  useEffect(() => {
+    if (filteredMesas.length > 0) {
+      const mesaIds = new Set(filteredMesas.map(m => m.id));
+      setExpandedMesas(mesaIds);
+    }
+  }, [filteredMesas]);
 
-    return () => {
-      if (scrollContainer) {
-        scrollContainer.removeEventListener('scroll', handleScroll);
-        console.log('Scroll listener removed');
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, [comboboxOpen, searchTerm, hasMoreProducts, isLoadingMore, loadMoreProductos]);
-
-  // Load initial products when combobox opens
+  // Initialize search results when combobox opens
   useEffect(() => {
     if (comboboxOpen && productos.length > 0) {
-      console.log('Combobox opened - Products:', productos.length, 'HasMore:', hasMoreProducts);
       searchProductos('');
     }
   }, [comboboxOpen, productos, searchProductos]);
 
-  // Get selected product for display
+  // Get selected product
   const selectedProduct = productos.find(p => p.producto_id.toString() === selectedProductoId) || 
                          searchResults.find(p => p.producto_id.toString() === selectedProductoId);
 
   // Add producto to mesa
   const handleAddProducto = async () => {
     if (!selectedMesaId || !selectedProductoId) {
-      toast.error('Campos requeridos', {
-        description: 'Por favor selecciona una mesa y un producto',
-        duration: 3000,
-      });
+      toast.error('Selecciona una mesa y un producto');
       return;
     }
 
     try {
-      // Use 0 as default quantity if no quantity is provided or is empty
       const quantity = cantidadMoldes ? parseInt(cantidadMoldes) : 0;
       
       const response = await fetch('/api/moldes-activos/productos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mesa_id: selectedMesaId,
           producto_id: parseInt(selectedProductoId),
@@ -317,7 +296,7 @@ export function MoldesActivos() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to add producto to mesa');
+        throw new Error(errorData.error || 'Failed to add producto');
       }
 
       const result = await response.json();
@@ -325,95 +304,58 @@ export function MoldesActivos() {
       const mesaName = mesas.find(m => m.id === selectedMesaId)?.nombre || 'la mesa';
       
       if (result.action === 'updated') {
-        // Product already existed, quantity was updated
         setMesas(prev => prev.map(mesa => 
           mesa.id === selectedMesaId 
             ? {
                 ...mesa, 
                 productos: mesa.productos.map(producto => 
-                  producto.id === result.producto.id 
-                    ? result.producto
-                    : producto
+                  producto.id === result.producto.id ? result.producto : producto
                 )
               }
             : mesa
         ));
-        
-        toast.success('Cantidad actualizada', {
-          description: `${productName} en ${mesaName}: ${result.previousQuantity} + ${result.addedQuantity} = ${result.producto.cantidad_moldes} moldes`,
-          duration: 4000,
-        });
+        toast.success(`${productName} actualizado en ${mesaName}: ${result.producto.cantidad_moldes} moldes`);
       } else {
-        // New product was added
         setMesas(prev => prev.map(mesa => 
           mesa.id === selectedMesaId 
             ? { ...mesa, productos: [...mesa.productos, result.producto] }
             : mesa
         ));
-        
-        toast.success('Producto agregado', {
-          description: `${productName} agregado a ${mesaName} con ${result.producto.cantidad_moldes} moldes`,
-          duration: 3000,
-        });
+        toast.success(`${productName} agregado a ${mesaName}`);
       }
       
       // Reset form
       setSelectedProductoId('');
-      setSearchTerm('');
+      setSearchProductTerm('');
       setCantidadMoldes('');
       setShowAddProductoDialog(false);
       setComboboxOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding producto:', error);
-      toast.error('Error al agregar producto', {
-        description: error.message,
-        duration: 4000,
-      });
+      toast.error(`Error: ${error.message}`);
     }
   };
 
-  // Handle quantity input change (optimistic update)
-  const handleQuantityInputChange = (productoId: string, value: string) => {
-    setEditingQuantities(prev => ({
-      ...prev,
-      [productoId]: value
-    }));
+  // Handle quantity changes
+  const handleQuantityChange = (productoId: string, value: string) => {
+    setEditingQuantities(prev => ({ ...prev, [productoId]: value }));
   };
 
-  // Handle Enter key press to save quantity
   const handleQuantityKeyDown = async (
     e: React.KeyboardEvent<HTMLInputElement>, 
     mesaId: string, 
     productoId: string, 
     currentValue: string
   ) => {
-    console.log('Key pressed:', e.key, 'for product:', productoId);
-    
     if (e.key === 'Enter') {
-      console.log('Enter key detected! Processing...', 'Product:', productoId, 'Value:', currentValue);
-      
       const newQuantity = parseInt(currentValue) || 0;
       if (newQuantity < 0) return;
 
-      // Get product name BEFORE the API call to ensure we have it
-      const mesa = mesas.find(m => m.id === mesaId);
-      const producto = mesa?.productos.find(p => p.id === productoId);
-      const productName = producto?.nombre || 'Producto';
-      
-      console.log('Found product for notification:', productName);
-
       try {
-        console.log('Making PATCH request to update quantity...');
-        
         const response = await fetch('/api/moldes-activos/productos', {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: productoId,
-            cantidad_moldes: newQuantity
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: productoId, cantidad_moldes: newQuantity })
         });
 
         if (!response.ok) {
@@ -421,10 +363,6 @@ export function MoldesActivos() {
           throw new Error(errorData.error || 'Failed to update cantidad');
         }
 
-        const result = await response.json();
-        console.log('API response:', result);
-
-        // Update the actual data
         setMesas(prev => prev.map(mesa => 
           mesa.id === mesaId 
             ? {
@@ -438,30 +376,16 @@ export function MoldesActivos() {
             : mesa
         ));
 
-        // Clear the editing state
         setEditingQuantities(prev => {
           const newState = { ...prev };
           delete newState[productoId];
           return newState;
         });
 
-        console.log('About to show toast notification...');
-
-        toast.success('Cantidad actualizada', {
-          description: `${productName}: ${newQuantity} moldes`,
-          duration: 3000,
-        });
-        
-        console.log('Toast notification should be visible now');
-        
-      } catch (error) {
+        toast.success('Cantidad actualizada');
+      } catch (error: any) {
         console.error('Error updating cantidad:', error);
-        toast.error('Error al actualizar cantidad', {
-          description: error.message,
-          duration: 4000,
-        });
-        
-        // Revert the editing state
+        toast.error(`Error: ${error.message}`);
         setEditingQuantities(prev => {
           const newState = { ...prev };
           delete newState[productoId];
@@ -471,8 +395,7 @@ export function MoldesActivos() {
     }
   };
 
-  // Handle blur event to revert if no save occurred
-  const handleQuantityBlur = (productoId: string, originalValue: number) => {
+  const handleQuantityBlur = (productoId: string) => {
     setEditingQuantities(prev => {
       const newState = { ...prev };
       delete newState[productoId];
@@ -480,14 +403,12 @@ export function MoldesActivos() {
     });
   };
 
-  // Remove producto from mesa
+  // Remove producto
   const handleRemoveProducto = async (mesaId: string, productoId: string) => {
     try {
-      // Get product and mesa names before removal for better notification
       const mesa = mesas.find(m => m.id === mesaId);
       const producto = mesa?.productos.find(p => p.id === productoId);
       const productName = producto?.nombre || 'Producto';
-      const mesaName = mesa?.nombre || 'la mesa';
 
       const response = await fetch(`/api/moldes-activos/productos?id=${productoId}`, {
         method: 'DELETE'
@@ -504,75 +425,226 @@ export function MoldesActivos() {
           : mesa
       ));
       
-      toast.success('Producto removido', {
-        description: `${productName} removido de ${mesaName}`,
-        duration: 3000,
-      });
-    } catch (error) {
+      toast.success(`${productName} removido`);
+    } catch (error: any) {
       console.error('Error removing producto:', error);
-      toast.error('Error al remover producto', {
-        description: error.message,
-        duration: 4000,
-      });
+      toast.error(`Error: ${error.message}`);
     }
   };
 
+  // Initial load
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (loading && mesas.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+          <div className="h-8 bg-gray-200 rounded w-20 animate-pulse"></div>
+        </div>
+        <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
+        <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      {/* Compact Header */}
-      <div className="flex justify-between items-center">
-        <span className="text-xs text-muted-foreground">
-          {mesas.length} mesas de trabajo
-        </span>
-        <Button 
-          onClick={fetchData} 
-          disabled={loading} 
-          variant="outline" 
-          size="sm"
-          className="h-7 px-2 text-xs"
-        >
-          <Package className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-foreground">Mesas de Trabajo</h2>
+        <div className="flex items-center gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="active">Con productos</SelectItem>
+              <SelectItem value="empty">Vacías</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <Input
+              placeholder="Buscar mesas o productos..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="h-8 pl-8 pr-3 text-xs w-48"
+            />
+          </div>
+          <Button 
+            onClick={fetchData} 
+            variant="outline" 
+            size="sm" 
+            className="h-8 px-3"
+            disabled={loading}
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-4">
-          <div className="flex justify-center items-center space-x-2">
-            <Package className="h-3 w-3 animate-spin" />
-            <span className="text-xs text-muted-foreground">Cargando mesas...</span>
+      {/* Summary */}
+      <SummaryStats mesas={filteredMesas} />
+
+      {/* Moldes Needed Section */}
+      {moldesNeeded.length > 0 && (
+        <div className="border rounded-lg bg-card shadow-sm">
+          <div 
+            className="flex items-center justify-between p-3 bg-orange-50/50 border-b cursor-pointer hover:bg-orange-50/80 transition-colors"
+            onClick={() => setShowMoldesNeeded(!showMoldesNeeded)}
+          >
+            <div className="flex items-center gap-2">
+              {showMoldesNeeded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium text-foreground">Moldes Necesarios</span>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-200">
+              {moldesNeeded.length} productos
+            </Badge>
           </div>
+          {showMoldesNeeded && (
+            <div className="p-4">
+              <div className="text-xs text-muted-foreground mb-3">
+                Productos que necesitan moldes para completar cotizaciones en producción activa
+              </div>
+              <div className="grid gap-2">
+                {moldesNeeded.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-orange-50/30 rounded border">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-foreground">{item.producto_nombre}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Cotización: {item.cotizacion_folio} • {item.days_pending} días pendiente
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-6 px-2 text-xs"
+                        onClick={() => {
+                          // TODO: Add functionality to mark as resolved
+                          toast.info("Funcionalidad pendiente: marcar como resuelto");
+                        }}
+                      >
+                        Resuelto
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-          {mesas.map((mesa) => (
-            <Card key={mesa.id} className="border min-h-[120px] flex flex-col">
-              <CardHeader className="p-2 flex-shrink-0">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-1 text-sm">
-                    <TableIcon className="h-3 w-3" />
-                    {mesa.nombre}
-                  </CardTitle>
+      )}
+
+      {/* Controls */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-muted-foreground">
+            {filteredMesas.length} mesas • {filteredMesas.reduce((sum, mesa) => sum + mesa.productos.length, 0)} productos
+          </div>
+          {filteredMesas.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  const allMesaIds = new Set(filteredMesas.map(m => m.id));
+                  setExpandedMesas(allMesaIds);
+                }}
+              >
+                Expandir todo
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setExpandedMesas(new Set())}
+              >
+                Contraer todo
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mesas Groups */}
+      <div className="space-y-2">
+        {filteredMesas.length === 0 ? (
+          <div className="border rounded-lg bg-card shadow-sm">
+            <div className="h-24 text-center text-sm text-muted-foreground flex items-center justify-center">
+              {debouncedSearchTerm || statusFilter !== 'all' 
+                ? 'No se encontraron mesas con los filtros actuales' 
+                : 'No hay mesas disponibles'
+              }
+            </div>
+          </div>
+        ) : (
+          filteredMesas.map((mesa) => (
+            <div key={mesa.id} className="border rounded-lg bg-card shadow-sm">
+              {/* Mesa Header */}
+              <div 
+                className="flex items-center justify-between p-3 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => toggleMesa(mesa.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {expandedMesas.has(mesa.id) ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <Badge variant="outline" className="text-xs font-medium">
+                      Mesa {mesa.numero}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <TableIcon className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{mesa.nombre}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {mesa.productos.length} productos
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {mesa.productos.reduce((sum, p) => sum + p.cantidad_moldes, 0)} moldes
+                  </Badge>
                   <Dialog 
                     open={showAddProductoDialog && selectedMesaId === mesa.id} 
                     onOpenChange={(open) => {
                       setShowAddProductoDialog(open);
                       if (open) {
                         setSelectedMesaId(mesa.id);
-                        // Reset form when opening
                         setSelectedProductoId('');
-                        setSearchTerm('');
+                        setSearchProductTerm('');
                         setCantidadMoldes('');
                         setComboboxOpen(false);
                       }
                     }}
                   >
                     <DialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="h-6 w-6 p-0">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-6 w-6 p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Plus className="h-3 w-3" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-md">
                       <DialogHeader>
                         <DialogTitle className="text-sm">Agregar Producto a {mesa.nombre}</DialogTitle>
                       </DialogHeader>
@@ -597,8 +669,8 @@ export function MoldesActivos() {
                               <Command shouldFilter={false}>
                                 <CommandInput 
                                   placeholder="Buscar por nombre o SKU..." 
-                                  value={searchTerm}
-                                  onValueChange={handleSearchInputChange}
+                                  value={searchProductTerm}
+                                  onValueChange={handleProductSearchChange}
                                   className="text-xs"
                                 />
                                 <CommandList>
@@ -622,7 +694,7 @@ export function MoldesActivos() {
                                             setComboboxOpen(false);
                                             const selected = searchResults.find(p => p.producto_id.toString() === value);
                                             if (selected) {
-                                              setSearchTerm(selected.nombre);
+                                              setSearchProductTerm(selected.nombre);
                                             }
                                           }}
                                           className="text-xs"
@@ -635,41 +707,13 @@ export function MoldesActivos() {
                                           />
                                           <Package className="mr-1 h-3 w-3 text-muted-foreground" />
                                           <div className="flex-1">
-                                            <div className="font-medium">
-                                              {producto.nombre}
-                                            </div>
+                                            <div className="font-medium">{producto.nombre}</div>
                                             {producto.sku && (
-                                              <div className="text-xs text-muted-foreground">
-                                                SKU: {producto.sku}
-                                              </div>
+                                              <div className="text-xs text-muted-foreground">SKU: {producto.sku}</div>
                                             )}
                                           </div>
                                         </CommandItem>
                                       ))}
-                                      {!searchTerm.trim() && hasMoreProducts && (
-                                        <div 
-                                          ref={loadMoreTriggerRef}
-                                          className="p-3 text-center cursor-pointer border-t border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-                                          onClick={() => {
-                                            console.log('Manual load more clicked');
-                                            if (!isLoadingMore) {
-                                              loadMoreProductos();
-                                            }
-                                          }}
-                                        >
-                                          {isLoadingMore ? (
-                                            <div className="flex items-center justify-center text-sm text-gray-600">
-                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                              Cargando más productos...
-                                            </div>
-                                          ) : (
-                                            <div className="text-sm text-blue-600 font-medium">
-                                              <div>📦 Cargar más productos</div>
-                                              <div className="text-xs text-gray-500 mt-1">Click aquí o desplázate hacia abajo</div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )}
                                     </CommandGroup>
                                   )}
                                 </CommandList>
@@ -678,22 +722,31 @@ export function MoldesActivos() {
                           </Popover>
                         </div>
                         <div>
-                          <label className="text-xs font-medium mb-1 block">Cantidad de Moldes (opcional)</label>
+                          <label className="text-xs font-medium mb-1 block">Cantidad de Moldes</label>
                           <Input 
                             type="number"
                             value={cantidadMoldes}
                             onChange={(e) => setCantidadMoldes(e.target.value)}
-                            placeholder="0 (por defecto)"
+                            placeholder="0"
                             min="0"
                             className="h-8 text-xs"
                           />
-                          <p className="text-xs text-gray-500 mt-1">Si no especificas una cantidad, se usará 0 por defecto</p>
                         </div>
                         <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setShowAddProductoDialog(false)} size="sm" className="h-7 px-2 text-xs">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setShowAddProductoDialog(false)} 
+                            size="sm" 
+                            className="h-7 px-2 text-xs"
+                          >
                             Cancelar
                           </Button>
-                          <Button onClick={handleAddProducto} disabled={!selectedProductoId} size="sm" className="h-7 px-2 text-xs">
+                          <Button 
+                            onClick={handleAddProducto} 
+                            disabled={!selectedProductoId} 
+                            size="sm" 
+                            className="h-7 px-2 text-xs"
+                          >
                             Agregar
                           </Button>
                         </div>
@@ -701,76 +754,92 @@ export function MoldesActivos() {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent className="p-2 flex-1 flex flex-col">
-                <div className="space-y-1 flex-1">
+              </div>
+
+              {/* Products Table */}
+              {expandedMesas.has(mesa.id) && (
+                <div className="overflow-x-auto">
                   {mesa.productos.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center min-h-[60px]">
-                      <p className="text-xs text-muted-foreground text-center">
-                        Sin productos
-                      </p>
+                    <div className="h-24 text-center text-sm text-muted-foreground flex items-center justify-center">
+                      Sin productos asignados
                     </div>
                   ) : (
-                    mesa.productos.map((producto) => {
-                      const isEditing = editingQuantities[producto.id] !== undefined;
-                      const displayValue = isEditing 
-                        ? editingQuantities[producto.id] 
-                        : producto.cantidad_moldes.toString();
-                      
-                      return (
-                        <div key={producto.id} className="flex items-center justify-between p-1 bg-muted rounded text-xs">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1">
-                              <Package className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                              <span className="font-medium truncate">{producto.nombre}</span>
-                            </div>
-                            {producto.sku && (
-                              <p className="text-xs text-muted-foreground truncate">{producto.sku}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                            <Input 
-                              type="number"
-                              value={displayValue}
-                              onChange={(e) => handleQuantityInputChange(producto.id, e.target.value)}
-                              onKeyDown={(e) => handleQuantityKeyDown(e, mesa.id, producto.id, displayValue)}
-                              onBlur={() => handleQuantityBlur(producto.id, producto.cantidad_moldes)}
-                              className="w-12 h-6 text-center text-xs border-0 bg-background"
-                              min="0"
-                            />
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              onClick={() => handleRemoveProducto(mesa.id, producto.id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Trash2 className="h-3 w-3 text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b">
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-32">SKU</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Moldes</TableHead>
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mesa.productos.map((producto) => {
+                          const isEditing = editingQuantities[producto.id] !== undefined;
+                          const displayValue = isEditing 
+                            ? editingQuantities[producto.id] 
+                            : producto.cantidad_moldes.toString();
+                          
+                          return (
+                            <TableRow key={producto.id} className="hover:bg-muted/30 transition-colors h-12">
+                              <TableCell className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-sm font-medium text-foreground">{producto.nombre}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-center w-32">
+                                {producto.sku ? (
+                                  <Badge variant="outline" className="text-xs whitespace-nowrap">{producto.sku}</Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-center">
+                                <div className="flex items-center justify-center">
+                                  <Input 
+                                    type="number"
+                                    value={displayValue}
+                                    onChange={(e) => handleQuantityChange(producto.id, e.target.value)}
+                                    onKeyDown={(e) => handleQuantityKeyDown(e, mesa.id, producto.id, displayValue)}
+                                    onBlur={() => handleQuantityBlur(producto.id)}
+                                    className="w-16 h-7 text-center text-xs"
+                                    min="0"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-4 py-2 text-center">
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  onClick={() => handleRemoveProducto(mesa.id, producto.id)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-500" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   )}
                 </div>
-                {mesa.productos.length > 0 && (
-                  <div className="mt-2 pt-1 border-t flex-shrink-0">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-medium">Total:</span>
-                      <span className="font-bold">
-                        {mesa.productos.reduce((sum, p) => {
-                          // Use editing value if currently editing, otherwise use actual value
-                          const value = editingQuantities[p.id] !== undefined 
-                            ? parseInt(editingQuantities[p.id]) || 0
-                            : p.cantidad_moldes;
-                          return sum + value;
-                        }, 0)} moldes
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer */}
+      {filteredMesas.length > 0 && (
+        <div className="flex justify-between items-center text-xs text-muted-foreground px-1">
+          <span>
+            {filteredMesas.length} mesas • {filteredMesas.reduce((sum, mesa) => sum + mesa.productos.length, 0)} productos
+          </span>
+          <span>
+            {filteredMesas.reduce((sum, mesa) => sum + mesa.productos.reduce((mesaSum, producto) => mesaSum + producto.cantidad_moldes, 0), 0).toLocaleString()} moldes total
+          </span>
         </div>
       )}
     </div>

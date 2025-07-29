@@ -48,7 +48,7 @@ export default function ProduccionPage() {
               className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-purple-500 data-[state=active]:bg-purple-50/50 data-[state=active]:text-purple-700 hover:bg-muted/30 transition-colors"
             >
               <Users className="h-3.5 w-3.5" />
-              Clientes Activos
+              Producción Activa
             </TabsTrigger>
             <TabsTrigger 
               value="moldes" 

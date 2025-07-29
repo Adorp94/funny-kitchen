@@ -13,6 +13,13 @@ type PedidosData = {
   precio_venta: number;
   estimated_delivery_date?: string;
   days_until_delivery?: number;
+  is_premium?: boolean;
+  inventory_status?: {
+    terminado_disponible: number;
+    availability: 'sufficient' | 'partial' | 'none';
+    can_skip_production: boolean;
+    production_needed: number;
+  };
   production_status?: {
     is_in_production: boolean;
     pedidos: number;
@@ -71,6 +78,8 @@ export async function GET(request: NextRequest) {
         estado,
         cliente_id,
         estimated_delivery_date,
+        is_premium,
+        prioridad,
         clientes (
           nombre
         )
@@ -138,7 +147,7 @@ export async function GET(request: NextRequest) {
       .select('cotizacion_producto_id, cotizacion_id, producto_id')
       .in('cotizacion_id', cotizacionIds);
 
-    // Also get global production_active data for stage information
+    // Also get global production_active data for stage information and terminado inventory
     const productIds = [...new Set(productosData?.map(p => p.producto_id) || [])];
     const { data: productionData, error: productionError } = await supabase
       .from('production_active')
@@ -151,6 +160,17 @@ export async function GET(request: NextRequest) {
         terminado
       `)
       .in('producto_id', productIds);
+
+    // Get allocated products to calculate true surplus inventory
+    const { data: allocatedData, error: allocatedError } = await supabase
+      .from('production_allocations')
+      .select(`
+        producto_id,
+        cantidad_asignada,
+        stage
+      `)
+      .in('producto_id', productIds)
+      .in('stage', ['empaque', 'entregado']);
 
         if (productosError) {
       console.error("[API /production/pedidos GET] Error fetching productos:", productosError);
@@ -210,6 +230,47 @@ export async function GET(request: NextRequest) {
         // Find global production status for stage information
         const productionStatus = productionData?.find(p => p.producto_id === producto.producto_id);
         
+        // Calculate surplus inventory availability using the same logic as production_active_with_gap view
+        const terminadoTotal = productionStatus?.terminado || 0;
+        const cantidadRequerida = producto.cantidad;
+        const pedidosTotal = productionStatus?.pedidos || 0;
+        
+        // Calculate allocated products for this specific product
+        const allocatedForProduct = allocatedData?.filter(a => a.producto_id === producto.producto_id) || [];
+        const totalAllocated = allocatedForProduct.reduce((sum, a) => sum + (a.cantidad_asignada || 0), 0);
+        
+        // Calculate net pedidos (existing committed demand minus what's been allocated)
+        const netPedidos = Math.max(0, pedidosTotal - totalAllocated);
+        
+        // True surplus = terminado inventory minus what's already committed to existing production queue
+        // This shows what's actually available for NEW orders
+        const surplusDisponible = Math.max(0, terminadoTotal - netPedidos);
+        
+        let availability: 'sufficient' | 'partial' | 'none' = 'none';
+        let canSkipProduction = false;
+        let productionNeeded = cantidadRequerida;
+        
+        if (surplusDisponible >= cantidadRequerida) {
+          availability = 'sufficient';
+          canSkipProduction = true;
+          productionNeeded = 0;
+        } else if (surplusDisponible > 0) {
+          availability = 'partial';
+          canSkipProduction = false;
+          productionNeeded = cantidadRequerida - surplusDisponible;
+        } else {
+          availability = 'none';
+          canSkipProduction = false;
+          productionNeeded = cantidadRequerida;
+        }
+        
+        const inventory_status = {
+          terminado_disponible: surplusDisponible, // Now represents surplus, not just terminado
+          availability,
+          can_skip_production: canSkipProduction,
+          production_needed: productionNeeded
+        };
+        
         let production_status = {
           is_in_production: isInProductionQueue,
           pedidos: 0,
@@ -246,22 +307,28 @@ export async function GET(request: NextRequest) {
           precio_venta: producto.precio_unitario || 0,
           estimated_delivery_date: estimatedDeliveryFormatted,
           days_until_delivery: daysUntilDelivery,
+          is_premium: cotizacion.is_premium || cotizacion.prioridad || false,
+          inventory_status,
           production_status
         });
       }
     }
 
-    // Sort by priority (days until delivery), then by folio, then by product name
+    // Sort by priority: premium customers first, then by days until delivery, then by folio, then by product name
     processedPedidos.sort((a, b) => {
-      // Primary sort: by days until delivery (ascending - soonest first)
+      // Primary sort: premium customers first
+      if (a.is_premium !== b.is_premium) {
+        return (b.is_premium ? 1 : 0) - (a.is_premium ? 1 : 0);
+      }
+      // Secondary sort: by days until delivery (ascending - soonest first)
       if (a.days_until_delivery !== b.days_until_delivery) {
         return a.days_until_delivery - b.days_until_delivery;
       }
-      // Secondary sort: by folio
+      // Tertiary sort: by folio
       if (a.folio !== b.folio) {
         return a.folio.localeCompare(b.folio);
       }
-      // Tertiary sort: by product name
+      // Quaternary sort: by product name
       return a.producto.localeCompare(b.producto);
     });
 
