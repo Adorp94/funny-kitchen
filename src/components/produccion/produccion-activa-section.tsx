@@ -719,7 +719,10 @@ export const ProduccionActivaSection = React.memo(() => {
                       const daysLeft = cotizacion.cronograma?.dias_totales_estimados || 0;
                       const isComplex = cotizacion.cronograma?.productos_limitados_por_moldes > 0;
                       
-                      if (daysLeft <= 3) {
+                      if (daysLeft >= 999) {
+                        // Don't show timeline for products without moldes
+                        return null;
+                      } else if (daysLeft <= 3) {
                         return (
                           <Badge className="text-xs bg-red-50 text-red-700 border-red-200 hover:bg-red-100">
                             Urgente
