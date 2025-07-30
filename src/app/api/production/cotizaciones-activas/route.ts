@@ -52,7 +52,12 @@ export async function GET(request: NextRequest) {
         ),
         cotizacion_productos!cotizacion_productos_cotizacion_id_fkey (
           producto_id,
-          cantidad
+          cantidad,
+          productos (
+            nombre,
+            moldes_disponibles,
+            vueltas_max_dia
+          )
         )
       `)
       .in('estado', ['producción', 'pagada']) // Only include cotizaciones in production stages

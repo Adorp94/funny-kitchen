@@ -15,10 +15,12 @@ interface EnviadosProduct {
 }
 
 interface EnviadosTableProps {
-  productos: EnviadosProduct[];
+  productos?: EnviadosProduct[]; // Make optional for defensive programming
+  cotizacionId?: number; // Add cotizacionId to fetch own data
   isLoading?: boolean;
   totalCajasChicas?: number;
   totalCajasGrandes?: number;
+  onUpdate?: () => void; // Add update callback
 }
 
 // Memoized enviados product row component
@@ -64,11 +66,15 @@ const EnviadosProductRow = React.memo(({
 EnviadosProductRow.displayName = 'EnviadosProductRow';
 
 export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({ 
-  productos, 
+  productos = [], // Default to empty array for defensive programming
+  cotizacionId,
   isLoading = false,
   totalCajasChicas = 0,
-  totalCajasGrandes = 0
+  totalCajasGrandes = 0,
+  onUpdate
 }) => {
+  // Ensure productos is always an array
+  const productosArray = Array.isArray(productos) ? productos : [];
 
   if (isLoading) {
     return (
@@ -87,9 +93,9 @@ export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium text-gray-700">Productos Entregados</h3>
           <div className="flex items-center gap-2">
-            {productos.length > 0 && (
+            {productosArray.length > 0 && (
               <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
-                {productos.length} productos
+                {productosArray.length} productos
               </Badge>
             )}
             {(totalCajasChicas > 0 || totalCajasGrandes > 0) && (
@@ -110,7 +116,7 @@ export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({
         </div>
       </div>
       
-      {productos.length === 0 ? (
+      {productosArray.length === 0 ? (
         <div className="px-4 py-6 text-center text-gray-500">
           <div className="text-xs">No hay productos entregados para esta cotización</div>
         </div>
@@ -126,7 +132,7 @@ export const EnviadosTable: React.FC<EnviadosTableProps> = React.memo(({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {productos.map((producto, index) => (
+              {productosArray.map((producto, index) => (
                 <EnviadosProductRow
                   key={`enviados-${producto.nombre}-${index}`}
                   producto={producto}

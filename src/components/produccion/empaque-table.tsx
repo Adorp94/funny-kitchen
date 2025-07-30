@@ -28,7 +28,7 @@ interface EmpaqueTableProps {
   isLoading?: boolean;
   onProductRemoved?: () => void;
   onProductMoved?: (producto: EmpaqueProduct) => void;
-  empaqueData?: EmpaqueData;
+  empaqueData?: EmpaqueData | null;
   onEmpaqueDataUpdated?: () => void;
 }
 
@@ -93,7 +93,7 @@ const EmpaqueProductRow = React.memo(({
 EmpaqueProductRow.displayName = 'EmpaqueProductRow';
 
 export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({ 
-  productos, 
+  productos = [], // Default to empty array for defensive programming
   cotizacionId, 
   isLoading = false, 
   onProductRemoved,
@@ -101,6 +101,8 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
   empaqueData,
   onEmpaqueDataUpdated
 }) => {
+  // Ensure productos is always an array
+  const productosArray = Array.isArray(productos) ? productos : [];
   const [removingProducts, setRemovingProducts] = useState<Set<string>>(new Set());
   
   // State for box counts and comments - using strings to handle empty values properly
@@ -251,16 +253,16 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
       <div className="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium text-gray-700">Productos en Empaque</h3>
-          {productos.length > 0 && (
+          {productosArray.length > 0 && (
             <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
-              {productos.length} productos
+              {productosArray.length} productos
             </Badge>
           )}
         </div>
       </div>
 
       {/* Box Counts and Comments Section */}
-      {productos.length > 0 && cotizacionId && (
+      {productosArray.length > 0 && cotizacionId && (
         <div className="px-3 py-3 border-b border-gray-200 bg-gray-50/25">
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs font-medium text-gray-700">
@@ -342,7 +344,7 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
         </div>
       )}
       
-      {productos.length === 0 ? (
+      {productosArray.length === 0 ? (
         <div className="px-4 py-6 text-center text-gray-500">
           <div className="text-xs">No hay productos en empaque para esta cotización</div>
         </div>
@@ -359,7 +361,7 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {productos.map((producto, index) => {
+              {productosArray.map((producto, index) => {
                 const productKey = `${producto.producto_id}-${cotizacionId}`;
                 const isRemoving = removingProducts.has(productKey);
                 

@@ -5,6 +5,7 @@ import { TestingListing } from "@/components/testing/testing-listing";
 import { MoldesActivos } from "@/components/produccion/moldes-activos";
 import { PedidosSection } from "@/components/produccion/pedidos-section";
 import { ClientesActivosSection } from "@/components/produccion/clientes-activos-section";
+import { ProduccionActivaSection } from "@/components/produccion/produccion-activa-section";
 import { EnviosSection } from "@/components/produccion/envios-section";
 import { ProductionActiveListing } from "@/components/testing/production-active-listing";
 import { ReviewSectionOptimized } from "@/components/produccion/review-section-optimized";
@@ -83,7 +84,7 @@ export default function ProduccionPage() {
         </TabsContent>
 
         <TabsContent value="clientes-activos" className="mt-6">
-          <ClientesActivosSection />
+          <ProduccionActivaSection />
         </TabsContent>
 
         <TabsContent value="moldes" className="mt-6">

@@ -10,6 +10,8 @@ type ProductoConEstatus = {
   precio_venta: number;
   precio_total: number;
   producto_id: number;
+  moldes_disponibles?: number;
+  vueltas_max_dia?: number;
   produccion_status: {
     por_detallar: number;
     detallado: number;
@@ -115,7 +117,9 @@ export async function GET(
         precio_unitario,
         productos!inner (
           producto_id,
-          nombre
+          nombre,
+          moldes_disponibles,
+          vueltas_max_dia
         )
       `)
       .eq('cotizacion_id', parseInt(cotizacionId));
@@ -306,6 +310,8 @@ export async function GET(
         precio_venta: precioUnitario,
         precio_total: precioTotal,
         producto_id: productoId,
+        moldes_disponibles: producto.productos.moldes_disponibles || 1,
+        vueltas_max_dia: producto.productos.vueltas_max_dia || 1,
         produccion_status: produccionStatus,
         empaque_status: empaqueStatus,
         allocation_status: allocationStatus
