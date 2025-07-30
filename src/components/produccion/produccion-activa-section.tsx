@@ -373,7 +373,7 @@ export const ProduccionActivaSection = React.memo(() => {
     );
   }, [cotizaciones, debouncedSearchTerm]);
 
-  // Fetch cotizaciones in production status
+  // Fetch cotizaciones that are actually in active production (have products in production_queue)
   const fetchCotizaciones = useCallback(async (forceRefresh = false) => {
     if (!forceRefresh && Date.now() - performance.now() < 30000) return; // Cache for 30 seconds
     
@@ -381,13 +381,39 @@ export const ProduccionActivaSection = React.memo(() => {
     setError(null);
     
     try {
+      // First, quickly check if there are any cotizaciones in active production using the simpler API
+      const activeResponse = await fetch('/api/production/cotizaciones-activas');
+      
+      if (!activeResponse.ok && activeResponse.status !== 404) {
+        throw new Error(`Error del servidor (${activeResponse.status})`);
+      }
+      
+      const activeResult = await activeResponse.json();
+      
+      // If no active cotizaciones, show empty state immediately
+      if (!activeResult.data || activeResult.data.length === 0) {
+        console.log('[ProduccionActivaSection] No cotizaciones in active production');
+        setCotizaciones([]);
+        setLoading(false);
+        return;
+      }
+      
+      // If we have active cotizaciones, get the detailed cronograma data
       const response = await fetch('/api/production/cronograma');
       
       if (!response.ok) {
-        throw new Error('Error al cargar cotizaciones en producción');
+        throw new Error(`Error del servidor (${response.status})`);
       }
       
       const result = await response.json();
+      
+      // Handle empty state from cronograma API
+      if (!result.cotizaciones || result.cotizaciones.length === 0) {
+        console.log('[ProduccionActivaSection] No cronograma data available');
+        setCotizaciones([]);
+        setLoading(false);
+        return;
+      }
       
       // Process cotizaciones with cronograma calculations
       const cotizacionesWithTimeline = result.cotizaciones.map((cotizacion: any) => {
@@ -448,7 +474,10 @@ export const ProduccionActivaSection = React.memo(() => {
     } catch (error: any) {
       console.error('Error fetching cotizaciones:', error);
       setError(error.message);
-      toast.error('Error al cargar cotizaciones activas');
+      // Only show toast error for unexpected errors, not for empty states
+      if (!error.message.includes('404') && !error.message.includes('No cotizaciones')) {
+        toast.error('Error al cargar cotizaciones activas');
+      }
     } finally {
       setLoading(false);
     }
@@ -838,12 +867,12 @@ export const ProduccionActivaSection = React.memo(() => {
       )}
 
       {/* No Data State */}
-      {!loading && filteredCotizaciones.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <Package className="h-6 w-6 text-gray-300 mx-auto mb-2" />
-          <h3 className="text-sm font-medium text-gray-700 mb-1">No hay cotizaciones en producción activa</h3>
-          <p className="text-xs text-gray-500 max-w-sm mx-auto">
-            Las cotizaciones aparecerán aquí cuando sean movidas al estado "producción" desde la sección de Pedidos.
+      {!loading && filteredCotizaciones.length === 0 && !error && (
+        <div className="text-center py-16 text-gray-500">
+          <Factory className="h-8 w-8 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-sm font-medium text-gray-700 mb-2">No hay cotizaciones en producción</h3>
+          <p className="text-xs text-gray-500">
+            Mueve cotizaciones desde Pedidos para comenzar la producción
           </p>
         </div>
       )}

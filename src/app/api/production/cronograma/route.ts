@@ -75,7 +75,56 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Step 1: Get cotizaciones in production
+    // Step 1: Get cotizaciones that have products actively in production_queue
+    // First, get cotizaciones that have products in production_queue
+    const { data: activeProductionQueue, error: queueError } = await supabase
+      .from('production_queue')
+      .select(`
+        cotizacion_producto_id,
+        cotizacion_productos!inner (
+          cotizacion_id,
+          cotizaciones!cotizacion_productos_cotizacion_id_fkey!inner (
+            cotizacion_id,
+            folio,
+            cliente_id,
+            fecha_creacion,
+            estado
+          )
+        )
+      `)
+      .in('status', ['queued', 'in_progress']);
+
+    if (queueError) {
+      console.error("[API /production/cronograma GET] Error fetching production queue:", queueError);
+      return NextResponse.json({ 
+        error: 'Error al obtener cola de producción',
+        details: queueError.message 
+      }, { status: 500 });
+    }
+
+    // Extract unique cotizaciones from the queue data
+    const activeCotizacionIds = [...new Set(
+      activeProductionQueue?.map((item: any) => 
+        item.cotizacion_productos?.cotizaciones?.cotizacion_id
+      ).filter(id => id) || []
+    )];
+
+    if (activeCotizacionIds.length === 0) {
+      console.log("[API /production/cronograma GET] No cotizaciones with active production found");
+      return NextResponse.json({
+        cotizaciones: [],
+        summary: {
+          total_cotizaciones: 0,
+          total_productos_unicos: 0,
+          total_piezas_pedidas: 0,
+          total_piezas_pendientes: 0,
+          total_piezas_en_pipeline: 0,
+          productos_por_prioridad: []
+        }
+      });
+    }
+
+    // Now get the full cotizacion data for these active cotizaciones
     const { data: cotizacionesData, error: cotizacionesError } = await supabase
       .from('cotizaciones')
       .select(`
@@ -85,7 +134,7 @@ export async function GET(request: NextRequest) {
         fecha_creacion,
         estado
       `)
-      .eq('estado', 'producción')
+      .in('cotizacion_id', activeCotizacionIds)
       .order('fecha_creacion', { ascending: true });
 
     if (cotizacionesError) {
