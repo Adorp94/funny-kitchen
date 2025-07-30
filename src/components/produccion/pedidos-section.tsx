@@ -178,6 +178,15 @@ export const PedidosSection: React.FC = React.memo(() => {
     canSkipProduction: number;
     needsProduction: number;
     needsMoldes: Array<{ producto_nombre: string; folio: string }>;
+    productsWithInventory: Array<{
+      folio: string;
+      producto_id: number;
+      producto_nombre: string;
+      cantidad_necesaria: number;
+      inventario_disponible: number;
+      cantidad_a_empaque: number; // User can modify this
+      ir_a_empaque: boolean; // User can opt-out
+    }>;
   } | null>(null);
   const [isProcessingAllocation, setIsProcessingAllocation] = useState<boolean>(false);
 
@@ -409,6 +418,15 @@ export const PedidosSection: React.FC = React.memo(() => {
     let canSkipProduction = 0;
     let needsProduction = 0;
     const needsMoldes: Array<{ producto_nombre: string; folio: string }> = [];
+    const productsWithInventory: Array<{
+      folio: string;
+      producto_id: number;
+      producto_nombre: string;
+      cantidad_necesaria: number;
+      inventario_disponible: number;
+      cantidad_a_empaque: number;
+      ir_a_empaque: boolean;
+    }> = [];
 
     // Analyze each cotization's products
     selectedCotizacionesArray.forEach(cotizacion => {
@@ -424,8 +442,28 @@ export const PedidosSection: React.FC = React.memo(() => {
         }
         
         // Check inventory status
-        if (producto.inventory_status?.can_skip_production) {
-          canSkipProduction++;
+        const inventarioDisponible = producto.inventory_status?.terminado_disponible || 0;
+        const cantidadNecesaria = producto.cantidad;
+        
+        if (inventarioDisponible > 0) {
+          // Product has some inventory available
+          const maxParaEmpaque = Math.min(inventarioDisponible, cantidadNecesaria);
+          
+          productsWithInventory.push({
+            folio: cotizacion.folio,
+            producto_id: producto.producto_id,
+            producto_nombre: producto.producto_nombre,
+            cantidad_necesaria: cantidadNecesaria,
+            inventario_disponible: inventarioDisponible,
+            cantidad_a_empaque: maxParaEmpaque, // Default to maximum possible
+            ir_a_empaque: true // Default to enabled
+          });
+          
+          if (producto.inventory_status?.can_skip_production) {
+            canSkipProduction++;
+          } else {
+            needsProduction++; // Still needs some production
+          }
         } else {
           needsProduction++;
         }
@@ -438,7 +476,8 @@ export const PedidosSection: React.FC = React.memo(() => {
       totalProducts,
       canSkipProduction,
       needsProduction,
-      needsMoldes
+      needsMoldes,
+      productsWithInventory
     });
     setShowAllocationDialog(true);
   }, [selectedCotizaciones]);
@@ -450,12 +489,12 @@ export const PedidosSection: React.FC = React.memo(() => {
     setIsProcessingAllocation(true);
     
     try {
-      const response = await fetch('/api/production/process-cotizaciones', {
+      const response = await fetch('/api/production/process-cotizaciones-manual', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ cotizaciones: allocationData.cotizaciones })
+        body: JSON.stringify({ allocationData })
       });
 
       if (!response.ok) {
@@ -467,12 +506,27 @@ export const PedidosSection: React.FC = React.memo(() => {
       
       if (result.success) {
         const { summary } = result;
+        const empaqueCount = summary.total_empaque_allocations || 0;
+        
         toast.success(
           `Procesamiento completado: ${summary.successful}/${summary.total_cotizaciones} cotizaciones procesadas`,
           {
-            description: `${summary.total_to_empaque} productos a empaque, ${summary.total_to_bitacora} a producción`
+            description: `${empaqueCount} asignaciones a empaque, ${summary.total_to_bitacora} productos a producción`
           }
         );
+
+        // Show detailed summary if there are empaque allocations
+        if (empaqueCount > 0) {
+          const empaqueDetails = result.empaque_allocations?.map((a: any) => 
+            `${a.cantidad} ${a.producto_nombre} (${a.folio})`
+          ).join(', ');
+          
+          if (empaqueDetails) {
+            toast.info(`Asignado a empaque: ${empaqueDetails}`, {
+              duration: 8000
+            });
+          }
+        }
       } else {
         throw new Error('Error en el procesamiento de cotizaciones');
       }
@@ -905,21 +959,100 @@ export const PedidosSection: React.FC = React.memo(() => {
         </div>
       )}
 
-      {/* Allocation Confirmation Dialog */}
+      {/* Enhanced Allocation Dialog */}
       {showAllocationDialog && allocationData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Mover a Producción Activa</h3>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="text-sm text-gray-600">
                 Has seleccionado <strong>{allocationData.totalCotizaciones}</strong> cotizaciones con <strong>{allocationData.totalProducts}</strong> productos.
               </div>
               
+              {/* Products with Available Inventory */}
+              {allocationData.productsWithInventory.length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-gray-900">Productos con Inventario Disponible</h4>
+                  <div className="text-xs text-gray-500 mb-3">
+                    Puedes asignar inventario directamente a empaque o guardarlo para otras cotizaciones más urgentes.
+                  </div>
+                  
+                  <div className="space-y-3 max-h-64 overflow-y-auto border rounded-lg p-3">
+                    {allocationData.productsWithInventory.map((product, index) => (
+                      <div key={`${product.folio}-${product.producto_id}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">{product.producto_nombre}</div>
+                          <div className="text-xs text-gray-500">
+                            {product.folio} • Necesita: {product.cantidad_necesaria} • Disponible: {product.inventario_disponible}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3">
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={product.ir_a_empaque}
+                              onChange={(e) => {
+                                const updatedProducts = [...allocationData.productsWithInventory];
+                                updatedProducts[index].ir_a_empaque = e.target.checked;
+                                if (!e.target.checked) {
+                                  updatedProducts[index].cantidad_a_empaque = 0;
+                                } else {
+                                  updatedProducts[index].cantidad_a_empaque = Math.min(
+                                    product.inventario_disponible,
+                                    product.cantidad_necesaria
+                                  );
+                                }
+                                setAllocationData({
+                                  ...allocationData,
+                                  productsWithInventory: updatedProducts
+                                });
+                              }}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-gray-700">A empaque</span>
+                          </label>
+                          
+                          {product.ir_a_empaque && (
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={Math.min(product.inventario_disponible, product.cantidad_necesaria)}
+                                value={product.cantidad_a_empaque || ''}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  const maxValue = Math.min(product.inventario_disponible, product.cantidad_necesaria);
+                                  const finalValue = Math.min(Math.max(0, value), maxValue);
+                                  
+                                  const updatedProducts = [...allocationData.productsWithInventory];
+                                  updatedProducts[index].cantidad_a_empaque = finalValue;
+                                  setAllocationData({
+                                    ...allocationData,
+                                    productsWithInventory: updatedProducts
+                                  });
+                                }}
+                                className="w-20 h-8 text-xs text-center"
+                                placeholder="0"
+                              />
+                              <span className="text-xs text-gray-500">piezas</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Summary */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center p-2 bg-green-50 rounded text-sm">
-                  <span>✅ Directo a empaque (surplus):</span>
-                  <strong className="text-green-700">{allocationData.canSkipProduction}</strong>
+                  <span>✅ Directo a empaque:</span>
+                  <strong className="text-green-700">
+                    {allocationData.productsWithInventory.filter(p => p.ir_a_empaque).length} productos
+                  </strong>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-yellow-50 rounded text-sm">
                   <span>🔄 A bitácora (producción):</span>
@@ -938,13 +1071,6 @@ export const PedidosSection: React.FC = React.memo(() => {
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div className="text-xs text-gray-500">
-                • Los productos con inventario surplus irán directamente a empaque
-                • Los productos sin surplus irán a bitácora para producción
-                • Los productos sin moldes se añadirán al seguimiento de moldes necesarios
-                • Los clientes premium tendrán prioridad en la cola de producción
               </div>
 
               <div className="flex justify-end gap-2 pt-4">

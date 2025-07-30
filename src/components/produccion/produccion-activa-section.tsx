@@ -62,6 +62,7 @@ interface ProductoConEstatus {
     fecha_estimada_completion: string;
     limitado_por_moldes: boolean;
     capacidad_diaria: number;
+    moldes_disponibles: number;
   };
 }
 
@@ -103,40 +104,41 @@ interface EnviadosResponse {
 const clientCache = new Map<string, { data: CotizacionActiva; timestamp: number }>();
 const CACHE_DURATION = 120000; // 2 minutes
 
-// Calculate production timeline for a product using simplified cronograma logic
+// Calculate production timeline for a product using business logic
 const calculateProductTimeline = (producto: ProductoConEstatus) => {
-  const { moldes_disponibles = 1, vueltas_max_dia = 1 } = producto;
+  const { moldes_disponibles = 0, vueltas_max_dia = 1 } = producto;
   
-  // Calculate pending production (everything except terminado)
-  const cantidadPendiente = producto.produccion_status.por_detallar + 
-                          producto.produccion_status.detallado + 
-                          producto.produccion_status.sancocho;
+  // Use the total cantidad pedida for timeline calculation (not just pending)
+  const cantidadPedida = producto.cantidad_pedida || producto.cantidad || 0;
   
-  if (cantidadPendiente === 0) {
+  if (cantidadPedida === 0) {
     return {
       dias_estimados: 0,
-      fecha_estimada_completion: new Date().toISOString().split('T')[0],
+      fecha_estimada_completion: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }),
       limitado_por_moldes: false,
-      capacidad_diaria: 0
+      capacidad_diaria: 0,
+      moldes_disponibles: moldes_disponibles
     };
   }
   
-  // Apply 25% merma to all quantities
-  const cantidadConMerma = Math.ceil(cantidadPendiente * (1 + MERMA_PERCENTAGE));
+  // If no moldes available, cannot produce
+  if (moldes_disponibles === 0) {
+    return {
+      dias_estimados: 999,
+      fecha_estimada_completion: 'Sin moldes',
+      limitado_por_moldes: true,
+      capacidad_diaria: 0,
+      moldes_disponibles: moldes_disponibles
+    };
+  }
   
-  // Calculate daily production capacity
+  // Business logic: (FULL cantidad pedida + 25% merma) / moldes_activos = days
+  // This shows how long the entire order would take to produce
+  const cantidadConMerma = Math.ceil(cantidadPedida * (1 + MERMA_PERCENTAGE));
   const capacidadDiariaProducto = moldes_disponibles * vueltas_max_dia;
+  const diasEstimados = Math.ceil(cantidadConMerma / capacidadDiariaProducto);
   
-  // Determine if product is limited by molds vs global capacity
-  const limitadoPorMoldes = capacidadDiariaProducto < DAILY_CAPACITY;
-  
-  // Use effective daily capacity
-  const capacidadEfectiva = Math.min(capacidadDiariaProducto, DAILY_CAPACITY);
-  
-  // Calculate production days needed per product
-  const diasEstimados = Math.ceil(cantidadConMerma / capacidadEfectiva);
-  
-  // Calculate estimated completion date (only work days)
+  // Calculate estimated completion date (6 work days per week, skip Sundays)
   const today = new Date();
   let workDaysAdded = 0;
   let currentDate = new Date(today);
@@ -144,7 +146,7 @@ const calculateProductTimeline = (producto: ProductoConEstatus) => {
   while (workDaysAdded < diasEstimados) {
     currentDate.setDate(currentDate.getDate() + 1);
     const dayOfWeek = currentDate.getDay();
-    // Skip Sundays (0), work Monday (1) through Saturday (6)
+    // Skip Sundays (0), work Monday (1) through Saturday (6) = 6 days per week
     if (dayOfWeek !== 0) {
       workDaysAdded++;
     }
@@ -152,9 +154,10 @@ const calculateProductTimeline = (producto: ProductoConEstatus) => {
   
   return {
     dias_estimados: diasEstimados,
-    fecha_estimada_completion: currentDate.toISOString().split('T')[0],
-    limitado_por_moldes: limitadoPorMoldes,
-    capacidad_diaria: capacidadEfectiva
+    fecha_estimada_completion: currentDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }),
+    limitado_por_moldes: moldes_disponibles === 0,
+    capacidad_diaria: capacidadDiariaProducto,
+    moldes_disponibles: moldes_disponibles
   };
 };
 
@@ -163,45 +166,48 @@ const SummaryStats = React.memo(({ cotizaciones }: { cotizaciones: CotizacionAct
   const stats = useMemo(() => {
     const totalCotizaciones = cotizaciones.length;
     const totalPiezas = cotizaciones.reduce((sum, cotizacion) => sum + cotizacion.total_piezas, 0);
-    const totalProductos = cotizaciones.reduce((sum, cotizacion) => sum + cotizacion.productos.length, 0);
-    const totalPendientes = cotizaciones.reduce((sum, cotizacion) => sum + cotizacion.total_pendientes, 0);
-    const totalEnPipeline = cotizaciones.reduce((sum, cotizacion) => sum + cotizacion.total_en_pipeline, 0);
+    
+    // Calculate urgency levels
     const urgentCount = cotizaciones.filter(c => 
+      c.cronograma && c.cronograma.dias_totales_estimados <= 3
+    ).length;
+    
+    const thisWeekCount = cotizaciones.filter(c => 
+      c.cronograma && c.cronograma.dias_totales_estimados > 3 && c.cronograma.dias_totales_estimados <= 7
+    ).length;
+
+    const complexCount = cotizaciones.filter(c => 
       c.cronograma && c.cronograma.productos_limitados_por_moldes > 0
     ).length;
     
     return { 
       totalCotizaciones, 
       totalPiezas, 
-      totalProductos, 
-      totalPendientes, 
-      totalEnPipeline,
-      urgentCount 
+      urgentCount,
+      thisWeekCount,
+      complexCount 
     };
   }, [cotizaciones]);
 
+  if (stats.totalCotizaciones === 0) return null;
+
   return (
-    <div className="grid grid-cols-4 gap-4 p-3 bg-muted/30 border rounded-lg">
+    <div className="grid grid-cols-4 gap-3 p-3 bg-gray-50/50 border border-gray-200 rounded-lg">
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalCotizaciones}</div>
-        <div className="text-xs text-muted-foreground">Cotizaciones</div>
+        <div className="text-lg font-semibold text-gray-900">{stats.totalCotizaciones}</div>
+        <div className="text-xs text-gray-500">En producción</div>
       </div>
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalPiezas.toLocaleString()}</div>
-        <div className="text-xs text-muted-foreground">Piezas</div>
+        <div className="text-lg font-semibold text-gray-900">{stats.totalPiezas.toLocaleString()}</div>
+        <div className="text-xs text-gray-500">Piezas total</div>
       </div>
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalProductos}</div>
-        <div className="text-xs text-muted-foreground">Productos</div>
+        <div className="text-lg font-semibold text-red-600">{stats.urgentCount}</div>
+        <div className="text-xs text-gray-500">Urgentes</div>
       </div>
       <div className="text-center">
-        <div className="flex items-center justify-center gap-1">
-          <div className="text-sm font-semibold text-foreground">{stats.totalEnPipeline}</div>
-          {stats.urgentCount > 0 && (
-            <TrendingUp className="h-3 w-3 text-orange-600" />
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground">En Pipeline</div>
+        <div className="text-lg font-semibold text-orange-600">{stats.complexCount}</div>
+        <div className="text-xs text-gray-500">Requieren moldes</div>
       </div>
     </div>
   );
@@ -242,11 +248,6 @@ const ProductRow = React.memo(({
               Límite
             </span>
           )}
-          {timeline?.limitado_por_moldes && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-              Moldes
-            </span>
-          )}
         </div>
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
@@ -262,28 +263,27 @@ const ProductRow = React.memo(({
         </div>
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+          {timeline?.moldes_disponibles || 0}
+        </span>
+      </TableCell>
+      <TableCell className="px-3 py-2 text-center">
         {timeline ? (
-          <div className="space-y-1">
-            <span className="text-xs font-medium text-blue-700">
-              {timeline.dias_estimados} días
-            </span>
-            <div className="text-xs text-gray-500">
-              {timeline.fecha_estimada_completion}
-            </div>
-          </div>
+          <span className="text-xs font-medium text-blue-700">
+            {timeline.dias_estimados === 999 ? '-' : `${timeline.dias_estimados} días`}
+          </span>
         ) : (
           <span className="text-xs text-gray-400">Calculando...</span>
         )}
       </TableCell>
-      <TableCell className="px-3 py-2 text-right">
-        <span className="text-xs font-medium text-gray-900">
-          ${(producto.precio_venta || 0).toLocaleString()}
-        </span>
-      </TableCell>
-      <TableCell className="px-3 py-2 text-right">
-        <span className="text-xs font-medium text-green-700">
-          ${(producto.precio_total || 0).toLocaleString()}
-        </span>
+      <TableCell className="px-3 py-2 text-center">
+        {timeline ? (
+          <span className="text-xs text-gray-600">
+            {timeline.fecha_estimada_completion === 'Sin moldes' ? '-' : timeline.fecha_estimada_completion}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">-</span>
+        )}
       </TableCell>
     </TableRow>
   );
@@ -642,19 +642,16 @@ export const ProduccionActivaSection = React.memo(() => {
     <div className="space-y-4">
       {/* Header with search and refresh */}
       <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-900">Producción Activa</h1>
         <div className="flex items-center space-x-3">
-          <Factory className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Producción Activa</h2>
-        </div>
-        <div className="flex items-center space-x-2">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Buscar cotización, cliente o producto..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
-              className="pl-8 w-64 text-sm"
+              className="pl-9 pr-3 w-48 h-9 text-sm border-gray-300 rounded-lg focus:border-gray-400 focus:ring-0"
             />
           </div>
           <Button
@@ -662,12 +659,9 @@ export const ProduccionActivaSection = React.memo(() => {
             disabled={loading}
             variant="outline"
             size="sm"
+            className="h-9 px-3 border-gray-300 hover:bg-gray-50"
           >
-            {loading ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -702,45 +696,54 @@ export const ProduccionActivaSection = React.memo(() => {
             <div key={cotizacion.cotizacion_id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
               {/* Cotizacion Header - Clickable to expand/collapse */}
               <div 
-                className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 hover:bg-gray-100/50 cursor-pointer transition-colors"
+                className="px-4 py-3 border-b border-gray-200 bg-white hover:bg-gray-50/50 cursor-pointer transition-colors"
                 onClick={() => toggleCotizacion(cotizacion.cotizacion_id)}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center gap-2">
-                      {expandedCotizaciones.has(cotizacion.cotizacion_id) ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <Badge variant="outline" className="text-xs font-medium">
-                        {cotizacion.folio}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-sm font-medium text-foreground">{cotizacion.cliente}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{cotizacion.fecha_creacion}</span>
+                  <div className="flex items-center space-x-3">
+                    {expandedCotizaciones.has(cotizacion.cotizacion_id) ? (
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    )}
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{cotizacion.cliente}</div>
+                        <div className="text-xs text-gray-500">{cotizacion.total_piezas} productos</div>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {cotizacion.cronograma && cotizacion.cronograma.productos_limitados_por_moldes > 0 && (
-                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border-orange-200">
-                        🔧 {cotizacion.cronograma.productos_limitados_por_moldes} Limitados por Moldes
+                    {(() => {
+                      // Calculate urgency based on cronograma
+                      const daysLeft = cotizacion.cronograma?.dias_totales_estimados || 0;
+                      const isComplex = cotizacion.cronograma?.productos_limitados_por_moldes > 0;
+                      
+                      if (daysLeft <= 3) {
+                        return (
+                          <Badge className="text-xs bg-red-50 text-red-700 border-red-200 hover:bg-red-100">
+                            Urgente
+                          </Badge>
+                        );
+                      } else if (daysLeft <= 7) {
+                        return (
+                          <Badge className="text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
+                            Esta semana
+                          </Badge>
+                        );
+                      } else {
+                        return (
+                          <Badge className="text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+                            {daysLeft}d restantes
+                          </Badge>
+                        );
+                      }
+                    })()}
+                    {cotizacion.cronograma?.productos_limitados_por_moldes > 0 && (
+                      <Badge className="text-xs bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100">
+                        Requiere moldes
                       </Badge>
                     )}
-                    {cotizacion.cronograma && (
-                      <Badge variant="default" className="text-xs bg-blue-600 text-white">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {cotizacion.cronograma.fecha_estimada_completion}
-                      </Badge>
-                    )}
-                    <Badge variant="secondary" className="text-xs">
-                      {cotizacion.total_piezas} pzs
-                    </Badge>
                   </div>
                 </div>
               </div>
@@ -764,9 +767,9 @@ export const ProduccionActivaSection = React.memo(() => {
                             <TableRow className="bg-gray-50/50 border-b border-gray-200">
                               <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 h-8">Producto</TableHead>
                               <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Cantidad</TableHead>
-                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Timeline</TableHead>
-                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Precio</TableHead>
-                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-right h-8">Total</TableHead>
+                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Moldes</TableHead>
+                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Días</TableHead>
+                              <TableHead className="px-3 py-2 text-xs font-medium text-gray-700 text-center h-8">Fecha Entrega</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody className="[&_tr:last-child]:border-0">

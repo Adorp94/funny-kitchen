@@ -21,6 +21,10 @@ interface CronogramaProducto {
   vueltas_max_dia: number;
   capacidad_diaria: number;
   precio_venta: number;
+  // Timeline information
+  dias_estimados: number;
+  fecha_estimada_completion: string;
+  limitado_por_moldes: boolean;
 }
 
 interface CronogramaCotizacion {
@@ -56,6 +60,22 @@ interface CronogramaResponse {
       fecha_mas_temprana: string;
     }>;
   };
+}
+
+// Helper function to calculate working days (6 days per week, skip Sundays)
+function addWorkingDays(startDate: Date, workingDays: number): Date {
+  const result = new Date(startDate);
+  let daysAdded = 0;
+  
+  while (daysAdded < workingDays) {
+    result.setDate(result.getDate() + 1);
+    // Skip Sundays (0), work Monday (1) through Saturday (6)
+    if (result.getDay() !== 0) {
+      daysAdded++;
+    }
+  }
+  
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -218,27 +238,47 @@ export async function GET(request: NextRequest) {
     // Step 4: Get productos data
     const { data: productosData, error: productosError } = await supabase
       .from('productos')
-      .select('producto_id, nombre, sku, moldes_disponibles, vueltas_max_dia')
+      .select('producto_id, nombre, sku, vueltas_max_dia')
+      .in('producto_id', allProductIds);
+      
+    // Step 4b: Get active moldes for each product from productos_en_mesa
+    const { data: moldesActivosData, error: moldesError } = await supabase
+      .from('productos_en_mesa')
+      .select('producto_id, cantidad_moldes')
       .in('producto_id', allProductIds);
 
     if (productosError) {
       console.error("[API /production/cronograma GET] Error fetching productos:", productosError);
+    }
+    
+    if (moldesError) {
+      console.error("[API /production/cronograma GET] Error fetching moldes activos:", moldesError);
+    }
+
+    // Create moldes activos map by summing cantidad_moldes for each product across all mesas
+    const moldesActivosMap = new Map<number, number>();
+    if (moldesActivosData) {
+      moldesActivosData.forEach(molde => {
+        const currentTotal = moldesActivosMap.get(molde.producto_id) || 0;
+        moldesActivosMap.set(molde.producto_id, currentTotal + (molde.cantidad_moldes || 0));
+      });
     }
 
     // Create productos map
     const productosMap = new Map<number, {
       nombre: string;
       sku?: string;
-      moldes_disponibles: number;
+      moldes_activos: number;
       vueltas_max_dia: number;
     }>();
 
     if (productosData) {
       productosData.forEach(producto => {
+        const moldesActivos = moldesActivosMap.get(producto.producto_id) || 0;
         productosMap.set(producto.producto_id, {
           nombre: producto.nombre,
           sku: producto.sku,
-          moldes_disponibles: producto.moldes_disponibles || 1,
+          moldes_activos: moldesActivos, // Use actual active moldes from mesas
           vueltas_max_dia: producto.vueltas_max_dia || 1
         });
       });
@@ -366,9 +406,24 @@ export async function GET(request: NextRequest) {
         // Calculate real remaining work needed
         const cantidadPendiente = Math.max(0, cantidadPedida - cantidadAsignada - prodStatus.total_en_pipeline);
 
-        const moldesDisponibles = productoData.moldes_disponibles;
+        const moldesActivos = productoData.moldes_activos;
         const vueltasMaxDia = productoData.vueltas_max_dia;
-        const capacidadDiaria = moldesDisponibles * vueltasMaxDia;
+        
+        // Business logic: Apply 25% merma to the FULL cantidad pedida for timeline calculation
+        // This shows how long it would take to produce the entire order from scratch
+        const MERMA_PERCENTAGE = 0.25;
+        const cantidadConMerma = Math.ceil(cantidadPedida * (1 + MERMA_PERCENTAGE));
+        
+        // Calculate production capacity per day (moldes_activos * vueltas_max_dia)
+        const capacidadDiaria = moldesActivos * vueltasMaxDia;
+        
+        // Business logic: (cantidad + 25% merma) / moldes_activos = days
+        const diasEstimados = moldesActivos > 0 ? Math.ceil(cantidadConMerma / capacidadDiaria) : 999;
+        
+        // Calculate estimated completion date using working days (6 days per week)
+        const fechaEstimada = moldesActivos > 0 ? 
+          addWorkingDays(new Date(), diasEstimados).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) :
+          'Sin moldes';
 
         const cronogramaProducto: CronogramaProducto = {
           producto_id: cp.producto_id,
@@ -378,10 +433,14 @@ export async function GET(request: NextRequest) {
           cantidad_asignada: cantidadAsignada,
           cantidad_pendiente: cantidadPendiente,
           produccion_status: prodStatus,
-          moldes_disponibles: moldesDisponibles,
+          moldes_disponibles: moldesActivos,
           vueltas_max_dia: vueltasMaxDia,
           capacidad_diaria: capacidadDiaria,
-          precio_venta: cp.precio_unitario
+          precio_venta: cp.precio_unitario,
+          // Timeline information with business logic
+          dias_estimados: diasEstimados,
+          fecha_estimada_completion: fechaEstimada,
+          limitado_por_moldes: moldesActivos === 0
         };
 
         productos.push(cronogramaProducto);
@@ -405,7 +464,7 @@ export async function GET(request: NextRequest) {
             nombre: productoData.nombre,
             total_pendiente: cantidadPendiente,
             total_en_pipeline: prodStatus.total_en_pipeline,
-            moldes_disponibles: moldesDisponibles,
+            moldes_disponibles: moldesActivos,
             capacidad_diaria: capacidadDiaria,
             cotizaciones_count: 1,
             fecha_mas_temprana: fechaCreacion
