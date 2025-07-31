@@ -1689,21 +1689,30 @@ export async function getVentasForCSV(
   try {
     console.log('[getVentasForCSV] Starting ventas CSV generation with filters:', { month, year });
 
-    // Build query for sold cotizaciones (those with payments)
+    // Build query from payments table (where actual payment dates are) and join to cotizaciones
     let query = supabase
-      .from('cotizaciones')
+      .from('pagos')
       .select(`
-        cotizacion_id,
-        folio,
-        fecha_creacion,
-        fecha_pago_inicial,
+        fecha_pago,
+        monto,
+        monto_mxn,
         moneda,
-        total,
-        clientes!inner(nombre, correo, celular, razon_social)
+        metodo_pago,
+        cotizaciones!inner (
+          cotizacion_id,
+          folio,
+          fecha_creacion,
+          fecha_pago_inicial,
+          moneda,
+          total,
+          total_mxn,
+          clientes!inner(nombre, correo, celular, razon_social)
+        )
       `)
-      .in('estatus_pago', ['anticipo', 'parcial', 'pagado']);
+      .eq('tipo_ingreso', 'cotizacion')
+      .not('cotizacion_id', 'is', null);
 
-    // Apply filters if provided
+    // Apply filters if provided (only if not "Todos" - which is 0)
     if (year && year > 0) {
       const yearStart = `${year}-01-01T00:00:00Z`;
       const yearEnd = `${year}-12-31T23:59:59Z`;
@@ -1711,28 +1720,45 @@ export async function getVentasForCSV(
       if (month && month > 0) {
         const monthStart = new Date(year, month - 1, 1).toISOString();
         const monthEnd = new Date(year, month, 1).toISOString();
-        query = query.filter('fecha_pago_inicial', 'gte', monthStart).filter('fecha_pago_inicial', 'lt', monthEnd);
+        query = query.filter('fecha_pago', 'gte', monthStart).filter('fecha_pago', 'lt', monthEnd);
       } else {
-        query = query.filter('fecha_pago_inicial', 'gte', yearStart).filter('fecha_pago_inicial', 'lte', yearEnd);
+        query = query.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
       }
     }
+    // If year is 0 or undefined, no date filters are applied (gets all records)
 
-    const { data: ventas, error } = await query.order('fecha_pago_inicial', { ascending: false });
+    const { data: pagos, error } = await query.order('fecha_pago', { ascending: false });
 
     if (error) {
       console.error('[getVentasForCSV] Error fetching ventas:', error);
       return { success: false, error: `Error fetching ventas: ${error.message}` };
     }
 
-    if (!Array.isArray(ventas) || ventas.length === 0) {
+    if (!Array.isArray(pagos) || pagos.length === 0) {
       console.log('[getVentasForCSV] No ventas found for the specified filters');
       return { success: true, data: '' };
     }
 
+    // Group payments by cotizacion to avoid duplicates and get unique sales
+    const cotizacionesMap = new Map();
+    
+    pagos.forEach(pago => {
+      const cotizacion = pago.cotizaciones;
+      if (cotizacion && !cotizacionesMap.has(cotizacion.cotizacion_id)) {
+        cotizacionesMap.set(cotizacion.cotizacion_id, {
+          ...cotizacion,
+          primera_fecha_pago: pago.fecha_pago
+        });
+      }
+    });
+
+    const ventasUnicas = Array.from(cotizacionesMap.values());
+
     // Transform data for CSV
-    const csvData = ventas.map((venta) => ({
+    const csvData = ventasUnicas.map((venta) => ({
       Folio: venta.folio || '',
       FechaCreacion: venta.fecha_creacion ? new Date(venta.fecha_creacion).toLocaleDateString('es-MX') : '',
+      PrimeraFechaPago: venta.primera_fecha_pago ? new Date(venta.primera_fecha_pago).toLocaleDateString('es-MX') : '',
       FechaPagoInicial: venta.fecha_pago_inicial ? new Date(venta.fecha_pago_inicial).toLocaleDateString('es-MX') : '',
       Cliente: venta.clientes?.nombre || '',
       RazonSocial: venta.clientes?.razon_social || '',
@@ -1783,7 +1809,7 @@ export async function getIngresosFilteredForCSV(
         cotizaciones(folio, clientes(nombre))
       `);
 
-    // Apply filters if provided
+    // Apply filters if provided (only if not "Todos" - which is 0)
     if (year && year > 0) {
       const yearStart = `${year}-01-01T00:00:00Z`;
       const yearEnd = `${year}-12-31T23:59:59Z`;
@@ -1796,6 +1822,7 @@ export async function getIngresosFilteredForCSV(
         query = query.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
       }
     }
+    // If year is 0 or undefined, no date filters are applied (gets all records)
 
     const { data: ingresos, error } = await query.order('fecha_pago', { ascending: false });
 
@@ -1854,7 +1881,7 @@ export async function getEgresosFilteredForCSV(
       .from('egresos')
       .select('*');
 
-    // Apply filters if provided
+    // Apply filters if provided (only if not "Todos" - which is 0)
     if (year && year > 0) {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
@@ -1867,6 +1894,7 @@ export async function getEgresosFilteredForCSV(
         query = query.filter('fecha', 'gte', yearStart).filter('fecha', 'lte', yearEnd);
       }
     }
+    // If year is 0 or undefined, no date filters are applied (gets all records)
 
     const { data: egresos, error } = await query.order('fecha', { ascending: false });
 
