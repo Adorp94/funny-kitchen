@@ -253,6 +253,7 @@ export async function POST(req: NextRequest) {
     console.log(`Has IVA: ${iva}`);
     console.log(`Global Discount: ${descuento_global}%`);
     console.log(`Received ${productos?.length} products`);
+    console.log("RECEIVED PRODUCTOS DATA:", JSON.stringify(productos, null, 2));
     console.log("===============================");
 
     // Validate required fields
@@ -539,9 +540,20 @@ export async function POST(req: NextRequest) {
                         : null,
                     capacidad: 0, // Default for custom products
                     unidad: 'unidad', // Default unit
-                    precio: p.precio_unitario || p.precio || 0,
+                    precio: p.precio_unitario_mxn || p.precio_unitario || p.precio || 0,
                     cantidad_inventario: 0
                 };
+
+                // Validate that we have a valid price for custom products
+                if (!customProductData.precio || customProductData.precio <= 0) {
+                    console.error(`CRITICAL: Custom product "${p.nombre}" has invalid price:`, customProductData.precio);
+                    console.error(`Product data received:`, p);
+                    await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
+                    return NextResponse.json({ 
+                        error: `Error: El producto personalizado "${p.nombre}" no tiene un precio válido.`,
+                        details: `Precio recibido: ${customProductData.precio}` 
+                    }, { status: 400 });
+                }
 
                 // Get the next producto_id
                 const { data: maxProductData, error: maxProductError } = await supabase
@@ -596,8 +608,17 @@ export async function POST(req: NextRequest) {
       .map((p: any) => {
 
         // Use the MXN values sent from the frontend for the product
-        const prod_original_precio_mxn = p.precio_unitario_mxn;
-        const prod_original_subtotal_mxn = p.subtotal_mxn;
+        // Frontend sends: precio_unitario_mxn, subtotal_mxn
+        const prod_original_precio_mxn = p.precio_unitario_mxn || p.precio_unitario || p.precio || 0;
+        const prod_original_subtotal_mxn = p.subtotal_mxn || p.subtotal || (prod_original_precio_mxn * (p.cantidad || 1));
+        
+        // Additional validation to ensure we have valid numeric values
+        if (!prod_original_precio_mxn || prod_original_precio_mxn <= 0) {
+            console.warn(`Invalid price for product ${p.nombre}: ${prod_original_precio_mxn}`);
+            return null; // This will be filtered out
+        }
+
+        console.log(`Processing product for insertion: ${p.nombre}, precio_mxn: ${prod_original_precio_mxn}, subtotal_mxn: ${prod_original_subtotal_mxn}`);
 
         // Calculate display price/subtotal for this product
         let prod_db_precio: number;
@@ -613,11 +634,11 @@ export async function POST(req: NextRequest) {
         // Assign the generated ID
         const currentId = nextId++;
 
-        return {
+        const productToInsert = {
           cotizacion_producto_id: currentId, // Assign explicit ID
           cotizacion_id: cotizacionId,
           producto_id: p.finalProductoId,
-          cantidad: p.cantidad,
+          cantidad: p.cantidad || 1,
           // Calculated display values for DB
           precio_unitario: prod_db_precio,
           subtotal: prod_db_subtotal,
@@ -626,34 +647,44 @@ export async function POST(req: NextRequest) {
           subtotal_mxn: prod_original_subtotal_mxn,
           // Other fields
           descuento_producto: p.descuento || 0,
-          descripcion: p.descripcion,
-          colores: Array.isArray(p.colores) ? p.colores.join(',') : p.colores,
-          acabado: p.acabado
+          descripcion: p.descripcion || null,
+          colores: Array.isArray(p.colores) ? p.colores.join(',') : (p.colores || null),
+          acabado: p.acabado || null
         };
+
+        console.log(`Prepared product for insertion:`, productToInsert);
+        return productToInsert;
       })
-      .filter((p: any): p is object => p !== null); // Filter out nulls
+      .filter((p: any): p is object => p !== null && p.producto_id && p.precio_unitario >= 0); // More robust filtering
 
     if (productosToInsert.length === 0) {
-      console.warn("No valid products found to insert after validation.");
+      console.error("CRITICAL: No valid products found to insert after validation.");
+      console.error("Original productos received:", productos);
+      console.error("Processed products:", processedProducts);
       // Rollback: Delete the just inserted cotizacion if no products are valid
       await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
       return NextResponse.json({ error: 'Ningún producto válido para agregar a la cotización.' }, { status: 400 });
     }
 
     console.log(`Attempting to insert ${productosToInsert.length} products into cotizacion_productos`);
+    console.log("Products to insert:", JSON.stringify(productosToInsert, null, 2));
 
-    const { error: productosInsertError } = await supabase
+    const { data: insertedProducts, error: productosInsertError } = await supabase
         .from('cotizacion_productos')
-        .insert(productosToInsert);
+        .insert(productosToInsert)
+        .select('cotizacion_producto_id, producto_id');
 
     if (productosInsertError) {
-        console.error('Error inserting products into cotizacion_productos:', productosInsertError);
+        console.error('CRITICAL ERROR: Failed to insert products into cotizacion_productos:', productosInsertError);
+        console.error('Failed products data:', JSON.stringify(productosToInsert, null, 2));
         // Rollback: Delete the just inserted cotizacion
+        console.log(`Rolling back cotizacion ${cotizacionId} due to product insertion failure`);
         await supabase.from('cotizaciones').delete().eq('cotizacion_id', cotizacionId);
         return NextResponse.json({ error: `Error al guardar productos: ${productosInsertError.message}` }, { status: 500 });
     }
 
     console.log("Products inserted successfully for cotizacion ID:", cotizacionId);
+    console.log("Inserted product IDs:", insertedProducts);
     
     // --- End Database Transaction --- 
 
