@@ -160,17 +160,16 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     };
 
     console.log("Context addProducto: Adding internal product (with individual discount applied to subtotalMXN):", nuevoProductoInterno);
-    // Avoid adding duplicates if possible (e.g., during HMR) - check by id
+    // Handle duplicates by updating existing products or adding new ones
     setInternalProductos(prev => {
         const existingIndex = prev.findIndex(p => p.id === nuevoProductoInterno.id);
         if (existingIndex > -1) {
-            console.warn(`[Context addProducto] Product with id ${nuevoProductoInterno.id} already exists. Not adding again.`);
-            // Optionally update if needed, but for initial load, maybe skipping is fine
-            // const newState = [...prev];
-            // newState[existingIndex] = nuevoProductoInterno;
-            // return newState;
-            return prev; // Keep existing state if duplicate found during initial load/HMR
+            console.log(`[Context addProducto] Product with id ${nuevoProductoInterno.id} already exists. Updating existing product.`);
+            const newState = [...prev];
+            newState[existingIndex] = nuevoProductoInterno;
+            return newState;
         }
+        console.log(`[Context addProducto] Adding new product with id ${nuevoProductoInterno.id}`);
         return [...prev, nuevoProductoInterno];
     });
   }, []); // Dependencies? Only stable setters.

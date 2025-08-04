@@ -899,14 +899,26 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     // Ensure precioUnitarioValue is at least 0 if it's null but required (e.g., for context)
     const finalPrecioUnitario = precioUnitarioValue ?? 0;
 
+    // Debug logging for the fix
+    console.log("🔍 [FORM DEBUG] Creating productToSend...");
+    console.log("🔍 [FORM DEBUG] activeTab:", activeTab);
+    console.log("🔍 [FORM DEBUG] formData.producto_id:", formData.producto_id);
+    
+    const originalProductId = formData.producto_id ? parseInt(formData.producto_id) : null;
+    const finalProductId = (activeTab === 'nuevo') ? null : originalProductId;
+    
+    console.log("🔍 [FORM DEBUG] originalProductId:", originalProductId);
+    console.log("🔍 [FORM DEBUG] finalProductId (after fix):", finalProductId);
+
     const productToSend: any = { // Use 'any' temporarily or define a specific type
-        producto_id: formData.producto_id ? parseInt(formData.producto_id) : null,
+        producto_id: finalProductId,
         nombre: formData.nombre,
-        // Use finalPrecioUnitario which defaults null to 0, as context expects a number
+        // Send both precio and precio_unitario for compatibility
+        precio: finalPrecioUnitario,
         precio_unitario: finalPrecioUnitario, 
         cantidad: parseInt(formData.cantidad) || 1,
         descuento: 0, // Assuming no discount field in this form?
-        sku: formData.sku,
+        sku: formData.sku || "", // Ensure SKU is always a string, will be auto-generated if empty
         tipo_ceramica: formData.tipo_ceramica,
         capacidad: formData.capacidad ? parseInt(formData.capacidad) : null,
         unidad: formData.unidad,
@@ -921,7 +933,8 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
     // It is the PARENT's responsibility to call the context's addProducto function.
     // DO NOT call handleSaveProduct or handleUpdateProduct here.
 
-    console.log("Calling onProductoChange with:", productToSend);
+    console.log("🔍 [FORM DEBUG] Final productToSend:", productToSend);
+    console.log("🔍 [FORM DEBUG] Calling onProductoChange with:", productToSend);
     if (onProductoChange) {
         onProductoChange(productToSend);
         toast.success("Producto listo para agregar a la cotización."); // More accurate toast
@@ -1127,7 +1140,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   icon={<Package className="h-4 w-4" />}
                   className={`${touched.nombre && errors.nombre ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                   required
-                  readOnly={!formData.producto_id && !comboboxOpen}
+                  readOnly={activeTab === 'existente' && !formData.producto_id && !comboboxOpen}
                   onClick={() => !formData.producto_id && setComboboxOpen(true)}
                 />
                 {touched.nombre && errors.nombre && (
@@ -1147,7 +1160,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   onChange={handleInputChange}
                   placeholder="Describe el producto"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  readOnly={!formData.producto_id && !comboboxOpen}
+                  readOnly={activeTab === 'existente' && !formData.producto_id && !comboboxOpen}
                 />
               </FormControl>
               
@@ -1160,7 +1173,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   onChange={handleInputChange}
                   placeholder="Ej: Rojo, Azul, Verde"
                   icon={<Layers className="h-4 w-4" />}
-                  readOnly={!formData.producto_id && !comboboxOpen}
+                  readOnly={activeTab === 'existente' && !formData.producto_id && !comboboxOpen}
                 />
               </FormControl>
               
@@ -1199,7 +1212,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   icon={<Layers className="h-4 w-4" />}
                   className={`${touched.cantidad && errors.cantidad ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                   required
-                  readOnly={!formData.producto_id && !comboboxOpen}
+                  readOnly={activeTab === 'existente' && !formData.producto_id && !comboboxOpen}
                 />
                 {touched.cantidad && errors.cantidad && (
                   <div className="text-red-500 text-xs mt-1 flex items-center">
@@ -1346,7 +1359,12 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
                   <Button
                     type="button"
                     onClick={handleAddToCart}
-                    disabled={!formData.nombre || !formData.precio || Object.keys(errors).length > 0}
+                    disabled={
+                      !formData.nombre || 
+                      !formData.cantidad ||
+                      (activeTab === 'nuevo' && !formData.precio) ||
+                      Object.keys(errors).length > 0
+                    }
                     variant="default"
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                   >
@@ -1465,17 +1483,6 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
               </FormControl>
             </div>
             
-            {/* SKU */}
-            <FormControl>
-              <FormLabel>SKU</FormLabel>
-              <Input
-                name="sku"
-                value={formData.sku}
-                onChange={handleInputChange}
-                placeholder="Código de producto"
-                icon={<Hash className="h-4 w-4" />}
-              />
-            </FormControl>
             
             {/* Tipo Cerámica */}
             <FormControl>

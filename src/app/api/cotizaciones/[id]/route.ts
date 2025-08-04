@@ -258,9 +258,17 @@ export async function PUT(
         const productsToUpdate = [];
 
         // 2. Process incoming products
+        console.log('🔍 [API DEBUG] Processing productos array:', data.productos.length);
         for (const producto of data.productos) {
+            console.log('🔍 [API DEBUG] Processing product:', {
+                nombre: producto.nombre,
+                producto_id: producto.producto_id,
+                cotizacion_producto_id: producto.cotizacion_producto_id
+            });
+            
             // Handle custom products by creating them in productos table first
             let finalProductoId = producto.producto_id ? parseInt(producto.producto_id, 10) : null;
+            console.log('🔍 [API DEBUG] finalProductoId after parsing:', finalProductoId);
             
             // If this is a custom product (no producto_id), create it in productos table first
             if (!finalProductoId && producto.nombre) {
@@ -338,9 +346,15 @@ export async function PUT(
 
             // Skip if we still don't have a valid producto_id (this shouldn't happen now)
             if (!dbProductoData.producto_id) {
-                console.warn(`Skipping product - still no producto_id after processing: ${producto.nombre}`);
+                console.error(`🚫 [API DEBUG] SKIPPING PRODUCT - no producto_id after processing: ${producto.nombre}`);
+                console.error(`🚫 [API DEBUG] dbProductoData:`, dbProductoData);
                 continue;
             }
+            
+            console.log('🔍 [API DEBUG] Product passed validation:', {
+                nombre: producto.nombre,
+                finalProductoId: dbProductoData.producto_id
+            });
             
             incomingProductoIds.add(dbProductoData.producto_id);
 

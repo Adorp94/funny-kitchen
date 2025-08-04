@@ -299,13 +299,35 @@ function EditCotizacionClient() {
     const toastId = toast.loading("Actualizando cotización...");
 
     try {
-      const productosPayload = productos.map((p) => {
-        if (!p.cotizacion_producto_id && p.producto_id && window.validProductIds && !window.validProductIds.has(p.producto_id)) {
-           console.warn(`Attempting to save product "${p.nombre}" with invalid producto_id: ${p.producto_id}`);
+      console.log('🔍 [SAVE DEBUG] Starting payload creation...');
+      console.log('🔍 [SAVE DEBUG] Raw productos from context:', productos);
+      console.log('🔍 [SAVE DEBUG] Number of productos from context:', productos.length);
+      
+      const productosPayload = productos.map((p, index) => {
+        console.log(`🔍 [SAVE DEBUG] Processing product ${index + 1}:`, {
+          nombre: p.nombre,
+          id: p.id,
+          cotizacion_producto_id: p.cotizacion_producto_id,
+          producto_id: p.producto_id,
+          precio: p.precio,
+          cantidad: p.cantidad
+        });
+
+        // Skip validation for newly created products (they won't be in the cached validProductIds)
+        // New products are identified by having a producto_id but no cotizacion_producto_id
+        const isNewlyCreatedProduct = !p.cotizacion_producto_id && p.producto_id;
+        
+        if (!isNewlyCreatedProduct && !p.cotizacion_producto_id && p.producto_id && window.validProductIds && !window.validProductIds.has(p.producto_id)) {
+           console.warn(`🚫 [SAVE DEBUG] FILTERED OUT: "${p.nombre}" with invalid producto_id: ${p.producto_id}`);
+           console.warn(`🚫 [SAVE DEBUG] Valid IDs available:`, Array.from(window.validProductIds || []));
            return null;
         }
+        
+        if (isNewlyCreatedProduct) {
+          console.log(`✅ [SAVE DEBUG] Allowing newly created product "${p.nombre}" with producto_id: ${p.producto_id}`);
+        }
 
-        return {
+        const payload = {
           ...(p.cotizacion_producto_id && { cotizacion_producto_id: p.cotizacion_producto_id }),
           ...(p.producto_id && { producto_id: p.producto_id }),
           nombre: p.nombre,
@@ -318,9 +340,13 @@ function EditCotizacionClient() {
           colores: Array.isArray(p.colores) && p.colores.length > 0 ? p.colores : null,
           acabado: p.acabado || null,
         };
+        
+        console.log(`✅ [SAVE DEBUG] Including product "${p.nombre}" in payload:`, payload);
+        return payload;
       }).filter(Boolean);
 
-      console.log('Productos payload for update:', productosPayload);
+      console.log('🔍 [SAVE DEBUG] Final productos payload:', productosPayload);
+      console.log('🔍 [SAVE DEBUG] Payload count:', productosPayload.length);
 
       const cotizacionData = {
         cliente_id: cliente.cliente_id,
@@ -386,7 +412,14 @@ function EditCotizacionClient() {
   };
 
   const handleAddProduct = (productoFromForm: any | null) => {
-     if (!productoFromForm) return;
+     if (!productoFromForm) {
+       console.log("🔍 [ADD DEBUG] No product data received");
+       return;
+     }
+
+     console.log("🔍 [ADD DEBUG] Received product data from form:", productoFromForm);
+     console.log("🔍 [ADD DEBUG] Form product_id:", productoFromForm?.producto_id);
+     console.log("🔍 [ADD DEBUG] Current productos in context:", productos.length);
 
      const precio = productoFromForm?.precio_unitario || productoFromForm?.precio || 0;
      const cantidad = productoFromForm?.cantidad || 1;
@@ -405,27 +438,29 @@ function EditCotizacionClient() {
        acabado: productoFromForm?.acabado || "",
      };
 
-     const existing = productos.find(p =>
-        (productoForContext.id && p.id === productoForContext.id) ||
-        (productoForContext.producto_id && p.producto_id === productoForContext.producto_id && !p.cotizacion_producto_id)
-     );
+     console.log("🔍 [ADD DEBUG] Processed product for context:", productoForContext);
+     console.log("🔍 [ADD DEBUG] productoForContext.producto_id:", productoForContext?.producto_id);
 
-     if (existing) {
-        console.log("[handleAddProduct] Updating existing product:", productoForContext);
-        addProducto({
-            ...existing,
-            ...productoForContext,
-        });
-        toast.success('Producto actualizado en la cotización');
-     } else {
-        console.log("[handleAddProduct] Adding new product:", productoForContext);
-        addProducto({
-          ...productoForContext,
-          id: generateUniqueId(),
-          cotizacion_producto_id: null,
-        });
-        toast.success('Producto agregado a la cotización');
-     }
+     // For editing cotización, always add as new product since we want to allow multiple instances
+     // The context will handle ID management and updates
+     console.log("🔍 [ADD DEBUG] Adding new product:", productoForContext);
+     
+     const productToAdd = {
+       ...productoForContext,
+       id: generateUniqueId(), // Always generate a new unique ID
+       cotizacion_producto_id: null, // New products don't have cotizacion_producto_id yet
+     };
+     
+     console.log("🔍 [ADD DEBUG] Final product being sent to context:", productToAdd);
+     console.log("🔍 [ADD DEBUG] Final product_id:", productToAdd?.producto_id);
+     addProducto(productToAdd);
+     
+     // Log context state after adding
+     setTimeout(() => {
+       console.log("🔍 [ADD DEBUG] Context state after adding:", productos.length + 1);
+     }, 100);
+     
+     toast.success('Producto agregado a la cotización');
   };
 
   const handleRemoveProduct = (id: string) => {
@@ -721,7 +756,7 @@ function EditCotizacionClient() {
                     setGlobalDiscount={setGlobalDiscount}
                     hasIva={hasIva}
                     setHasIva={setHasIva}
-                    ivaAmount={financials.ivaAmountMXN}
+                    ivaAmount={financials.displayIvaAmount}
                     shippingCost={shippingCost}
                     setShippingCost={setShippingCost}
                     total={financials.displayTotal}
