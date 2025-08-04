@@ -101,8 +101,12 @@ export async function getFinancialMetrics(
 
       // Apply month filter if month and year are provided and not 0
       if (month) {
-        const monthStartIngresos = new Date(year, month - 1, 1).toISOString();
-        const monthEndIngresos = new Date(year, month, 1).toISOString(); // Use less than start of next month
+        // Use consistent UTC date formatting to avoid timezone issues
+        const monthStartIngresos = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
+        const nextMonthIngresos = month === 12 ? 1 : month + 1;
+        const nextYearIngresos = month === 12 ? year + 1 : year;
+        const monthEndIngresos = `${nextYearIngresos}-${String(nextMonthIngresos).padStart(2, '0')}-01T00:00:00Z`;
+        
         const monthStartEgresos = `${year}-${String(month).padStart(2, '0')}-01`;
         const nextMonthEgresos = month === 12 ? 1 : month + 1;
         const nextYearEgresos = month === 12 ? year + 1 : year;
@@ -153,7 +157,7 @@ export async function getFinancialMetrics(
     
     // Calculate totals (same logic as before, now on potentially filtered data)
     const ingresosMXNTotal = Array.isArray(ingresosMXN) 
-      ? ingresosMXN.reduce((acc, curr) => acc + Number(curr?.monto_mxn || curr?.monto || 0), 0) 
+      ? ingresosMXN.reduce((acc, curr) => acc + Number(curr?.monto || 0), 0) 
       : 0;
     
     const ingresosUSDTotal = Array.isArray(ingresosUSD) 
@@ -215,7 +219,8 @@ export async function getAllIngresos(
       countQuery = countQuery.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
 
       if (month) {
-         const monthStart = new Date(year, month - 1, 1).toISOString();
+         // Use consistent UTC date formatting to avoid timezone issues
+         const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
          // Calculate the first day of the next month
          let nextMonthYear = year;
          let nextMonth = month + 1;
@@ -223,7 +228,7 @@ export async function getAllIngresos(
              nextMonth = 1;
              nextMonthYear += 1;
          }
-         const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+         const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
          countQuery = countQuery.filter('fecha_pago', 'gte', monthStart);
          countQuery = countQuery.filter('fecha_pago', 'lt', monthEnd); // Use 'lt' for end date exclusive
       }
@@ -272,14 +277,15 @@ export async function getAllIngresos(
        dataQuery = dataQuery.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
 
        if (month) {
-         const monthStart = new Date(year, month - 1, 1).toISOString();
+         // Use consistent UTC date formatting to avoid timezone issues
+         const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
          let nextMonthYear = year;
          let nextMonth = month + 1;
          if (nextMonth > 12) {
              nextMonth = 1;
              nextMonthYear += 1;
          }
-         const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+         const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
          dataQuery = dataQuery.filter('fecha_pago', 'gte', monthStart);
          dataQuery = dataQuery.filter('fecha_pago', 'lt', monthEnd);
        }
@@ -1087,14 +1093,14 @@ export async function getCashFlowMetrics(
     let paymentDateFilter = '';
     if (year) {
       if (month) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
         let nextMonthYear = year;
         let nextMonth = month + 1;
         if (nextMonth > 12) {
           nextMonth = 1;
           nextMonthYear += 1;
         }
-        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
         paymentDateFilter = `fecha_pago.gte.${monthStart},fecha_pago.lt.${monthEnd}`;
       } else {
         const yearStart = `${year}-01-01T00:00:00Z`;
@@ -1280,14 +1286,14 @@ export async function getCotizacionPayments(
     // Apply date filters
     if (year) {
       if (month) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
         let nextMonthYear = year;
         let nextMonth = month + 1;
         if (nextMonth > 12) {
           nextMonth = 1;
           nextMonthYear += 1;
         }
-        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
         query = query.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
       } else {
         const yearStart = `${year}-01-01T00:00:00Z`;
@@ -1390,14 +1396,14 @@ export async function getCashFlowDataForCSV(
     // Apply date filters
     if (year) {
       if (month) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
         let nextMonthYear = year;
         let nextMonth = month + 1;
         if (nextMonth > 12) {
           nextMonth = 1;
           nextMonthYear += 1;
         }
-        const monthEnd = new Date(nextMonthYear, nextMonth - 1, 1).toISOString();
+        const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
         query = query.gte('fecha_pago', monthStart).lt('fecha_pago', monthEnd);
       } else {
         const yearStart = `${year}-01-01T00:00:00Z`;
@@ -1718,8 +1724,10 @@ export async function getVentasForCSV(
       const yearEnd = `${year}-12-31T23:59:59Z`;
       
       if (month && month > 0) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
-        const monthEnd = new Date(year, month, 1).toISOString();
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
         query = query.filter('fecha_pago', 'gte', monthStart).filter('fecha_pago', 'lt', monthEnd);
       } else {
         query = query.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
@@ -1815,8 +1823,10 @@ export async function getIngresosFilteredForCSV(
       const yearEnd = `${year}-12-31T23:59:59Z`;
       
       if (month && month > 0) {
-        const monthStart = new Date(year, month - 1, 1).toISOString();
-        const monthEnd = new Date(year, month, 1).toISOString();
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
         query = query.filter('fecha_pago', 'gte', monthStart).filter('fecha_pago', 'lt', monthEnd);
       } else {
         query = query.filter('fecha_pago', 'gte', yearStart).filter('fecha_pago', 'lte', yearEnd);
@@ -1887,8 +1897,9 @@ export async function getEgresosFilteredForCSV(
       const yearEnd = `${year}-12-31`;
       
       if (month && month > 0) {
-        const monthStart = new Date(year, month - 1, 1).toISOString().split('T')[0];
-        const monthEnd = new Date(year, month, 0).toISOString().split('T')[0];
+        const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthEnd = `${year}-${String(month).padStart(2, '0')}-${daysInMonth.toString().padStart(2, '0')}`;
         query = query.filter('fecha', 'gte', monthStart).filter('fecha', 'lte', monthEnd);
       } else {
         query = query.filter('fecha', 'gte', yearStart).filter('fecha', 'lte', yearEnd);
@@ -1943,8 +1954,10 @@ export async function getVentasMonthlyReport(
   try {
     console.log('[getVentasMonthlyReport] Generating monthly ventas report for:', { year, month });
     
-    const monthStart = new Date(year, month - 1, 1).toISOString();
-    const monthEnd = new Date(year, month, 1).toISOString();
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`;
 
     let query = supabase
       .from('cotizaciones')
@@ -2005,8 +2018,10 @@ export async function getVentasBiMonthlyReport(
   try {
     console.log('[getVentasBiMonthlyReport] Generating bi-monthly ventas report for:', { year, startMonth });
     
-    const monthStart = new Date(year, startMonth - 1, 1).toISOString();
-    const monthEnd = new Date(year, startMonth + 1, 1).toISOString();
+    const monthStart = `${year}-${String(startMonth).padStart(2, '0')}-01T00:00:00Z`;
+    const endMonth = startMonth + 2 > 12 ? startMonth + 2 - 12 : startMonth + 2;
+    const endYear = startMonth + 2 > 12 ? year + 1 : year;
+    const monthEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-01T00:00:00Z`;
 
     let query = supabase
       .from('cotizaciones')
@@ -2068,8 +2083,10 @@ export async function getVentasTriMonthlyReport(
     console.log('[getVentasTriMonthlyReport] Generating tri-monthly ventas report for:', { year, quarter });
     
     const startMonth = (quarter - 1) * 3 + 1;
-    const monthStart = new Date(year, startMonth - 1, 1).toISOString();
-    const monthEnd = new Date(year, startMonth + 2, 1).toISOString();
+    const monthStart = `${year}-${String(startMonth).padStart(2, '0')}-01T00:00:00Z`;
+    const endMonth = startMonth + 3 > 12 ? startMonth + 3 - 12 : startMonth + 3;
+    const endYear = startMonth + 3 > 12 ? year + 1 : year;
+    const monthEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-01T00:00:00Z`;
 
     let query = supabase
       .from('cotizaciones')
@@ -2180,6 +2197,113 @@ export async function getVentasAnnualReport(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    };
+  }
+}
+
+// Function to ensure opening balance exists for a given month
+export async function ensureOpeningBalance(
+  year: number, 
+  month: number
+): Promise<{ success: boolean; data?: { mxn: number; usd: number }; error?: string }> {
+  try {
+    const { data: openingBalanceData, error } = await supabase
+      .rpc('get_opening_balance', { target_year: year, target_month: month });
+    
+    if (error) {
+      console.error('Error getting opening balance:', error);
+      return { success: false, error: error.message };
+    }
+    
+    if (openingBalanceData && openingBalanceData.length > 0) {
+      const balance = openingBalanceData[0];
+      // Parse the PostgreSQL row format "(amount_mxn,amount_usd)"
+      const values = balance.get_opening_balance.replace(/[()]/g, '').split(',');
+      const mxn = parseFloat(values[0]) || 0;
+      const usd = parseFloat(values[1]) || 0;
+      
+      return {
+        success: true,
+        data: { mxn, usd }
+      };
+    }
+    
+    return { success: false, error: 'No opening balance found' };
+  } catch (error) {
+    console.error('Error ensuring opening balance:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to ensure opening balance' 
+    };
+  }
+}
+
+// Function to create opening balance ingreso for a specific month
+export async function createOpeningBalanceIngreso(
+  year: number, 
+  month: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if opening balance ingreso already exists for this month
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const { data: existingIngreso } = await supabase
+      .from('pagos')
+      .select('*')
+      .eq('tipo_ingreso', 'otro')
+      .eq('descripcion', 'Saldo inicial del mes')
+      .gte('fecha_pago', `${year}-${month.toString().padStart(2, '0')}-01T00:00:00Z`)
+      .lt('fecha_pago', `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01T00:00:00Z`)
+      .single();
+    
+    if (existingIngreso) {
+      return { success: true }; // Already exists
+    }
+    
+    // Get the opening balance amount
+    const { data: openingBalanceData, error: balanceError } = await supabase
+      .rpc('get_opening_balance', { target_year: year, target_month: month });
+    
+    if (balanceError || !openingBalanceData || openingBalanceData.length === 0) {
+      return { success: false, error: 'Could not calculate opening balance' };
+    }
+    
+    const balance = openingBalanceData[0];
+    const values = balance.opening_mxn ? [balance.opening_mxn, balance.opening_usd] : 
+                    balance.get_opening_balance.replace(/[()]/g, '').split(',');
+    const openingBalanceMXN = parseFloat(values[0]) || 0;
+    const openingBalanceUSD = parseFloat(values[1]) || 0;
+    
+    // Only create ingreso if there's a non-zero opening balance
+    if (openingBalanceMXN !== 0 || openingBalanceUSD !== 0) {
+      // Create opening balance as ingreso entry
+      const { error: insertError } = await supabase
+        .from('pagos')
+        .insert({
+          tipo_ingreso: 'otro',
+          descripcion: 'Saldo inicial del mes',
+          moneda: 'MXN',
+          monto: openingBalanceMXN,
+          monto_mxn: openingBalanceMXN,
+          metodo_pago: 'saldo_anterior',
+          fecha_pago: `${year}-${month.toString().padStart(2, '0')}-01T00:00:01Z`,
+          tipo_pago: 'saldo_inicial',
+          estado: 'aprobado',
+          notas: `Saldo arrastrado del mes anterior (${month === 1 ? 12 : month - 1}/${month === 1 ? year - 1 : year})`
+        });
+      
+      if (insertError) {
+        console.error('Error creating opening balance ingreso:', insertError);
+        return { success: false, error: insertError.message };
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating opening balance ingreso:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to create opening balance ingreso' 
     };
   }
 } 

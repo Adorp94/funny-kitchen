@@ -129,7 +129,7 @@ export function IngresosTable({
         <Table className="min-w-[800px]">
           <TableHeader className="bg-slate-50 border-b border-slate-200">
             <TableRow className="hover:bg-slate-50">
-              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[100px]">Tipo</TableHead>
+              <TableHead className="h-10 text-xs font-medium text-slate-500 w-[120px]">Tipo</TableHead>
               <TableHead className="h-10 text-xs font-medium text-slate-500">Detalle</TableHead>
               <TableHead className="h-10 text-xs font-medium text-slate-500 w-[120px]">Fecha</TableHead>
               <TableHead className="h-10 text-xs font-medium text-slate-500 w-[150px] text-right">Monto</TableHead>
@@ -172,11 +172,11 @@ export function IngresosTable({
                   >
                     <TableCell className="py-3 font-medium text-slate-900">
                       {ingreso.tipo_ingreso === 'cotizacion' ? (
-                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-xs whitespace-nowrap">
                           Cotización
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                        <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 text-xs whitespace-nowrap">
                           Otro Ingreso
                         </Badge>
                       )}
