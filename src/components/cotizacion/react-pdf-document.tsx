@@ -494,7 +494,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
             {displayProductos.map((item, index) => (
               <View style={styles.tableRow} key={item.id || index} wrap={false}>
                 <View style={styles.tableCol1}>
-                  <Text style={styles.tableRowText}>{item.descripcion || item.producto_nombre || 'N/A'}</Text>
+                  <Text style={styles.tableRowText}>{item.producto_nombre || item.descripcion || 'N/A'}</Text>
                 </View>
                 <Text style={[styles.tableCol2, styles.tableRowText]}>{item.cantidad}</Text>
                 <Text style={[styles.tableCol3, styles.tableRowText]}>
