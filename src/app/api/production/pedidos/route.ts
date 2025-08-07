@@ -235,16 +235,15 @@ export async function GET(request: NextRequest) {
         const cantidadRequerida = producto.cantidad;
         const pedidosTotal = productionStatus?.pedidos || 0;
         
-        // Calculate allocated products for this specific product
-        const allocatedForProduct = allocatedData?.filter(a => a.producto_id === producto.producto_id) || [];
-        const totalAllocated = allocatedForProduct.reduce((sum, a) => sum + (a.cantidad_asignada || 0), 0);
+        // Calculate empaque allocations for this specific product (only empaque, not entregado)
+        const empaqueForProduct = allocatedData?.filter(a => 
+          a.producto_id === producto.producto_id && a.stage === 'empaque'
+        ) || [];
+        const totalEmpaqueAllocated = empaqueForProduct.reduce((sum, a) => sum + (a.cantidad_asignada || 0), 0);
         
-        // Calculate net pedidos (existing committed demand minus what's been allocated)
-        const netPedidos = Math.max(0, pedidosTotal - totalAllocated);
-        
-        // True surplus = terminado inventory minus what's already committed to existing production queue
-        // This shows what's actually available for NEW orders
-        const surplusDisponible = Math.max(0, terminadoTotal - netPedidos);
+        // Available terminado = current terminado stock minus what has been moved to empaque
+        // This shows what's actually available to move directly to empaque
+        const surplusDisponible = Math.max(0, terminadoTotal - totalEmpaqueAllocated);
         
         let availability: 'sufficient' | 'partial' | 'none' = 'none';
         let canSkipProduction = false;
@@ -265,7 +264,7 @@ export async function GET(request: NextRequest) {
         }
         
         const inventory_status = {
-          terminado_disponible: surplusDisponible, // Now represents surplus, not just terminado
+          terminado_disponible: surplusDisponible, // Available terminado stock after subtracting empaque allocations
           availability,
           can_skip_production: canSkipProduction,
           production_needed: productionNeeded

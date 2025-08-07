@@ -89,14 +89,14 @@ The production module includes sophisticated allocation and fulfillment tracking
 - **Status Change**: When moving cotización to "producción" status, products are NO LONGER automatically added to bitácora
 - **Manual Selection**: Users must manually select products in the Pedidos section to add them to bitácora
 - **Selection Criteria**: Only products with available moldes can be selected (checkbox only appears for products with moldes > 0)
-- **Move to Bitácora**: Selected products are moved using the "Mover X a Bitácora" button which calls `/api/production/move-to-bitacora`
+- **Move to Producción Activa**: Selected products are processed using the "Mover a Producción Activa" dialog which calls `/api/production/process-cotizaciones-manual`
 
 #### Key Production Components
 - **Pedidos Section** (`/src/components/produccion/pedidos-section.tsx`)
   - View all products from cotizaciones in "producción" status
-  - Manual selection system with checkboxes (only for products with moldes)
-  - "Mover X a Bitácora" button to move selected products to production queue
-  - Integration with moldes availability checking
+  - Cotización-level selection system with inventory analysis
+  - "Mover a Producción Activa" dialog for smart allocation (direct to empaque or to production queue)
+  - Integration with moldes availability checking and terminado inventory
 
 - **Clientes Activos Section** (`/src/components/produccion/clientes-activos-section.tsx`)
   - Search quotations by ID to view product details and production status
@@ -114,7 +114,7 @@ The production module includes sophisticated allocation and fulfillment tracking
 
 #### Production API Endpoints
 - **`/api/production/pedidos`** - Fetch all products from cotizaciones in "producción" status for manual selection
-- **`/api/production/move-to-bitacora`** - Move selected products to production queue (bitácora) with molde validation
+- **`/api/production/process-cotizaciones-manual`** - Smart allocation processing: moves products with terminado inventory directly to empaque, remaining to production queue (bitácora)
 - **`/api/production/clientes-activos/[cotizacionId]`** - Fetch quotation details with production status
 - **`/api/production/empaque`** - Manage empaque allocations (POST: move to empaque, GET: view empaque products, DELETE: return to terminado, PATCH: update box counts)
 - **`/api/production/enviados`** - Manage delivery allocations with auto-completion logic

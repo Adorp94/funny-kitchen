@@ -121,6 +121,37 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // First, check current terminado stock and subtract from it
+        const { data: productionStatus, error: statusError } = await supabase
+          .from('production_active')
+          .select('terminado')
+          .eq('producto_id', allocation.producto_id)
+          .single();
+
+        if (statusError || !productionStatus) {
+          console.error(`[API] Error fetching production status for ${allocation.producto_nombre}:`, statusError);
+          continue;
+        }
+
+        if (productionStatus.terminado < allocation.cantidad) {
+          console.error(`[API] Insufficient terminado stock for ${allocation.producto_nombre}: has ${productionStatus.terminado}, needs ${allocation.cantidad}`);
+          continue;
+        }
+
+        // Update production_active to decrease terminado
+        const { error: updateStatusError } = await supabase
+          .from('production_active')
+          .update({ 
+            terminado: productionStatus.terminado - allocation.cantidad,
+            updated_at: new Date().toISOString()
+          })
+          .eq('producto_id', allocation.producto_id);
+
+        if (updateStatusError) {
+          console.error(`[API] Error updating production status for ${allocation.producto_nombre}:`, updateStatusError);
+          continue;
+        }
+
         // Create empaque allocation
         const { error: empaqueError } = await supabase
           .from('production_allocations')
@@ -130,13 +161,18 @@ export async function POST(request: NextRequest) {
             cantidad_asignada: allocation.cantidad,
             stage: 'empaque',
             fecha_asignacion: new Date().toISOString(),
-            comentarios: 'Asignación manual desde pedidos'
+            notas: `Asignación manual desde pedidos - ${allocation.cantidad} productos movidos de terminado a empaque`
           });
 
         if (empaqueError) {
           console.error(`[API] Error creating empaque allocation for ${allocation.producto_nombre}:`, empaqueError);
+          // Rollback: restore terminado count
+          await supabase
+            .from('production_active')
+            .update({ terminado: productionStatus.terminado })
+            .eq('producto_id', allocation.producto_id);
         } else {
-          console.log(`[API] Successfully allocated ${allocation.cantidad} ${allocation.producto_nombre} to empaque for ${allocation.folio}`);
+          console.log(`[API] Successfully moved ${allocation.cantidad} ${allocation.producto_nombre} from terminado to empaque for ${allocation.folio}`);
         }
 
       } catch (error: any) {

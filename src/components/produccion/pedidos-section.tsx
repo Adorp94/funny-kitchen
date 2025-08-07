@@ -167,7 +167,6 @@ export const PedidosSection: React.FC = React.memo(() => {
   const [expandedCotizaciones, setExpandedCotizaciones] = useState<Set<string>>(new Set());
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [selectedCotizaciones, setSelectedCotizaciones] = useState<Map<string, SelectedCotizacion>>(new Map());
-  const [isMovingToBitacora, setIsMovingToBitacora] = useState<boolean>(false);
   
   // Allocation dialog states
   const [showAllocationDialog, setShowAllocationDialog] = useState<boolean>(false);
@@ -400,7 +399,7 @@ export const PedidosSection: React.FC = React.memo(() => {
   }, []);
 
   // Prepare allocation analysis for cotization-level processing
-  const prepareAllocationAnalysis = useCallback(() => {
+  const prepareAllocationAnalysis = useCallback(async () => {
     if (selectedCotizaciones.size === 0) {
       toast.error("Selecciona al menos una cotización para procesar");
       return;
@@ -421,47 +420,84 @@ export const PedidosSection: React.FC = React.memo(() => {
       ir_a_empaque: boolean;
     }> = [];
 
-    // Analyze each cotization's products
-    selectedCotizacionesArray.forEach(cotizacion => {
-      cotizacion.productos.forEach(producto => {
-        totalProducts++;
-        
-        // Check if product needs moldes
-        if (!producto.has_moldes) {
-          needsMoldes.push({
-            producto_nombre: producto.producto_nombre,
-            folio: cotizacion.folio
-          });
-        }
-        
-        // Check inventory status
-        const inventarioDisponible = producto.inventory_status?.terminado_disponible || 0;
-        const cantidadNecesaria = producto.cantidad;
-        
-        if (inventarioDisponible > 0) {
-          // Product has some inventory available
-          const maxParaEmpaque = Math.min(inventarioDisponible, cantidadNecesaria);
-          
-          productsWithInventory.push({
-            folio: cotizacion.folio,
-            producto_id: producto.producto_id,
-            producto_nombre: producto.producto_nombre,
-            cantidad_necesaria: cantidadNecesaria,
-            inventario_disponible: inventarioDisponible,
-            cantidad_a_empaque: maxParaEmpaque, // Default to maximum possible
-            ir_a_empaque: true // Default to enabled
-          });
-          
-          if (producto.inventory_status?.can_skip_production) {
-            canSkipProduction++;
-          } else {
-            needsProduction++; // Still needs some production
-          }
-        } else {
-          needsProduction++;
-        }
+    // Get unique product IDs to fetch fresh terminado data
+    const allProductIds = [...new Set(
+      selectedCotizacionesArray.flatMap(cot => 
+        cot.productos.map(p => p.producto_id)
+      )
+    )];
+
+    // Fetch fresh production_active data for accurate terminado inventory
+    try {
+      const response = await fetch('/api/production-active');
+      if (!response.ok) throw new Error('Failed to fetch production data');
+      
+      const productionData = await response.json();
+      console.log('[DEBUG] Production data response:', productionData);
+      
+      const terminadoMap = new Map<number, number>();
+      
+      // Create map of actual terminado inventory
+      if (productionData.data) {
+        productionData.data.forEach((item: any) => {
+          console.log(`[DEBUG] Product ${item.producto_id}: terminado = ${item.terminado}`);
+          terminadoMap.set(item.producto_id, item.terminado || 0);
+        });
+      }
+      
+      // Debug: Show what products we're checking
+      allProductIds.forEach(productId => {
+        const terminadoStock = terminadoMap.get(productId) || 0;
+        console.log(`[DEBUG] Product ${productId} has ${terminadoStock} terminado stock available`);
       });
-    });
+
+      // Analyze each cotization's products with fresh terminado data
+      selectedCotizacionesArray.forEach(cotizacion => {
+        cotizacion.productos.forEach(producto => {
+          totalProducts++;
+          
+          // Check if product needs moldes
+          if (!producto.has_moldes) {
+            needsMoldes.push({
+              producto_nombre: producto.producto_nombre,
+              folio: cotizacion.folio
+            });
+          }
+          
+          // Use fresh terminado data instead of stale pedidos data
+          const inventarioDisponible = terminadoMap.get(producto.producto_id) || 0;
+          const cantidadNecesaria = producto.cantidad;
+          
+          if (inventarioDisponible > 0) {
+            // Product has some inventory available
+            const maxParaEmpaque = Math.min(inventarioDisponible, cantidadNecesaria);
+            
+            productsWithInventory.push({
+              folio: cotizacion.folio,
+              producto_id: producto.producto_id,
+              producto_nombre: producto.producto_nombre,
+              cantidad_necesaria: cantidadNecesaria,
+              inventario_disponible: inventarioDisponible,
+              cantidad_a_empaque: maxParaEmpaque, // Default to maximum possible
+              ir_a_empaque: true // Default to enabled
+            });
+            
+            if (inventarioDisponible >= cantidadNecesaria) {
+              canSkipProduction++;
+            } else {
+              needsProduction++; // Still needs some production
+            }
+          } else {
+            needsProduction++;
+          }
+        });
+      });
+
+    } catch (error) {
+      console.error('Error fetching fresh production data:', error);
+      toast.error('Error al obtener datos de producción actualizados');
+      return;
+    }
 
     setAllocationData({
       cotizaciones: selectedCotizacionesArray,
@@ -538,60 +574,6 @@ export const PedidosSection: React.FC = React.memo(() => {
     }
   }, [allocationData, fetchPedidos]);
 
-  // Legacy move to bitácora (kept for manual override) - now works with cotizaciones
-  const handleMoveToBitacora = useCallback(async () => {
-    if (selectedCotizaciones.size === 0) {
-      toast.error("Selecciona al menos una cotización para mover a bitácora");
-      return;
-    }
-
-    setIsMovingToBitacora(true);
-    
-    try {
-      // Convert cotizaciones to product format for legacy API
-      const productsToMove: any[] = [];
-      Array.from(selectedCotizaciones.values()).forEach(cotizacion => {
-        cotizacion.productos.forEach(producto => {
-          productsToMove.push({
-            folio: cotizacion.folio,
-            producto_id: producto.producto_id,
-            producto_nombre: producto.producto_nombre,
-            cantidad_total: producto.cantidad,
-            cantidad_selected: producto.cantidad
-          });
-        });
-      });
-      
-      const response = await fetch('/api/production/move-to-bitacora', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          products: productsToMove
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al mover productos a bitácora');
-      }
-
-      const result = await response.json();
-      
-      toast.success(`${selectedCotizaciones.size} cotizaciones movidas a bitácora exitosamente`);
-      
-      // Clear selections and refresh data
-      setSelectedCotizaciones(new Map());
-      fetchPedidos(true);
-      
-    } catch (error: any) {
-      console.error('Error moving products to bitácora:', error);
-      toast.error(`Error al mover productos: ${error.message}`);
-    } finally {
-      setIsMovingToBitacora(false);
-    }
-  }, [selectedCotizaciones, fetchPedidos]);
 
   // Toggle cotización expansion
   const toggleCotizacion = useCallback((folio: string) => {
