@@ -383,8 +383,9 @@ export async function GET(request: NextRequest) {
         const productAllocations = allocationsMap.get(cp.producto_id);
         const cantidadAsignada = productAllocations?.get(cotizacion.cotizacion_id) || 0;
 
-        // Calculate real remaining work needed
-        const cantidadPendiente = Math.max(0, cantidadPedida - cantidadAsignada - prodStatus.total_en_pipeline);
+        // Calculate real remaining work needed for this specific cotización
+        // Only subtract what has been actually delivered/completed for this cotización
+        const cantidadPendiente = Math.max(0, cantidadPedida - cantidadAsignada);
 
         const moldesDisponibles = productoData.moldes_disponibles;
         const vueltasMaxDia = productoData.vueltas_max_dia;

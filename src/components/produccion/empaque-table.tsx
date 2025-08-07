@@ -185,7 +185,14 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
   };
 
   const handleRemoveProduct = async (producto: EmpaqueProduct) => {
+    console.log('[EmpaqueTable] handleRemoveProduct called with:', { producto, cotizacionId });
+    
     if (!cotizacionId || !producto.producto_id) {
+      console.error('[EmpaqueTable] Missing required data:', { 
+        cotizacionId, 
+        producto_id: producto.producto_id,
+        producto 
+      });
       toast.error('Error', { description: 'Información de producto incompleta' });
       return;
     }
@@ -194,13 +201,16 @@ export const EmpaqueTable: React.FC<EmpaqueTableProps> = React.memo(({
     setRemovingProducts(prev => new Set([...prev, productKey]));
 
     try {
-      const response = await fetch(
-        `/api/production/empaque?producto_id=${producto.producto_id}&cotizacion_id=${cotizacionId}`,
-        { method: 'DELETE' }
-      );
+      const url = `/api/production/empaque?producto_id=${producto.producto_id}&cotizacion_id=${cotizacionId}`;
+      console.log('[EmpaqueTable] Making DELETE request to:', url);
+      
+      const response = await fetch(url, { method: 'DELETE' });
 
+      console.log('[EmpaqueTable] DELETE response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('[EmpaqueTable] DELETE request failed:', errorData);
         throw new Error(errorData.error || 'Error al devolver producto');
       }
 

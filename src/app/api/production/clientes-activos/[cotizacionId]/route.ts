@@ -191,20 +191,6 @@ export async function GET(
       console.warn("[API /production/clientes-activos GET] Warning: Could not fetch this cotization entregados:", thisEntregadosError);
     }
 
-    // Get total empaque allocations for all products to calculate available terminado
-    const { data: totalEmpaqueData, error: totalEmpaqueError } = await supabase
-      .from('production_allocations')
-      .select(`
-        producto_id,
-        cantidad_asignada
-      `)
-      .in('producto_id', productIds)
-      .eq('stage', 'empaque');
-
-    if (totalEmpaqueError) {
-      console.warn("[API /production/clientes-activos GET] Warning: Could not fetch total empaque:", totalEmpaqueError);
-      // Continue without total empaque data
-    }
 
     // Create a map of production status by product ID
     const productionStatusMap = new Map();
@@ -238,14 +224,6 @@ export async function GET(
       });
     }
 
-    // Create a map of total empaque allocations by product ID (across all cotizaciones)
-    const totalEmpaqueMap = new Map();
-    if (totalEmpaqueData) {
-      totalEmpaqueData.forEach(empaque => {
-        const existing = totalEmpaqueMap.get(empaque.producto_id) || 0;
-        totalEmpaqueMap.set(empaque.producto_id, existing + (empaque.cantidad_asignada || 0));
-      });
-    }
 
     // Format date as DD-MM-YY
     const fecha = new Date(cotizacionData.fecha_creacion);
@@ -270,16 +248,17 @@ export async function GET(
         terminado: 0
       };
 
-      // Calculate available terminado considering both global stock and this cotización's limits
-      const totalEmpaqueAllocated = totalEmpaqueMap.get(productoId) || 0;
-      const globalTerminadoDisponible = Math.max(0, produccionStatusBase.terminado - totalEmpaqueAllocated);
+      // Calculate available terminado using the actual current stock from production_active
+      // This reflects the real-time stock after previous allocations have already been deducted
+      const currentTerminadoStock = produccionStatusBase.terminado || 0;
       
-      // Also consider this cotización's remaining allocation limit
+      // Only consider this cotización's remaining allocation limit based on delivered products
       const totalEntregadoThisCotizacion = thisCotizacionEntregadosMap.get(productoId) || 0;
       const remainingQuotaForThisCotizacion = Math.max(0, cantidad - totalEntregadoThisCotizacion);
       
-      // The actual available amount is the minimum of global stock and remaining quota
-      const terminadoDisponible = Math.min(globalTerminadoDisponible, remainingQuotaForThisCotizacion);
+      // The available amount is the minimum of current stock and remaining quota for this cotización
+      const terminadoDisponible = Math.min(currentTerminadoStock, remainingQuotaForThisCotizacion);
+      
 
       const produccionStatus = {
         ...produccionStatusBase,

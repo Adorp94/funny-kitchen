@@ -113,8 +113,14 @@ const ProductRow = React.memo(({
   index: number;
   onProductClick?: (producto: ProductoConEstatus) => void;
 }) => {
+  // Check if product already has all needed pieces in empaque for this cotización
+  const cantidadEnEmpaque = producto.empaque_status?.cantidad_empaque || 0;
+  const cantidadPedida = producto.cantidad || 0;
+  const allPiecesInEmpaque = cantidadEnEmpaque >= cantidadPedida;
+  
   const canClickToEmpaque = !producto.allocation_status.limite_alcanzado && 
-                           producto.produccion_status.terminado_disponible > 0;
+                           producto.produccion_status.terminado_disponible > 0 &&
+                           !allPiecesInEmpaque;
   
   return (
     <TableRow 
@@ -123,6 +129,8 @@ const ProductRow = React.memo(({
       title={!canClickToEmpaque ? 
         (producto.allocation_status.limite_alcanzado ? 
          `Límite alcanzado: ${producto.allocation_status.total_asignado}/${producto.allocation_status.cantidad_cotizacion} asignados` :
+         allPiecesInEmpaque ?
+         `Todos los productos ya están en empaque: ${cantidadEnEmpaque}/${cantidadPedida}` :
          'Sin productos terminados disponibles'
         ) : 'Click para mover a empaque'}
     >

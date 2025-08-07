@@ -34,6 +34,9 @@ function useDebounce<T>(value: T, delay: number): T {
 interface ProductoConEstatus {
   nombre: string;
   cantidad: number;
+  cantidad_pedida?: number; // Original order quantity
+  cantidad_pendiente?: number; // Remaining quantity to produce
+  cantidad_asignada?: number; // Allocated to empaque/entregado
   fecha: string;
   precio_venta?: number; // Make optional with fallback
   precio_total?: number; // Make optional with fallback
@@ -225,8 +228,14 @@ const ProductRow = React.memo(({
   index: number;
   onProductClick?: (producto: ProductoConEstatus) => void;
 }) => {
+  // Check if product already has all needed pieces in empaque for this cotización
+  const cantidadEnEmpaque = producto.empaque_status?.cantidad_empaque || 0;
+  const cantidadPedida = producto.cantidad || 0;
+  const allPiecesInEmpaque = cantidadEnEmpaque >= cantidadPedida;
+  
   const canClickToEmpaque = !producto.allocation_status?.limite_alcanzado && 
-                           producto.produccion_status.terminado_disponible > 0;
+                           producto.produccion_status.terminado_disponible > 0 &&
+                           !allPiecesInEmpaque;
   
   const timeline = producto.timeline;
   
@@ -237,6 +246,8 @@ const ProductRow = React.memo(({
       title={!canClickToEmpaque ? 
         (producto.allocation_status?.limite_alcanzado ? 
          `Límite alcanzado: ${producto.allocation_status.total_asignado}/${producto.allocation_status.cantidad_cotizacion} asignados` :
+         allPiecesInEmpaque ?
+         `Todos los productos ya están en empaque: ${cantidadEnEmpaque}/${cantidadPedida}` :
          'Sin productos terminados disponibles'
         ) : 'Click para mover a empaque'}
     >
@@ -252,14 +263,24 @@ const ProductRow = React.memo(({
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
         <div className="space-y-1">
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-            {producto.cantidad}
+          {/* Show remaining quantity that still needs to be produced */}
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+            (producto.cantidad_pendiente || 0) > 0 
+              ? 'bg-amber-100 text-amber-700' 
+              : 'bg-green-100 text-green-700'
+          }`}>
+            {producto.cantidad_pendiente || 0} restantes
           </span>
-          {producto.allocation_status && producto.allocation_status.total_asignado > 0 && (
-            <div className="text-xs text-gray-500">
-              {producto.allocation_status.total_asignado}/{producto.allocation_status.cantidad_cotizacion} asignados
-            </div>
-          )}
+          {/* Show breakdown of original quantity */}
+          <div className="text-xs text-gray-500 space-y-0.5">
+            <div>Original: {producto.cantidad}</div>
+            {producto.allocation_status && producto.allocation_status.total_asignado > 0 && (
+              <div>Empacado: {producto.allocation_status.total_asignado}</div>
+            )}
+            {producto.produccion_status?.total_en_pipeline > 0 && (
+              <div>En proceso: {producto.produccion_status.total_en_pipeline}</div>
+            )}
+          </div>
         </div>
       </TableCell>
       <TableCell className="px-3 py-2 text-center">
@@ -425,6 +446,9 @@ export const ProduccionActivaSection = React.memo(() => {
             timeline,
             // Ensure consistent data structure for ProductRow
             cantidad: producto.cantidad_pedida || producto.cantidad || 0,
+            cantidad_pedida: producto.cantidad_pedida || producto.cantidad || 0,
+            cantidad_pendiente: producto.cantidad_pendiente || 0,
+            cantidad_asignada: producto.cantidad_asignada || 0,
             precio_venta: producto.precio_venta || 0,
             precio_total: (producto.precio_venta || 0) * (producto.cantidad_pedida || producto.cantidad || 0),
             fecha: cotizacion.fecha_creacion?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -525,28 +549,54 @@ export const ProduccionActivaSection = React.memo(() => {
 
   // Fetch production status data for a specific cotizacion
   const fetchProductionStatusData = useCallback(async (cotizacionId: number) => {
+    console.log('[ProduccionActiva] fetchProductionStatusData called for:', cotizacionId);
     try {
-      const response = await fetch(`/api/production/clientes-activos/${cotizacionId}`);
+      const url = `/api/production/clientes-activos/${cotizacionId}`;
+      console.log('[ProduccionActiva] Making request to:', url);
+      const response = await fetch(url);
+      console.log('[ProduccionActiva] Response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('[ProduccionActiva] Production status data received:', result);
         if (result.data && result.data.productos) {
+          console.log('[ProduccionActiva] Setting production status data for cotizacion:', cotizacionId, result.data.productos);
+          // Debug specific ZOMBIE product allocation for cotizacion 2396
+          if (cotizacionId === 2396) {
+            const zombieProduct = result.data.productos.find((p: any) => p.nombre === 'ZOMBIE');
+            if (zombieProduct) {
+              console.log('[DEBUG CLIENT] ZOMBIE product data for cotizacion 2396:', {
+                nombre: zombieProduct.nombre,
+                cantidad: zombieProduct.cantidad,
+                produccion_status: zombieProduct.produccion_status,
+                allocation_status: zombieProduct.allocation_status,
+                empaque_status: zombieProduct.empaque_status
+              });
+            }
+          }
           setProductionStatusDataMap(prev => new Map(prev.set(cotizacionId, result.data.productos)));
         }
+      } else {
+        console.error('[ProduccionActiva] Response not ok:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Error fetching production status data:', error);
+      console.error('[ProduccionActiva] Error fetching production status data:', error);
     }
   }, []);
 
   // Toggle cotizacion expansion (like Pedidos section)
   const toggleCotizacion = useCallback((cotizacionId: number) => {
+    console.log('[ProduccionActiva] toggleCotizacion called for:', cotizacionId);
     setExpandedCotizaciones(prev => {
       const newSet = new Set(prev);
       if (newSet.has(cotizacionId)) {
+        console.log('[ProduccionActiva] Collapsing cotizacion:', cotizacionId);
         newSet.delete(cotizacionId);
       } else {
+        console.log('[ProduccionActiva] Expanding cotizacion:', cotizacionId);
         newSet.add(cotizacionId);
         // Fetch empaque, enviados, and production status data for this cotizacion when expanded
+        console.log('[ProduccionActiva] Fetching data for cotizacion:', cotizacionId);
         fetchEmpaqueData(cotizacionId);
         fetchEnviadosData(cotizacionId);
         fetchProductionStatusData(cotizacionId);
@@ -583,6 +633,19 @@ export const ProduccionActivaSection = React.memo(() => {
       });
     }
   }, [fetchCotizaciones, selectedCotizacionId, selectedProduct, fetchEmpaqueData, fetchEnviadosData, fetchProductionStatusData]);
+
+  // Handle empaque product removal (needs different refresh logic)
+  const handleEmpaqueProductRemoved = useCallback((cotizacionId: number) => {
+    console.log('[ProduccionActiva] handleEmpaqueProductRemoved for cotizacion:', cotizacionId);
+    
+    // Refresh all data for this cotizacion
+    fetchEmpaqueData(cotizacionId);
+    fetchEnviadosData(cotizacionId);
+    fetchProductionStatusData(cotizacionId);
+    
+    // Also refresh cronograma data
+    fetchCotizaciones(true);
+  }, [fetchEmpaqueData, fetchEnviadosData, fetchProductionStatusData, fetchCotizaciones]);
 
   // Handle empaque product click to move to enviados
   const handleEmpaqueProductClick = useCallback((producto: any, cotizacionId: number) => {
@@ -843,17 +906,20 @@ export const ProduccionActivaSection = React.memo(() => {
                       productos={(() => {
                         // Get production status data for this cotizacion which has empaque_status
                         const productionStatusData = productionStatusDataMap.get(cotizacion.cotizacion_id) || [];
-                        return productionStatusData
+                        const filteredProducts = productionStatusData
                           .filter(p => p.empaque_status && p.empaque_status.cantidad_empaque > 0)
                           .map(p => ({
                             nombre: p.nombre,
                             cantidad: p.empaque_status?.cantidad_empaque || 0,
                             producto_id: p.producto_id
                           }));
+                        
+                        console.log('[ProduccionActiva] EmpaqueTable productos for cotizacion', cotizacion.cotizacion_id, ':', filteredProducts);
+                        return filteredProducts;
                       })()}
                       cotizacionId={cotizacion.cotizacion_id}
                       isLoading={false}
-                      onProductRemoved={handleDialogSuccess}
+                      onProductRemoved={() => handleEmpaqueProductRemoved(cotizacion.cotizacion_id)}
                       onProductMoved={(producto) => handleEmpaqueProductClick(producto, cotizacion.cotizacion_id)}
                       empaqueData={empaqueDataMap.get(cotizacion.cotizacion_id)}
                       onEmpaqueDataUpdated={(data) => handleEmpaqueDataUpdated(data, cotizacion.cotizacion_id)}
