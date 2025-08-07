@@ -221,8 +221,7 @@ export async function POST(request: NextRequest) {
                   qty_total: cantidadParaBitacora,
                   qty_pendiente: cantidadParaBitacora,
                   status: 'queued',
-                  priority: isPremium ? 'premium' : 'normal',
-                  fecha_agregado: new Date().toISOString()
+                  premium: isPremium
                 });
 
               if (queueError) {

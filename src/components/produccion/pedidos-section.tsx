@@ -308,32 +308,25 @@ export const PedidosSection: React.FC = React.memo(() => {
   };
 
 
-  // Fetch moldes data
+  // Fetch moldes data from productos table (inventory source)
   const fetchMoldesData = useCallback(async () => {
     try {
-      const response = await fetch('/api/moldes-activos/mesas');
+      const response = await fetch('/api/productos?pageSize=1000');
       if (!response.ok) throw new Error('Failed to fetch moldes data');
       
-      const mesas = await response.json();
+      const result = await response.json();
+      const productos = result.data || [];
       const moldesMap: Record<number, MoldeInfo> = {};
       
-      mesas.forEach((mesa: any) => {
-        mesa.productos.forEach((producto: any) => {
-          const productoId = producto.producto_id;
-          if (!moldesMap[productoId]) {
-            moldesMap[productoId] = {
-              producto_id: productoId,
-              total_moldes: 0,
-              mesas: []
-            };
-          }
-          
-          moldesMap[productoId].total_moldes += producto.cantidad_moldes;
-          moldesMap[productoId].mesas.push({
-            nombre: mesa.nombre,
-            cantidad: producto.cantidad_moldes
-          });
-        });
+      productos.forEach((producto: any) => {
+        const productoId = producto.producto_id;
+        const moldesDisponibles = producto.moldes_disponibles || 0;
+        
+        moldesMap[productoId] = {
+          producto_id: productoId,
+          total_moldes: moldesDisponibles,
+          mesas: [] // Not applicable for inventory-based moldes
+        };
       });
       
       setMoldesData(moldesMap);
