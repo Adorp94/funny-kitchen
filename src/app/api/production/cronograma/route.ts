@@ -235,17 +235,28 @@ export async function GET(request: NextRequest) {
     const allProductIds = Array.from(new Set(cotizacionProductosData.map(cp => cp.producto_id)));
     console.log(`[API /production/cronograma GET] Processing ${allProductIds.length} unique products`);
 
-    // Step 4: Get productos data with moldes_disponibles from inventory
+    // Step 4: Get productos data
     const { data: productosData, error: productosError } = await supabase
       .from('productos')
-      .select('producto_id, nombre, sku, vueltas_max_dia, moldes_disponibles')
+      .select('producto_id, nombre, sku, vueltas_max_dia')
       .in('producto_id', allProductIds);
 
     if (productosError) {
       console.error("[API /production/cronograma GET] Error fetching productos:", productosError);
     }
 
-    // Create productos map using moldes_disponibles from inventory (not moldes_activos from mesas)
+    // Step 4b: Get active moldes data from mesas (for production capacity calculation)
+    const { data: moldesActivosData, error: moldesActivosError } = await supabase
+      .from('moldes_activos')
+      .select('producto_id, SUM(cantidad) as total_moldes')
+      .in('producto_id', allProductIds)
+      .group('producto_id');
+
+    if (moldesActivosError) {
+      console.error("[API /production/cronograma GET] Error fetching moldes activos:", moldesActivosError);
+    }
+
+    // Create productos map using active moldes from mesas (for production capacity)
     const productosMap = new Map<number, {
       nombre: string;
       sku?: string;
@@ -253,12 +264,21 @@ export async function GET(request: NextRequest) {
       vueltas_max_dia: number;
     }>();
 
+    // Create moldes activos map
+    const moldesActivosMap = new Map<number, number>();
+    if (moldesActivosData) {
+      moldesActivosData.forEach((item: any) => {
+        moldesActivosMap.set(item.producto_id, item.total_moldes || 0);
+      });
+    }
+
     if (productosData) {
       productosData.forEach(producto => {
+        const moldesActivos = moldesActivosMap.get(producto.producto_id) || 0;
         productosMap.set(producto.producto_id, {
           nombre: producto.nombre,
           sku: producto.sku,
-          moldes_disponibles: producto.moldes_disponibles || 0, // Use inventory moldes
+          moldes_disponibles: moldesActivos, // Use active moldes from mesas for capacity calculation
           vueltas_max_dia: producto.vueltas_max_dia || 1
         });
       });
