@@ -33,11 +33,13 @@ interface ProductosContextType {
 
   // Financial values in the selected display currency
   financials: {
-    displaySubtotal: number;       // Subtotal in selected currency
+    displaySubtotal: number;       // Subtotal after individual discounts, in selected currency
+    displayBaseSubtotal: number;   // Base subtotal before any discounts, in selected currency
     displayShippingCost: number;   // Shipping cost in selected currency
     displayIvaAmount: number;      // IVA in selected currency
     displayTotal: number;          // Total in selected currency
     baseSubtotalMXN: number;       // Subtotal before global discount, in MXN
+    grossSubtotalMXN: number;      // Gross subtotal before any discounts, in MXN
     subtotalAfterDiscountMXN: number; // Subtotal after global discount, in MXN
     shippingCostMXN: number;       // Shipping cost in MXN
     ivaAmountMXN: number;          // IVA amount in MXN
@@ -323,23 +325,27 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
     // 8. Calculate display values based on moneda
     let displaySubtotal = 0;
+    let displayBaseSubtotal = 0;
     let displayShippingCost = 0;
     let displayIvaAmount = 0;
     let displayTotal = 0;
 
     if (moneda === 'MXN') {
       displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
+      displayBaseSubtotal = subtotalBrutoMXN; // Show base subtotal before any discounts
       displayShippingCost = shippingCostMXN; // Already MXN
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
     } else if (moneda === 'USD' && exchangeRate) {
       displaySubtotal = convertMXNtoUSD(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
+      displayBaseSubtotal = convertMXNtoUSD(subtotalBrutoMXN); // Show base subtotal before any discounts
       // Shipping cost was input in USD, so use it directly
       displayShippingCost = shippingCostInput;
       displayIvaAmount = convertMXNtoUSD(ivaAmountMXN);
       displayTotal = convertMXNtoUSD(totalMXN);
     } else if (moneda === 'EUR' && exchangeRate) {
       displaySubtotal = convertMXNtoEUR(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
+      displayBaseSubtotal = convertMXNtoEUR(subtotalBrutoMXN); // Show base subtotal before any discounts
       // Shipping cost was input in EUR, so use it directly
       displayShippingCost = shippingCostInput;
       displayIvaAmount = convertMXNtoEUR(ivaAmountMXN);
@@ -347,6 +353,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     } else {
       // Fallback: Display MXN values if USD/EUR selected but no rate
       displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
+      displayBaseSubtotal = subtotalBrutoMXN; // Show base subtotal before any discounts
       displayShippingCost = shippingCostMXN; // Display the calculated MXN cost
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
@@ -372,10 +379,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       displayProductos,
       financials: {
         displaySubtotal,
+        displayBaseSubtotal,
         displayShippingCost,
         displayIvaAmount,
         displayTotal,
         baseSubtotalMXN: subtotalConDescuentosIndividualesMXN, // Use subtotal after individual discounts as base
+        grossSubtotalMXN: subtotalBrutoMXN, // Gross subtotal before any discounts
         subtotalAfterDiscountMXN: subtotalAfterGlobalDiscountMXN, // Subtotal after global discount
         shippingCostMXN,
         ivaAmountMXN,

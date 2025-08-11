@@ -35,7 +35,8 @@ interface ETAResult {
 interface ResumenCotizacionProps {
   cliente: Cliente | null;
   productos: any[];
-  subtotal: number;
+  subtotal: number; // This should be the base subtotal before any discounts
+  subtotalAfterIndividualDiscounts?: number; // Optional: subtotal after individual discounts but before global discount
   ivaAmount: number;
   globalDiscount: number;
   setGlobalDiscount: (value: number) => void;
@@ -68,6 +69,7 @@ export function ResumenCotizacion({
   cliente,
   productos,
   subtotal,
+  subtotalAfterIndividualDiscounts,
   ivaAmount,
   globalDiscount,
   setGlobalDiscount,
@@ -243,11 +245,19 @@ export function ResumenCotizacion({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Subtotal Display */}
+          {/* Base Subtotal Display (before any discounts) */}
           <div className="flex justify-between items-center py-1">
-            <span className="text-sm text-muted-foreground">Subtotal Productos</span>
+            <span className="text-sm text-muted-foreground">Subtotal Base</span>
             <span className="text-sm font-medium">{formatCurrency(subtotal, moneda)}</span>
           </div>
+
+          {/* Show subtotal after individual discounts if there are individual discounts */}
+          {subtotalAfterIndividualDiscounts && subtotalAfterIndividualDiscounts < subtotal && (
+            <div className="flex justify-between items-center py-1">
+              <span className="text-sm text-muted-foreground pl-6">Subtotal con Descuentos Individuales</span>
+              <span className="text-sm font-medium">{formatCurrency(subtotalAfterIndividualDiscounts, moneda)}</span>
+            </div>
+          )}
 
           {/* Global Discount Input */}
           <div className="flex justify-between items-center py-1">
@@ -272,19 +282,19 @@ export function ResumenCotizacion({
             </div>
           </div>
           
-           {/* Discount Amount Display */}
+           {/* Global Discount Amount Display - Apply to correct base */}
            {globalDiscount > 0 && (
             <div className="flex justify-between items-center py-1 text-sm text-destructive">
-              <span className="pl-6">Monto Descuento</span>
-              <span>-{formatCurrency(subtotal * (globalDiscount / 100), moneda)}</span>
+              <span className="pl-6">Monto Descuento Global</span>
+              <span>-{formatCurrency((subtotalAfterIndividualDiscounts || subtotal) * (globalDiscount / 100), moneda)}</span>
             </div>
           )}
 
-          {/* Subtotal After Discount Display */}
+          {/* Final Subtotal After All Discounts Display */}
           {globalDiscount > 0 && (
             <div className="flex justify-between items-center py-1">
-              <span className="text-sm font-medium text-muted-foreground">Subtotal Después de Descuento</span>
-              <span className="text-sm font-medium">{formatCurrency(subtotal * (1 - globalDiscount / 100), moneda)}</span>
+              <span className="text-sm font-medium text-muted-foreground">Subtotal Final</span>
+              <span className="text-sm font-medium">{formatCurrency((subtotalAfterIndividualDiscounts || subtotal) * (1 - globalDiscount / 100), moneda)}</span>
             </div>
           )}
 

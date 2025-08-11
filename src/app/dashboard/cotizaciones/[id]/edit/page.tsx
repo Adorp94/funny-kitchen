@@ -751,7 +751,8 @@ function EditCotizacionClient() {
                     cliente={cliente}
                     productos={productos}
                     moneda={moneda}
-                    subtotal={financials.displaySubtotal}
+                    subtotal={financials.displayBaseSubtotal}
+                    subtotalAfterIndividualDiscounts={financials.displaySubtotal}
                     globalDiscount={globalDiscount}
                     setGlobalDiscount={setGlobalDiscount}
                     hasIva={hasIva}

@@ -628,7 +628,8 @@ function NuevaCotizacionClient() {
             <ResumenCotizacion 
               productos={productos}
               moneda={moneda}
-              subtotal={moneda === 'MXN' ? (financials?.baseSubtotalMXN ?? 0) : (financials?.baseSubtotalMXN ? convertMXNtoUSD(financials.baseSubtotalMXN) : 0)}
+              subtotal={financials?.displayBaseSubtotal ?? 0}
+              subtotalAfterIndividualDiscounts={financials?.displaySubtotal}
               ivaAmount={financials?.displayIvaAmount ?? 0}
               globalDiscount={globalDiscount} 
               hasIva={hasIva}
