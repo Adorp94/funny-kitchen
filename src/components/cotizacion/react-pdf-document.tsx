@@ -408,9 +408,24 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   // Subtotal after product discounts
   const subtotalAfterProductDiscounts = subtotal - totalProductDiscounts;
 
-  // Increase the product limit from 8 to 15
-  const displayProductos = productos.slice(0, 15);
-  const hasMoreProducts = productos.length > 15;
+  // Show all products and calculate dynamic font sizes
+  const displayProductos = productos;
+  const productCount = productos.length;
+  
+  // Dynamic font sizes based on product count
+  const getFontSizes = (count: number) => {
+    if (count <= 10) {
+      return { header: 8, row: 7.5, summary: 9 };
+    } else if (count <= 20) {
+      return { header: 7.5, row: 7, summary: 8.5 };
+    } else if (count <= 30) {
+      return { header: 7, row: 6.5, summary: 8 };
+    } else {
+      return { header: 6.5, row: 6, summary: 7.5 };
+    }
+  };
+  
+  const fontSizes = getFontSizes(productCount);
 
   return (
     <Document>
@@ -472,36 +487,36 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
             {/* Table Header */}
             <View style={styles.tableHeader}>
               <View style={styles.tableCol1}>
-                <Text style={styles.tableHeaderText}>Descripción</Text>
+                <Text style={[styles.tableHeaderText, { fontSize: fontSizes.header }]}>Descripción</Text>
               </View>
               <View style={styles.tableCol2}>
-                <Text style={styles.tableHeaderTextCenter}>Cant.</Text>
+                <Text style={[styles.tableHeaderTextCenter, { fontSize: fontSizes.header }]}>Cant.</Text>
               </View>
               <View style={styles.tableCol3}>
-                <Text style={styles.tableHeaderTextRight}>P. Unitario</Text>
+                <Text style={[styles.tableHeaderTextRight, { fontSize: fontSizes.header }]}>P. Unitario</Text>
               </View>
               {productos.some(p => p.descuento && p.descuento > 0) && (
                 <View style={styles.tableCol4}>
-                  <Text style={styles.tableHeaderTextRight}>Desc.</Text>
+                  <Text style={[styles.tableHeaderTextRight, { fontSize: fontSizes.header }]}>Desc.</Text>
                 </View>
               )}
               <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}>
-                <Text style={styles.tableHeaderTextRight}>Subtotal</Text>
+                <Text style={[styles.tableHeaderTextRight, { fontSize: fontSizes.header }]}>Subtotal</Text>
               </View>
             </View>
             
-            {/* Table Rows - Limited to fit single page */}
+            {/* Table Rows - Show all products with dynamic font size */}
             {displayProductos.map((item, index) => (
               <View style={styles.tableRow} key={item.id || index} wrap={false}>
                 <View style={styles.tableCol1}>
-                  <Text style={styles.tableRowText}>{item.producto_nombre || item.descripcion || 'N/A'}</Text>
+                  <Text style={[styles.tableRowText, { fontSize: fontSizes.row }]}>{item.producto_nombre || item.descripcion || 'N/A'}</Text>
                 </View>
-                <Text style={[styles.tableCol2, styles.tableRowText]}>{item.cantidad}</Text>
-                <Text style={[styles.tableCol3, styles.tableRowText]}>
+                <Text style={[styles.tableCol2, styles.tableRowText, { fontSize: fontSizes.row }]}>{item.cantidad}</Text>
+                <Text style={[styles.tableCol3, styles.tableRowText, { fontSize: fontSizes.row }]}>
                   {formatCurrency(item.precio_unitario, moneda)}
                 </Text>
                 {productos.some(p => p.descuento && p.descuento > 0) && (
-                  <Text style={[styles.tableCol4, styles.tableRowText]}>
+                  <Text style={[styles.tableCol4, styles.tableRowText, { fontSize: fontSizes.row }]}>
                     {item.descuento > 0 ? `${item.descuento}%` : '-'}
                   </Text>
                 )}
@@ -509,29 +524,13 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
                   productos.some(p => p.descuento && p.descuento > 0)
                     ? styles.tableCol5 // Has width: '15%', textAlign: 'right'
                     : { ...styles.tableCol4, width: '20%' }, // Ensures width: '20%', inherits textAlign: 'right' from tableCol4
-                  styles.tableRowText
+                  styles.tableRowText,
+                  { fontSize: fontSizes.row }
                 ]}>
                   {formatCurrency(item.precio_total, moneda)}
                 </Text>
               </View>
             ))}
-            
-            {/* Show a message if there are more products */}
-            {hasMoreProducts && (
-              <View style={styles.tableRow}>
-                <View style={styles.tableCol1}>
-                  <Text style={[styles.tableRowText, { color: '#6b7280', fontSize: 9 }]}>
-                    Y {productos.length - 15} productos más...
-                  </Text>
-                </View>
-                <View style={styles.tableCol2}></View>
-                <View style={styles.tableCol3}></View>
-                {productos.some(p => p.descuento && p.descuento > 0) && (
-                  <View style={styles.tableCol4}></View>
-                )}
-                <View style={productos.some(p => p.descuento && p.descuento > 0) ? styles.tableCol5 : { ...styles.tableCol4, width: '20%' }}></View>
-              </View>
-            )}
           </View>
         </View>
         
@@ -541,34 +540,34 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
             <Text style={styles.boxTitle}>Resumen</Text>
             <View style={styles.box}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal:</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(subtotal, moneda)}</Text>
+                <Text style={[styles.summaryLabel, { fontSize: fontSizes.summary }]}>Subtotal:</Text>
+                <Text style={[styles.summaryValue, { fontSize: fontSizes.summary }]}>{formatCurrency(subtotal, moneda)}</Text>
               </View>
               
               {descuento_global > 0 && (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Descuento global ({descuento_global}%):</Text>
-                  <Text style={styles.summaryNegative}>-{formatCurrency((subtotal) * (descuento_global / 100), moneda)}</Text>
+                  <Text style={[styles.summaryLabel, { fontSize: fontSizes.summary }]}>Descuento global ({descuento_global}%):</Text>
+                  <Text style={[styles.summaryNegative, { fontSize: fontSizes.summary }]}>-{formatCurrency((subtotal) * (descuento_global / 100), moneda)}</Text>
                 </View>
               )}
               
               {iva && (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>IVA (16%):</Text>
-                  <Text style={styles.summaryValue}>{formatCurrency(monto_iva, moneda)}</Text>
+                  <Text style={[styles.summaryLabel, { fontSize: fontSizes.summary }]}>IVA (16%):</Text>
+                  <Text style={[styles.summaryValue, { fontSize: fontSizes.summary }]}>{formatCurrency(monto_iva, moneda)}</Text>
                 </View>
               )}
               
               {incluye_envio && costo_envio > 0 && (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Envío:</Text>
-                  <Text style={styles.summaryValue}>{formatCurrency(costo_envio, moneda)}</Text>
+                  <Text style={[styles.summaryLabel, { fontSize: fontSizes.summary }]}>Envío:</Text>
+                  <Text style={[styles.summaryValue, { fontSize: fontSizes.summary }]}>{formatCurrency(costo_envio, moneda)}</Text>
                 </View>
               )}
               
               <View style={styles.summaryTotal}>
-                <Text style={styles.summaryTotalLabel}>Total:</Text>
-                <Text style={styles.summaryTotalValue}>{formatCurrency(total, moneda)}</Text>
+                <Text style={[styles.summaryTotalLabel, { fontSize: fontSizes.summary + 1 }]}>Total:</Text>
+                <Text style={[styles.summaryTotalValue, { fontSize: fontSizes.summary + 1 }]}>{formatCurrency(total, moneda)}</Text>
               </View>
             </View>
           </View>
