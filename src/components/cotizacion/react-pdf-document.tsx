@@ -520,7 +520,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
             {hasMoreProducts && (
               <View style={styles.tableRow}>
                 <View style={styles.tableCol1}>
-                  <Text style={[styles.tableRowText, { fontStyle: 'italic' }]}>
+                  <Text style={[styles.tableRowText, { color: '#6b7280', fontSize: 9 }]}>
                     Y {productos.length - 15} productos más...
                   </Text>
                 </View>

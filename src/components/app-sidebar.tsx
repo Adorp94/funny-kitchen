@@ -62,11 +62,6 @@ const navigationGroups = [
         url: "/produccion",
         icon: Factory,
       },
-      {
-        title: "Moldes",
-        url: "/dashboard/inventario",
-        icon: Package,
-      },
     ],
   },
   {

@@ -23,7 +23,6 @@ const breadcrumbConfig: BreadcrumbConfig = {
   "/dashboard": { title: "Dashboard", href: "/dashboard" },
   "/dashboard/cotizaciones": { title: "Cotizaciones", href: "/dashboard/cotizaciones" },
   "/dashboard/finanzas": { title: "Finanzas", href: "/dashboard/finanzas" },
-  "/dashboard/inventario": { title: "Inventario", href: "/dashboard/inventario" },
   "/produccion": { title: "Producción", href: "/produccion" },
   "/nueva-cotizacion": { title: "Nueva Cotización", href: "/nueva-cotizacion" },
   "/ver-cotizacion": { title: "Ver Cotización", href: "/ver-cotizacion" },

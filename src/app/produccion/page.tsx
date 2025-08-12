@@ -3,6 +3,7 @@
 import React from 'react';
 import { TestingListing } from "@/components/testing/testing-listing";
 import { MoldesActivos } from "@/components/produccion/moldes-activos";
+import { InventarioSection } from "@/components/produccion/inventario-section";
 import { PedidosSection } from "@/components/produccion/pedidos-section";
 import { ClientesActivosSection } from "@/components/produccion/clientes-activos-section";
 import { ProduccionActivaSection } from "@/components/produccion/produccion-activa-section";
@@ -10,7 +11,7 @@ import { EnviosSection } from "@/components/produccion/envios-section";
 import { ProductionActiveListing } from "@/components/testing/production-active-listing";
 import { ReviewSectionOptimized } from "@/components/produccion/review-section-optimized";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye, Truck } from 'lucide-react';
+import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye, Truck, Archive } from 'lucide-react';
 
 export default function ProduccionPage() {
 
@@ -59,12 +60,20 @@ export default function ProduccionPage() {
               Moldes Activos
             </TabsTrigger>
             <TabsTrigger 
+              value="inventario" 
+              className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-slate-500 data-[state=active]:bg-slate-50/50 data-[state=active]:text-slate-700 hover:bg-muted/30 transition-colors"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Moldes
+            </TabsTrigger>
+            {/* Hidden Revisar Tab */}
+            {/* <TabsTrigger 
               value="revisar" 
               className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-indigo-50/50 data-[state=active]:text-indigo-700 hover:bg-muted/30 transition-colors"
             >
               <Eye className="h-3.5 w-3.5" />
               Revisar
-            </TabsTrigger>
+            </TabsTrigger> */}
             <TabsTrigger 
               value="envios" 
               className="flex items-center gap-1.5 text-xs font-medium py-2.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-teal-500 data-[state=active]:bg-teal-50/50 data-[state=active]:text-teal-700 hover:bg-muted/30 transition-colors"
@@ -91,9 +100,14 @@ export default function ProduccionPage() {
           <MoldesActivos />
         </TabsContent>
 
-        <TabsContent value="revisar" className="mt-6">
-          <ReviewSectionOptimized />
+        <TabsContent value="inventario" className="mt-6">
+          <InventarioSection />
         </TabsContent>
+
+        {/* Hidden Revisar Section - Keep code but make unreachable */}
+        {/* <TabsContent value="revisar" className="mt-6">
+          <ReviewSectionOptimized />
+        </TabsContent> */}
 
         <TabsContent value="envios" className="mt-6">
           <EnviosSection />

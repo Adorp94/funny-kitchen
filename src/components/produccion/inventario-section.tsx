@@ -31,7 +31,7 @@ interface Stats {
   showing: number;
 }
 
-export default function InventarioMoldesPage() {
+export function InventarioSection() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -295,23 +295,21 @@ export default function InventarioMoldesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="text-lg">Cargando inventario...</span>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-lg">Cargando inventario...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Inventario de Moldes</h1>
+          <h2 className="text-2xl font-bold">Inventario de Moldes</h2>
           <p className="text-muted-foreground">
             Gestión de moldes disponibles para producción
           </p>

@@ -23,11 +23,6 @@ const navigation = [
     icon: Factory,
   },
   {
-    name: "Inventario Moldes",
-    href: "/dashboard/inventario",
-    icon: Package,
-  },
-  {
     name: "Finanzas",
     href: "/dashboard/finanzas",
     icon: DollarSign,

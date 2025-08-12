@@ -102,12 +102,6 @@ const moduleCards = [
     icon: DollarSign,
     href: "/dashboard/finanzas",
   },
-  {
-    title: "Moldes",
-    description: "Gestiona tus moldes",
-    icon: Package,
-    href: "/dashboard/inventario",
-  },
 ];
 
 export default function DashboardPage() {

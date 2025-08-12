@@ -248,9 +248,8 @@ export async function GET(request: NextRequest) {
     // Step 4b: Get active moldes data from mesas (for production capacity calculation)
     const { data: moldesActivosData, error: moldesActivosError } = await supabase
       .from('moldes_activos')
-      .select('producto_id, SUM(cantidad) as total_moldes')
-      .in('producto_id', allProductIds)
-      .group('producto_id');
+      .select('producto_id, cantidad')
+      .in('producto_id', allProductIds);
 
     if (moldesActivosError) {
       console.error("[API /production/cronograma GET] Error fetching moldes activos:", moldesActivosError);
@@ -264,11 +263,12 @@ export async function GET(request: NextRequest) {
       vueltas_max_dia: number;
     }>();
 
-    // Create moldes activos map
+    // Create moldes activos map - aggregate manually since we can't use SUM in query
     const moldesActivosMap = new Map<number, number>();
     if (moldesActivosData) {
       moldesActivosData.forEach((item: any) => {
-        moldesActivosMap.set(item.producto_id, item.total_moldes || 0);
+        const currentTotal = moldesActivosMap.get(item.producto_id) || 0;
+        moldesActivosMap.set(item.producto_id, currentTotal + (item.cantidad || 0));
       });
     }
 

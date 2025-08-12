@@ -19,12 +19,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TypeScript**: Full TypeScript support with strict mode
 
 ### Core Features
-This is a quotation management system for Funny Kitchen (ceramic artisan company) with four main modules:
+This is a quotation management system for Funny Kitchen (ceramic artisan company) with three main modules:
 
 1. **Quotations** (`/dashboard/cotizaciones/`) - Create, edit, and manage quotes
 2. **Finance** (`/dashboard/finanzas/`) - Track income, expenses, and payments
-3. **Production** (`/produccion/`) - Production queue, allocation management, and fulfillment tracking
-4. **Inventory** (`/dashboard/inventario/`) - Mold inventory management
+3. **Production** (`/produccion/`) - Production queue, allocation management, fulfillment tracking, and mold inventory management
 
 ### Key Architecture Patterns
 
