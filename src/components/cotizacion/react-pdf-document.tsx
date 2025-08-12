@@ -412,24 +412,43 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
   const displayProductos = productos;
   const productCount = productos.length;
   
-  // Dynamic font sizes based on product count
+  // Dynamic font sizes based on product count - more aggressive scaling
   const getFontSizes = (count: number) => {
-    if (count <= 10) {
+    if (count <= 8) {
       return { header: 8, row: 7.5, summary: 9 };
-    } else if (count <= 20) {
-      return { header: 7.5, row: 7, summary: 8.5 };
-    } else if (count <= 30) {
+    } else if (count <= 12) {
       return { header: 7, row: 6.5, summary: 8 };
-    } else {
+    } else if (count <= 16) {
       return { header: 6.5, row: 6, summary: 7.5 };
+    } else if (count <= 20) {
+      return { header: 6, row: 5.5, summary: 7 };
+    } else if (count <= 25) {
+      return { header: 5.5, row: 5, summary: 6.5 };
+    } else {
+      return { header: 5, row: 4.5, summary: 6 };
     }
   };
   
   const fontSizes = getFontSizes(productCount);
+  
+  // Dynamic spacing based on product count
+  const getSpacing = (count: number) => {
+    if (count <= 8) {
+      return { sectionMargin: 12, rowPadding: 3 };
+    } else if (count <= 16) {
+      return { sectionMargin: 8, rowPadding: 2 };
+    } else if (count <= 25) {
+      return { sectionMargin: 6, rowPadding: 1.5 };
+    } else {
+      return { sectionMargin: 4, rowPadding: 1 };
+    }
+  };
+  
+  const spacing = getSpacing(productCount);
 
   return (
     <Document>
-      <Page size="LETTER" style={styles.page}>
+      <Page size="LETTER" style={[styles.page, { padding: productCount > 12 ? 16 : 24 }]}>
         {/* Header */}
         <View style={styles.header}>
           <Image 
@@ -481,7 +500,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
         </View>
         
         {/* Products */}
-        <View style={styles.section}>
+        <View style={[styles.section, { marginBottom: spacing.sectionMargin }]}>
           <Text style={styles.columnTitle}>Productos</Text>
           <View style={styles.table}>
             {/* Table Header */}
@@ -507,7 +526,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
             
             {/* Table Rows - Show all products with dynamic font size */}
             {displayProductos.map((item, index) => (
-              <View style={styles.tableRow} key={item.id || index} wrap={false}>
+              <View style={[styles.tableRow, { paddingVertical: spacing.rowPadding }]} key={item.id || index} wrap={false}>
                 <View style={styles.tableCol1}>
                   <Text style={[styles.tableRowText, { fontSize: fontSizes.row }]}>{item.producto_nombre || item.descripcion || 'N/A'}</Text>
                 </View>
@@ -535,7 +554,7 @@ const ReactPDFDocument: React.FC<ReactPDFDocumentProps> = ({ cliente, folio, cot
         </View>
         
         {/* Summary on the right */}
-        <View style={styles.summarySection}>
+        <View style={[styles.summarySection, { marginBottom: spacing.sectionMargin }]}>
           <View style={styles.summaryRight}>
             <Text style={styles.boxTitle}>Resumen</Text>
             <View style={styles.box}>
