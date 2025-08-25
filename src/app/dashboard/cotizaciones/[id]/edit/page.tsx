@@ -351,13 +351,13 @@ function EditCotizacionClient() {
       const cotizacionData = {
         cliente_id: cliente.cliente_id,
         moneda: moneda,
-        subtotal: financials.subtotalAfterDiscountMXN,
+        subtotal_mxn: financials?.baseSubtotalMXN ?? 0,
         descuento_global: globalDiscount,
         iva: hasIva,
-        monto_iva: financials.ivaAmountMXN,
-        incluye_envio: shippingCost > 0,
-        costo_envio: shippingCost,
-        total: financials.totalMXN,
+        monto_iva: financials?.ivaAmountMXN ?? 0,
+        incluye_envio: (financials?.shippingCostMXN ?? 0) > 0,
+        costo_envio_mxn: financials?.shippingCostMXN ?? 0,
+        total_mxn: financials?.totalMXN ?? 0,
         tipo_cambio: exchangeRate,
         tiempo_estimado: parseInt(tiempoEstimado) || 6,
         tiempo_estimado_max: parseInt(tiempoEstimadoMax) || 8,
@@ -486,13 +486,13 @@ function EditCotizacionClient() {
                 precio_total: p.subtotal,
             })),
             moneda: moneda,
-            subtotal: financials.subtotalAfterDiscountMXN,
+            subtotal_mxn: financials?.baseSubtotalMXN ?? 0,
             descuento_global: globalDiscount,
             iva: hasIva,
-            monto_iva: financials.ivaAmountMXN,
-            incluye_envio: shippingCost > 0,
-            costo_envio: shippingCost,
-            total: financials.totalMXN,
+            monto_iva: financials?.ivaAmountMXN ?? 0,
+            incluye_envio: (financials?.shippingCostMXN ?? 0) > 0,
+            costo_envio_mxn: financials?.shippingCostMXN ?? 0,
+            total_mxn: financials?.totalMXN ?? 0,
             tiempo_estimado: tiempoEstimado,
             tiempo_estimado_max: tiempoEstimadoMax,
             folio: cotizacionOriginal?.folio || `CT-${cotizacionId}`
@@ -751,16 +751,16 @@ function EditCotizacionClient() {
                     cliente={cliente}
                     productos={productos}
                     moneda={moneda}
-                    subtotal={financials.displayBaseSubtotal}
-                    subtotalAfterIndividualDiscounts={financials.displaySubtotal}
+                    subtotal={financials?.displayBaseSubtotal ?? 0}
+                    subtotalAfterIndividualDiscounts={financials?.displaySubtotal}
+                    ivaAmount={financials?.displayIvaAmount ?? 0}
                     globalDiscount={globalDiscount}
                     setGlobalDiscount={setGlobalDiscount}
                     hasIva={hasIva}
                     setHasIva={setHasIva}
-                    ivaAmount={financials.displayIvaAmount}
                     shippingCost={shippingCost}
                     setShippingCost={setShippingCost}
-                    total={financials.displayTotal}
+                    total={financials?.displayTotal ?? 0}
                     tiempoEstimado={tiempoEstimado}
                     setTiempoEstimado={handleTiempoEstimadoChange}
                     tiempoEstimadoMax={tiempoEstimadoMax}
