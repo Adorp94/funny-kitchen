@@ -160,27 +160,33 @@ function NuevaCotizacionClient() {
 
   // Add a useEffect to load any previously saved client data on component mount
   useEffect(() => {
-    // Development mode check remains the same...
-    if (process.env.NODE_ENV === 'development') {
-      console.log("Development mode detected: clearing non-product session storage");
+    // Check if this is a fresh start (coming from successful cotización creation or direct navigation)
+    // Clear all data to ensure clean UX
+    const shouldClear = !sessionStorage.getItem('nueva_cotizacion_keep_data');
+    
+    if (shouldClear || process.env.NODE_ENV === 'development') {
+      console.log("Clearing all cotización data for fresh start");
       sessionStorage.removeItem('cotizacion_cliente');
-      // Don't clear product context here anymore - context handles its own persistence
-      // clearProductos(); 
+      clearProductos(); // This will clear all context data and session storage
       setClienteData(null);
       setCliente(null);
-      // return; // Allow loading client data even in dev?
+      setIsPremium(false);
+      setTiempoEstimadoInput("6");
+      setTiempoEstimadoMaxInput("8");
+    } else {
+      // Load client data only if we're preserving data
+      const savedCliente = sessionStorage.getItem('cotizacion_cliente');
+      if (savedCliente && !cliente) {
+        try {
+          const parsedCliente = JSON.parse(savedCliente);
+          setClienteData(parsedCliente);
+          setCliente(parsedCliente);
+        } catch (e) { console.error("Error parsing saved client data:", e); }
+      }
     }
     
-    // Load client data (remains the same)
-    const savedCliente = sessionStorage.getItem('cotizacion_cliente');
-    if (savedCliente && !cliente) {
-      try {
-        const parsedCliente = JSON.parse(savedCliente);
-        setClienteData(parsedCliente);
-        setCliente(parsedCliente);
-      } catch (e) { console.error("Error parsing saved client data:", e); }
-    }
-    // No need to call clearProductos here anymore on initial load
+    // Remove the flag after checking
+    sessionStorage.removeItem('nueva_cotizacion_keep_data');
   }, []); // Removed clearProductos dependency
   
   // *** NEW: useEffect to fetch ETA when relevant data changes ***
@@ -375,9 +381,8 @@ function NuevaCotizacionClient() {
 
       toast.success(`Cotización ${result.folio} creada exitosamente!`);
       console.log(`Cotización ${cotizacionId} guardada, PDF generation can proceed if needed...`);
-      // Maybe trigger PDF generation here if required immediately
       
-      // Clear context and session storage on success
+      // Clear context and session storage on success for clean UX
       clearProductos();
       sessionStorage.removeItem('cotizacion_cliente'); 
       setIsPremium(false); // Reset premium flag

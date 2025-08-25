@@ -479,18 +479,32 @@ function EditCotizacionClient() {
         const pdfData = {
             ...cotizacionOriginal,
             cliente: cliente,
-            productos: productos.map(p => ({
-                ...p,
-                precio_unitario: p.precio,
-                descuento_producto: p.descuento,
-                precio_total: p.subtotal,
-            })),
+            productos: productos.map(p => {
+                // Convert MXN prices to display currency for PDF
+                let displayPrice = p.precio; // MXN base price
+                let displaySubtotal = p.subtotal; // MXN subtotal
+                
+                if (moneda === 'USD' && exchangeRate && exchangeRate > 0) {
+                    displayPrice = p.precio / exchangeRate;
+                    displaySubtotal = p.subtotal / exchangeRate;
+                } else if (moneda === 'EUR' && exchangeRate && exchangeRate > 0) {
+                    displayPrice = p.precio / exchangeRate;
+                    displaySubtotal = p.subtotal / exchangeRate;
+                }
+                
+                return {
+                    ...p,
+                    precio_unitario: displayPrice,
+                    descuento_producto: p.descuento,
+                    precio_total: displaySubtotal,
+                };
+            }),
             moneda: moneda,
             subtotal: financials?.displayBaseSubtotal ?? 0,
             subtotal_mxn: financials?.baseSubtotalMXN ?? 0,
             descuento_global: globalDiscount,
             iva: hasIva,
-            monto_iva: financials?.ivaAmountMXN ?? 0,
+            monto_iva: financials?.displayIvaAmount ?? 0, // Use display currency IVA amount
             incluye_envio: (financials?.shippingCostMXN ?? 0) > 0,
             costo_envio: financials?.displayShippingCost ?? 0,
             costo_envio_mxn: financials?.shippingCostMXN ?? 0,

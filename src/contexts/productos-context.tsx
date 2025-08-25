@@ -202,11 +202,18 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   const clearProductos = useCallback(() => {
     console.log("[Context] clearProductos called");
     setInternalProductos([]);
-    // Consider resetting other fields like discount, shipping etc. if needed
+    // Reset all financial fields to defaults
     setGlobalDiscount(0);
     setHasIva(false);
     setShippingCostInput(0);
+    setMoneda('MXN'); // Reset currency to default
+    
+    // Clear all session storage items related to cotización
     sessionStorage.removeItem('cotizacion_internalProductos');
+    sessionStorage.removeItem('cotizacion_moneda');
+    sessionStorage.removeItem('cotizacion_globalDiscount');
+    sessionStorage.removeItem('cotizacion_hasIva');
+    sessionStorage.removeItem('cotizacion_shippingCostInput');
   }, []);
 
   // --- Financial Calculations ---

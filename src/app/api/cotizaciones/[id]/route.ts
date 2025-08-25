@@ -200,21 +200,43 @@ export async function PUT(
     
     // Build update object based only on confirmed fields
     // Note: We have both display currency fields and MXN fields in the database
-    // The MXN fields are what get used for the PDF generation
+    // The edit page sends MXN values, so we use them directly for _mxn fields
+    // and calculate display currency values if needed
+    const subtotalMXN = typeof data.subtotal === 'string' ? parseFloat(data.subtotal) : data.subtotal;
+    const costoEnvioMXN = typeof data.costo_envio === 'string' ? parseFloat(data.costo_envio) : data.costo_envio;
+    const totalMXN = typeof data.total === 'string' ? parseFloat(data.total) : data.total;
+    const exchangeRate = typeof data.tipo_cambio === 'string' ? parseFloat(data.tipo_cambio) : data.tipo_cambio;
+    
+    // Calculate display currency values based on moneda
+    let displaySubtotal = subtotalMXN;
+    let displayCostoEnvio = costoEnvioMXN;
+    let displayTotal = totalMXN;
+    
+    if (data.moneda === 'USD' && exchangeRate && exchangeRate > 0) {
+      displaySubtotal = subtotalMXN / exchangeRate;
+      displayCostoEnvio = costoEnvioMXN / exchangeRate;
+      displayTotal = totalMXN / exchangeRate;
+    } else if (data.moneda === 'EUR' && exchangeRate && exchangeRate > 0) {
+      // Assuming EUR exchange rate is also stored
+      displaySubtotal = subtotalMXN / exchangeRate;
+      displayCostoEnvio = costoEnvioMXN / exchangeRate;
+      displayTotal = totalMXN / exchangeRate;
+    }
+
     const updateData = {
       cliente_id: typeof data.cliente_id === 'string' ? parseInt(data.cliente_id) : data.cliente_id,
       moneda: data.moneda,
-      subtotal: typeof data.subtotal === 'string' ? parseFloat(data.subtotal) : data.subtotal,
-      subtotal_mxn: typeof data.subtotal === 'string' ? parseFloat(data.subtotal) : data.subtotal, // Use same value for MXN field
+      subtotal: displaySubtotal,
+      subtotal_mxn: subtotalMXN,
       descuento_global: typeof data.descuento_global === 'string' ? parseFloat(data.descuento_global) : data.descuento_global,
       iva: data.iva,
       monto_iva: typeof data.monto_iva === 'string' ? parseFloat(data.monto_iva) : data.monto_iva,
       incluye_envio: data.incluye_envio,
-      costo_envio: typeof data.costo_envio === 'string' ? parseFloat(data.costo_envio) : data.costo_envio,
-      costo_envio_mxn: typeof data.costo_envio === 'string' ? parseFloat(data.costo_envio) : data.costo_envio, // Use same value for MXN field
-      total: typeof data.total === 'string' ? parseFloat(data.total) : data.total,
-      total_mxn: typeof data.total === 'string' ? parseFloat(data.total) : data.total, // Use same value for MXN field
-      tipo_cambio: typeof data.tipo_cambio === 'string' ? parseFloat(data.tipo_cambio) : data.tipo_cambio,
+      costo_envio: displayCostoEnvio,
+      costo_envio_mxn: costoEnvioMXN,
+      total: displayTotal,
+      total_mxn: totalMXN,
+      tipo_cambio: exchangeRate,
     };
     
     // Only add fecha_actualizacion if it exists in the table (as per schema)
