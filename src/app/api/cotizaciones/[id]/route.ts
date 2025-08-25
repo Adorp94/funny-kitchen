@@ -199,16 +199,21 @@ export async function PUT(
     console.log("Found existing cotizacion, proceeding with update");
     
     // Build update object based only on confirmed fields
+    // Note: We have both display currency fields and MXN fields in the database
+    // The MXN fields are what get used for the PDF generation
     const updateData = {
       cliente_id: typeof data.cliente_id === 'string' ? parseInt(data.cliente_id) : data.cliente_id,
       moneda: data.moneda,
       subtotal: typeof data.subtotal === 'string' ? parseFloat(data.subtotal) : data.subtotal,
+      subtotal_mxn: typeof data.subtotal === 'string' ? parseFloat(data.subtotal) : data.subtotal, // Use same value for MXN field
       descuento_global: typeof data.descuento_global === 'string' ? parseFloat(data.descuento_global) : data.descuento_global,
       iva: data.iva,
       monto_iva: typeof data.monto_iva === 'string' ? parseFloat(data.monto_iva) : data.monto_iva,
       incluye_envio: data.incluye_envio,
       costo_envio: typeof data.costo_envio === 'string' ? parseFloat(data.costo_envio) : data.costo_envio,
+      costo_envio_mxn: typeof data.costo_envio === 'string' ? parseFloat(data.costo_envio) : data.costo_envio, // Use same value for MXN field
       total: typeof data.total === 'string' ? parseFloat(data.total) : data.total,
+      total_mxn: typeof data.total === 'string' ? parseFloat(data.total) : data.total, // Use same value for MXN field
       tipo_cambio: typeof data.tipo_cambio === 'string' ? parseFloat(data.tipo_cambio) : data.tipo_cambio,
     };
     
