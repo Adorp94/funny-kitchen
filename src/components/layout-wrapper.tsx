@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { usePathname } from 'next/navigation'
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
@@ -8,18 +7,19 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { Separator } from '@/components/ui/separator'
 import { DynamicBreadcrumb } from '@/components/dynamic-breadcrumb'
 import { Loader2 } from 'lucide-react'
+import { useHydration } from '@/hooks/use-hydration'
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const { user, loading, mounted } = useAuth()
+  const { user, loading } = useAuth()
   const pathname = usePathname()
+  const isHydrated = useHydration()
 
   // Routes that don't require authentication and shouldn't show the sidebar
   const publicRoutes = ['/login', '/reset-password', '/auth']
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
-  // Prevent hydration mismatch by not rendering loading state on server
-  // Show loading spinner while checking authentication, but only after mounted
-  if (!mounted || loading) {
+  // Prevent hydration mismatch by showing loading until hydrated and auth is ready
+  if (!isHydrated || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center space-x-2">
