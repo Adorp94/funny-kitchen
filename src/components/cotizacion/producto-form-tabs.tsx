@@ -7,7 +7,7 @@ import { Input } from '../ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { toast } from "react-hot-toast";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { searchProductos, insertProducto, Producto as ProductoType } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -107,7 +107,7 @@ export function ProductoFormTabs({ productoId, onProductoChange }: ProductoFormP
   const pageSize = 20;
   
   // Initialize Supabase client
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
 
   const [formData, setFormData] = useState<ProductoFormData>({
     producto_id: "",

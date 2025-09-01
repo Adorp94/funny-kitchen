@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 // Import the simple Supabase client instance
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
     const onlyIds = searchParams.get('onlyIds') === 'true';
     
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await request.json();
     
     // Handle batch lookup by product names for production scheduling

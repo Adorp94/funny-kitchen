@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from "@/lib/supabase/server";
 
 // Type definitions
 type MoveToEmpaqueRequest = {
@@ -26,18 +25,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: (name: string) => cookieStore.get(name)?.value,
-          set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
-          remove: (name: string, options: any) => cookieStore.remove(name, options),
-        },
-      }
-    );
+    const supabase = await createClient();
 
     // Start transaction to ensure data consistency
     const { data: currentStatus, error: statusError } = await supabase
@@ -227,18 +215,7 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => cookieStore.get(name)?.value,
-        set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
-        remove: (name: string, options: any) => cookieStore.remove(name, options),
-      },
-    }
-  );
+  const supabase = await createClient();
 
   try {
     // Get empaque products for the cotizacion
@@ -325,18 +302,7 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: (name: string) => cookieStore.get(name)?.value,
-          set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
-          remove: (name: string, options: any) => cookieStore.remove(name, options),
-        },
-      }
-    );
+    const supabase = await createClient();
 
     // Get the allocation to delete
     let allocationToDelete;
@@ -483,18 +449,7 @@ export async function PATCH(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get: (name: string) => cookieStore.get(name)?.value,
-          set: (name: string, value: string, options: any) => cookieStore.set(name, value, options),
-          remove: (name: string, options: any) => cookieStore.remove(name, options),
-        },
-      }
-    );
+    const supabase = await createClient();
 
     // Check if there are empaque allocations for this cotización
     const { data: existingAllocations, error: checkError } = await supabase

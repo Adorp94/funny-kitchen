@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 interface RequestParams {
@@ -52,6 +52,8 @@ export async function GET(
   request: NextRequest,
   { params: { id } }: { params: { id: string } }
 ) {
+  const supabase = await createClient();
+  
   // --- Restore Original Logic --- 
   try {
     const cotizacionId = id; // Use id directly
@@ -170,6 +172,8 @@ export async function PUT(
   request: NextRequest,
   { params: { id } }: { params: { id: string } }
 ) {
+  const supabase = await createClient();
+  
   try {
     console.log("Cotizacion update API called for ID:", id);
     const cotizacionId = parseInt(id);
@@ -570,6 +574,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const supabase = await createClient();
+  
   const cotizacionId = parseInt(params.id, 10);
 
   if (isNaN(cotizacionId)) {

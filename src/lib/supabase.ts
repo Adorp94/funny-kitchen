@@ -1,4 +1,4 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 
 // Define the Cliente type based on the database schema
 export interface Cliente {
@@ -33,7 +33,7 @@ export interface Producto {
 
 // Search for clients by name or phone with pagination
 export async function searchClientes(query: string, page = 0, pageSize = 20) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     // Call the API endpoint directly
@@ -71,7 +71,7 @@ export async function searchClientes(query: string, page = 0, pageSize = 20) {
 
 // Search for products by name or SKU with pagination
 export async function searchProductos(query: string, page = 0, pageSize = 20) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     // Call the API endpoint directly
@@ -109,7 +109,7 @@ export async function searchProductos(query: string, page = 0, pageSize = 20) {
 
 // Get a client by ID
 export async function getClienteById(id: number) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     const { data, error } = await supabase
@@ -127,7 +127,7 @@ export async function getClienteById(id: number) {
 
 // Get a product by ID
 export async function getProductoById(id: number) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     const { data, error } = await supabase
@@ -145,7 +145,7 @@ export async function getProductoById(id: number) {
 
 // Insert a new client
 export async function insertCliente(cliente: Omit<Cliente, 'cliente_id'>) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     const { data, error } = await supabase
@@ -216,7 +216,7 @@ export async function insertProducto(producto: Omit<Producto, 'producto_id'>) {
 
 // Update an existing client
 export async function updateCliente(cliente: Partial<Cliente> & { cliente_id: number }) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     const { data, error } = await supabase
@@ -245,7 +245,7 @@ export async function updateCliente(cliente: Partial<Cliente> & { cliente_id: nu
 
 // Update an existing product
 export async function updateProducto(producto: Partial<Producto> & { producto_id: number }) {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   
   try {
     const { data, error } = await supabase

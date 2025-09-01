@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { ProtectedRoute } from "@/components/protected-route";
 import { ArrowDown, ArrowUp, DollarSign, FileText, ReceiptIcon, Plus, CreditCard, RefreshCw, TrendingUp, Calendar, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,7 @@ import { IngresosTable } from '@/components/finanzas/ingresos-table';
 import { EgresosTable } from '@/components/finanzas/egresos-table';
 import { CashFlowSection } from '@/components/finanzas/cash-flow-section';
 import { ReportesSection } from '@/components/finanzas/reportes-section';
+import { CuentasPorCobrarSection } from '@/components/finanzas/cuentas-por-cobrar-section';
 import { 
   createIngreso, 
   createEgreso, 
@@ -617,7 +619,8 @@ export default function FinanzasPage() {
   };
 
   return (
-    <>
+    <ProtectedRoute requiredModule="finanzas">
+      <>
       {/* Modals remain the same */}
       <IngresoResponsiveWrapper
         isOpen={isIngresoModalOpen}
@@ -793,7 +796,7 @@ export default function FinanzasPage() {
 
         {/* Data Tables Section */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 h-9 bg-muted p-1">
+          <TabsList className="grid w-full grid-cols-5 h-9 bg-muted p-1">
             <TabsTrigger 
               value="cashflow" 
               className="text-xs font-medium data-[state=active]:bg-green-100 data-[state=active]:text-green-800 data-[state=active]:shadow-sm"
@@ -811,6 +814,12 @@ export default function FinanzasPage() {
               className="text-xs font-medium data-[state=active]:bg-red-100 data-[state=active]:text-red-800 data-[state=active]:shadow-sm"
             >
               Egresos
+            </TabsTrigger>
+            <TabsTrigger 
+              value="por-cobrar" 
+              className="text-xs font-medium data-[state=active]:bg-orange-100 data-[state=active]:text-orange-800 data-[state=active]:shadow-sm"
+            >
+              Por Cobrar
             </TabsTrigger>
             <TabsTrigger 
               value="reportes" 
@@ -881,6 +890,12 @@ export default function FinanzasPage() {
               onDelete={handleDeleteEgreso}
             />
            </TabsContent>
+           <TabsContent value="por-cobrar" className="space-y-4 mt-6">
+             <CuentasPorCobrarSection 
+               selectedMonth={selectedMonth === 0 ? undefined : selectedMonth}
+               selectedYear={selectedYear === 0 ? undefined : selectedYear}
+             />
+           </TabsContent>
            <TabsContent value="reportes" className="space-y-4 mt-6">
              <div className="space-y-1">
                <h3 className="text-base font-medium text-foreground">Reportes de Ventas</h3>
@@ -901,6 +916,7 @@ export default function FinanzasPage() {
            </TabsContent>
          </Tabs>
       </div>
-    </>
+      </>
+    </ProtectedRoute>
   );
 } 

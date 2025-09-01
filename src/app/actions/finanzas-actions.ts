@@ -1,7 +1,7 @@
 "use server";
 
-// Import the exported Supabase client instance directly
-import { supabase } from '@/lib/supabase/server';
+// Import the Supabase client factory
+import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { convertToCSV, formatCurrency } from '@/lib/utils'; // Import the helper and formatCurrency
 
@@ -11,6 +11,32 @@ interface FinancialMetrics {
   egresos: { mxn: number; usd: number };
   balance: { mxn: number; usd: number };
   cotizacionesPagadas: number;
+}
+
+interface AccountsReceivableMetrics {
+  totalPorCobrar: { mxn: number; usd: number };
+  clientesConSaldo: number;
+  clientesMorosos: number;
+  promedioDiasCobro: number;
+}
+
+interface AccountReceivableItem {
+  cotizacion_id: number;
+  folio: string;
+  estado: string;
+  total: number;
+  total_mxn: number;
+  monto_pagado: number;
+  monto_pagado_mxn: number;
+  saldo_pendiente: number;
+  saldo_pendiente_mxn: number;
+  porcentaje_completado: number;
+  dias_transcurridos: number;
+  fecha_aprobacion: string;
+  cliente_nombre: string;
+  cliente_celular: string;
+  cliente_correo: string;
+  moneda: string;
 }
 
 // Updated IngresoData to include new fields and make cotizacion-specific fields optional
@@ -57,6 +83,8 @@ export async function getFinancialMetrics(
   year?: number   // Can be 0 for "Todos"
 ): Promise<{ success: boolean; data?: FinancialMetrics; error?: string }> {
   try {
+    const supabase = await createClient();
+    
     // Base queries
     let ingresosMXNQuery = supabase
       .from('pagos')
@@ -207,6 +235,8 @@ export async function getAllIngresos(
   error?: string
 }> {
   try {
+    const supabase = await createClient();
+    
     // Base query now targets the 'pagos' table
     let countQuery = supabase
       .from('pagos')
@@ -418,6 +448,8 @@ export async function getAllEgresos(
   error?: string 
 }> {
   try {
+    const supabase = await createClient();
+    
     let countQuery = supabase
       .from('egresos')
       .select('*', { count: 'exact', head: true });
@@ -537,6 +569,8 @@ export async function getAllEgresos(
 // - usuario_id: number (optional)
 export async function createIngreso(data: any): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = await createClient();
+    
     const tipoIngreso = data.tipo_ingreso || (data.cotizacion_id ? 'cotizacion' : 'otro'); // Infer type if not provided
     const cotizacionId = tipoIngreso === 'cotizacion' ? Number(data.cotizacion_id) : null;
     const descripcion = tipoIngreso === 'otro' ? data.descripcion : null;
@@ -708,8 +742,7 @@ export async function createIngreso(data: any): Promise<{ success: boolean; erro
 // Server action to create a new egreso (expense)
 export async function createEgreso(data: any): Promise<{ success: boolean; error?: string }> {
   try {
-    // Use the imported supabase instance directly
-    // const supabase = createClient(); <-- Remove this line
+    const supabase = await createClient();
     
     // Calculate monto_mxn based on moneda
     let montoMXN = Number(data.monto);
@@ -757,6 +790,8 @@ export async function getAvailableCotizaciones(): Promise<{
   error?: string 
 }> {
   try {
+    const supabase = await createClient();
+    
     const allowedStatuses = ['pendiente', 'aprobada', 'anticipo_pagado', 'pagada_parcial', 'producción']; 
 
     // Fetch cotizaciones and join client name
@@ -816,6 +851,7 @@ export async function getAllIngresosForCSV(
   // Remove month/year parameters
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     let query = supabase
       .from('pagos')
       .select(`
@@ -891,6 +927,7 @@ export async function getAllEgresosForCSV(
   // Remove month/year parameters
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     let query = supabase
       .from('egresos')
       .select('*') 
@@ -942,6 +979,7 @@ export async function getAllEgresosForCSV(
 // Delete ingreso (payment) function
 export async function deleteIngreso(pagoId: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = await createClient();
     // Check if the payment exists and get its cotizacion_id to update totals
     const { data: pagoData, error: fetchError } = await supabase
       .from('pagos')
@@ -1036,6 +1074,7 @@ export async function deleteIngreso(pagoId: number): Promise<{ success: boolean;
 // Delete egreso function
 export async function deleteEgreso(egresoId: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = await createClient();
     // Check if the egreso exists
     const { data: egresoData, error: fetchError } = await supabase
       .from('egresos')
@@ -1089,6 +1128,8 @@ export async function getCashFlowMetrics(
   error?: string;
 }> {
   try {
+    const supabase = await createClient();
+    
     // Build date filters for PAYMENTS (not cotización creation)
     let paymentDateFilter = '';
     if (year) {
@@ -1114,6 +1155,7 @@ export async function getCashFlowMetrics(
       .from('pagos')
       .select(`
         cotizacion_id,
+        monto,
         monto_mxn,
         moneda,
         cotizaciones!inner (
@@ -1173,15 +1215,14 @@ export async function getCashFlowMetrics(
         uniqueCotizaciones.set(cot.cotizacion_id, cot);
       }
       
-      // Sum actual payments made in the date range using reliable monto_mxn
-      // After data integrity fix, all MXN payments have monto_mxn populated
+      // FIXED: Sum actual payments with proper NULL handling for monto_mxn
       if (payment.moneda === 'MXN') {
-        actualPaymentsMXN += Number(payment.monto_mxn || 0);
+        // Use monto_mxn if available, fallback to monto for MXN payments
+        actualPaymentsMXN += Number(payment.monto_mxn || payment.monto || 0);
       } else if (payment.moneda === 'USD' || payment.moneda === 'EUR') {
         // For USD/EUR payments (if any), monto_mxn contains the converted amount
         actualPaymentsMXN += Number(payment.monto_mxn || 0);
-        // Also track USD/EUR separately if needed
-        // actualPaymentsUSD += Number(payment.monto || 0);
+        actualPaymentsUSD += Number(payment.monto || 0);
       }
     });
 
@@ -1203,7 +1244,7 @@ export async function getCashFlowMetrics(
     });
 
     // Calculate collection rate based on actual payments vs total value
-    const totalActiveValue = totalActiveQuotesMXN + (totalActiveQuotesUSD * 20); // Rough conversion for rate
+    const totalActiveValue = totalActiveQuotesMXN + (totalActiveQuotesUSD * 20);
     const totalPaymentsValue = actualPaymentsMXN + (actualPaymentsUSD * 20);
     const collectionRate = totalActiveValue > 0 ? (totalPaymentsValue / totalActiveValue) * 100 : 0;
 
@@ -1227,7 +1268,7 @@ export async function getCashFlowMetrics(
           usd: Math.max(0, pendingCollectionsUSD) 
         },
         collectionRate: Math.round(collectionRate * 100) / 100,
-        activeCotizaciones: soldCotizaciones.length,
+        activeCotizaciones: soldCotizaciones?.length || 0,
         totalCotizaciones: allCotizaciones?.length || 0
       }
     };
@@ -1253,6 +1294,8 @@ export async function getCotizacionPayments(
   error?: string;
 }> {
   try {
+    const supabase = await createClient();
+    
     const offset = (page - 1) * pageSize;
 
     // Build the query for payments from ALL cotizaciones that have been sold (have payments)
@@ -1365,6 +1408,7 @@ export async function getCashFlowDataForCSV(
   year?: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     // Build the query for ALL payments from cotizaciones (sold = has payments)
     let query = supabase
       .from('pagos')
@@ -1487,6 +1531,7 @@ export async function getCashFlowDataForCSV(
 // Get all historic cash flow data for CSV export (no date filters)
 export async function getCashFlowDataForCSVHistoric(): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     // Get ALL cotizaciones that have had payments (historically sold), regardless of current status
     const { data: payments, error: paymentsError } = await supabase
       .from('pagos')
@@ -1588,6 +1633,7 @@ export async function getCashFlowDataForCSVHistoric(): Promise<{ success: boolea
 // Get all financial data (ingresos + egresos) combined for CSV export (historic)
 export async function getAllFinancialDataForCSV(): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getAllFinancialDataForCSV] Starting CSV generation...');
 
     // Get all ingresos (pagos)
@@ -1693,6 +1739,7 @@ export async function getVentasForCSV(
   year?: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getVentasForCSV] Starting ventas CSV generation with filters:', { month, year });
 
     // Build query from payments table (where actual payment dates are) and join to cotizaciones
@@ -1795,6 +1842,7 @@ export async function getIngresosFilteredForCSV(
   year?: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getIngresosFilteredForCSV] Starting ingresos CSV generation with filters:', { month, year });
 
     // Build query for ingresos with filters
@@ -1884,6 +1932,7 @@ export async function getEgresosFilteredForCSV(
   year?: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getEgresosFilteredForCSV] Starting egresos CSV generation with filters:', { month, year });
 
     // Build query for egresos with filters
@@ -1952,6 +2001,7 @@ export async function getVentasMonthlyReport(
   month: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getVentasMonthlyReport] Generating monthly ventas report for:', { year, month });
     
     const monthStart = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`;
@@ -2016,6 +2066,7 @@ export async function getVentasBiMonthlyReport(
   startMonth: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getVentasBiMonthlyReport] Generating bi-monthly ventas report for:', { year, startMonth });
     
     const monthStart = `${year}-${String(startMonth).padStart(2, '0')}-01T00:00:00Z`;
@@ -2080,6 +2131,7 @@ export async function getVentasTriMonthlyReport(
   quarter: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getVentasTriMonthlyReport] Generating tri-monthly ventas report for:', { year, quarter });
     
     const startMonth = (quarter - 1) * 3 + 1;
@@ -2144,6 +2196,7 @@ export async function getVentasAnnualReport(
   year: number
 ): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    const supabase = await createClient();
     console.log('[getVentasAnnualReport] Generating annual ventas report for:', { year });
     
     const yearStart = `${year}-01-01T00:00:00Z`;
@@ -2207,6 +2260,7 @@ export async function ensureOpeningBalance(
   month: number
 ): Promise<{ success: boolean; data?: { mxn: number; usd: number }; error?: string }> {
   try {
+    const supabase = await createClient();
     const { data: openingBalanceData, error } = await supabase
       .rpc('get_opening_balance', { target_year: year, target_month: month });
     
@@ -2244,6 +2298,7 @@ export async function createOpeningBalanceIngreso(
   month: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const supabase = await createClient();
     // Check if opening balance ingreso already exists for this month
     const nextMonth = month === 12 ? 1 : month + 1;
     const nextYear = month === 12 ? year + 1 : year;
@@ -2304,6 +2359,121 @@ export async function createOpeningBalanceIngreso(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to create opening balance ingreso' 
+    };
+  }
+}
+
+// --- ACCOUNTS RECEIVABLE (CUENTAS POR COBRAR) SERVER ACTIONS ---
+
+export async function getAccountsReceivableMetrics(
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: AccountsReceivableMetrics; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    // Use RPC function to get metrics
+    const { data: metricsData, error } = await supabase.rpc('get_accounts_receivable_metrics', {
+      filter_month: month || null,
+      filter_year: year || null
+    });
+
+    if (error) {
+      console.error('Error fetching accounts receivable metrics:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: metricsData
+    };
+  } catch (error) {
+    console.error('Error getting accounts receivable metrics:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to get accounts receivable metrics' 
+    };
+  }
+}
+
+export async function getAccountsReceivableList(
+  page: number = 1,
+  itemsPerPage: number = 10,
+  month?: number,
+  year?: number
+): Promise<{ success: boolean; data?: AccountReceivableItem[]; pagination?: PaginationResult; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    // Use RPC function to get accounts receivable list
+    const { data: listData, error } = await supabase.rpc('get_accounts_receivable_list', {
+      page_num: page,
+      items_per_page: itemsPerPage,
+      filter_month: month || null,
+      filter_year: year || null
+    });
+
+    if (error) {
+      console.error('Error fetching accounts receivable list:', error);
+      return { success: false, error: error.message };
+    }
+
+    // Process the JSON response from RPC function
+    const accountsData = listData?.data || [];
+    const totalCount = listData?.totalCount || 0;
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+
+    // Process and calculate fields for each account
+    const processedAccounts = accountsData.map((account: any) => {
+      const total = Number(account.total || 0);
+      const totalMxn = Number(account.total_mxn || account.total || 0);
+      const pagado = Number(account.monto_pagado || 0);
+      const pagadoMxn = Number(account.monto_pagado_mxn || account.monto_pagado || 0);
+      
+      const saldoPendiente = total - pagado;
+      const saldoPendienteMxn = totalMxn - pagadoMxn;
+      
+      // Calculate days since approval
+      const fechaAprobacion = new Date(account.fecha_aprobacion);
+      const hoy = new Date();
+      const diasTranscurridos = Math.floor((hoy.getTime() - fechaAprobacion.getTime()) / (1000 * 60 * 60 * 24));
+      
+      return {
+        cotizacion_id: account.cotizacion_id,
+        folio: account.folio,
+        estado: account.estado,
+        total,
+        total_mxn: totalMxn,
+        monto_pagado: pagado,
+        monto_pagado_mxn: pagadoMxn,
+        saldo_pendiente: saldoPendiente,
+        saldo_pendiente_mxn: saldoPendienteMxn,
+        porcentaje_completado: Number(account.porcentaje_completado || 0),
+        dias_transcurridos: diasTranscurridos,
+        fecha_aprobacion: account.fecha_aprobacion,
+        cliente_nombre: account.cliente_nombre || 'Cliente Desconocido',
+        cliente_celular: account.cliente_celular || '',
+        cliente_correo: account.cliente_correo || '',
+        moneda: account.moneda,
+        categoria_vencimiento: diasTranscurridos > 30 ? 'vencida' : diasTranscurridos > 15 ? 'por_vencer' : 'reciente'
+      };
+    });
+
+    return {
+      success: true,
+      data: processedAccounts,
+      pagination: {
+        page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage
+      }
+    };
+  } catch (error) {
+    console.error('Error getting accounts receivable list:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to get accounts receivable list' 
     };
   }
 } 

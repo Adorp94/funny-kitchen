@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/server';
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = createClientComponentClient();
+    const supabase = await createClient();
     const data = await request.json();
     
     const { cotizacion_id, estado, ...updateData } = data;

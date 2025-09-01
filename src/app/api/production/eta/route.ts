@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server'; // Corrected: Import the instance
+import { createClient } from '@/lib/supabase/server'; // Corrected: Import the instance
 import { ProductionPlannerService } from '@/services/productionPlannerService';
 import { Database } from '@/lib/database.types'; // Assuming this type import is correct
 

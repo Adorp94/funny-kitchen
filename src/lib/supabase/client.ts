@@ -1,28 +1,18 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr'
+import type { Database } from './types'
 
 // Get Supabase URL and key from environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Create a Supabase client
-export const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
 
-// Export createClient function for compatibility
-export const createClient = () => {
-  return createSupabaseClient(supabaseUrl, supabaseKey);
-};
+// Create browser client for client components
+export function createClient() {
+  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+}
 
-// Export default supabase client
-export default supabase;
-
-// Create a service role client for operations that need higher privileges
-// This should only be used in server contexts (API routes, Server Actions, etc.)
-export const supabaseAdmin = supabaseServiceRoleKey 
-  ? createSupabaseClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  : supabase; // Fallback to regular client if no service role key
+// Export default client for backward compatibility
+export const supabase = createClient()

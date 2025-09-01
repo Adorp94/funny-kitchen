@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
     console.log('Production Active API: Starting GET request');
     
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('production_active_with_gap')
       .select('*'); // Remove default ordering to allow frontend sorting
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert valid records
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('production_active')
       .upsert(validRecords, { 
@@ -135,6 +137,7 @@ export async function PUT(request: NextRequest) {
     if (sancocho !== undefined) updateData.sancocho = parseInt(sancocho);
     if (terminado !== undefined) updateData.terminado = parseInt(terminado);
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('production_active')
       .update(updateData)
@@ -162,6 +165,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'producto_id requerido' }, { status: 400 });
     }
 
+    const supabase = await createClient();
     const { error } = await supabase
       .from('production_active')
       .delete()

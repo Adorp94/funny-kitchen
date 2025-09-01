@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
+    
     // Get total count of cotizaciones
     const { count: totalCotizaciones, error: countError } = await supabase
       .from('cotizaciones')

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 // Import the simple Supabase client instance
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 // Force dynamic execution for Route Handler
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const search = searchParams.get('search');
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await request.json();
     
     const { data, error } = await supabase

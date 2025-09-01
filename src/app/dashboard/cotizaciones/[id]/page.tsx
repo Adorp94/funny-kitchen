@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CotizacionStatusModal } from "@/components/cotizacion/cotizacion-status-modal";
 import { getCotizacionDetails } from "@/app/actions/cotizacion-actions";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 interface PaymentFormData {
   monto: number;
@@ -81,6 +81,7 @@ export default function CotizacionDetailPage() {
       return false;
     }
 
+    const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id ?? null;
     const fechaISO = fecha.toISOString().split('T')[0];

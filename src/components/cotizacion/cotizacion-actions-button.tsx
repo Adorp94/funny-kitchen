@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import { getCotizacionDetails } from '@/app/actions/cotizacion-actions';
 import { useRouter } from 'next/navigation';
 import { PDFService } from '@/services/pdf-service';
-import { supabase } from '@/lib/supabase/client';
 import { formatDate } from '@/lib/utils';
 
 interface Cotizacion {

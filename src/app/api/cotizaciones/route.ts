@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { ProductoConDescuento } from '@/components/cotizacion/lista-productos-con-descuento';
 import { getNextFolioNumber } from '@/app/actions/cotizacion-actions';
 import { ProductionPlannerService } from '@/services/productionPlannerService';
@@ -22,6 +22,7 @@ function addBusinessDays(startDate: Date, days: number): Date {
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     
@@ -223,6 +224,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
     const data = await req.json();
     const plannerService = new ProductionPlannerService(supabase); // Instantiate planner (using imported supabase)
 

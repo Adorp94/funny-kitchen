@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Database } from '@/lib/supabase/types';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from "@/lib/supabase/server";
 import { ProductionPlannerService } from '@/services/productionPlannerService';
 
 // Define the structure of the data returned by the GET request
@@ -38,24 +37,7 @@ type QueueApiResponseItem = {
 export async function GET(request: NextRequest) {
   console.log("[API /production/queue GET] === STARTING REQUEST ===");
   
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => {
-          return cookieStore.get(name)?.value;
-        },
-        set: (name: string, value: string, options: any) => {
-          cookieStore.set(name, value, options);
-        },
-        remove: (name: string, options: any) => {
-          cookieStore.remove(name, options);
-        },
-      },
-    }
-  );
+  const supabase = await createClient();
 
   try {
     console.log("[API /production/queue GET] Fetching all production data...");
@@ -249,24 +231,7 @@ export async function PATCH(request: NextRequest) {
              return NextResponse.json({ error: 'queue_id, cotizacion_producto_id, o cotizacion_producto_ids es requerido' }, { status: 400 });
          }
 
-         const cookieStore = await cookies();
-         const supabase = createServerClient(
-             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-             {
-                 cookies: {
-                     get: (name: string) => {
-                         return cookieStore.get(name)?.value;
-                     },
-                     set: (name: string, value: string, options: any) => {
-                         cookieStore.set(name, value, options);
-                     },
-                     remove: (name: string, options: any) => {
-                         cookieStore.remove(name, options);
-                     },
-                 },
-             }
-         );
+         const supabase = await createClient();
 
          let result = {};
 

@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { data: colores, error } = await supabase
       .from('colores')
       .select('id, nombre, hex')
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
+    const supabase = await createClient();
     const body = await request.json();
     
     if (!body.color) {

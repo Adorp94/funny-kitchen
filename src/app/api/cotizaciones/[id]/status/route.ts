@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr' // Use ssr client for route handlers
-import { cookies } from 'next/headers' // Import cookies
+import { createClient } from '@/lib/supabase/server'
 import { ProductionPlannerService } from '@/services/productionPlannerService';
 import { Database } from '@/lib/supabase/types';
 import { revalidatePath } from 'next/cache'; // Need revalidatePath here now
@@ -40,21 +39,7 @@ export async function POST(
   const cotizacionId = parseInt(cotizacionIdStr, 10);
 
   // Create authenticated Supabase client
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        // Optional: set/remove if needed for auth state changes within the handler
-        // set(name: string, value: string, options: CookieOptions) { ... }, 
-        // remove(name: string, options: CookieOptions) { ... },
-      },
-    }
-  );
+  const supabase = await createClient();
 
   if (isNaN(cotizacionId)) {
     return NextResponse.json({ error: 'ID de cotización inválido' }, { status: 400 });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { ProtectedRoute } from "@/components/protected-route";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, User, Package, Receipt, Save, DollarSign, FileText, Loader2, Check, AlertTriangle, CalendarClock, Crown } from "lucide-react";
@@ -695,8 +696,10 @@ function NuevaCotizacionClient() {
 // Wrap the client component with the provider
 export default function NuevaCotizacionPage() {
   return (
-    <ProductosProvider>
-      <NuevaCotizacionClient />
-    </ProductosProvider>
+    <ProtectedRoute requiredModule="cotizaciones">
+      <ProductosProvider>
+        <NuevaCotizacionClient />
+      </ProductosProvider>
+    </ProtectedRoute>
   );
 }

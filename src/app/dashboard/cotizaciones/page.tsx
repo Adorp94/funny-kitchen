@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { ProtectedRoute } from "@/components/protected-route";
 import { toast } from "sonner";
 import { 
   ArrowUpDown, 
@@ -394,7 +395,8 @@ export default function CotizacionesPage() {
   };
   
   return (
-    <div className="space-y-4">
+    <ProtectedRoute requiredModule="cotizaciones">
+      <div className="space-y-4">
       {/* Clean Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -622,6 +624,7 @@ export default function CotizacionesPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 } 

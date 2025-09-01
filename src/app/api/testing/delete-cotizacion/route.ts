@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  
   try {
     const { cotizacion_id: cotizacionIdStr } = await request.json();
     const cotizacionId = parseInt(cotizacionIdStr, 10);

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from "@/lib/supabase/server";
 
 interface CotizacionActiva {
   cotizacion_id: number;
@@ -17,24 +16,7 @@ interface CotizacionActiva {
 export async function GET(request: NextRequest) {
   console.log("[API /production/cotizaciones-activas GET] === STARTING REQUEST ===");
   
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name: string) => {
-          return cookieStore.get(name)?.value;
-        },
-        set: (name: string, value: string, options: any) => {
-          cookieStore.set(name, value, options);
-        },
-        remove: (name: string, options: any) => {
-          cookieStore.set(name, '', { ...options, maxAge: 0 });
-        },
-      },
-    }
-  );
+  const supabase = await createClient();
 
   try {
     // Get all cotizaciones that have products in production_active

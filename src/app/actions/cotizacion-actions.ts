@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { ProductionPlannerService } from '@/services/productionPlannerService';
 import { Database } from '@/lib/supabase/types';
 
@@ -38,6 +38,7 @@ export async function updateCotizacionStatus(
   newStatus: string,
   paymentData?: AdvancePaymentData
 ): Promise<UpdateStatusResult> {
+  const supabase = await createClient();
   console.log('[Action updateCotizacionStatus] Called with:', { cotizacionId, newStatus, paymentData });
   
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -52,6 +53,7 @@ export async function updateCotizacionStatus(
   let planningWarnings: string[] = [];
 
   try {
+    const supabase = await createClient();
     const { data: existingCotizacion, error: getError } = await supabase
       .from('cotizaciones')
       .select('*, is_premium')
@@ -155,6 +157,7 @@ export async function updateCotizacionStatus(
            console.log(`[Action updateCotizacionStatus] Product ${currentProductId} (cotizacion_producto_id: ${item.cotizacion_producto_id}) has vueltas_max_dia: ${vueltasMaxDia}`);
 
           try {
+    const supabase = await createClient();
             const queueResult = await plannerService.addToQueueAndCalculateDates(
               item.cotizacion_producto_id,
               currentProductId,
@@ -215,6 +218,7 @@ export async function updateCotizacionStatus(
     }
     
     try {
+    const supabase = await createClient();
       const historialData = {
         cotizacion_id: cotizacionId,
         estado_anterior: existingCotizacion.estado,
@@ -240,6 +244,7 @@ export async function updateCotizacionStatus(
     
     if (paymentData) {
       try {
+    const supabase = await createClient();
         console.log('[Action updateCotizacionStatus] Recording payment data:', paymentData);
         const tipoCambio = existingCotizacion.tipo_cambio || 1;
         const moneda = existingCotizacion.moneda || 'MXN';
@@ -272,6 +277,7 @@ export async function updateCotizacionStatus(
           console.log('[Action updateCotizacionStatus] Payment recorded successfully');
           
           try {
+    const supabase = await createClient();
               const { data: currentPaymentData, error: fetchPaymentError } = await supabase
                   .from('cotizaciones')
                   .select('monto_pagado, monto_pagado_mxn')
@@ -340,6 +346,7 @@ export async function updateCotizacionStatus(
 
 export async function getCotizacionDetails(cotizacionId: number) {
   try {
+    const supabase = await createClient();
     const { data: cotizacion, error: cotizacionError } = await supabase
       .from('cotizaciones')
       .select(`
@@ -408,6 +415,7 @@ export async function getCotizacionDetails(cotizacionId: number) {
 
 export async function getAllAdvancePayments(page = 1, limit = 10) {
   try {
+    const supabase = await createClient();
     const offset = (page - 1) * limit;
     
     const { data: pagos, error: pagosError, count } = await supabase
@@ -471,9 +479,11 @@ export async function getAllAdvancePayments(page = 1, limit = 10) {
 }
 
 export async function getNextFolioNumber(): Promise<string> {
+  const supabase = await createClient();
   const currentYear = new Date().getFullYear();
   
   try {
+    const supabase = await createClient();
     const { data: latestCotizacion, error: idError } = await supabase
       .from('cotizaciones')
       .select('cotizacion_id, folio')
@@ -505,6 +515,7 @@ export async function getNextFolioNumber(): Promise<string> {
 
 async function fallbackGenerateFolio(currentYear: number, supabase: SupabaseClient) {
   try {
+    const supabase = await createClient();
     console.log('Using fallback method to generate folio');
     const { data: latestCotizacion, error } = await supabase
       .from('cotizaciones')

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from "next/link";
+import { ProtectedRoute } from "@/components/protected-route";
+import { usePermissions } from "@/hooks/use-permissions";
 import { FileText, DollarSign, Package, Factory } from "lucide-react";
 import { 
   Card, 
@@ -105,6 +107,7 @@ const moduleCards = [
 ];
 
 export default function DashboardPage() {
+  const { hasAccess } = usePermissions();
   const [metrics, setMetrics] = useState<{
     totalCotizaciones: number;
     valorTotal: number;
@@ -142,18 +145,28 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
+  // Filter modules based on user permissions
+  const accessibleModules = moduleCards.filter(module => {
+    // Map module hrefs to permission keys
+    if (module.href === "/dashboard/cotizaciones") return hasAccess("cotizaciones");
+    if (module.href === "/produccion") return hasAccess("produccion");
+    if (module.href === "/dashboard/finanzas") return hasAccess("finanzas");
+    return true; // Default allow for unknown modules
+  });
+
   return (
-    <div className="flex flex-col flex-1 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground"> 
-            Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Resumen general de la actividad de Funny Kitchen.
-          </p>
+    <ProtectedRoute requiredModule="dashboard">
+      <div className="flex flex-col flex-1 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground"> 
+              Dashboard
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Resumen general de la actividad de Funny Kitchen.
+            </p>
+          </div>
         </div>
-      </div>
 
       <div className="w-full max-w-sm">
         {metrics ? (
@@ -195,7 +208,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="grid grid-cols-1 gap-3">
-              {moduleCards.map((module, index) => {
+              {accessibleModules.map((module, index) => {
                 const iconBackgrounds = [
                   "bg-emerald-50 dark:bg-emerald-900/20",
                   "bg-purple-50 dark:bg-purple-900/20",
@@ -240,42 +253,49 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-2">
-              <Link
-                href="/nueva-cotizacion"
-                className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/10 hover:border-teal-200 dark:hover:border-teal-800 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <FileText className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Nueva Cotización</span>
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+N</span>
-              </Link>
+              {hasAccess("cotizaciones") && (
+                <Link
+                  href="/nueva-cotizacion"
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/10 hover:border-teal-200 dark:hover:border-teal-800 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Nueva Cotización</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+N</span>
+                </Link>
+              )}
               
-              <Link
-                href="/produccion"
-                className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/10 hover:border-rose-200 dark:hover:border-rose-800 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Factory className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Ver Producción</span>
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+P</span>
-              </Link>
+              {hasAccess("produccion") && (
+                <Link
+                  href="/produccion"
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/10 hover:border-rose-200 dark:hover:border-rose-800 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <Factory className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Ver Producción</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+P</span>
+                </Link>
+              )}
               
-              <Link
-                href="/dashboard/finanzas"
-                className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <DollarSign className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Finanzas</span>
-                </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+F</span>
-              </Link>
+              {hasAccess("finanzas") && (
+                <Link
+                  href="/dashboard/finanzas"
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <DollarSign className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Finanzas</span>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Ctrl+F</span>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 } 

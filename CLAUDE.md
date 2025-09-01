@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a quotation management system for Funny Kitchen (ceramic artisan company) with three main modules:
 
 1. **Quotations** (`/dashboard/cotizaciones/`) - Create, edit, and manage quotes
-2. **Finance** (`/dashboard/finanzas/`) - Track income, expenses, and payments
+2. **Finance** (`/dashboard/finanzas/`) - Track income, expenses, payments, and accounts receivable
 3. **Production** (`/produccion/`) - Production queue, allocation management, fulfillment tracking, and mold inventory management
 
 ### Key Architecture Patterns
@@ -134,10 +134,69 @@ The production module includes sophisticated allocation and fulfillment tracking
 - Migration `005_add_allocation_constraints.sql` - Allocation tracking and constraint validation
 - Migration `006_create_production_active_with_gap_view.sql` - Smart demand calculation view
 
+### Finance Module Features
+The finance module includes comprehensive financial tracking with five main sections:
+
+#### Accounts Receivable (Cuentas por Cobrar)
+- **Component**: `/src/components/finanzas/cuentas-por-cobrar-section.tsx`
+- **API Endpoint**: `/src/app/api/finanzas/cuentas-por-cobrar/route.ts`
+- **Server Actions**: `getAccountsReceivableMetrics()`, `getAccountsReceivableList()` in `/src/app/actions/finanzas-actions.ts`
+- **Features**: 
+  - Track outstanding balances from approved quotations
+  - Monitor overdue accounts (>30 days, 15-30 days, <15 days)
+  - Client contact information display
+  - Pagination and filtering by month/year
+  - Optimized RPC functions for complex SQL queries
+
+#### Database Functions (Accounts Receivable)
+- **`get_accounts_receivable_metrics()`** - Calculate aggregate metrics (total outstanding, client count, overdue accounts)
+- **`get_accounts_receivable_list()`** - Paginated list of outstanding accounts with client details
+- **`get_accounts_receivable_count()`** - Total count for pagination
+- **Note**: Uses RPC functions because PostgREST doesn't support column-to-column comparisons (`total > monto_pagado`)
+
+#### Cash Flow Metrics (Ventas Tab)
+- **Component**: `/src/components/finanzas/cash-flow-section.tsx`
+- **Server Actions**: `getCashFlowMetrics()`, `getCotizacionPayments()` in `/src/app/actions/finanzas-actions.ts`
+- **Features**:
+  - **Cotizaciones Vendidas**: Total value of cotizaciones that have received payments
+  - **Pagos Recibidos**: Actual payments received from sold cotizaciones (includes NULL handling for `monto_mxn`)
+  - **Pendiente por Cobrar**: Outstanding amount from sold cotizaciones
+  - **Tasa de Cobranza**: Collection rate percentage (payments received / total sold value)
+- **Business Logic**: "Sold cotizaciones" = cotizaciones with payments (not all approved/production cotizaciones)
+- **Data Integrity Fix**: Handles NULL `monto_mxn` values by falling back to `monto` for MXN payments
+
+### User Management and Access Control System
+The application includes a comprehensive role-based access control (RBAC) system:
+
+#### User Roles
+- **Super Admin** (`adolfo@heyaylabs.com`) - Full system access, cannot be deleted, manages all users
+- **Admin** - Can manage regular users, access to assigned modules 
+- **User** - Basic access to assigned modules only
+
+#### Access Control Features
+- **Module-Level Permissions**: Granular control over Dashboard, Cotizaciones, Producción, Finanzas, and Admin access
+- **Protected Routes**: All main pages use `ProtectedRoute` component for authorization
+- **Dynamic Navigation**: Sidebar only shows modules user has permission to access
+- **Admin Panel**: Accessible via user icon → "Configuración" (admin/super admin only)
+
+#### Key Admin Components
+- **Admin Page** (`/src/app/admin/page.tsx`) - Main configuration interface
+- **User Management** (`/src/components/admin/user-management.tsx`) - Add/edit/delete users and permissions
+- **Protected Route** (`/src/components/protected-route.tsx`) - Route authorization wrapper
+- **Permissions Hook** (`/src/hooks/use-permissions.tsx`) - Client-side permission checking
+
+#### Database Tables (User Management)
+- `user_profiles` - User roles and permissions with RLS policies
+- **Functions**: `is_admin_user()`, `is_super_admin_user()` for permission checking
+- **Trigger**: `create_user_profile()` automatically creates profiles for new auth users
+- **Migrations**: `add_user_roles_and_permissions`, `fix_user_profile_trigger_security`, `fix_infinite_recursion_rls`
+
 ### Important File Locations
 - Database migrations: `/database/migrations/`
 - API endpoints: `/src/app/api/`
 - Supabase config: `/src/lib/supabase/`
 - UI components: `/src/components/ui/`
 - Production components: `/src/components/produccion/`
+- Finance components: `/src/components/finanzas/`
+- Admin components: `/src/components/admin/`
 - Application constants: `/src/lib/constants.ts`

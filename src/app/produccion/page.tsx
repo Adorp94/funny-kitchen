@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { ProtectedRoute } from "@/components/protected-route";
 import { TestingListing } from "@/components/testing/testing-listing";
 import { MoldesActivos } from "@/components/produccion/moldes-activos";
 import { InventarioSection } from "@/components/produccion/inventario-section";
@@ -16,7 +17,8 @@ import { Factory, Wrench, Package, Users, ClipboardList, Activity, Eye, Truck, A
 export default function ProduccionPage() {
 
   return (
-    <div className="space-y-6">
+    <ProtectedRoute requiredModule="produccion">
+      <div className="space-y-6">
       {/* Clean Header */}
       <div className="space-y-1">
         <h1 className="text-xl font-semibold text-foreground flex items-center">
@@ -113,6 +115,7 @@ export default function ProduccionPage() {
           <EnviosSection />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 } 

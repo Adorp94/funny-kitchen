@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/cart-context";
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 type Producto = {
   id: string;
@@ -51,6 +51,7 @@ export function ProductoExistenteForm() {
         setLoading(true);
         
         // Use Supabase client to fetch actual products
+        const supabase = createClient();
         const { data, error } = await supabase
           .from('productos')
           .select('*')

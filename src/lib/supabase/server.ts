@@ -1,22 +1,38 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { Database } from './types';
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import type { Database } from './types'
 
-// Create a single instance of the Supabase client for server-side use (Route Handlers, Server Actions)
-// This uses the ANON KEY by default, suitable for public data access or RLS based on anon role.
-// If you need SERVICE_ROLE access, you would create another client instance using the service role key.
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and Anon Key must be defined in environment variables');
+  throw new Error('Missing Supabase environment variables')
 }
 
-// Export the single instance
-export const supabase = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey);
-
-// Remove the previous SSR-based client functions
-/*
-export function createClient() { ... }
-export function createRouteHandlerClient() { ... }
-*/
+// Create server client for server components and route handlers
+export async function createClient() {
+  const cookieStore = await cookies()
+  
+  return createServerClient<Database>(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  )
+}
