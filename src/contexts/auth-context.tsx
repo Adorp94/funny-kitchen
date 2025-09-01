@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  mounted: boolean
   signOut: () => Promise<void>
 }
 
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  mounted: false,
   signOut: async () => {},
 })
 
@@ -31,18 +33,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    let mounted = true
+    setMounted(true)
+    let isMounted = true
 
     // Get initial session
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         
-        if (!mounted) return // Component was unmounted
+        if (!isMounted) return // Component was unmounted
 
         if (error) {
           console.error('Error getting session:', error)
@@ -59,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
       } catch (err) {
         console.error('Failed to get session:', err)
-        if (mounted) {
+        if (isMounted) {
           setSession(null)
           setUser(null)
           setLoading(false)
@@ -72,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!mounted) return // Component was unmounted
+        if (!isMounted) return // Component was unmounted
 
         console.log('Auth state changed:', event, session?.user?.email || 'no user')
         setSession(session)
@@ -83,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_OUT') {
           // Use timeout to prevent immediate redirect during component unmounting
           setTimeout(() => {
-            if (mounted && typeof window !== 'undefined') {
+            if (isMounted && typeof window !== 'undefined') {
               window.location.href = '/login'
             }
           }, 100)
@@ -94,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => {
-      mounted = false
+      isMounted = false
       subscription.unsubscribe()
     }
   }, [router, supabase.auth])
@@ -113,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     loading,
+    mounted,
     signOut,
   }
 

@@ -20,13 +20,23 @@ const nextConfig = {
   experimental: {
     // (other experimental options can go here if needed)
   },
-  // Force all API routes to be dynamic
-  output: 'standalone',
+  // Remove standalone output for Vercel deployment
+  // output: 'standalone', // This can cause asset loading issues on Vercel
   
   // Make sure environment variables are available
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  },
+  
+  // Ensure proper asset loading
+  assetPrefix: process.env.NODE_ENV === 'production' ? undefined : undefined,
+  
+  // Configure images for production
+  images: {
+    domains: ['funny-kitchen.vercel.app', 'localhost'],
+    unoptimized: false,
   },
   
   // Configure handling of specific API routes

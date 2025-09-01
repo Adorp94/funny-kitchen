@@ -10,15 +10,16 @@ import { DynamicBreadcrumb } from '@/components/dynamic-breadcrumb'
 import { Loader2 } from 'lucide-react'
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, mounted } = useAuth()
   const pathname = usePathname()
 
   // Routes that don't require authentication and shouldn't show the sidebar
   const publicRoutes = ['/login', '/reset-password', '/auth']
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
-  // Show loading spinner while checking authentication
-  if (loading) {
+  // Prevent hydration mismatch by not rendering loading state on server
+  // Show loading spinner while checking authentication, but only after mounted
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex items-center space-x-2">
