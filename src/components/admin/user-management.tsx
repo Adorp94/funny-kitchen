@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Plus, Save, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { createUserWithInvite, deleteUserAccount } from "@/app/actions/admin-actions";
 import { toast } from "sonner";
 
 interface UserProfile {
@@ -91,17 +92,18 @@ export function UserManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .insert({
-          email: newUser.email,
-          role: newUser.role,
-          permissions: newUser.permissions
-        });
+      const result = await createUserWithInvite({
+        email: newUser.email,
+        role: newUser.role,
+        permissions: newUser.permissions
+      });
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error(result.error || "Error al agregar usuario");
+        return;
+      }
 
-      toast.success("Usuario agregado exitosamente");
+      toast.success("Usuario creado exitosamente. Se ha enviado un email de confirmación.");
       setShowAddUser(false);
       setNewUser({
         email: "",
@@ -127,12 +129,12 @@ export function UserManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .delete()
-        .eq("id", userId);
+      const result = await deleteUserAccount(userId);
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error(result.error || "Error al eliminar usuario");
+        return;
+      }
 
       toast.success("Usuario eliminado exitosamente");
       fetchUsers();

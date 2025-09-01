@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -15,8 +15,20 @@ export default function ConfirmResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isNewUser, setIsNewUser] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+
+  // Check if user is newly created (no last_sign_in_at)
+  React.useEffect(() => {
+    const checkUserStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user && !user.last_sign_in_at) {
+        setIsNewUser(true)
+      }
+    }
+    checkUserStatus()
+  }, [supabase])
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,8 +57,12 @@ export default function ConfirmResetPasswordPage() {
         return
       }
 
-      // Redirect to login with success message
-      router.push('/login?message=password-updated')
+      // Redirect to dashboard with success message for new users, login for password reset
+      if (isNewUser) {
+        router.push('/dashboard?message=account-created')
+      } else {
+        router.push('/login?message=password-updated')
+      }
     } catch (err) {
       console.error('Update password error:', err)
       setError('Ocurrió un error inesperado. Por favor intenta de nuevo.')
@@ -60,10 +76,10 @@ export default function ConfirmResetPasswordPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            Nueva Contraseña
+            {isNewUser ? 'Crear Contraseña' : 'Nueva Contraseña'}
           </CardTitle>
           <CardDescription className="text-center">
-            Ingresa tu nueva contraseña
+            {isNewUser ? 'Configura tu contraseña para acceder al sistema' : 'Ingresa tu nueva contraseña'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -75,7 +91,7 @@ export default function ConfirmResetPasswordPage() {
           
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Nueva Contraseña</Label>
+              <Label htmlFor="password">{isNewUser ? 'Contraseña' : 'Nueva Contraseña'}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -121,7 +137,7 @@ export default function ConfirmResetPasswordPage() {
                   Actualizando...
                 </>
               ) : (
-                'Actualizar Contraseña'
+                isNewUser ? 'Crear Contraseña' : 'Actualizar Contraseña'
               )}
             </Button>
           </form>

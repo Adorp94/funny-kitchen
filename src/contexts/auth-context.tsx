@@ -35,22 +35,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (!mounted) return // Component was unmounted
+
         if (error) {
           console.error('Error getting session:', error)
+          // Don't throw error, just set empty state
+          setSession(null)
+          setUser(null)
+          setLoading(false)
+          return
         }
+
         console.log('Initial session:', { session: !!session, user: session?.user?.email })
         setSession(session)
         setUser(session?.user ?? null)
+        setLoading(false)
       } catch (err) {
         console.error('Failed to get session:', err)
-        setSession(null)
-        setUser(null)
-      } finally {
-        setLoading(false)
+        if (mounted) {
+          setSession(null)
+          setUser(null)
+          setLoading(false)
+        }
       }
     }
 
@@ -58,15 +71,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session)
+      (event, session) => {
+        if (!mounted) return // Component was unmounted
+
+        console.log('Auth state changed:', event, session?.user?.email || 'no user')
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
 
+        // Handle auth state changes
         if (event === 'SIGNED_OUT') {
-          router.push('/login')
-          router.refresh()
+          // Use timeout to prevent immediate redirect during component unmounting
+          setTimeout(() => {
+            if (mounted && typeof window !== 'undefined') {
+              window.location.href = '/login'
+            }
+          }, 100)
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           router.refresh()
         }
@@ -74,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
   }, [router, supabase.auth])

@@ -59,36 +59,6 @@ export default function LoginPage() {
     }
   }
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setMessage('')
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-
-      if (error) {
-        setError(error.message)
-        return
-      }
-
-      if (data.user && !data.session) {
-        setMessage('Please check your email for a confirmation link to complete your registration.')
-      }
-    } catch (err) {
-      console.error('Sign up error:', err)
-      setError('An unexpected error occurred during sign up. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -148,39 +118,20 @@ export default function LoginPage() {
               </div>
             </div>
             
-            <div className="flex flex-col space-y-2">
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Iniciando sesión...
-                  </>
-                ) : (
-                  'Iniciar Sesión'
-                )}
-              </Button>
-              
-              <Button 
-                type="button"
-                variant="outline" 
-                className="w-full" 
-                disabled={loading}
-                onClick={handleSignUp}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
-                  </>
-                ) : (
-                  'Crear Cuenta'
-                )}
-              </Button>
-            </div>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
@@ -189,6 +140,9 @@ export default function LoginPage() {
             <Link href="/reset-password" className="text-blue-600 hover:underline">
               Restablecer
             </Link>
+          </div>
+          <div className="text-xs text-center text-gray-500 border-t pt-2">
+            ¿Necesitas una cuenta? Contacta a tu administrador.
           </div>
         </CardFooter>
       </Card>
