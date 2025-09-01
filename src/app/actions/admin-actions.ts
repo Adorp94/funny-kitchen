@@ -72,16 +72,22 @@ export async function createUserWithInvite(userData: CreateUserRequest) {
 
     // Send invitation email manually with correct redirect URL
     if (!createError && newUser.user) {
-      // Determine the correct app URL for the environment
+      // Use production URL explicitly for invitation emails
       const appUrl = process.env.NODE_ENV === 'production' 
         ? 'https://funny-kitchen.vercel.app' 
-        : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+        : 'http://localhost:3000';
+        
+      console.log(`Sending invitation to ${userData.email} with redirect: ${appUrl}/auth/callback?type=invite`);
         
       const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
         userData.email,
         {
-          // Use the environment-appropriate URL with type parameter
-          redirectTo: `${appUrl}/auth/callback?type=invite`
+          // Use explicit production URL for invitations
+          redirectTo: `${appUrl}/auth/callback?type=invite`,
+          // Try to override any dashboard settings
+          data: {
+            redirectTo: `${appUrl}/auth/callback?type=invite`
+          }
         }
       );
       if (inviteError) {

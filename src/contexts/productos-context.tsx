@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useMemo, use
 import { Producto as ProductoBase } from "@/components/cotizacion/producto-simplificado";
 import { ProductoConDescuento as ProductoDisplay } from "@/components/cotizacion/lista-productos-con-descuento";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useHydration } from "@/hooks/use-hydration";
 
 // --- NEW: Internal product state type storing base MXN values ---
 interface ProductoEnContext extends ProductoBase {
@@ -68,6 +69,8 @@ interface ProductosContextType {
 const ProductosContext = createContext<ProductosContextType | undefined>(undefined);
 
 export function ProductosProvider({ children }: { children: ReactNode }) {
+  const isHydrated = useHydration();
+  
   // --- STATE: Use internal product type ---
   const [internalProductos, setInternalProductos] = useState<ProductoEnContext[]>([]);
   // --- END STATE ---
@@ -108,6 +111,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
   // --- Load/Save internalProductos from sessionStorage ---
   useEffect(() => {
+    if (!isHydrated) return;
+    
     const savedProductos = sessionStorage.getItem('cotizacion_internalProductos'); // Changed key
     const savedMoneda = sessionStorage.getItem('cotizacion_moneda');
     const savedGlobalDiscount = sessionStorage.getItem('cotizacion_globalDiscount');
@@ -126,7 +131,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     if (savedHasIva) setHasIva(savedHasIva === 'true');
     if (savedShippingCost) setShippingCostInput(parseFloat(savedShippingCost) || 0);
 
-  }, []);
+  }, [isHydrated]);
 
   useEffect(() => {
     sessionStorage.setItem('cotizacion_internalProductos', JSON.stringify(internalProductos)); // Changed key
@@ -218,6 +223,26 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
   // --- Financial Calculations ---
   const calculatedFinancials = useMemo(() => {
+    if (!isHydrated) {
+      // Return default values during hydration to prevent server/client mismatch
+      return {
+        productos: [],
+        financials: {
+          displaySubtotal: 0,
+          displayBaseSubtotal: 0,
+          displayShippingCost: 0,
+          displayIvaAmount: 0,
+          displayTotal: 0,
+          baseSubtotalMXN: 0,
+          grossSubtotalMXN: 0,
+          subtotalAfterDiscountMXN: 0,
+          shippingCostMXN: 0,
+          ivaAmountMXN: 0,
+          totalMXN: 0,
+        }
+      };
+    }
+    
     console.log("[Context] Recalculating financials...");
     console.log(` - Moneda: ${moneda}, Rate: ${exchangeRate}`);
     console.log(` - Shipping Input: ${shippingCostInput} (${moneda})`);
@@ -399,7 +424,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       },
     };
 
-  }, [internalProductos, globalDiscount, hasIva, shippingCostInput, moneda, exchangeRate, convertMXNtoUSD, convertUSDtoMXN, convertMXNtoEUR, convertEURtoMXN]);
+  }, [isHydrated, internalProductos, globalDiscount, hasIva, shippingCostInput, moneda, exchangeRate, convertMXNtoUSD, convertUSDtoMXN, convertMXNtoEUR, convertEURtoMXN]);
 
 
   // --- Context Value ---
