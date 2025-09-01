@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,7 +18,18 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Check for success message from URL params
+  useEffect(() => {
+    const messageParam = searchParams.get('message')
+    if (messageParam === 'password-updated') {
+      setMessage('¡Contraseña actualizada correctamente! Ahora puedes iniciar sesión.')
+    } else if (messageParam === 'email-confirmed') {
+      setMessage('¡Email confirmado! Ahora puedes iniciar sesión.')
+    }
+  }, [searchParams])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()

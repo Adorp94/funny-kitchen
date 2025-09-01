@@ -19,11 +19,22 @@ export default function ConfirmResetPasswordPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Check if user is newly created (no last_sign_in_at)
+  // Check if user is newly created (via invitation) or came from invitation flow
   React.useEffect(() => {
     const checkUserStatus = async () => {
+      // Check URL for invitation indicators
+      const urlParams = new URLSearchParams(window.location.search)
+      const isFromInvite = urlParams.get('type') === 'invite' || 
+                          window.location.pathname.includes('reset-password/confirm')
+      
       const { data: { user } } = await supabase.auth.getUser()
-      if (user && !user.last_sign_in_at) {
+      
+      // If user just authenticated via invitation token or is recently created
+      const isRecent = user?.created_at && 
+        (Date.now() - new Date(user.created_at).getTime()) < 10 * 60 * 1000 // 10 minutes
+      
+      if (user && (isFromInvite || !user.email_confirmed_at || isRecent)) {
+        console.log('Setting as new user - fromInvite:', isFromInvite, 'emailConfirmed:', !!user.email_confirmed_at, 'isRecent:', isRecent)
         setIsNewUser(true)
       }
     }
@@ -57,10 +68,15 @@ export default function ConfirmResetPasswordPage() {
         return
       }
 
-      // Redirect to dashboard with success message for new users, login for password reset
+      // For new users (invitations), redirect to dashboard after password creation
+      // For existing users (password reset), they need to log in again
       if (isNewUser) {
+        // Force a session refresh to ensure the user is properly authenticated
+        await supabase.auth.refreshSession()
+        console.log('New user password created, redirecting to dashboard')
         router.push('/dashboard?message=account-created')
       } else {
+        console.log('Password updated, redirecting to login')
         router.push('/login?message=password-updated')
       }
     } catch (err) {
