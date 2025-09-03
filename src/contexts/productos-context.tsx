@@ -106,11 +106,6 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     getExchangeRate
   } = useExchangeRate();
 
-  // Create stable references for conversion functions to prevent unnecessary re-renders
-  const stableConvertMXNtoUSD = useCallback((amount: number) => convertMXNtoUSD(amount), [convertMXNtoUSD]);
-  const stableConvertUSDtoMXN = useCallback((amount: number) => convertUSDtoMXN(amount), [convertUSDtoMXN]);
-  const stableConvertMXNtoEUR = useCallback((amount: number) => convertMXNtoEUR(amount), [convertMXNtoEUR]);
-  const stableConvertEURtoMXN = useCallback((amount: number) => convertEURtoMXN(amount), [convertEURtoMXN]);
 
   // Get the exchange rate for the current selected currency
   const exchangeRate = getExchangeRate(moneda === 'MXN' ? 'USD' : moneda);
@@ -268,8 +263,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         } else if (moneda === 'USD') {
             if (exchangeRate && exchangeRate > 0) { // Ensure exchangeRate is valid
                 try {
-                    displayPrice = stableConvertMXNtoUSD(p.precioMXN);
-                    displaySubtotal = stableConvertMXNtoUSD(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
+                    displayPrice = convertMXNtoUSD(p.precioMXN);
+                    displaySubtotal = convertMXNtoUSD(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
                     console.log(`[Context]   - Converted to USD (Rate: ${exchangeRate}): displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
                 } catch (conversionError) {
                     console.error(`[Context]   - Error converting product ${index} to USD:`, conversionError);
@@ -284,8 +279,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         } else if (moneda === 'EUR') {
             if (exchangeRate && exchangeRate > 0) { // Ensure exchangeRate is valid
                 try {
-                    displayPrice = stableConvertMXNtoEUR(p.precioMXN);
-                    displaySubtotal = stableConvertMXNtoEUR(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
+                    displayPrice = convertMXNtoEUR(p.precioMXN);
+                    displaySubtotal = convertMXNtoEUR(p.subtotalConDescuentoIndividualMXN); // Use the discounted subtotal
                     console.log(`[Context]   - Converted to EUR (Rate: ${exchangeRate}): displayPrice=${displayPrice}, displaySubtotal=${displaySubtotal}`);
                 } catch (conversionError) {
                     console.error(`[Context]   - Error converting product ${index} to EUR:`, conversionError);
@@ -340,9 +335,9 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
         if (moneda === 'MXN') {
             shippingCostMXN = shippingCostInput;
         } else if (moneda === 'USD' && exchangeRate) {
-            shippingCostMXN = stableConvertUSDtoMXN(shippingCostInput);
+            shippingCostMXN = convertUSDtoMXN(shippingCostInput);
         } else if (moneda === 'EUR' && exchangeRate) {
-            shippingCostMXN = stableConvertEURtoMXN(shippingCostInput);
+            shippingCostMXN = convertEURtoMXN(shippingCostInput);
         } else {
             // Fallback or handle error if rate unavailable for USD/EUR shipping
             shippingCostMXN = 0; // Or maybe keep shippingCostInput if MXN? Decide policy.
@@ -375,19 +370,19 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
       displayIvaAmount = ivaAmountMXN;
       displayTotal = totalMXN;
     } else if (moneda === 'USD' && exchangeRate) {
-      displaySubtotal = stableConvertMXNtoUSD(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
-      displayBaseSubtotal = stableConvertMXNtoUSD(subtotalBrutoMXN); // Show base subtotal before any discounts
+      displaySubtotal = convertMXNtoUSD(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
+      displayBaseSubtotal = convertMXNtoUSD(subtotalBrutoMXN); // Show base subtotal before any discounts
       // Shipping cost was input in USD, so use it directly
       displayShippingCost = shippingCostInput;
-      displayIvaAmount = stableConvertMXNtoUSD(ivaAmountMXN);
-      displayTotal = stableConvertMXNtoUSD(totalMXN);
+      displayIvaAmount = convertMXNtoUSD(ivaAmountMXN);
+      displayTotal = convertMXNtoUSD(totalMXN);
     } else if (moneda === 'EUR' && exchangeRate) {
-      displaySubtotal = stableConvertMXNtoEUR(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
-      displayBaseSubtotal = stableConvertMXNtoEUR(subtotalBrutoMXN); // Show base subtotal before any discounts
+      displaySubtotal = convertMXNtoEUR(subtotalConDescuentosIndividualesMXN); // Show subtotal after individual discounts
+      displayBaseSubtotal = convertMXNtoEUR(subtotalBrutoMXN); // Show base subtotal before any discounts
       // Shipping cost was input in EUR, so use it directly
       displayShippingCost = shippingCostInput;
-      displayIvaAmount = stableConvertMXNtoEUR(ivaAmountMXN);
-      displayTotal = stableConvertMXNtoEUR(totalMXN);
+      displayIvaAmount = convertMXNtoEUR(ivaAmountMXN);
+      displayTotal = convertMXNtoEUR(totalMXN);
     } else {
       // Fallback: Display MXN values if USD/EUR selected but no rate
       displaySubtotal = subtotalConDescuentosIndividualesMXN; // Show subtotal after individual discounts
@@ -457,10 +452,10 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     setMoneda,
     exchangeRate,
     tipoCambio: exchangeRate,
-    convertMXNtoUSD: stableConvertMXNtoUSD,
-    convertUSDtoMXN: stableConvertUSDtoMXN,
-    convertMXNtoEUR: stableConvertMXNtoEUR,
-    convertEURtoMXN: stableConvertEURtoMXN,
+    convertMXNtoUSD,
+    convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
   }), [
     calculatedFinancials.displayProductos,
     addProducto,
@@ -477,10 +472,10 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     moneda,
     setMoneda,
     exchangeRate,
-    stableConvertMXNtoUSD,
-    stableConvertUSDtoMXN,
-    stableConvertMXNtoEUR,
-    stableConvertEURtoMXN,
+    convertMXNtoUSD,
+    convertUSDtoMXN,
+    convertMXNtoEUR,
+    convertEURtoMXN,
   ]);
 
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface ExchangeRates {
   USD: number;
@@ -115,35 +115,35 @@ export function useExchangeRate() {
     }
   };
 
-  const convertMXNtoUSD = (amountMXN: number): number => {
+  const convertMXNtoUSD = useCallback((amountMXN: number): number => {
     if (!exchangeRates) return amountMXN;
     return Number((amountMXN / exchangeRates.USD).toFixed(2));
-  };
+  }, [exchangeRates]);
 
-  const convertUSDtoMXN = (amountUSD: number): number => {
+  const convertUSDtoMXN = useCallback((amountUSD: number): number => {
     if (!exchangeRates) return amountUSD;
     return Number((amountUSD * exchangeRates.USD).toFixed(2));
-  };
+  }, [exchangeRates]);
 
-  const convertMXNtoEUR = (amountMXN: number): number => {
+  const convertMXNtoEUR = useCallback((amountMXN: number): number => {
     if (!exchangeRates) return amountMXN;
     return Number((amountMXN / exchangeRates.EUR).toFixed(2));
-  };
+  }, [exchangeRates]);
 
-  const convertEURtoMXN = (amountEUR: number): number => {
+  const convertEURtoMXN = useCallback((amountEUR: number): number => {
     if (!exchangeRates) return amountEUR;
     return Number((amountEUR * exchangeRates.EUR).toFixed(2));
-  };
+  }, [exchangeRates]);
 
-  const getExchangeRate = (currency: 'USD' | 'EUR'): number | null => {
+  const getExchangeRate = useCallback((currency: 'USD' | 'EUR'): number | null => {
     if (!exchangeRates) return null;
     return exchangeRates[currency];
-  };
+  }, [exchangeRates]);
 
-  const formatExchangeRateInfo = (): string => {
+  const formatExchangeRateInfo = useCallback((): string => {
     if (!exchangeRates || !baseRates) return '';
     return `USD: ${exchangeRates.USD.toFixed(2)} MXN (Base: ${baseRates.USD.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)}) | EUR: ${exchangeRates.EUR.toFixed(2)} MXN (Base: ${baseRates.EUR.toFixed(2)} - ${Math.abs(MARKUP).toFixed(2)})`;
-  };
+  }, [exchangeRates, baseRates]);
 
   return {
     exchangeRates,
