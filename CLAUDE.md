@@ -38,7 +38,8 @@ This is a quotation management system for Funny Kitchen (ceramic artisan company
 - **Layout Components**: Sidebar navigation with breadcrumbs in root layout
 
 #### State Management
-- **ProductosContext** (`/src/contexts/productos-context.tsx`) - Manages product state for quotations
+- **AuthContext** (`/src/contexts/auth-context.tsx`) - Manages user authentication state with hydration safety
+- **ProductosContext** (`/src/contexts/produtos-context.tsx`) - Manages product state for quotations with hydration safety
 - **CartContext** (`/src/contexts/cart-context.tsx`) - Shopping cart functionality
 
 #### Database Tables
@@ -76,6 +77,12 @@ Main quotation creation flow:
 - Supabase SSR configured for server-side rendering
 - TailwindCSS configured with shadcn/ui theme system
 - Path aliases: `@/*` maps to `./src/*`
+
+#### React Hydration Safety
+- **useHydration Hook** (`/src/hooks/use-hydration.ts`) - Prevents server/client mismatches
+- **AuthContext** - Only runs auth operations after client hydration
+- **ProductosContext** - Waits for hydration before sessionStorage access and financial calculations
+- **LayoutWrapper** - Shows loading state until hydration and auth are ready
 
 ### Production Management System
 The production module includes sophisticated allocation and fulfillment tracking:
@@ -190,6 +197,36 @@ The application includes a comprehensive role-based access control (RBAC) system
 - **Functions**: `is_admin_user()`, `is_super_admin_user()` for permission checking
 - **Trigger**: `create_user_profile()` automatically creates profiles for new auth users
 - **Migrations**: `add_user_roles_and_permissions`, `fix_user_profile_trigger_security`, `fix_infinite_recursion_rls`
+
+#### Authentication Flow & Invitation System
+The application uses a sophisticated Supabase Auth setup with invitation flow:
+
+- **Auth Context** (`/src/contexts/auth-context.tsx`) - Manages authentication state with hydration safety
+- **Layout Wrapper** (`/src/components/layout-wrapper.tsx`) - Conditionally renders sidebar based on auth state
+- **Hydration Hook** (`/src/hooks/use-hydration.ts`) - Prevents SSR/CSR mismatches in auth flow
+
+##### Invitation Flow
+1. **Admin Creates User** → `/src/app/actions/admin-actions.ts` calls `inviteUserByEmail()`
+2. **User Clicks Email Link** → Routes to `/src/app/auth/callback/route.ts` 
+3. **Token Verification** → Handles both PKCE and token_hash flows
+4. **Password Creation** → `/src/app/reset-password/confirm/page.tsx`
+5. **Auto-Login** → New users redirect directly to dashboard, existing users to login
+
+##### Key Authentication Components
+- **Auth Callback** (`/src/app/auth/callback/route.ts`) - Handles invitation tokens and PKCE flow
+- **Login Page** (`/src/app/login/page.tsx`) - Sign-in with success message handling
+- **Password Reset** (`/src/app/reset-password/confirm/page.tsx`) - Password creation with user detection
+- **Admin Actions** (`/src/app/actions/admin-actions.ts`) - User creation and invitation sending
+
+##### Production Configuration Requirements
+- **Supabase Dashboard** → **Settings** → **Authentication**
+  - **Site URL**: `https://funny-kitchen.vercel.app`
+  - **Redirect URLs**: `https://funny-kitchen.vercel.app/**`
+- **Environment Variables**:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` 
+  - `SUPABASE_SERVICE_ROLE_KEY` (for admin operations)
+  - `NEXT_PUBLIC_APP_URL` (for invitation redirects)
 
 ### Important File Locations
 - Database migrations: `/database/migrations/`
