@@ -77,12 +77,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession()
 
-    // Listen for auth changes
+    // Listen for auth changes - but wait for initial session to be processed first
+    let initialSessionProcessed = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!isMounted) return
 
         console.log('Auth state changed:', event, session?.user?.email || 'no user')
+        
+        // Handle INITIAL_SESSION first without triggering re-renders during hydration
+        if (event === 'INITIAL_SESSION') {
+          console.log('Processing INITIAL_SESSION, marking as processed')
+          initialSessionProcessed = true
+          return
+        }
+        
+        // Skip other events until INITIAL_SESSION is processed to prevent hydration issues
+        if (!initialSessionProcessed) {
+          console.log('Skipping auth event until INITIAL_SESSION is processed:', event)
+          return
+        }
         
         // Only update state for specific events to avoid multiple renders
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
