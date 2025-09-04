@@ -38,8 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Only run after hydration to prevent server/client mismatch
-    if (!isHydrated) return
+    if (!isHydrated) {
+      console.log('[AuthContext] Not hydrated yet, skipping auth initialization')
+      return
+    }
 
+    console.log('[AuthContext] Starting auth initialization after hydration')
     let isMounted = true
 
     // Get initial session

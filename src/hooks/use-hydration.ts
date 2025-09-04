@@ -10,8 +10,10 @@ export function useHydration() {
   const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
+    console.log('[useHydration] Setting hydrated to true')
     setIsHydrated(true)
   }, [])
 
+  console.log('[useHydration] Current hydration state:', isHydrated)
   return isHydrated
 }

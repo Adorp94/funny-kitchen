@@ -232,7 +232,14 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
   // --- Financial Calculations ---
   const calculatedFinancials = useMemo(() => {
+    console.log('[ProductosContext] calculatedFinancials useMemo executing', {
+      isHydrated,
+      exchangeRateLoading,
+      productCount: internalProductos.length
+    });
+    
     if (!isHydrated || exchangeRateLoading) {
+      console.log('[ProductosContext] Returning default values - not hydrated or loading rates');
       // Return default values during hydration and while loading rates to prevent server/client mismatch
       return {
         displayProductos: [],
@@ -437,7 +444,12 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
 
 
   // --- Context Value ---
-  const contextValue = useMemo((): ProductosContextType => ({
+  const contextValue = useMemo((): ProductosContextType => {
+    console.log('[ProductosContext] contextValue useMemo executing', {
+      hasCalculatedFinancials: !!calculatedFinancials,
+      productsCount: calculatedFinancials.displayProductos?.length || 0
+    });
+    return {
     productos: calculatedFinancials.displayProductos,
     setProductos,
     addProducto,
@@ -459,7 +471,8 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     convertUSDtoMXN,
     convertMXNtoEUR,
     convertEURtoMXN,
-  }), [
+  };
+  }, [
     calculatedFinancials.displayProductos,
     setProductos,
     addProducto,

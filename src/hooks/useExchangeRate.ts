@@ -26,15 +26,19 @@ interface BanxicoResponse {
 export function useExchangeRate() {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
   const [baseRates, setBaseRates] = useState<BaseRates | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Initialize loading as false to prevent hydration mismatch during SSG
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const MARKUP = -0.8; // Subtract 0.8 from the base rate
 
   useEffect(() => {
+    // Set loading to true when effect starts to run
+    setLoading(true);
+    
     const fetchExchangeRates = async () => {
       try {
-        console.log('Fetching exchange rates from Banxico API...');
+        console.log('[useExchangeRate] Fetching exchange rates from Banxico API...');
         
         // Set fallback values to use in case of error
         const fallbackRates = {
@@ -81,8 +85,8 @@ export function useExchangeRate() {
           setExchangeRates(ratesWithMarkup);
           setLastUpdated(date || fallbackDate);
           
-          console.log('Successfully fetched exchange rates:', parsedRates, 'with markup:', ratesWithMarkup);
-          console.log('Last updated date:', date);
+          console.log('[useExchangeRate] Successfully fetched exchange rates:', parsedRates, 'with markup:', ratesWithMarkup);
+          console.log('[useExchangeRate] Last updated date:', date);
         } catch (apiError) {
           console.log('Error fetching exchange rates, using fallback values:', apiError);
           setError(apiError instanceof Error ? apiError.message : 'Failed to fetch exchange rates');
@@ -96,6 +100,7 @@ export function useExchangeRate() {
           setLastUpdated(fallbackDate);
         }
       } finally {
+        console.log('[useExchangeRate] Setting loading to false');
         setLoading(false);
       }
     };
