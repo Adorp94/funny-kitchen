@@ -222,6 +222,14 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('cotizacion_shippingCostInput');
   }, []);
 
+  // --- Set products (stable function) ---
+  const setProductos = useCallback((prods: any[]) => {
+    // This is complex now - ideally don't allow direct setting from outside
+    // If needed, would require converting display products back to internal format
+    console.warn("Directly setting products is discouraged. Use add/remove/update.");
+    // setInternalProductos(convertToInternalFormat(prods)); // Needs implementation
+  }, []);
+
   // --- Financial Calculations ---
   const calculatedFinancials = useMemo(() => {
     if (!isHydrated || exchangeRateLoading) {
@@ -431,12 +439,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
   // --- Context Value ---
   const contextValue = useMemo((): ProductosContextType => ({
     productos: calculatedFinancials.displayProductos,
-    setProductos: (prods) => {
-        // This is complex now - ideally don't allow direct setting from outside
-        // If needed, would require converting display products back to internal format
-        console.warn("Directly setting products is discouraged. Use add/remove/update.");
-        // setInternalProductos(convertToInternalFormat(prods)); // Needs implementation
-    },
+    setProductos,
     addProducto,
     removeProducto,
     updateProductoDiscount,
@@ -458,6 +461,7 @@ export function ProductosProvider({ children }: { children: ReactNode }) {
     convertEURtoMXN,
   }), [
     calculatedFinancials.displayProductos,
+    setProductos,
     addProducto,
     removeProducto,
     updateProductoDiscount,
