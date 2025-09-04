@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // --- Service Logic ---
     try {
-        // Removed: const supabase = createClient(); 
+        const supabase = await createClient();
 
         // Fetch product details using the imported supabase instance
         const { data: productData, error: productError } = await supabase
