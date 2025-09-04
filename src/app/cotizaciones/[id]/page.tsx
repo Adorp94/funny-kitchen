@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { formatDate } from '@/lib/utils'
 import { formatCurrency } from '@/lib/utils'
 import { ResponsiveTable } from "@/components/ui/responsive-table";
+import { ProtectedRoute } from "@/components/protected-route";
 
 interface Producto {
   id: string;
@@ -46,7 +47,7 @@ const isMobileDevice = () => {
   );
 };
 
-export default function CotizacionDetailPage() {
+function CotizacionDetailPageContent() {
   const params = useParams()
   const router = useRouter()
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null)
@@ -518,4 +519,12 @@ export default function CotizacionDetailPage() {
       </div>
     </div>
   )
+}
+
+export default function CotizacionDetailPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <CotizacionDetailPageContent />
+    </ProtectedRoute>
+  );
 } 

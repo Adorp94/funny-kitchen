@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { PDFCotizacion } from "@/components/cotizacion/pdf-cotizacion";
 import { ProductosProvider } from "@/contexts/productos-context";
+import { ProtectedRoute } from "@/components/protected-route";
 
 interface Cliente {
   cliente_id?: number;
@@ -41,7 +42,7 @@ interface Cotizacion {
   productos: any[];
 }
 
-export default function VerCotizacionPage() {
+function VerCotizacionPageContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
@@ -131,5 +132,13 @@ export default function VerCotizacionPage() {
         />
       </div>
     </ProductosProvider>
+  );
+}
+
+export default function VerCotizacionPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <VerCotizacionPageContent />
+    </ProtectedRoute>
   );
 } 

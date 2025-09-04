@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { CotizacionStatusModal } from "@/components/cotizacion/cotizacion-status-modal";
 import { getCotizacionDetails } from "@/app/actions/cotizacion-actions";
 import { createClient } from "@/lib/supabase/client";
+import { ProtectedRoute } from "@/components/protected-route";
 
 interface PaymentFormData {
   monto: number;
@@ -33,7 +34,7 @@ const DetailItem = ({ label, value, icon: Icon }: { label: string; value: React.
   </div>
 );
 
-export default function CotizacionDetailPage() {
+function CotizacionDetailPageContent() {
   const params = useParams();
   const router = useRouter();
   
@@ -384,5 +385,13 @@ export default function CotizacionDetailPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function CotizacionDetailPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <CotizacionDetailPageContent />
+    </ProtectedRoute>
   );
 } 

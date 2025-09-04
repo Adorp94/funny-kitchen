@@ -19,6 +19,7 @@ import { generateUniqueId } from "@/lib/utils/misc";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { PDFService } from '@/services/pdf-service';
 import { Label } from "@/components/ui/label";
+import { ProtectedRoute } from "@/components/protected-route";
 
 interface ExtendedProductoBase extends ProductoBase {
   cantidad: number;
@@ -50,7 +51,7 @@ declare global {
 }
 
 // Wrapper component to provide context
-export default function EditCotizacionPage() {
+function EditCotizacionPageContent() {
   return (
     <ProductosProvider>
       <EditCotizacionClient />
@@ -829,5 +830,13 @@ function EditCotizacionClient() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function EditCotizacionPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <EditCotizacionPageContent />
+    </ProtectedRoute>
   );
 }

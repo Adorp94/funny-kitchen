@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const id = context.params.id;
+    const { id } = await params;
     
     // Get a specific client
     const { data, error } = await supabase
@@ -30,11 +30,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const clienteId = context.params.id;
+    const { id: clienteId } = await params;
     const body = await request.json();
     
     if (!clienteId) {

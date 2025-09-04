@@ -35,6 +35,7 @@ import {
   Pen
 } from "lucide-react";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
+import { ProtectedRoute } from "@/components/protected-route";
 
 interface Cotizacion {
   cotizacion_id: number;
@@ -62,7 +63,7 @@ const isMobileDevice = () => {
   );
 };
 
-export default function CotizacionesPage() {
+function CotizacionesPageContent() {
   const router = useRouter();
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
   const [filteredCotizaciones, setFilteredCotizaciones] = useState<Cotizacion[]>([]);
@@ -370,5 +371,13 @@ export default function CotizacionesPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function CotizacionesPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <CotizacionesPageContent />
+    </ProtectedRoute>
   );
 }

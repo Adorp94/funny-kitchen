@@ -4,8 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import PDFWrapper from "@/components/cotizacion/pdf-wrapper";
+import { ProtectedRoute } from "@/components/protected-route";
 
-export default function PDFViewPage() {
+function PDFViewPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const cotizacionId = params.id as string;
@@ -137,5 +138,13 @@ export default function PDFViewPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PDFViewPage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <PDFViewPageContent />
+    </ProtectedRoute>
   );
 } 
