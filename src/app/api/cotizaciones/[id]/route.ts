@@ -50,8 +50,9 @@ const updateCotizacionSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params: { id } }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
   
   // --- Restore Original Logic --- 
@@ -170,8 +171,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params: { id } }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
   
   try {
@@ -217,14 +219,14 @@ export async function PUT(
     let displayTotal = totalMXN;
     
     if (data.moneda === 'USD' && exchangeRate && exchangeRate > 0) {
-      displaySubtotal = subtotalMXN / exchangeRate;
-      displayCostoEnvio = costoEnvioMXN / exchangeRate;
-      displayTotal = totalMXN / exchangeRate;
+      displaySubtotal = Number((subtotalMXN / exchangeRate).toFixed(2));
+      displayCostoEnvio = Number((costoEnvioMXN / exchangeRate).toFixed(2));
+      displayTotal = Number((totalMXN / exchangeRate).toFixed(2));
     } else if (data.moneda === 'EUR' && exchangeRate && exchangeRate > 0) {
       // Assuming EUR exchange rate is also stored
-      displaySubtotal = subtotalMXN / exchangeRate;
-      displayCostoEnvio = costoEnvioMXN / exchangeRate;
-      displayTotal = totalMXN / exchangeRate;
+      displaySubtotal = Number((subtotalMXN / exchangeRate).toFixed(2));
+      displayCostoEnvio = Number((costoEnvioMXN / exchangeRate).toFixed(2));
+      displayTotal = Number((totalMXN / exchangeRate).toFixed(2));
     }
 
     const updateData = {
@@ -572,11 +574,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const supabase = await createClient();
   
-  const cotizacionId = parseInt(params.id, 10);
+  const cotizacionId = parseInt(id, 10);
 
   if (isNaN(cotizacionId)) {
     return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
