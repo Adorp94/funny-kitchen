@@ -767,8 +767,8 @@ export function MoldesActivos() {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-b">
+                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-28">SKU</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground">Producto</TableHead>
-                          <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-32">SKU</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-24">Moldes</TableHead>
                           <TableHead className="px-4 py-3 text-xs font-semibold text-muted-foreground text-center w-20">Acciones</TableHead>
                         </TableRow>
@@ -782,18 +782,18 @@ export function MoldesActivos() {
                           
                           return (
                             <TableRow key={producto.id} className="hover:bg-muted/30 transition-colors h-12">
-                              <TableCell className="px-4 py-2">
-                                <div className="flex items-center gap-2">
-                                  <Package className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-sm font-medium text-foreground">{producto.nombre}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="px-4 py-2 text-center w-32">
+                              <TableCell className="px-4 py-2 text-center w-28">
                                 {producto.sku ? (
                                   <Badge variant="outline" className="text-xs whitespace-nowrap">{producto.sku}</Badge>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">-</span>
                                 )}
+                              </TableCell>
+                              <TableCell className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-sm font-medium text-foreground">{producto.nombre}</span>
+                                </div>
                               </TableCell>
                               <TableCell className="px-4 py-2 text-center">
                                 <div className="flex items-center justify-center">
