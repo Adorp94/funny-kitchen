@@ -237,3 +237,159 @@ The application uses a sophisticated Supabase Auth setup with invitation flow:
 - Finance components: `/src/components/finanzas/`
 - Admin components: `/src/components/admin/`
 - Application constants: `/src/lib/constants.ts`
+
+## Security and Authentication Best Practices
+
+### Next.js 15 Dynamic Route Patterns
+All dynamic API routes must use the new async params pattern:
+
+```typescript
+// ❌ OLD PATTERN (Next.js 14 and below)
+export async function GET(
+  request: NextRequest,
+  { params: { id } }: { params: { id: string } }
+) {
+  // Direct usage - causes warnings in Next.js 15
+  const cotizacionId = id;
+}
+
+// ✅ NEW PATTERN (Next.js 15)
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Must await params first
+  const { id } = await params;
+  const cotizacionId = id;
+}
+```
+
+### Authentication Security Guidelines
+
+#### Supabase Auth Best Practices
+
+**❌ AVOID `getSession()` - Security Risk:**
+```typescript
+// Insecure - data comes directly from cookies
+const { data: { session } } = await supabase.auth.getSession();
+const user = session?.user; // ⚠️ May not be authentic
+```
+
+**✅ USE `getUser()` - Secure:**
+```typescript
+// Secure - validates with Supabase Auth server
+const { data: { user }, error } = await supabase.auth.getUser();
+// User data is authenticated by the server
+```
+
+#### Route Protection Patterns
+
+**All pages requiring authentication must use `ProtectedRoute` wrapper:**
+
+```typescript
+// ✅ CORRECT - Explicit protection
+export default function SomePage() {
+  return (
+    <ProtectedRoute requiredModule="cotizaciones">
+      <SomePageContent />
+    </ProtectedRoute>
+  );
+}
+
+// ✅ CORRECT - Admin-only pages
+export default function AdminPage() {
+  return (
+    <ProtectedRoute requireAdmin={true}>
+      <AdminPageContent />
+    </ProtectedRoute>
+  );
+}
+
+// ✅ CORRECT - Super admin only
+export default function SuperAdminPage() {
+  return (
+    <ProtectedRoute requireSuperAdmin={true}>
+      <SuperAdminPageContent />
+    </ProtectedRoute>
+  );
+}
+```
+
+#### Protected Route Coverage
+
+**All pages are properly protected:**
+- ✅ `/dashboard/**` - Requires dashboard permission
+- ✅ `/cotizaciones/**` - Requires cotizaciones permission  
+- ✅ `/produccion` - Requires produccion permission
+- ✅ `/dashboard/finanzas` - Requires finanzas permission
+- ✅ `/admin` - Requires admin role
+- ✅ `/nueva-cotizacion` - Requires cotizaciones permission
+
+#### API Route Security
+
+**Server-side authentication for API routes:**
+```typescript
+export async function GET(request: NextRequest) {
+  const supabase = await createClient();
+  
+  // ✅ Verify user authentication
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
+  // ✅ Check user permissions if needed
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role, permissions')
+    .eq('email', user.email)
+    .single();
+    
+  // Continue with authorized logic...
+}
+```
+
+### Currency Conversion Best Practices
+
+#### Consistent Precision Handling
+Always use consistent rounding for currency conversions:
+
+```typescript
+// ✅ CORRECT - Frontend and backend use same precision
+const convertMXNtoUSD = (amountMXN: number): number => {
+  if (!exchangeRate) return amountMXN;
+  return Number((amountMXN / exchangeRate).toFixed(2));
+};
+
+// ✅ CORRECT - API routes match frontend precision
+if (data.moneda === 'USD' && exchangeRate && exchangeRate > 0) {
+  displaySubtotal = Number((subtotalMXN / exchangeRate).toFixed(2));
+  displayCostoEnvio = Number((costoEnvioMXN / exchangeRate).toFixed(2));
+  displayTotal = Number((totalMXN / exchangeRate).toFixed(2));
+}
+```
+
+### Code Review Security Checklist
+
+Before deploying changes, verify:
+
+1. ✅ All dynamic routes use `await params` pattern
+2. ✅ All pages have appropriate `ProtectedRoute` wrappers
+3. ✅ API routes validate user authentication
+4. ✅ Currency calculations use consistent precision
+5. ✅ No direct usage of `getSession()` for security-critical operations
+6. ✅ User permissions are checked server-side for sensitive operations
+7. ✅ No hardcoded credentials or API keys in client code
+
+### Performance Optimization Notes
+
+#### Hydration Safety
+- Use `useHydration()` hook to prevent SSR/CSR mismatches
+- AuthContext waits for hydration before auth operations
+- ProductosContext waits for hydration before sessionStorage access
+
+#### Loading States
+- Always show loading states during authentication checks
+- Use skeleton components during data fetching
+- Implement proper error boundaries for auth failures

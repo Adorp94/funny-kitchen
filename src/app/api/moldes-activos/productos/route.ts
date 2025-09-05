@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await request.json();
     const { mesa_id, producto_id, cantidad_moldes } = body;
 
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const body = await request.json();
     const { id, cantidad_moldes } = body;
 
@@ -141,6 +143,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const productoId = searchParams.get('id');
 
