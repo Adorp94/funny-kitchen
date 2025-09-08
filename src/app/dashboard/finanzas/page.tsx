@@ -114,6 +114,7 @@ export default function FinanzasPage() {
   const [activeTab, setActiveTab] = useState("cashflow");
   const [isIngresoModalOpen, setIsIngresoModalOpen] = useState(false);
   const [isEgresoModalOpen, setIsEgresoModalOpen] = useState(false);
+  const [selectedCotizacionForPayment, setSelectedCotizacionForPayment] = useState<{id: number, folio: string} | null>(null);
   
   // State for data
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
@@ -577,6 +578,17 @@ export default function FinanzasPage() {
     }
   };
 
+  // --- Payment Handler ---
+  const handlePayCotizacion = (cotizacionId: number, folio: string) => {
+    setSelectedCotizacionForPayment({ id: cotizacionId, folio });
+    setIsIngresoModalOpen(true);
+  };
+
+  const handleIngresoModalClose = () => {
+    setIsIngresoModalOpen(false);
+    setSelectedCotizacionForPayment(null);
+  };
+
   // --- Delete Handlers ---
   const handleDeleteIngreso = async (pagoId: number) => {
     try {
@@ -624,8 +636,9 @@ export default function FinanzasPage() {
       {/* Modals remain the same */}
       <IngresoResponsiveWrapper
         isOpen={isIngresoModalOpen}
-        onClose={() => setIsIngresoModalOpen(false)}
+        onClose={handleIngresoModalClose}
         onSubmit={handleIngresoSubmit}
+        preSelectedCotizacion={selectedCotizacionForPayment}
       />
       <EgresoModal
         isOpen={isEgresoModalOpen}
@@ -894,6 +907,7 @@ export default function FinanzasPage() {
              <CuentasPorCobrarSection 
                selectedMonth={selectedMonth === 0 ? undefined : selectedMonth}
                selectedYear={selectedYear === 0 ? undefined : selectedYear}
+               onPayCotizacion={handlePayCotizacion}
              />
            </TabsContent>
            <TabsContent value="reportes" className="space-y-4 mt-6">

@@ -9,7 +9,6 @@ import { AuthProvider } from "@/contexts/auth-context";
 import { Separator } from "@/components/ui/separator";
 import { DynamicBreadcrumb } from "@/components/dynamic-breadcrumb";
 import { LayoutWrapper } from "@/components/layout-wrapper";
-import { AuthDebug } from "@/components/debug/auth-debug";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,7 +28,6 @@ export default function RootLayout({
         <AuthProvider>
           <ProductosProvider>
             <LayoutWrapper>{children}</LayoutWrapper>
-            <AuthDebug />
             <Toaster />
           </ProductosProvider>
         </AuthProvider>

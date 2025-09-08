@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { 
   Table, 
   TableBody, 
@@ -26,10 +27,14 @@ import {
   Loader2,
   ArrowLeft,
   ArrowRight,
-  Phone,
   Mail,
-  Eye,
-  Calendar
+  CreditCard,
+  Calendar,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
@@ -69,9 +74,10 @@ interface AccountReceivableItem {
 interface CuentasPorCobrarSectionProps {
   selectedMonth?: number;
   selectedYear?: number;
+  onPayCotizacion?: (cotizacionId: number, folio: string) => void;
 }
 
-export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: CuentasPorCobrarSectionProps) {
+export function CuentasPorCobrarSection({ selectedMonth, selectedYear, onPayCotizacion }: CuentasPorCobrarSectionProps) {
   const [metrics, setMetrics] = useState<AccountsReceivableMetrics>({
     totalPorCobrar: { mxn: 0, usd: 0 },
     clientesConSaldo: 0,
@@ -83,22 +89,26 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [accountsLoading, setAccountsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null);
+  const [allAccounts, setAllAccounts] = useState<AccountReceivableItem[]>([]);
+  const [filteredAccounts, setFilteredAccounts] = useState<AccountReceivableItem[]>([]);
 
   useEffect(() => {
     fetchMetrics();
-  }, [selectedMonth, selectedYear]);
+  }, []);
 
   useEffect(() => {
-    fetchAccounts(page);
-  }, [page, selectedMonth, selectedYear]);
+    fetchAccounts();
+  }, []);
 
   const fetchMetrics = async () => {
     setLoading(true);
-    console.log('[CuentasPorCobrarSection] Fetching metrics with filters:', { selectedMonth, selectedYear });
+    console.log('[CuentasPorCobrarSection] Fetching metrics without date filters (show all outstanding accounts)');
     try {
       const result = await getAccountsReceivableMetrics(
-        selectedMonth || undefined, 
-        selectedYear || undefined
+        undefined, 
+        undefined
       );
       console.log('[CuentasPorCobrarSection] getAccountsReceivableMetrics result:', result);
       if (result.success && result.data) {
@@ -114,26 +124,139 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
     }
   };
 
-  const fetchAccounts = async (pageNum: number) => {
+  const fetchAccounts = async () => {
     setAccountsLoading(true);
     try {
+      // Load all accounts by requesting a large page size
       const result = await getAccountsReceivableList(
-        pageNum,
-        10,
-        selectedMonth || undefined,
-        selectedYear || undefined
+        1,
+        1000, // Large number to get all accounts
+        undefined,
+        undefined
       );
       if (result.success && result.data) {
+        setAllAccounts(result.data);
         setAccounts(result.data);
-        if (result.pagination) {
-          setTotalPages(result.pagination.totalPages);
-        }
+        setFilteredAccounts(result.data);
+        // Reset pagination since we now have all data locally
+        setPage(1);
       }
     } catch (error) {
       console.error('Error fetching accounts receivable:', error);
     } finally {
       setAccountsLoading(false);
     }
+  };
+
+  // Fuzzy search function
+  const fuzzySearch = (items: AccountReceivableItem[], term: string) => {
+    if (!term.trim()) return items;
+    
+    const searchLower = term.toLowerCase();
+    return items.filter(item => {
+      const searchableText = `
+        ${item.folio} 
+        ${item.cliente_nombre} 
+        ${item.cliente_celular || ''} 
+        ${item.cliente_correo || ''} 
+        ${item.estado}
+      `.toLowerCase();
+      
+      return searchableText.includes(searchLower);
+    });
+  };
+
+  // Sorting function
+  const sortAccounts = (items: AccountReceivableItem[], config: {key: string, direction: 'asc' | 'desc'} | null) => {
+    if (!config) return items;
+    
+    return [...items].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (config.key) {
+        case 'folio':
+          aValue = a.folio;
+          bValue = b.folio;
+          break;
+        case 'cliente':
+          aValue = a.cliente_nombre;
+          bValue = b.cliente_nombre;
+          break;
+        case 'total':
+          aValue = a.total;
+          bValue = b.total;
+          break;
+        case 'pagado':
+          aValue = a.monto_pagado;
+          bValue = b.monto_pagado;
+          break;
+        case 'saldo':
+          aValue = a.saldo_pendiente;
+          bValue = b.saldo_pendiente;
+          break;
+        case 'porcentaje':
+          aValue = a.porcentaje_completado;
+          bValue = b.porcentaje_completado;
+          break;
+        case 'dias':
+          aValue = a.dias_transcurridos;
+          bValue = b.dias_transcurridos;
+          break;
+        case 'fecha':
+          aValue = new Date(a.fecha_aprobacion);
+          bValue = new Date(b.fecha_aprobacion);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return config.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return config.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Handle search
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    const searchResults = fuzzySearch(allAccounts, term);
+    const sortedResults = sortAccounts(searchResults, sortConfig);
+    setFilteredAccounts(sortedResults);
+    setPage(1); // Reset to first page when searching
+  };
+
+  // Handle sorting with tri-state logic
+  const handleSort = (key: string) => {
+    let newSortConfig: {key: string, direction: 'asc' | 'desc'} | null;
+    
+    if (!sortConfig || sortConfig.key !== key) {
+      // First click: sort ascending
+      newSortConfig = { key, direction: 'asc' };
+    } else if (sortConfig.direction === 'asc') {
+      // Second click: sort descending
+      newSortConfig = { key, direction: 'desc' };
+    } else {
+      // Third click: remove sorting (back to original)
+      newSortConfig = null;
+    }
+    
+    setSortConfig(newSortConfig);
+    const searchResults = fuzzySearch(allAccounts, searchTerm);
+    const sortedResults = sortAccounts(searchResults, newSortConfig);
+    setFilteredAccounts(sortedResults);
+    setPage(1); // Reset to first page when sorting
+  };
+
+  // Get sort icon
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="h-3 w-3 text-gray-400" />;
+    }
+    if (sortConfig.direction === 'asc') {
+      return <ArrowUp className="h-3 w-3 text-blue-600" />;
+    }
+    return <ArrowDown className="h-3 w-3 text-blue-600" />;
   };
 
   const getVencimientoColor = (dias: number) => {
@@ -165,6 +288,13 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
       </Badge>
     );
   };
+
+  // Paginate filtered results
+  const itemsPerPage = 10;
+  const totalFilteredPages = Math.ceil(filteredAccounts.length / itemsPerPage);
+  const startIndex = (page - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAccounts = filteredAccounts.slice(startIndex, endIndex);
 
   if (loading) {
     return (
@@ -272,8 +402,29 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
                   Cuentas por Cobrar
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 mt-0.5">
-                  Cotizaciones con saldo pendiente de pago
+                  Todas las cotizaciones con saldo pendiente (sin filtro de fecha)
                 </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                <Input
+                  placeholder="Buscar por folio, cliente..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-8 h-8 w-56 text-xs border-gray-200 focus:border-blue-300 focus:ring-blue-200"
+                />
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1 h-6 w-6 p-0 hover:bg-gray-100"
+                    onClick={() => handleSearch('')}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -283,26 +434,81 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
-          ) : accounts.length > 0 ? (
+          ) : paginatedAccounts.length > 0 ? (
             <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-gray-200">
-                      <TableHead className="font-medium text-gray-600 py-2 text-xs">Cotización</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs">Cliente</TableHead>
+                      <TableHead className="font-medium text-gray-600 py-2 text-xs">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                          onClick={() => handleSort('folio')}
+                        >
+                          Cotización
+                          {getSortIcon('folio')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                          onClick={() => handleSort('cliente')}
+                        >
+                          Cliente
+                          {getSortIcon('cliente')}
+                        </button>
+                      </TableHead>
                       <TableHead className="font-medium text-gray-600 text-xs">Estado</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-right">Total</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-right">Pagado</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-right">Saldo</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-center">%</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-center">Días</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-center">Estado</TableHead>
-                      <TableHead className="font-medium text-gray-600 text-xs text-center">Contacto</TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-right">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors ml-auto"
+                          onClick={() => handleSort('total')}
+                        >
+                          Total
+                          {getSortIcon('total')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-right">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors ml-auto"
+                          onClick={() => handleSort('pagado')}
+                        >
+                          Pagado
+                          {getSortIcon('pagado')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-right">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors ml-auto"
+                          onClick={() => handleSort('saldo')}
+                        >
+                          Saldo
+                          {getSortIcon('saldo')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-center">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors mx-auto"
+                          onClick={() => handleSort('porcentaje')}
+                        >
+                          %
+                          {getSortIcon('porcentaje')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-center">
+                        <button 
+                          className="flex items-center gap-1 hover:text-gray-900 transition-colors mx-auto"
+                          onClick={() => handleSort('dias')}
+                        >
+                          Días
+                          {getSortIcon('dias')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-600 text-xs text-center">Pagos</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {accounts.map((account) => (
+                    {paginatedAccounts.map((account) => (
                       <TableRow key={account.cotizacion_id} className="border-gray-200 hover:bg-gray-50/50">
                         <TableCell className="py-2">
                           <div className="space-y-0.5">
@@ -320,14 +526,11 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
                         <TableCell>
                           <div className="space-y-0.5">
                             <div className="text-xs font-medium text-gray-900">{account.cliente_nombre}</div>
-                            <div className="text-xs text-gray-500">
-                              {account.cliente_celular && (
-                                <span className="inline-flex items-center">
-                                  <Phone className="h-3 w-3 mr-1" />
-                                  {account.cliente_celular}
-                                </span>
-                              )}
-                            </div>
+                            {account.cliente_correo && (
+                              <div className="text-xs text-gray-500">
+                                {account.cliente_correo}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -359,21 +562,7 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          {getVencimientoBadge(account.dias_transcurridos)}
-                        </TableCell>
-                        <TableCell className="text-center">
                           <div className="flex justify-center items-center gap-1">
-                            {account.cliente_celular && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-green-600 hover:text-green-800 hover:bg-green-50"
-                                title={`Llamar a ${account.cliente_celular}`}
-                                onClick={() => window.open(`tel:${account.cliente_celular}`, '_self')}
-                              >
-                                <Phone className="h-3 w-3" />
-                              </Button>
-                            )}
                             {account.cliente_correo && (
                               <Button
                                 variant="ghost"
@@ -385,16 +574,15 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
                                 <Mail className="h-3 w-3" />
                               </Button>
                             )}
-                            <Link href={`/dashboard/cotizaciones/${account.cotizacion_id}/edit`}>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-gray-600 hover:text-gray-800 hover:bg-gray-50"
-                                title="Ver cotización"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-green-600 hover:text-green-800 hover:bg-green-50"
+                              title="Registrar pago"
+                              onClick={() => onPayCotizacion?.(account.cotizacion_id, account.folio)}
+                            >
+                              <CreditCard className="h-3 w-3" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -404,10 +592,10 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {totalFilteredPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
                   <div className="text-xs text-gray-500">
-                    Página {page} de {totalPages}
+                    Página {page} de {totalFilteredPages} ({filteredAccounts.length} resultados {searchTerm ? 'filtrados' : 'totales'})
                   </div>
                   <div className="flex items-center space-x-1">
                     <Button
@@ -422,8 +610,8 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage(Math.min(totalPages, page + 1))}
-                      disabled={page >= totalPages || accountsLoading}
+                      onClick={() => setPage(Math.min(totalFilteredPages, page + 1))}
+                      disabled={page >= totalFilteredPages || accountsLoading}
                       className="h-7 w-7 p-0 border-gray-200 hover:bg-gray-100"
                     >
                       <ArrowRight className="h-3 w-3" />
@@ -435,12 +623,31 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear }: Cuentas
           ) : (
             <div className="text-center py-8">
               <div className="mx-auto w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center mb-3">
-                <DollarSign className="h-4 w-4 text-gray-400" />
+                {searchTerm ? (
+                  <Search className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <DollarSign className="h-4 w-4 text-gray-400" />
+                )}
               </div>
-              <p className="text-xs font-medium text-gray-900 mb-1">No hay cuentas pendientes</p>
-              <p className="text-xs text-gray-500">
-                Todas las cotizaciones están completamente pagadas
+              <p className="text-xs font-medium text-gray-900 mb-1">
+                {searchTerm ? 'No se encontraron resultados' : 'No hay cuentas pendientes'}
               </p>
+              <p className="text-xs text-gray-500">
+                {searchTerm 
+                  ? `No hay cotizaciones que coincidan con "${searchTerm}"`
+                  : 'Todas las cotizaciones están completamente pagadas'
+                }
+              </p>
+              {searchTerm && (
+                <Button
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => handleSearch('')}
+                  className="mt-2 text-xs h-7"
+                >
+                  Limpiar búsqueda
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

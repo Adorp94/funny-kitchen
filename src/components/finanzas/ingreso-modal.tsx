@@ -76,9 +76,10 @@ interface IngresoResponsiveWrapperProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: IngresoFormValues) => Promise<boolean>;
+  preSelectedCotizacion?: { id: number; folio: string } | null;
 }
 
-export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoResponsiveWrapperProps) {
+export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit, preSelectedCotizacion }: IngresoResponsiveWrapperProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cotizaciones, setCotizaciones] = useState<any[]>([]);
   const [isLoadingCotizaciones, setIsLoadingCotizaciones] = useState(false);
@@ -116,6 +117,20 @@ export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoR
       loadCotizaciones();
     }
   }, [isOpen, form]);
+
+  // Effect to pre-select cotizacion when provided
+  useEffect(() => {
+    if (isOpen && preSelectedCotizacion && cotizaciones.length > 0) {
+      const matchingCotizacion = cotizaciones.find(
+        c => c.cotizacion_id === preSelectedCotizacion.id
+      );
+      if (matchingCotizacion) {
+        form.setValue('tipo_ingreso', 'cotizacion');
+        form.setValue('cotizacion_id', preSelectedCotizacion.id);
+        form.setValue('moneda', matchingCotizacion.moneda || 'MXN');
+      }
+    }
+  }, [isOpen, preSelectedCotizacion, cotizaciones, form]);
 
   const loadCotizaciones = async () => {
     setIsLoadingCotizaciones(true);
@@ -190,7 +205,9 @@ export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoR
           <DialogHeader>
             <DialogTitle>Registrar Ingreso</DialogTitle>
             <DialogDescription>
-               {watchedTipoIngreso === 'cotizacion'
+               {preSelectedCotizacion 
+                 ? `Registrar pago para cotización ${preSelectedCotizacion.folio}`
+                 : watchedTipoIngreso === 'cotizacion'
                  ? "Selecciona la cotización y registra los detalles del pago recibido."
                  : "Registra los detalles del ingreso recibido."}
             </DialogDescription>
@@ -219,7 +236,9 @@ export function IngresoResponsiveWrapper({ isOpen, onClose, onSubmit }: IngresoR
         <DrawerHeader className="text-left">
           <DrawerTitle>Registrar Ingreso</DrawerTitle>
           <DrawerDescription>
-             {watchedTipoIngreso === 'cotizacion'
+             {preSelectedCotizacion 
+                 ? `Registrar pago para cotización ${preSelectedCotizacion.folio}`
+                 : watchedTipoIngreso === 'cotizacion'
                  ? "Selecciona la cotización y registra los detalles del pago recibido."
                  : "Registra los detalles del ingreso recibido."}
           </DrawerDescription>

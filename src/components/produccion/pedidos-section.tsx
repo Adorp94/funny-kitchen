@@ -123,29 +123,22 @@ const getInventoryTooltip = (pedido: PedidoItem & { moldesInfo: any; hasMoldes: 
 // Memoized summary stats component
 const SummaryStats = React.memo(({ pedidos, selectedCount }: { pedidos: PedidoItem[]; selectedCount: number }) => {
   const stats = useMemo(() => {
-    const totalProductos = pedidos.length; // This is the count of individual products
     const totalCotizaciones = new Set(pedidos.map(pedido => pedido.folio)).size; // Unique cotizaciones
-    const totalPiezas = pedidos.reduce((sum, pedido) => sum + pedido.cantidad, 0);
     const uniqueClientes = new Set(pedidos.map(pedido => pedido.cliente)).size;
-    const uniqueProductos = new Set(pedidos.map(pedido => pedido.producto)).size;
     const totalValue = pedidos.reduce((sum, pedido) => sum + (pedido.cantidad * pedido.precio_venta), 0);
     
-    return { totalCotizaciones, totalProductos, totalPiezas, uniqueClientes, uniqueProductos, totalValue };
+    return { totalCotizaciones, uniqueClientes, totalValue };
   }, [pedidos]);
 
   return (
-    <div className="grid grid-cols-4 gap-4 p-3 bg-muted/30 border rounded-lg">
+    <div className="grid grid-cols-3 gap-4 p-3 bg-muted/30 border rounded-lg">
       <div className="text-center">
         <div className="text-sm font-semibold text-foreground">{stats.totalCotizaciones}</div>
         <div className="text-xs text-muted-foreground">Cotizaciones</div>
       </div>
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalPiezas.toLocaleString()}</div>
-        <div className="text-xs text-muted-foreground">Piezas</div>
-      </div>
-      <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{stats.totalProductos}</div>
-        <div className="text-xs text-muted-foreground">Productos</div>
+        <div className="text-sm font-semibold text-foreground">{stats.uniqueClientes}</div>
+        <div className="text-xs text-muted-foreground">Clientes</div>
       </div>
       <div className="text-center">
         <div className="text-sm font-semibold text-foreground">{selectedCount}</div>
@@ -366,7 +359,8 @@ export const PedidosSection: React.FC = React.memo(() => {
       setLastFetch(now);
       
       if (pedidosData.length > 0) {
-        toast.success(`${pedidosData.length} pedidos cargados exitosamente`);
+        const uniqueCotizaciones = new Set(pedidosData.map(p => p.folio)).size;
+        toast.success(`${uniqueCotizaciones} cotizaciones cargadas exitosamente`);
       }
       
     } catch (err: any) {
@@ -803,8 +797,8 @@ export const PedidosSection: React.FC = React.memo(() => {
                   </div>
                   <div className="flex items-center gap-2">
                     {cotizacion.productos.some(p => p.is_premium) && (
-                      <Badge variant="default" className="text-xs bg-purple-600 text-white">
-                        ⭐ Premium
+                      <Badge variant="outline" className="text-xs text-indigo-700 bg-indigo-50 border-indigo-200 font-medium">
+                        Premium
                       </Badge>
                     )}
                     {cotizacion.productos.some(p => p.production_status?.is_in_production) && (
@@ -814,9 +808,6 @@ export const PedidosSection: React.FC = React.memo(() => {
                     )}
                     <Badge variant="secondary" className="text-xs">
                       {cotizacion.productos.length} productos
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {cotizacion.productos.reduce((sum, p) => sum + p.cantidad, 0)} piezas
                     </Badge>
                   </div>
                 </div>
@@ -1070,6 +1061,36 @@ export const PedidosSection: React.FC = React.memo(() => {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Action Button */}
+      {selectedCotizaciones.size > 0 && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <div className="flex flex-col gap-2">
+            {/* Main Action Button */}
+            <Button
+              onClick={prepareAllocationAnalysis}
+              size="default"
+              className="h-14 px-6 bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-full"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              <div className="flex flex-col items-start">
+                <span className="text-sm font-medium">Mover a Producción</span>
+                <span className="text-xs opacity-90">{selectedCotizaciones.size} cotizaciones</span>
+              </div>
+            </Button>
+            
+            {/* Clear Selection Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedCotizaciones(new Map())}
+              className="h-10 px-4 bg-white border-gray-300 text-gray-700 shadow-md hover:shadow-lg transition-all duration-200 rounded-full"
+            >
+              <span className="text-xs">Limpiar</span>
+            </Button>
           </div>
         </div>
       )}
