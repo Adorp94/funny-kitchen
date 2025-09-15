@@ -31,10 +31,10 @@ import { EgresosTable } from '@/components/finanzas/egresos-table';
 import { CashFlowSection } from '@/components/finanzas/cash-flow-section';
 import { ReportesSection } from '@/components/finanzas/reportes-section';
 import { CuentasPorCobrarSection } from '@/components/finanzas/cuentas-por-cobrar-section';
-import { 
-  createIngreso, 
-  createEgreso, 
-  getAllIngresos, 
+import {
+  createIngreso,
+  createEgreso,
+  getAllIngresos,
   getAllEgresos,
   getFinancialMetrics,
   getVentasForCSV,
@@ -45,7 +45,8 @@ import {
   getVentasTriMonthlyReport,
   getVentasAnnualReport,
   deleteIngreso,
-  deleteEgreso
+  deleteEgreso,
+  markBadDebt
 } from '@/app/actions/finanzas-actions';
 import { formatCurrency } from '@/lib/utils';
 import { 

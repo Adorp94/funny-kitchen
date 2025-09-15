@@ -2471,9 +2471,64 @@ export async function getAccountsReceivableList(
     };
   } catch (error) {
     console.error('Error getting accounts receivable list:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get accounts receivable list' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get accounts receivable list'
+    };
+  }
+}
+
+// Mark quotation as bad debt (unpayable)
+export async function markBadDebt(
+  cotizacionId: number,
+  isBadDebt: boolean,
+  notas?: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'No autorizado' };
+    }
+
+    // Update the quotation's bad debt status
+    const { data, error } = await supabase
+      .from('cotizaciones')
+      .update({
+        deuda_incobrable: isBadDebt,
+        ...(notas && { notas })
+      })
+      .eq('cotizacion_id', cotizacionId)
+      .select('cotizacion_id, folio, deuda_incobrable, total, monto_pagado, moneda')
+      .single();
+
+    if (error) {
+      console.error('Error updating bad debt status:', error);
+      return { success: false, error: 'Error al actualizar estado de deuda incobrable' };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Cotización no encontrada' };
+    }
+
+    // Revalidate the finanzas page to refresh data
+    revalidatePath('/dashboard/finanzas');
+
+    return {
+      success: true,
+      data,
+      message: isBadDebt
+        ? `Cotización ${data.folio} marcada como deuda incobrable`
+        : `Cotización ${data.folio} restaurada de deuda incobrable`
+    };
+
+  } catch (error) {
+    console.error('Error marking bad debt:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error interno del servidor'
     };
   }
 } 

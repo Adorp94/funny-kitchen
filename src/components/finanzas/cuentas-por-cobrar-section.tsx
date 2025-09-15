@@ -19,10 +19,10 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { 
-  Clock, 
-  DollarSign, 
-  AlertTriangle, 
+import {
+  Clock,
+  DollarSign,
+  AlertTriangle,
   TrendingDown,
   Loader2,
   ArrowLeft,
@@ -34,15 +34,19 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date";
-import { 
-  getAccountsReceivableMetrics, 
-  getAccountsReceivableList 
+import {
+  getAccountsReceivableMetrics,
+  getAccountsReceivableList,
+  markBadDebt
 } from "@/app/actions/finanzas-actions";
 import Link from 'next/link';
+import { toast } from "sonner";
+import { BadDebtConfirmationDialog } from "./bad-debt-confirmation-dialog";
 
 interface AccountsReceivableMetrics {
   totalPorCobrar: { mxn: number; usd: number };
@@ -93,6 +97,20 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear, onPayCoti
   const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'} | null>(null);
   const [allAccounts, setAllAccounts] = useState<AccountReceivableItem[]>([]);
   const [filteredAccounts, setFilteredAccounts] = useState<AccountReceivableItem[]>([]);
+  const [markingBadDebt, setMarkingBadDebt] = useState<number | null>(null);
+  const [badDebtDialog, setBadDebtDialog] = useState<{
+    isOpen: boolean;
+    cotizacionId: number;
+    folio: string;
+    clientName: string;
+    amount: string;
+  }>({
+    isOpen: false,
+    cotizacionId: 0,
+    folio: '',
+    clientName: '',
+    amount: ''
+  });
 
   useEffect(() => {
     fetchMetrics();
@@ -287,6 +305,46 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear, onPayCoti
         {estadoInfo.label}
       </Badge>
     );
+  };
+
+  // Handler for opening bad debt confirmation dialog
+  const handleMarkBadDebt = (cotizacionId: number, folio: string, clientName: string, saldoPendiente: number, moneda: string) => {
+    setBadDebtDialog({
+      isOpen: true,
+      cotizacionId,
+      folio,
+      clientName,
+      amount: formatCurrency(saldoPendiente, moneda)
+    });
+  };
+
+  // Handler for confirming bad debt marking
+  const handleConfirmBadDebt = async () => {
+    const { cotizacionId, folio } = badDebtDialog;
+
+    setMarkingBadDebt(cotizacionId);
+    try {
+      const result = await markBadDebt(cotizacionId, true);
+
+      if (result.success) {
+        toast.success(result.message || `Cotización ${folio} marcada como deuda incobrable`);
+        // Refresh data
+        await Promise.all([fetchMetrics(), fetchAccounts()]);
+        setBadDebtDialog({ isOpen: false, cotizacionId: 0, folio: '', clientName: '', amount: '' });
+      } else {
+        toast.error(result.error || 'Error al marcar como deuda incobrable');
+      }
+    } catch (error) {
+      console.error('Error marking bad debt:', error);
+      toast.error('Error interno del servidor');
+    } finally {
+      setMarkingBadDebt(null);
+    }
+  };
+
+  // Handler for closing dialog
+  const handleCloseBadDebtDialog = () => {
+    setBadDebtDialog({ isOpen: false, cotizacionId: 0, folio: '', clientName: '', amount: '' });
   };
 
   // Paginate filtered results
@@ -583,6 +641,26 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear, onPayCoti
                             >
                               <CreditCard className="h-3 w-3" />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-red-600 hover:text-red-800 hover:bg-red-50"
+                              title="Marcar como deuda incobrable"
+                              onClick={() => handleMarkBadDebt(
+                                account.cotizacion_id,
+                                account.folio,
+                                account.cliente_nombre,
+                                account.saldo_pendiente,
+                                account.moneda
+                              )}
+                              disabled={markingBadDebt === account.cotizacion_id}
+                            >
+                              {markingBadDebt === account.cotizacion_id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -652,6 +730,17 @@ export function CuentasPorCobrarSection({ selectedMonth, selectedYear, onPayCoti
           )}
         </CardContent>
       </Card>
+
+      {/* Bad Debt Confirmation Dialog */}
+      <BadDebtConfirmationDialog
+        isOpen={badDebtDialog.isOpen}
+        onClose={handleCloseBadDebtDialog}
+        onConfirm={handleConfirmBadDebt}
+        quotationFolio={badDebtDialog.folio}
+        clientName={badDebtDialog.clientName}
+        amount={badDebtDialog.amount}
+        isLoading={markingBadDebt === badDebtDialog.cotizacionId}
+      />
     </div>
   );
 }
