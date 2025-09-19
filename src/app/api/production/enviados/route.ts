@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       // Get total quantities ordered for this cotización
       const { data: cotizacionProductos, error: cotizacionError } = await supabase
         .from('cotizacion_productos')
-        .select('producto_id, cantidad')
+        .select('producto_id, cantidad, cantidad_produccion')
         .eq('cotizacion_id', cotizacion_id);
 
       if (cotizacionError) {
@@ -240,7 +240,9 @@ export async function POST(request: NextRequest) {
           // Create maps for comparison
           const orderedMap = new Map();
           cotizacionProductos.forEach(cp => {
-            orderedMap.set(cp.producto_id, cp.cantidad);
+            // Use production quantity when available, fall back to original quantity
+            const cantidadRequerida = cp.cantidad_produccion ?? cp.cantidad;
+            orderedMap.set(cp.producto_id, cantidadRequerida);
           });
 
           const sentMap = new Map();

@@ -50,10 +50,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check allocation limits by calculating from existing data
-    // Get the original quantity ordered in the cotización
+    // Get the production quantity ordered in the cotización
     const { data: cotizacionProducto, error: cotizacionError } = await supabase
       .from('cotizacion_productos')
-      .select('cantidad')
+      .select('cantidad, cantidad_produccion')
       .eq('cotizacion_id', cotizacion_id)
       .eq('producto_id', producto_id)
       .single();
@@ -82,13 +82,15 @@ export async function POST(request: NextRequest) {
     }
 
     const totalAllocated = existingAllocations?.reduce((sum, alloc) => sum + alloc.cantidad_asignada, 0) || 0;
-    const cantidadDisponible = cotizacionProducto.cantidad - totalAllocated;
+    // Use production quantity when available, fall back to original quantity
+    const cantidadOrdenada = cotizacionProducto.cantidad_produccion ?? cotizacionProducto.cantidad;
+    const cantidadDisponible = cantidadOrdenada - totalAllocated;
 
     // Check if adding this quantity would exceed the cotización limit
     if (cantidadDisponible < cantidad) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Límite de asignación excedido',
-        details: `Solo quedan ${cantidadDisponible} productos disponibles para asignar de los ${cotizacionProducto.cantidad} originalmente ordenados. Ya se han asignado ${totalAllocated} productos.`
+        details: `Solo quedan ${cantidadDisponible} productos disponibles para asignar de los ${cantidadOrdenada} requeridos para producción. Ya se han asignado ${totalAllocated} productos.`
       }, { status: 400 });
     }
 

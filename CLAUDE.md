@@ -44,10 +44,10 @@ This is a quotation management system for Funny Kitchen (ceramic artisan company
 
 #### Database Tables
 Key tables include:
-- `cotizaciones` - Quotations with pricing and status
+- `cotizaciones` - Quotations with pricing and status (includes `deuda_incobrable` field for bad debt management)
 - `clientes` - Customer information
 - `productos` - Product catalog with SKUs and inventory
-- `cotizacion_productos` - Products linked to quotations
+- `cotizacion_productos` - Products linked to quotations (includes `cantidad_produccion` field for production demand tracking)
 - `moldes_activos` - Active molds for production
 - `mesas_moldes` - Production workstations
 - `production_queue` - Production scheduling and planning
@@ -125,12 +125,20 @@ The production module includes sophisticated allocation and fulfillment tracking
 - **`/api/production/empaque`** - Manage empaque allocations (POST: move to empaque, GET: view empaque products, DELETE: return to terminado, PATCH: update box counts)
 - **`/api/production/enviados`** - Manage delivery allocations with auto-completion logic
 
+#### Production Quantity Management
+- **Dual Quantity System**:
+  - `cantidad` - Original cotización quantity (preserved for billing/finance)
+  - `cantidad_produccion` - Actual production demand (accounts for breakage, partial completion, etc.)
+- **Smart Fallback**: System uses `cantidad_produccion` when available, falls back to `cantidad` for legacy records
+- **Production Planning**: All production APIs (pedidos, cronograma, clientes-activos) use production quantities
+- **Financial Integrity**: Original quantities preserved for billing and contract purposes
+
 #### Allocation Logic
-- **Smart Validation**: Products can only be allocated up to their quotation quantity
+- **Smart Validation**: Products can only be allocated up to their production quantity
 - **Partial Allocations**: Support for moving products in batches (e.g., 10 out of 15 pieces)
 - **Global Stock Awareness**: Considers both quotation limits and actual available terminado stock
 - **Auto-Completion**: Automatically marks quotations as 'enviada' when all products are fully delivered
-- **Demand Calculation**: Pedidos column shows net unfulfilled demand (total ordered - allocated), preventing over-production
+- **Demand Calculation**: Pedidos column shows net unfulfilled demand (production ordered - allocated), preventing over-production
 - **Box Tracking**: Complete preservation of packaging information across empaque → entregado stages
 
 #### Database Tables (Production-Specific)
@@ -147,19 +155,36 @@ The finance module includes comprehensive financial tracking with five main sect
 #### Accounts Receivable (Cuentas por Cobrar)
 - **Component**: `/src/components/finanzas/cuentas-por-cobrar-section.tsx`
 - **API Endpoint**: `/src/app/api/finanzas/cuentas-por-cobrar/route.ts`
-- **Server Actions**: `getAccountsReceivableMetrics()`, `getAccountsReceivableList()` in `/src/app/actions/finanzas-actions.ts`
-- **Features**: 
+- **Server Actions**: `getAccountsReceivableMetrics()`, `getAccountsReceivableList()`, `markBadDebt()` in `/src/app/actions/finanzas-actions.ts`
+- **Features**:
   - Track outstanding balances from approved quotations
   - Monitor overdue accounts (>30 days, 15-30 days, <15 days)
   - Client contact information display
   - Pagination and filtering by month/year
+  - **Bad Debt Management**: Mark unpayable quotations as bad debt
   - Optimized RPC functions for complex SQL queries
+
+#### Bad Debt Management System
+- **Database Field**: `deuda_incobrable` BOOLEAN in `cotizaciones` table
+- **Component**: `/src/components/finanzas/bad-debt-confirmation-dialog.tsx`
+- **API Endpoint**: `/src/app/api/cotizaciones/[id]/bad-debt/route.ts`
+- **Business Logic**:
+  - Removes quotations from accounts receivable calculations without affecting payment records
+  - Preserves financial data integrity (no fake payments added)
+  - Provides clear audit trail of bad debt decisions
+  - Action is reversible through quotation management
+- **UI Features**:
+  - Red trash icon button in accounts receivable table
+  - Simple confirmation dialog with quotation details
+  - Loading states and error handling
+  - Automatic data refresh after operations
 
 #### Database Functions (Accounts Receivable)
 - **`get_accounts_receivable_metrics()`** - Calculate aggregate metrics (total outstanding, client count, overdue accounts)
 - **`get_accounts_receivable_list()`** - Paginated list of outstanding accounts with client details
 - **`get_accounts_receivable_count()`** - Total count for pagination
 - **Note**: Uses RPC functions because PostgREST doesn't support column-to-column comparisons (`total > monto_pagado`)
+- **Bad Debt Exclusion**: All functions automatically exclude quotations marked as `deuda_incobrable = TRUE`
 
 #### Cash Flow Metrics (Ventas Tab)
 - **Component**: `/src/components/finanzas/cash-flow-section.tsx`

@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
     // Step 3: Get cotizacion_productos for these cotizaciones
     const { data: cotizacionProductosData, error: cpError } = await supabase
       .from('cotizacion_productos')
-      .select('cotizacion_id, producto_id, cantidad, precio_unitario')
+      .select('cotizacion_id, producto_id, cantidad, cantidad_produccion, precio_unitario')
       .in('cotizacion_id', cotizacionIds);
 
     if (cpError) {
@@ -343,7 +343,7 @@ export async function GET(request: NextRequest) {
       }
       cotizacionProductosMap.get(cp.cotizacion_id)!.push({
         producto_id: cp.producto_id,
-        cantidad: cp.cantidad,
+        cantidad: cp.cantidad_produccion ?? cp.cantidad,
         precio_unitario: cp.precio_unitario || 0
       });
     });
@@ -376,7 +376,7 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        const cantidadPedida = cp.cantidad;
+        const cantidadPedida = cp.cantidad_produccion ?? cp.cantidad;
         
         // Get production status
         const prodStatus = productionStatusMap.get(cp.producto_id) || {

@@ -641,11 +641,12 @@ export async function POST(req: NextRequest) {
           cotizacion_id: cotizacionId,
           producto_id: p.finalProductoId,
           cantidad: p.cantidad || 1,
+          cantidad_produccion: p.cantidad || 1, // Initialize production quantity same as original
           // Calculated display values for DB
           precio_unitario: prod_db_precio,
           subtotal: prod_db_subtotal,
           // Base MXN values for DB (use original from frontend)
-          precio_unitario_mxn: prod_original_precio_mxn, 
+          precio_unitario_mxn: prod_original_precio_mxn,
           subtotal_mxn: prod_original_subtotal_mxn,
           // Other fields
           descuento_producto: p.descuento || 0,

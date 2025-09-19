@@ -271,9 +271,9 @@ const ProductRow = React.memo(({
           }`}>
             {producto.cantidad_pendiente || 0} restantes
           </span>
-          {/* Show breakdown of original quantity */}
+          {/* Show breakdown of production quantity */}
           <div className="text-xs text-gray-500 space-y-0.5">
-            <div>Original: {producto.cantidad}</div>
+            <div>A producir: {producto.cantidad}</div>
             {producto.allocation_status && producto.allocation_status.total_asignado > 0 && (
               <div>Empacado: {producto.allocation_status.total_asignado}</div>
             )}

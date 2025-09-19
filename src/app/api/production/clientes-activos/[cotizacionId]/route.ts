@@ -96,6 +96,7 @@ export async function GET(
       .from('cotizacion_productos')
       .select(`
         cantidad,
+        cantidad_produccion,
         precio_unitario,
         productos!inner (
           producto_id,
@@ -218,7 +219,8 @@ export async function GET(
     // Transform products data
     const productos: ProductoConEstatus[] = productosData.map(producto => {
       const precioUnitario = producto.precio_unitario || 0;
-      const cantidad = producto.cantidad;
+      // Use cantidad_produccion if available, otherwise fall back to cantidad
+      const cantidad = producto.cantidad_produccion ?? producto.cantidad;
       const precioTotal = precioUnitario * cantidad;
       const productoId = producto.productos.producto_id;
       

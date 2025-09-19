@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
         cotizacion_id,
         producto_id,
         cantidad,
+        cantidad_produccion,
         precio_unitario,
         productos (
           nombre
@@ -213,7 +214,8 @@ export async function GET(request: NextRequest) {
         
         // Calculate surplus inventory availability using the same logic as production_active_with_gap view
         const terminadoTotal = productionStatus?.terminado || 0;
-        const cantidadRequerida = producto.cantidad;
+        // Use cantidad_produccion if available, otherwise fall back to cantidad
+        const cantidadRequerida = producto.cantidad_produccion ?? producto.cantidad;
         const pedidosTotal = productionStatus?.pedidos || 0;
         
         // Calculate empaque allocations for this specific product (only empaque, not entregado)
@@ -282,7 +284,7 @@ export async function GET(request: NextRequest) {
           cliente: clienteNombre,
           producto: productoNombre,
           producto_id: producto.producto_id,
-          cantidad: producto.cantidad,
+          cantidad: cantidadRequerida, // Use the production quantity we calculated above
           fecha: fechaFormatted,
           precio_venta: producto.precio_unitario || 0,
           estimated_delivery_date: estimatedDeliveryFormatted,
